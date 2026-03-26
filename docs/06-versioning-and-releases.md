@@ -68,6 +68,8 @@ If you want official versions like `v0.2.0`, you create **tags** (manually or vi
 
 ## 4. One-time setup (recommended)
 
+This section is your **initial setup**. You only do it once per computer/repo.
+
 ### 4.1 Initialize Git repo at `Portfolio/` root
 
 Run from `Portfolio/`:
@@ -94,6 +96,40 @@ git push -u origin main
 - Import the GitHub repo into Vercel
 - In Vercel settings, set **Root Directory** to `portfolio-site`
 - Deploy
+
+### 4.4 First version (initial release)
+
+Your first release is usually **`v0.1.0`**.
+
+Checklist:
+
+1. Ensure the site builds/lints:
+
+```bash
+cd portfolio-site
+npm run lint
+npm run build
+```
+
+2. Update `CHANGELOG.md` at repo root (`Portfolio/CHANGELOG.md`):
+   - Move completed items from **Unreleased** into a new `0.1.0` section.
+3. Commit the changelog:
+
+```bash
+cd ..
+git add CHANGELOG.md
+git commit -m "docs: add changelog for v0.1.0"
+```
+
+4. Create and push a tag:
+
+```bash
+git tag -a v0.1.0 -m "v0.1.0"
+git push
+git push --tags
+```
+
+That’s it—GitHub now has a real version tag.
 
 ---
 
@@ -130,19 +166,49 @@ This is optional now, but extremely helpful later if we automate releases.
 
 ---
 
-## 6. How to create a release version (manual but safe)
+## 6. Recurring releases (patch / minor / major)
 
-### 6.1 Update changelog notes first
+This is what you do **every time you want a new version** (e.g. `v0.1.1`, `v0.2.0`, `v1.0.0`).
 
-Create/update `CHANGELOG.md` (we’ll add this file when you want) and write:
+### 6.0 When do I choose patch vs minor vs major?
 
-- what you added
-- what you changed
-- what you fixed
+- **Patch** (`x.y.Z`): bug fixes, small UI polish, copy fixes, tiny performance tweaks  
+  Example: “Fix theme outline in light mode”, “Improve panel contrast”
+- **Minor** (`x.Y.0`): new user-facing features that don’t “break” your site  
+  Example: “Add contact form”, “Add trading journal page”, “Add gallery lightbox”
+- **Major** (`X.0.0`): big breaking changes / “public stable launch”  
+  Example: major redesign, route removals, or you consider the portfolio stable enough for `1.0.0`
 
-### 6.2 Bump the version number
+### 6.1 Make your changes (many commits are OK)
 
-Run from `portfolio-site/`:
+You can do as many commits as you want before releasing:
+
+```bash
+git add .
+git commit -m "feat: add contact section"
+git commit -m "fix: improve contrast on light theme"
+```
+
+Only release when you decide a milestone is ready.
+
+### 6.2 Update the changelog (every release)
+
+Rules:
+
+- Keep an **`[Unreleased]`** section at the top.
+- Add bullets under `Added / Changed / Fixed` as you work (or right before release).
+- When releasing:
+  - create a new section: `## [0.2.0] - YYYY-MM-DD`
+  - move the relevant bullets from **Unreleased** into that version
+  - leave `Unreleased` empty (or start new bullets for next work)
+
+### 6.3 Choose your release method (recommended vs alternative)
+
+You have two good options. Pick one and stay consistent.
+
+#### Option A (recommended): use `npm version …` to create the tag
+
+From `Portfolio/portfolio-site/`:
 
 ```bash
 npm version patch -m "chore(release): %s"
@@ -160,20 +226,47 @@ or:
 npm version major -m "chore(release): %s"
 ```
 
-What this does (when you’re in a Git repo):
+What it does:
 
-- updates `portfolio-site/package.json` version
-- creates a **git commit**
-- creates a **git tag** like `v0.2.0`
+- bumps `portfolio-site/package.json` version
+- creates a commit for the bump
+- creates a git tag `vX.Y.Z`
 
-### 6.3 Push commit + tags to GitHub
+Then push:
 
 ```bash
 git push
 git push --tags
 ```
 
-Now GitHub has the tag and you have an official version.
+#### Option B: manual tag (if you prefer full control)
+
+1. Edit `portfolio-site/package.json` version yourself.
+2. Commit it:
+
+```bash
+git add portfolio-site/package.json
+git commit -m "chore(release): v0.2.0"
+```
+
+3. Tag and push:
+
+```bash
+git tag -a v0.2.0 -m "v0.2.0"
+git push
+git push --tags
+```
+
+### 6.4 What happens with Vercel when you release?
+
+Typical setup:
+
+- Every push → Vercel preview deploy
+- Every push to `main` → Vercel production deploy
+
+So your release process already triggers deployments as long as you push your commits.
+
+If you want a strict rule like “only deploy on tags”, that’s possible later, but not needed right now.
 
 ---
 
