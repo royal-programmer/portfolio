@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f6f8ff;
+  --foreground: #0f172a;
+  --page-bg: transparent;
+  --fg: #0f172a;
+  --muted: #475569;
+  --accent: #3b82f6;
+  --accent-glow: rgba(59, 130, 246, 0.3);
+  --accent-glow-2: rgba(139, 92, 246, 0.2);
+  --cta-fg: #ffffff;
+  --control-bg: rgba(255, 255, 255, 0.55);
+  --control-border: rgba(15, 23, 42, 0.14);
+  --control-text: var(--fg);
+  --control-hover: rgba(15, 23, 42, 0.06);
+  --panel-bg: rgba(255, 255, 255, 0.78);
+  --panel-border: rgba(148, 163, 184, 0.4);
+  --panel-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+  --chip-bg: rgba(15, 23, 42, 0.05);
+  --chip-border: rgba(15, 23, 42, 0.08);
+  --bg-image-opacity: 0.22;
+  --bg-overlay: rgba(246, 248, 255, 0.72);
+  --surface-bg: rgba(255, 255, 255, 0.62);
+  --surface-border: rgba(15, 23, 42, 0.14);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root[data-ui-theme="dark"] {
+  --background: #090b15;
+  --foreground: #f4f7ff;
+  --page-bg: transparent;
+  --fg: #f4f7ff;
+  --muted: #b7bfd3;
+  --accent: #3b82f6;
+  --accent-glow: rgba(59, 130, 246, 0.35);
+  --accent-glow-2: rgba(139, 92, 246, 0.2);
+  --cta-fg: #08111f;
+  --control-bg: rgba(255, 255, 255, 0.06);
+  --control-border: rgba(148, 163, 184, 0.18);
+  --control-text: var(--fg);
+  --control-hover: rgba(255, 255, 255, 0.08);
+  --panel-bg: rgba(15, 23, 42, 0.72);
+  --panel-border: rgba(96, 165, 250, 0.26);
+  --panel-shadow: 0 30px 80px rgba(2, 6, 23, 0.65);
+  --chip-bg: rgba(148, 163, 184, 0.12);
+  --chip-border: rgba(148, 163, 184, 0.24);
+  --bg-image-opacity: 0.6;
+  --bg-overlay: rgba(9, 11, 21, 0.64);
+  --surface-bg: rgba(2, 6, 23, 0.52);
+  --surface-border: rgba(148, 163, 184, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-ui-theme]) {
+    --background: #090b15;
+    --foreground: #f4f7ff;
+    --page-bg: transparent;
+    --fg: #f4f7ff;
+    --muted: #b7bfd3;
+    --accent: #3b82f6;
+    --accent-glow: rgba(59, 130, 246, 0.35);
+    --accent-glow-2: rgba(139, 92, 246, 0.2);
+    --cta-fg: #08111f;
+    --control-bg: rgba(255, 255, 255, 0.06);
+    --control-border: rgba(148, 163, 184, 0.18);
+    --control-text: var(--fg);
+    --control-hover: rgba(255, 255, 255, 0.08);
+    --panel-bg: rgba(15, 23, 42, 0.72);
+    --panel-border: rgba(96, 165, 250, 0.26);
+    --panel-shadow: 0 30px 80px rgba(2, 6, 23, 0.65);
+    --chip-bg: rgba(148, 163, 184, 0.12);
+    --chip-border: rgba(148, 163, 184, 0.24);
+    --bg-image-opacity: 0.6;
+    --bg-overlay: rgba(9, 11, 21, 0.64);
+    --surface-bg: rgba(2, 6, 23, 0.52);
+    --surface-border: rgba(148, 163, 184, 0.18);
+  }
+}
+
+:root[data-persona="trader"][data-ui-theme="light"] {
+  --background: #f4fff8;
+  --foreground: #0f2518;
+  --page-bg: #f4fff8;
+  --fg: #0f2518;
+  --muted: #3b6750;
+  --accent: #16a34a;
+  --accent-glow: rgba(34, 197, 94, 0.28);
+  --accent-glow-2: rgba(16, 185, 129, 0.18);
+  --cta-fg: #ffffff;
+  --control-bg: rgba(255, 255, 255, 0.6);
+  --control-border: rgba(16, 185, 129, 0.28);
+  --control-text: var(--fg);
+  --control-hover: rgba(16, 185, 129, 0.14);
+  --panel-bg: rgba(236, 253, 245, 0.84);
+  --panel-border: rgba(22, 163, 74, 0.26);
+  --panel-shadow: 0 24px 60px rgba(22, 101, 52, 0.15);
+  --chip-bg: rgba(20, 83, 45, 0.07);
+  --chip-border: rgba(20, 83, 45, 0.12);
+  --bg-image-opacity: 0.42;
+}
+
+:root[data-persona="trader"][data-ui-theme="dark"] {
+  --background: #050807;
+  --foreground: #ebfff4;
+  --page-bg: #050807;
+  --fg: #ebfff4;
+  --muted: #a0c8af;
+  --accent: #22c55e;
+  --accent-glow: rgba(34, 197, 94, 0.35);
+  --accent-glow-2: rgba(16, 185, 129, 0.2);
+  --cta-fg: #03260e;
+  --control-bg: rgba(0, 0, 0, 0.16);
+  --control-border: rgba(34, 197, 94, 0.26);
+  --control-text: var(--fg);
+  --control-hover: rgba(34, 197, 94, 0.12);
+  --panel-bg: rgba(5, 18, 10, 0.78);
+  --panel-border: rgba(34, 197, 94, 0.32);
+  --panel-shadow: 0 30px 80px rgba(0, 10, 4, 0.7);
+  --chip-bg: rgba(134, 239, 172, 0.12);
+  --chip-border: rgba(134, 239, 172, 0.24);
+  --bg-image-opacity: 0.75;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-persona="trader"]:not([data-ui-theme]) {
+    --background: #050807;
+    --foreground: #ebfff4;
+    --page-bg: #050807;
+    --fg: #ebfff4;
+    --muted: #a0c8af;
+    --accent: #22c55e;
+    --accent-glow: rgba(34, 197, 94, 0.35);
+    --accent-glow-2: rgba(16, 185, 129, 0.2);
+    --cta-fg: #03260e;
+    --control-bg: rgba(0, 0, 0, 0.16);
+    --control-border: rgba(34, 197, 94, 0.26);
+    --control-text: var(--fg);
+    --control-hover: rgba(34, 197, 94, 0.12);
+    --panel-bg: rgba(5, 18, 10, 0.78);
+    --panel-border: rgba(34, 197, 94, 0.32);
+    --panel-shadow: 0 30px 80px rgba(0, 10, 4, 0.7);
+    --chip-bg: rgba(134, 239, 172, 0.12);
+    --chip-border: rgba(134, 239, 172, 0.24);
+    --bg-image-opacity: 0.75;
+  }
+}
+
+:root[data-persona="photographer"][data-ui-theme="light"] {
+  --accent: #ec4899;
+  --accent-glow: rgba(236, 72, 153, 0.28);
+  --accent-glow-2: rgba(236, 72, 153, 0.16);
+  --bg-image-opacity: 0.35;
+  --panel-border: rgba(236, 72, 153, 0.26);
+  --chip-bg: rgba(236, 72, 153, 0.07);
+  --chip-border: rgba(236, 72, 153, 0.14);
+}
+
+:root[data-persona="photographer"][data-ui-theme="dark"] {
+  --accent: #ec4899;
+  --accent-glow: rgba(236, 72, 153, 0.35);
+  --accent-glow-2: rgba(236, 72, 153, 0.2);
+  --bg-image-opacity: 0.68;
+  --panel-border: rgba(236, 72, 153, 0.32);
+  --chip-bg: rgba(251, 113, 133, 0.12);
+  --chip-border: rgba(251, 113, 133, 0.24);
+}
+
+:root[data-persona="photographer"]:not([data-ui-theme]) {
+  --accent: #ec4899;
+  --accent-glow: rgba(236, 72, 153, 0.35);
+  --accent-glow-2: rgba(236, 72, 153, 0.2);
+  --bg-image-opacity: 0.62;
+  --panel-border: rgba(236, 72, 153, 0.32);
+  --chip-bg: rgba(251, 113, 133, 0.12);
+  --chip-border: rgba(251, 113, 133, 0.24);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
