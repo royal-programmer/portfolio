@@ -1,134 +1,46 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { TypeAnimation } from "react-type-animation";
-import {
-  ArrowRight,
-  Briefcase,
-  Camera,
-  CandlestickChart,
-  Lock,
-  Monitor,
-  Moon,
-  Sun,
-} from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PERSONA_ORDER, usePersona, type Persona } from "./persona-provider";
-
-type UiTheme = "system" | "light" | "dark";
-
-const PERSONA_CONTENT = {
-  engineer: {
-    label: "Engineer Mode",
-    eyebrow: "Developer + Software Engineer",
-    heading: "I design fast, scalable web products with premium UX.",
-    body: "Building clean systems, modern interfaces, and reliable backends from idea to launch.",
-    accent: "#3b82f6",
-    cta: "View engineering projects",
-    points: ["Next.js + TypeScript", "System architecture", "API and backend integration"],
-  },
-  trader: {
-    label: "Trader Mode",
-    eyebrow: "Quant Mind + Risk Discipline",
-    heading: "I track setups, probabilities, and execution with system-first thinking.",
-    body: "Focused on process quality, risk control, and repeatable decisions across market cycles.",
-    accent: "#22c55e",
-    cta: "Explore trading journal",
-    points: ["Risk-managed strategy", "Data-backed journaling", "Daily review workflow"],
-  },
-  photographer: {
-    label: "Photographer Mode",
-    eyebrow: "Lens Focus + Composition",
-    heading: "I capture light, shape stories, and design visuals.",
-    body: "From portraits to street scenes, I focus on framing, timing, and atmosphere.",
-    accent: "#ec4899",
-    cta: "View photography",
-    points: ["Portrait lighting", "Street composition", "Editing + color grading"],
-  },
-} as const;
-
-const PERSONA_BACKGROUNDS: Record<Persona, string> = {
-  engineer:
-    'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1600&q=80',
-  trader:
-    'https://images.unsplash.com/photo-1559526324-593bc073d936?auto=format&fit=crop&w=1600&q=80',
-  photographer:
-    'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=1600&q=80',
-};
-
-const KONAMI = [
-  "arrowup",
-  "arrowup",
-  "arrowdown",
-  "arrowdown",
-  "arrowleft",
-  "arrowright",
-  "arrowleft",
-  "arrowright",
-  "b",
-  "a",
-];
-
-const THEME_OPTIONS: Array<{ value: UiTheme; label: string; icon: typeof Monitor }> = [
-  { value: "system", label: "System", icon: Monitor },
-  { value: "light", label: "Light", icon: Sun },
-  { value: "dark", label: "Dark", icon: Moon },
-];
-
-const makeTypeSequence = (words: string[], pauseMs: number): Array<string | number> => {
-  // react-type-animation: sequence alternates "next text" + "pause time".
-  const seq: Array<string | number> = [];
-  for (const word of words) seq.push(word, pauseMs);
-  return seq;
-};
-
-const ENGINEER_WORDS = [
-  "UI/UX Designer",
-  "React Developer",
-  "TypeScript",
-  "Node.js",
-  "Next.js",
-  "Cloud Specialist",
-  "API Builder",
-];
-
-const TRADER_WORDS = [
-  "Price Action",
-  "Risk Management",
-  "Trading Systems",
-  "Probabilistic Thinking",
-  "Backtesting",
-  "Execution Discipline",
-  "Quant Mindset",
-];
-
-const ENGINEER_SEQUENCE = makeTypeSequence(ENGINEER_WORDS, 1400);
-const TRADER_SEQUENCE = makeTypeSequence(TRADER_WORDS, 1400);
-
-const PHOTOGRAPHER_WORDS = [
-  "Photographer",
-  "Portrait Lighting",
-  "Street Photography",
-  "Camera & Composition",
-  "Color Grading",
-  "Storytelling Frames",
-];
-
-const PHOTOGRAPHER_SEQUENCE = makeTypeSequence(PHOTOGRAPHER_WORDS, 1400);
+import type { AssistantQueueItem, ChatMessage, LeadDraft } from "./components/chat-types";
+import { BubbleDock } from "./components/bubble-dock";
+import { HomeHeader } from "./components/home-header";
+import { HomeHero } from "./components/home-hero";
+import { IdentityPanel } from "./components/identity-panel";
+import { PersonaBackdrop } from "./components/persona-backdrop";
+import { ProjectsGrid } from "./components/projects-grid";
+import {
+  CHAT_GAP_AFTER_USER_MS,
+  CHAT_MIN_THINKING_MS,
+  CHAT_TYPING_MIN_BUFFER_MS,
+  KONAMI,
+  PERSONA_CONTENT,
+  QUICK_STACK_EXIT_MS,
+  SOCIAL_LINKS,
+  type UiTheme,
+} from "./components/site-content";
 
 export default function Home() {
   const { persona, setPersona } = usePersona();
   const [showFlash, setShowFlash] = useState(false);
-  const [uiTheme, setUiTheme] = useState<UiTheme>(() => {
-    if (typeof window === "undefined") return "system";
-    const saved = window.localStorage.getItem("ui-theme");
-    if (saved === "light" || saved === "dark" || saved === "system") return saved;
-    return "system";
-  });
-  const sequence = useRef<string[]>([]);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(false);
+  const [uiTheme, setUiTheme] = useState<UiTheme>("system");
+  const [openBubble, setOpenBubble] = useState<"none" | "prefs" | "agent">("none");
+  const [pendingBubble, setPendingBubble] = useState<"none" | "prefs" | "agent">("none");
+  const [launcherOpen, setLauncherOpen] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [leadInput, setLeadInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [leadStep, setLeadStep] = useState<0 | 1 | 2 | 3>(0);
+  const [leadDraft, setLeadDraft] = useState<LeadDraft>({ name: "", email: "", reason: "" });
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [assistantBuffering, setAssistantBuffering] = useState(false);
+  const konamiSequenceRef = useRef<string[]>([]);
   const holdTimer = useRef<number | null>(null);
-  const themeMenuRef = useRef<HTMLDivElement | null>(null);
-  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+  const bubbleDockRef = useRef<HTMLDivElement | null>(null);
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const chatInnerRef = useRef<HTMLDivElement | null>(null);
+  const leadInlineFieldRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const content = useMemo(() => PERSONA_CONTENT[persona], [persona]);
 
   const HOLD_MS = 1300;
@@ -136,6 +48,21 @@ export default function Home() {
   const lastDownRef = useRef<number>(0);
   const downStreakRef = useRef<number>(0);
   const holdTargetPersonaRef = useRef<Persona>("engineer");
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const msgIdRef = useRef(0);
+  const assistantQueueRef = useRef<AssistantQueueItem[]>([]);
+  const assistantTypingRef = useRef(false);
+  const assistantBufferTimerRef = useRef<number | null>(null);
+  const assistantPreDotsTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem("ui-theme");
+    if (savedTheme === "light" || savedTheme === "dark" || savedTheme === "system") {
+      queueMicrotask(() => setUiTheme(savedTheme));
+    }
+    const savedSound = window.localStorage.getItem("sound-enabled") === "true";
+    queueMicrotask(() => setSoundEnabled(savedSound));
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem("ui-theme", uiTheme);
@@ -147,10 +74,18 @@ export default function Home() {
   }, [uiTheme]);
 
   useEffect(() => {
+    window.localStorage.setItem("sound-enabled", soundEnabled ? "true" : "false");
+  }, [soundEnabled]);
+
+  useEffect(() => {
     const onPointerDown = (event: MouseEvent | TouchEvent) => {
-      if (!themeMenuRef.current) return;
+      if (!bubbleDockRef.current) return;
       const target = event.target as Node | null;
-      if (target && !themeMenuRef.current.contains(target)) setIsThemeMenuOpen(false);
+      if (target && !bubbleDockRef.current.contains(target)) {
+        setOpenBubble("none");
+        setPendingBubble("none");
+        setLauncherOpen(false);
+      }
     };
 
     window.addEventListener("mousedown", onPointerDown);
@@ -161,19 +96,85 @@ export default function Home() {
     };
   }, []);
 
+  const playPersonaStinger = useCallback(
+    (next: Persona) => {
+      if (!soundEnabled) return;
+      if (typeof window === "undefined") return;
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
+
+      try {
+        const Ctx =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = audioCtxRef.current ?? new Ctx();
+        audioCtxRef.current = ctx;
+        if (ctx.state === "suspended") void ctx.resume();
+
+        const now = ctx.currentTime;
+        const master = ctx.createGain();
+        master.gain.setValueAtTime(0.0001, now);
+        master.gain.exponentialRampToValueAtTime(0.12, now + 0.02);
+        master.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+        master.connect(ctx.destination);
+
+        const osc = ctx.createOscillator();
+        const filter = ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(1400, now);
+        filter.frequency.exponentialRampToValueAtTime(420, now + 0.26);
+
+        const base = next === "engineer" ? 440 : next === "trader" ? 220 : 330;
+        const end = next === "engineer" ? 740 : next === "trader" ? 520 : 660;
+
+        osc.type = next === "trader" ? "sawtooth" : "triangle";
+        osc.frequency.setValueAtTime(base, now);
+        osc.frequency.exponentialRampToValueAtTime(end, now + 0.18);
+
+        osc.connect(filter);
+        filter.connect(master);
+
+        osc.start(now);
+        osc.stop(now + 0.3);
+      } catch {
+        // ignore audio errors (autoplay policies, missing support)
+      }
+    },
+    [soundEnabled],
+  );
+
   const applyPersonaWithFlash = useCallback(
     (next: Persona) => {
       setShowFlash(true);
+      playPersonaStinger(next);
       setPersona(next);
       window.setTimeout(() => setShowFlash(false), 600);
     },
-    [setPersona],
+    [playPersonaStinger, setPersona],
   );
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      sequence.current = [...sequence.current, event.key.toLowerCase()].slice(-10);
-      if (KONAMI.every((k, i) => sequence.current[i] === k)) {
+      if (!event) return;
+      const key = event.key;
+      if (key === undefined || key === null) return;
+      let lower: string;
+      try {
+        lower =
+          typeof key === "string"
+            ? key.toLowerCase()
+            : typeof key === "number" && Number.isFinite(key)
+              ? String(key).toLowerCase()
+              : "";
+      } catch {
+        return;
+      }
+      if (!lower) return;
+
+      const prev = konamiSequenceRef.current;
+      const base = Array.isArray(prev) ? prev : [];
+      konamiSequenceRef.current = [...base, lower].slice(-10);
+      if (KONAMI.every((k, i) => konamiSequenceRef.current[i] === k)) {
         setShowFlash(true);
         const idx = PERSONA_ORDER.indexOf(persona);
         setPersona(PERSONA_ORDER[(idx + 1) % PERSONA_ORDER.length]);
@@ -199,9 +200,12 @@ export default function Home() {
     }
   };
 
-  const onLogoPointerDown = () => {
+  const onLogoPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+
+    const windowMs = event.pointerType === "touch" ? 420 : DOUBLE_WINDOW_MS;
     const now = Date.now();
-    if (now - lastDownRef.current < DOUBLE_WINDOW_MS) downStreakRef.current += 1;
+    if (now - lastDownRef.current < windowMs) downStreakRef.current += 1;
     else downStreakRef.current = 1;
     lastDownRef.current = now;
 
@@ -211,216 +215,309 @@ export default function Home() {
     startHold();
   };
 
+  const openPanelFromLauncher = (target: "agent" | "prefs") => {
+    setPendingBubble(target);
+    setLauncherOpen(false);
+    window.setTimeout(() => {
+      setOpenBubble(target);
+      setPendingBubble("none");
+    }, QUICK_STACK_EXIT_MS);
+  };
+
+  const maybeStartNextAssistantTyping = useCallback(() => {
+    if (assistantTypingRef.current) return;
+    const item = assistantQueueRef.current.shift();
+    if (!item) return;
+    assistantTypingRef.current = true;
+
+    const runDotsThenBubble = () => {
+      setAssistantBuffering(true);
+      assistantBufferTimerRef.current = window.setTimeout(() => {
+        const id = ++msgIdRef.current;
+        setAssistantBuffering(false);
+        setChatMessages((prev) => [
+          ...prev,
+          { id, role: "assistant", content: item.content, animate: true },
+        ]);
+        assistantBufferTimerRef.current = null;
+      }, CHAT_TYPING_MIN_BUFFER_MS);
+    };
+
+    const pause = item.pauseBeforeDotsMs;
+    if (pause <= 0) {
+      runDotsThenBubble();
+      return;
+    }
+    assistantPreDotsTimerRef.current = window.setTimeout(() => {
+      assistantPreDotsTimerRef.current = null;
+      runDotsThenBubble();
+    }, pause);
+  }, []);
+
+  const appendAssistantMessage = useCallback(
+    (content: string, opts?: { pauseBeforeDotsMs?: number }) => {
+      assistantQueueRef.current.push({
+        content,
+        pauseBeforeDotsMs: opts?.pauseBeforeDotsMs ?? 0,
+      });
+      queueMicrotask(() => maybeStartNextAssistantTyping());
+    },
+    [maybeStartNextAssistantTyping],
+  );
+
+  const askLeadQuestion = (step: 2 | 3) => {
+    const pause = CHAT_GAP_AFTER_USER_MS;
+    if (step === 2) appendAssistantMessage("Thanks. What is your email?", { pauseBeforeDotsMs: pause });
+    if (step === 3) appendAssistantMessage("Perfect. Why do you want to connect?", { pauseBeforeDotsMs: pause });
+  };
+
+  const submitLead = async (payload: LeadDraft) => {
+    setChatLoading(true);
+    try {
+      const res = await fetch("/api/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Lead submission failed");
+      appendAssistantMessage("Done. I have saved your request and Ratul will get back to you soon.", {
+        pauseBeforeDotsMs: CHAT_GAP_AFTER_USER_MS,
+      });
+    } catch {
+      appendAssistantMessage(
+        "I could not submit right now. Please email ratul.arya.roy@gmail.com directly.",
+        { pauseBeforeDotsMs: CHAT_GAP_AFTER_USER_MS },
+      );
+    } finally {
+      setChatLoading(false);
+      setLeadStep(0);
+      setLeadDraft({ name: "", email: "", reason: "" });
+      setLeadInput("");
+    }
+  };
+
+  const handleChatSubmit = async () => {
+    const fromLead = leadStep > 0;
+    const text = (fromLead ? leadInput : chatInput).trim();
+    if (!text || chatLoading) return;
+    if (fromLead) setLeadInput("");
+    else setChatInput("");
+    const id = ++msgIdRef.current;
+    setChatMessages((prev) => [...prev, { id, role: "user", content: text }]);
+
+    if (fromLead) {
+      if (leadStep === 1) {
+        setLeadDraft((p) => ({ ...p, name: text }));
+        setLeadStep(2);
+        askLeadQuestion(2);
+      } else if (leadStep === 2) {
+        setLeadDraft((p) => ({ ...p, email: text }));
+        setLeadStep(3);
+        askLeadQuestion(3);
+      } else {
+        const finalLead = { ...leadDraft, reason: text };
+        setLeadDraft(finalLead);
+        await submitLead(finalLead);
+      }
+      return;
+    }
+
+    setChatLoading(true);
+    const thinkingStarted = performance.now();
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ persona, message: text }),
+      });
+      if (!res.ok) throw new Error("Chat failed");
+      const data = (await res.json()) as { reply: string; startLeadFlow?: boolean };
+      const elapsed = performance.now() - thinkingStarted;
+      if (elapsed < CHAT_MIN_THINKING_MS) {
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, CHAT_MIN_THINKING_MS - elapsed);
+        });
+      }
+      let combined = data.reply.trimEnd();
+      if (data.startLeadFlow) {
+        setLeadInput("");
+        setLeadStep(1);
+        combined = `${combined}\n\nGreat. What is your name?`;
+      }
+      appendAssistantMessage(combined, { pauseBeforeDotsMs: CHAT_GAP_AFTER_USER_MS });
+    } catch {
+      const elapsed = performance.now() - thinkingStarted;
+      if (elapsed < CHAT_MIN_THINKING_MS) {
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, CHAT_MIN_THINKING_MS - elapsed);
+        });
+      }
+      appendAssistantMessage(
+        "I had trouble responding. Ask again, or use socials in Preferences for now.",
+        { pauseBeforeDotsMs: CHAT_GAP_AFTER_USER_MS },
+      );
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const handleQuickAction = (kind: "socials" | "about" | "connect") => {
+    const quickLabel =
+      kind === "about" ? "About Ratul" : kind === "socials" ? "Socials" : "Connect";
+    const id = ++msgIdRef.current;
+    setChatMessages((prev) => [...prev, { id, role: "user", content: quickLabel }]);
+
+    if (kind === "socials") {
+      const socials = SOCIAL_LINKS.map((s) => `${s.label}: ${s.value}`).join("\n");
+      appendAssistantMessage(`Here are Ratul's links:\n${socials}`, {
+        pauseBeforeDotsMs: CHAT_GAP_AFTER_USER_MS,
+      });
+      return;
+    }
+    if (kind === "about") {
+      appendAssistantMessage(
+        persona === "engineer"
+          ? "Ratul is a software engineer focused on product UX, scalable frontend architecture, and backend integrations."
+          : persona === "trader"
+            ? "Ratul approaches markets with a process-first mindset: risk management, journaling, and disciplined execution."
+            : "Ratul is also a photographer focused on composition, portrait lighting, and visual storytelling.",
+        { pauseBeforeDotsMs: CHAT_GAP_AFTER_USER_MS },
+      );
+      return;
+    }
+    setLeadInput("");
+    setLeadStep(1);
+    appendAssistantMessage(
+      "Awesome. I can take your contact details in chat.\n\nGreat. What is your name?",
+      { pauseBeforeDotsMs: CHAT_GAP_AFTER_USER_MS },
+    );
+  };
+
+  const finishTyping = (id: number) => {
+    setChatMessages((prev) => prev.map((m) => (m.id === id ? { ...m, animate: false } : m)));
+    assistantTypingRef.current = false;
+    maybeStartNextAssistantTyping();
+  };
+
+  useEffect(() => {
+    return () => {
+      if (assistantBufferTimerRef.current) {
+        window.clearTimeout(assistantBufferTimerRef.current);
+        assistantBufferTimerRef.current = null;
+      }
+      if (assistantPreDotsTimerRef.current) {
+        window.clearTimeout(assistantPreDotsTimerRef.current);
+        assistantPreDotsTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (openBubble !== "agent") return;
+    if (chatMessages.length > 0) return;
+    appendAssistantMessage(
+      "Hi, I am Ratul's AI assistant. I can share socials, explain his work, and help you connect quickly.",
+    );
+  }, [appendAssistantMessage, chatMessages.length, openBubble]);
+
+  const lastChatMessage = chatMessages.at(-1);
+  const leadAwaitingReply = leadStep > 0 && lastChatMessage?.role === "assistant";
+
+  const assistantActivelyTyping = useMemo(
+    () => chatMessages.some((m) => m.role === "assistant" && m.animate),
+    [chatMessages],
+  );
+
+  const agentComposerLocked =
+    leadStep > 0 || assistantBuffering || chatLoading || assistantActivelyTyping;
+
+  const leadFieldPlaceholder =
+    leadStep === 1 ? "Your name…" : leadStep === 2 ? "you@example.com" : "A sentence or two is perfect";
+
+  const leadFieldInteractable =
+    leadAwaitingReply && !lastChatMessage?.animate && !assistantBuffering && !chatLoading;
+
+  useEffect(() => {
+    if (openBubble !== "agent" || !leadFieldInteractable) return;
+    queueMicrotask(() => leadInlineFieldRef.current?.focus());
+  }, [openBubble, leadFieldInteractable, lastChatMessage?.id, leadStep]);
+
+  const scrollChatToBottom = useCallback(() => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (openBubble !== "agent") return;
+    scrollChatToBottom();
+  }, [openBubble, assistantBuffering, chatLoading, chatMessages, scrollChatToBottom]);
+
+  useEffect(() => {
+    if (openBubble !== "agent") return;
+    const scrollEl = chatScrollRef.current;
+    const inner = chatInnerRef.current;
+    if (!scrollEl || !inner) return;
+
+    const ro = new ResizeObserver(() => {
+      scrollEl.scrollTop = scrollEl.scrollHeight;
+    });
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, [openBubble, assistantBuffering, chatLoading, chatMessages.length]);
+
   return (
     <main className="min-h-screen overflow-x-hidden bg-[var(--page-bg)] text-[var(--fg)] transition-colors duration-700">
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={`bg-${persona}`}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.35, ease: "easeOut" }}
-          className="pointer-events-none fixed inset-0 -z-20 bg-cover bg-center"
-          style={{
-            backgroundImage: `url("${PERSONA_BACKGROUNDS[persona]}")`,
-            opacity: "var(--bg-image-opacity)",
-          }}
-        />
-      </AnimatePresence>
-      <div
-        className="pointer-events-none fixed inset-0 -z-10"
-        style={{ backgroundColor: "var(--bg-overlay)" }}
-      />
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,var(--accent-glow),transparent_42%),radial-gradient(circle_at_20%_80%,var(--accent-glow-2),transparent_45%)]" />
-      <motion.div
-        animate={{ opacity: showFlash ? 0.3 : 0 }}
-        className="pointer-events-none fixed inset-0 z-50 bg-white mix-blend-overlay"
-      />
+      <PersonaBackdrop persona={persona} showFlash={showFlash} />
 
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6 md:px-10">
-        <button
-          onMouseDown={onLogoPointerDown}
-          onMouseUp={stopHold}
-          onMouseLeave={stopHold}
-          onTouchStart={onLogoPointerDown}
-          onTouchEnd={stopHold}
-          className="group flex items-center gap-2 rounded-full border px-4 py-2 backdrop-blur-xl"
-          style={{
-            backgroundColor: "var(--control-bg)",
-            borderColor: "var(--control-border)",
-            color: "var(--control-text)",
-          }}
-        >
-          <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
-          RR Portfolio
-          <Lock className="h-4 w-4 opacity-60 group-hover:opacity-100" />
-        </button>
-        <span
-          className="rounded-full border px-4 py-2 text-sm backdrop-blur-xl"
-          style={{ backgroundColor: "var(--control-bg)", borderColor: "var(--control-border)" }}
-        >
-          {content.label}
-        </span>
-        <div ref={themeMenuRef} className="relative">
-          <motion.div
-            layout
-            transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="h-11 w-[252px] overflow-hidden rounded-full border p-1 backdrop-blur-xl"
-            style={{ backgroundColor: "var(--control-bg)", borderColor: "var(--control-border)" }}
-          >
-            <AnimatePresence mode="wait" initial={false}>
-              {!isThemeMenuOpen ? (
-                <motion.button
-                  key="theme-closed"
-                  type="button"
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.16, ease: "easeOut" }}
-                  onClick={() => setIsThemeMenuOpen(true)}
-                  className="flex h-full w-full items-center justify-center rounded-full text-sm text-[var(--fg)] transition-colors"
-                  aria-expanded={false}
-                  aria-label="Open theme controls"
-                  style={{ backgroundColor: "var(--control-bg)" }}
-                >
-                  Theme
-                </motion.button>
-              ) : (
-                <motion.div
-                  key="theme-open"
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.16, ease: "easeOut" }}
-                  className="flex h-full items-center gap-1"
-                >
-                  {THEME_OPTIONS.map((option) => {
-                    const Icon = option.icon;
-                    const active = uiTheme === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => {
-                          setUiTheme(option.value);
-                          setIsThemeMenuOpen(false);
-                        }}
-                        className={`inline-flex h-full flex-1 items-center justify-center gap-1 rounded-full px-2 text-xs transition-all sm:text-sm ${
-                          active
-                          ? "bg-[var(--control-hover)] text-[var(--fg)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),0_10px_28px_rgba(0,0,0,0.12)]"
-                          : "text-[var(--muted)] hover:bg-[var(--control-hover)] hover:text-[var(--fg)]"
-                        }`}
-                        aria-pressed={active}
-                      >
-                        <Icon className="h-3.5 w-3.5" />
-                        {option.label}
-                      </button>
-                    );
-                  })}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        </div>
-      </header>
+      <HomeHeader onLogoPointerDown={onLogoPointerDown} onLogoPointerUp={stopHold} />
 
-      <section className="mx-auto grid w-full max-w-6xl gap-10 px-6 pb-20 pt-8 md:grid-cols-2 md:px-10 md:pt-16">
-        <motion.div
-          initial={{ opacity: 0, y: 28 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: "easeOut" }}
-          viewport={{ once: true, margin: "-50px" }}
-          className="space-y-6 rounded-3xl border p-6 backdrop-blur-2xl"
-          style={{
-            backgroundColor: "var(--surface-bg)",
-            borderColor: "var(--surface-border)",
-            boxShadow: "var(--panel-shadow)",
-          }}
-        >
-          <p className="text-sm uppercase tracking-[0.2em] text-[var(--accent)]">{content.eyebrow}</p>
-          <p className="text-lg text-[var(--muted)] md:text-2xl">
-            I am a{" "}
-            <span className="font-semibold text-[var(--accent)]">
-              <TypeAnimation
-                key={persona}
-                sequence={
-                  persona === "engineer" ? ENGINEER_SEQUENCE : persona === "trader" ? TRADER_SEQUENCE : PHOTOGRAPHER_SEQUENCE
-                }
-                speed={55}
-                deletionSpeed={38}
-                repeat={Infinity}
-                cursor
-              />
-            </span>
-          </p>
-          <h1 className="text-4xl font-semibold leading-tight md:text-6xl">{content.heading}</h1>
-          <p className="max-w-xl text-lg text-[var(--muted)]">{content.body}</p>
-          <button className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-3 font-medium text-[var(--cta-fg)] transition-transform hover:scale-[1.03]">
-            {content.cta}
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.7, ease: "easeOut" }}
-          viewport={{ once: true, margin: "-50px" }}
-          className="rounded-3xl border p-6 backdrop-blur-2xl transition-all duration-700"
-          style={{
-            backgroundColor: "var(--panel-bg)",
-            borderColor: "var(--panel-border)",
-            boxShadow: "var(--panel-shadow)",
-          }}
-        >
-          <div className="mb-4 flex items-center gap-2 text-sm text-[var(--muted)]">
-            {persona === "engineer" ? (
-              <Briefcase className="h-4 w-4" />
-            ) : persona === "trader" ? (
-              <CandlestickChart className="h-4 w-4" />
-            ) : (
-              <Camera className="h-4 w-4" />
-            )}
-            Identity Shift Panel
-          </div>
-          <div className="space-y-4">
-            {content.points.map((point) => (
-              <div
-                key={point}
-                className="rounded-2xl border px-4 py-3"
-                style={{ backgroundColor: "var(--chip-bg)", borderColor: "var(--chip-border)" }}
-              >
-                {point}
-              </div>
-            ))}
-          </div>
-          <p className="mt-6 text-xs text-[var(--muted)]">
-            Easter egg hint: 1× click + hold → Engineer, 2× → Trader, 3× → Photographer (4×+ still Photographer).
-            Refresh or reopen the site starts as Engineer; moving between pages keeps your persona. Konami code still cycles personas.
-          </p>
-        </motion.div>
+      <section className="mx-auto grid w-full max-w-6xl gap-8 px-6 pb-20 pt-2 md:grid-cols-2 md:gap-10 md:px-10 md:pt-3">
+        <HomeHero persona={persona} content={content} />
+        <IdentityPanel persona={persona} content={content} />
       </section>
 
-      <section className="mx-auto grid w-full max-w-6xl gap-6 px-6 pb-24 md:grid-cols-3 md:px-10">
-        {["Projects", "Experience", "Contact"].map((title, idx) => (
-          <motion.article
-            key={title}
-            initial={{ opacity: 0, y: 18 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: idx * 0.1 }}
-            viewport={{ once: true }}
-            className="rounded-3xl border p-6 backdrop-blur-xl"
-            style={{ backgroundColor: "var(--surface-bg)", borderColor: "var(--surface-border)" }}
-          >
-            <h3 className="mb-3 text-xl font-semibold">{title}</h3>
-            <p className="text-[var(--muted)]">
-              {title === "Projects" && "Selected work with product thinking, architecture depth, and polished UI."}
-              {title === "Experience" && "Engineering discipline blended with market strategy and execution mindset."}
-              {title === "Contact" && "Open to freelance, collaboration, and full-time opportunities."}
-            </p>
-          </motion.article>
-        ))}
-      </section>
+      <ProjectsGrid />
+
+      <BubbleDock
+        bubbleDockRef={bubbleDockRef}
+        openBubble={openBubble}
+        launcherOpen={launcherOpen}
+        setLauncherOpen={setLauncherOpen}
+        pendingBubble={pendingBubble}
+        setPendingBubble={setPendingBubble}
+        setOpenBubble={setOpenBubble}
+        soundEnabled={soundEnabled}
+        onSoundToggle={() => setSoundEnabled((v) => !v)}
+        uiTheme={uiTheme}
+        onUiThemeChange={setUiTheme}
+        openPanelFromLauncher={openPanelFromLauncher}
+        agentChat={{
+          personaModeLabel: content.label,
+          chatScrollRef,
+          chatInnerRef,
+          leadFieldRef: leadInlineFieldRef,
+          messages: chatMessages,
+          leadAwaitingReply,
+          lastMessage: lastChatMessage,
+          leadStep,
+          leadInput,
+          onLeadInputChange: setLeadInput,
+          leadPlaceholder: leadFieldPlaceholder,
+          leadFieldInteractable,
+          chatInput,
+          onChatInputChange: setChatInput,
+          assistantBuffering,
+          chatLoading,
+          agentComposerLocked,
+          onChatSubmit: handleChatSubmit,
+          onQuickAction: handleQuickAction,
+          scrollChatToBottom,
+          finishTyping,
+        }}
+      />
     </main>
   );
 }
