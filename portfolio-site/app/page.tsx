@@ -5,10 +5,14 @@ import { PERSONA_ORDER, usePersona, type Persona } from "./persona-provider";
 import type { AssistantQueueItem, ChatMessage, LeadDraft } from "./components/chat-types";
 import { BubbleDock } from "./components/bubble-dock";
 import { HomeHeader } from "./components/home-header";
-import { HomeHero } from "./components/home-hero";
-import { IdentityPanel } from "./components/identity-panel";
 import { PersonaBackdrop } from "./components/persona-backdrop";
-import { ProjectsGrid } from "./components/projects-grid";
+import {
+  PersonaHomeBody,
+  type PersonaMotionOrchestratorHandle,
+} from "./components/persona-home-body";
+import { PersonaTransitionWash } from "./components/persona-transition-wash";
+import { usePersonaTransitionPrefs } from "./hooks/use-persona-transition-prefs";
+import { usePersonaTransitionRunner } from "./hooks/use-persona-transition-runner";
 import {
   CHAT_GAP_AFTER_USER_MS,
   CHAT_MIN_THINKING_MS,
@@ -22,7 +26,12 @@ import {
 
 export default function Home() {
   const { persona, setPersona } = usePersona();
-  const [showFlash, setShowFlash] = useState(false);
+  const {
+    transitionsEnabled,
+    setTransitionsEnabled,
+    effectiveTransitions,
+    hydrated: prefsHydrated,
+  } = usePersonaTransitionPrefs();
   const [soundEnabled, setSoundEnabled] = useState<boolean>(false);
   const [uiTheme, setUiTheme] = useState<UiTheme>("system");
   const [openBubble, setOpenBubble] = useState<"none" | "prefs" | "agent">("none");
@@ -41,10 +50,19 @@ export default function Home() {
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const chatInnerRef = useRef<HTMLDivElement | null>(null);
   const leadInlineFieldRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  const personaOrchestratorRef = useRef<PersonaMotionOrchestratorHandle | null>(null);
   const content = useMemo(() => PERSONA_CONTENT[persona], [persona]);
+  const effectiveTransitionsRef = useRef(effectiveTransitions);
+  effectiveTransitionsRef.current = effectiveTransitions;
 
+  /** How long to hold the logo before the chained persona switch fires */
   const HOLD_MS = 1300;
-  const DOUBLE_WINDOW_MS = 280;
+  /**
+   * Max milliseconds between consecutive pointer-downs on the logo to chain
+   * 1× Engineer → 2× Trader → 3× Photographer. Increase if taps feel too fast.
+   */
+  const PERSONA_CHAIN_WINDOW_MOUSE_MS = 520;
+  const PERSONA_CHAIN_WINDOW_TOUCH_MS = 680;
   const lastDownRef = useRef<number>(0);
   const downStreakRef = useRef<number>(0);
   const holdTargetPersonaRef = useRef<Persona>("engineer");
@@ -96,13 +114,12 @@ export default function Home() {
     };
   }, []);
 
-  const playPersonaStinger = useCallback(
-    (next: Persona) => {
-      if (!soundEnabled) return;
-      if (typeof window === "undefined") return;
-      if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
+  const playPersonaStinger = useCallback((next: Persona) => {
+    if (!soundEnabled) return;
+    if (!effectiveTransitionsRef.current) return;
+    if (typeof window === "undefined") return;
 
-      try {
+    try {
         const Ctx =
           window.AudioContext ||
           (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -136,22 +153,18 @@ export default function Home() {
 
         osc.start(now);
         osc.stop(now + 0.3);
-      } catch {
-        // ignore audio errors (autoplay policies, missing support)
-      }
-    },
-    [soundEnabled],
-  );
+    } catch {
+      // ignore audio errors (autoplay policies, missing support)
+    }
+  }, [soundEnabled]);
 
-  const applyPersonaWithFlash = useCallback(
-    (next: Persona) => {
-      setShowFlash(true);
-      playPersonaStinger(next);
-      setPersona(next);
-      window.setTimeout(() => setShowFlash(false), 600);
-    },
-    [playPersonaStinger, setPersona],
-  );
+  const { washOpen, runTransition } = usePersonaTransitionRunner({
+    persona,
+    setPersona,
+    effectiveTransitions,
+    playPersonaStinger,
+    orchestratorRef: personaOrchestratorRef,
+  });
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -175,20 +188,18 @@ export default function Home() {
       const base = Array.isArray(prev) ? prev : [];
       konamiSequenceRef.current = [...base, lower].slice(-10);
       if (KONAMI.every((k, i) => konamiSequenceRef.current[i] === k)) {
-        setShowFlash(true);
         const idx = PERSONA_ORDER.indexOf(persona);
-        setPersona(PERSONA_ORDER[(idx + 1) % PERSONA_ORDER.length]);
-        window.setTimeout(() => setShowFlash(false), 600);
+        void runTransition(PERSONA_ORDER[(idx + 1) % PERSONA_ORDER.length]);
       }
     };
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [persona, setPersona]);
+  }, [persona, runTransition]);
 
   const startHold = () => {
     holdTimer.current = window.setTimeout(() => {
-      applyPersonaWithFlash(holdTargetPersonaRef.current);
+      void runTransition(holdTargetPersonaRef.current);
       downStreakRef.current = 0;
     }, HOLD_MS);
   };
@@ -203,7 +214,8 @@ export default function Home() {
   const onLogoPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
 
-    const windowMs = event.pointerType === "touch" ? 420 : DOUBLE_WINDOW_MS;
+    const windowMs =
+      event.pointerType === "touch" ? PERSONA_CHAIN_WINDOW_TOUCH_MS : PERSONA_CHAIN_WINDOW_MOUSE_MS;
     const now = Date.now();
     if (now - lastDownRef.current < windowMs) downStreakRef.current += 1;
     else downStreakRef.current = 1;
@@ -469,17 +481,20 @@ export default function Home() {
   }, [openBubble, assistantBuffering, chatLoading, chatMessages.length]);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[var(--page-bg)] text-[var(--fg)] transition-colors duration-700">
-      <PersonaBackdrop persona={persona} showFlash={showFlash} />
+    <main className="min-h-screen overflow-x-clip bg-[var(--page-bg)] text-[var(--fg)] transition-colors duration-700">
+      <PersonaBackdrop persona={persona} showFlash={false} />
 
       <HomeHeader onLogoPointerDown={onLogoPointerDown} onLogoPointerUp={stopHold} />
 
-      <section className="mx-auto grid w-full max-w-6xl gap-8 px-6 pb-20 pt-2 md:grid-cols-2 md:gap-10 md:px-10 md:pt-3">
-        <HomeHero persona={persona} content={content} />
-        <IdentityPanel persona={persona} content={content} />
-      </section>
+      <PersonaTransitionWash open={washOpen} />
 
-      <ProjectsGrid />
+      <div
+        className="relative z-10 min-h-0 overflow-x-clip overflow-y-clip"
+        aria-busy={washOpen}
+        aria-live="polite"
+      >
+        <PersonaHomeBody ref={personaOrchestratorRef} persona={persona} content={content} />
+      </div>
 
       <BubbleDock
         bubbleDockRef={bubbleDockRef}
@@ -491,6 +506,9 @@ export default function Home() {
         setOpenBubble={setOpenBubble}
         soundEnabled={soundEnabled}
         onSoundToggle={() => setSoundEnabled((v) => !v)}
+        transitionsEnabled={transitionsEnabled}
+        onTransitionsToggle={() => setTransitionsEnabled((v) => !v)}
+        prefsHydrated={prefsHydrated}
         uiTheme={uiTheme}
         onUiThemeChange={setUiTheme}
         openPanelFromLauncher={openPanelFromLauncher}

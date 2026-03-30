@@ -9,7 +9,7 @@ export type HomeHeaderProps = {
 };
 
 /** How long each image stays visible before crossfading to the other */
-const ROTATE_INTERVAL_MS = 4000;
+const ROTATE_INTERVAL_MS = 2000;
 const CROSSFADE_MS = 700;
 
 export function HomeHeader({ onLogoPointerDown, onLogoPointerUp }: HomeHeaderProps) {
@@ -34,7 +34,7 @@ export function HomeHeader({ onLogoPointerDown, onLogoPointerUp }: HomeHeaderPro
   const showRMark = reducedMotion ? false : showMark;
 
   return (
-    <header className="mx-auto w-full max-w-6xl px-3 pb-0 pt-1.5 md:px-10 md:pt-2.5">
+    <header className="relative z-[55] mx-auto w-full max-w-6xl px-3 pb-0 pt-1.5 md:px-10 md:pt-2.5">
       <div className="relative inline-flex">
         <span
           className="pointer-events-none absolute -inset-4 rounded-full opacity-75 blur-2xl"
@@ -50,9 +50,11 @@ export function HomeHeader({ onLogoPointerDown, onLogoPointerUp }: HomeHeaderPro
           onPointerUp={onLogoPointerUp}
           onPointerCancel={onLogoPointerUp}
           onPointerLeave={onLogoPointerUp}
-          className="group relative flex h-[4.75rem] w-[4.75rem] shrink-0 items-stretch justify-stretch rounded-full p-[3px] transition-[transform,filter] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--accent)] active:scale-[0.96] md:h-[5.25rem] md:w-[5.25rem] md:p-[3.5px]"
+          onContextMenu={(e) => e.preventDefault()}
+          className="group relative flex h-[4.75rem] w-[4.75rem] shrink-0 select-none items-stretch justify-stretch rounded-full p-[3px] transition-[transform,filter] [-webkit-touch-callout:none] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--accent)] active:scale-[0.96] md:h-[5.25rem] md:w-[5.25rem] md:p-[3.5px]"
           style={{
             touchAction: "manipulation",
+            WebkitTouchCallout: "none",
             background:
               "linear-gradient(145deg, rgba(255,255,255,0.65) 0%, color-mix(in srgb, var(--accent) 55%, rgba(255,255,255,0.2)) 38%, color-mix(in srgb, var(--accent) 25%, rgba(15,23,42,0.85)) 100%)",
             boxShadow: `
@@ -66,9 +68,10 @@ export function HomeHeader({ onLogoPointerDown, onLogoPointerUp }: HomeHeaderPro
           title="Hold to cycle Engineer → Trader → Photographer"
         >
           <span
-            className="relative min-h-0 min-w-0 flex-1 overflow-hidden rounded-full bg-black"
+            className="relative min-h-0 min-w-0 flex-1 select-none overflow-hidden rounded-full bg-black [-webkit-touch-callout:none]"
             style={{
               boxShadow: "inset 0 4px 16px rgba(255,255,255,0.22), inset 0 -12px 32px rgba(0,0,0,0.38)",
+              WebkitTouchCallout: "none",
             }}
           >
             <span className="absolute inset-0 transition-transform duration-300 ease-out group-hover:scale-[1.04]">
@@ -77,12 +80,15 @@ export function HomeHeader({ onLogoPointerDown, onLogoPointerUp }: HomeHeaderPro
                   src="/R.jpg"
                   alt=""
                   fill
+                  draggable={false}
                   sizes="(max-width: 768px) 84px, 84px"
-                  className={`object-contain object-center scale-[1.45] transition-opacity ease-out ${
+                  className={`pointer-events-none select-none object-contain object-center scale-[1] transition-opacity ease-out [-webkit-user-drag:none] ${
                     showRMark ? "opacity-100" : "opacity-0"
                   }`}
                   style={{
                     transitionDuration: reducedMotion ? "0ms" : `${CROSSFADE_MS}ms`,
+                    WebkitTouchCallout: "none",
+                    userSelect: "none",
                   }}
                   priority
                 />
@@ -92,12 +98,15 @@ export function HomeHeader({ onLogoPointerDown, onLogoPointerUp }: HomeHeaderPro
                   src="/profile-cartoon-avatar.png"
                   alt=""
                   fill
+                  draggable={false}
                   sizes="(max-width: 768px) 76px, 84px"
-                  className={`object-cover transition-opacity ease-out ${
+                  className={`pointer-events-none select-none object-cover transition-opacity ease-out [-webkit-user-drag:none] ${
                     showRMark ? "opacity-0" : "opacity-100"
                   }`}
                   style={{
                     transitionDuration: reducedMotion ? "0ms" : `${CROSSFADE_MS}ms`,
+                    WebkitTouchCallout: "none",
+                    userSelect: "none",
                   }}
                 />
               </span>

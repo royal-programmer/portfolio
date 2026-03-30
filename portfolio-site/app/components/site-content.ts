@@ -39,7 +39,7 @@ export const PERSONA_BACKGROUNDS: Record<Persona, string> = {
   engineer:
     "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1600&q=80",
   trader:
-    "https://images.unsplash.com/photo-1559526324-593bc073d936?auto=format&fit=crop&w=1600&q=80",
+    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1920&q=85",
   photographer:
     "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=1600&q=80",
 };

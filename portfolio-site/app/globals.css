@@ -87,7 +87,8 @@
 :root[data-persona="trader"][data-ui-theme="light"] {
   --background: #f4fff8;
   --foreground: #0f2518;
-  --page-bg: #f4fff8;
+  /* Must stay transparent so fixed PersonaBackdrop shows through main */
+  --page-bg: transparent;
   --fg: #0f2518;
   --muted: #3b6750;
   --accent: #16a34a;
@@ -109,7 +110,7 @@
 :root[data-persona="trader"][data-ui-theme="dark"] {
   --background: #050807;
   --foreground: #ebfff4;
-  --page-bg: #050807;
+  --page-bg: transparent;
   --fg: #ebfff4;
   --muted: #a0c8af;
   --accent: #22c55e;
@@ -132,7 +133,7 @@
   :root[data-persona="trader"]:not([data-ui-theme]) {
     --background: #050807;
     --foreground: #ebfff4;
-    --page-bg: #050807;
+    --page-bg: transparent;
     --fg: #ebfff4;
     --muted: #a0c8af;
     --accent: #22c55e;

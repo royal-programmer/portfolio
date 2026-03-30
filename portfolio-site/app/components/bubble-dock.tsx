@@ -16,6 +16,9 @@ export type BubbleDockProps = {
   setOpenBubble: (v: "none" | "prefs" | "agent") => void;
   soundEnabled: boolean;
   onSoundToggle: () => void;
+  transitionsEnabled: boolean;
+  onTransitionsToggle: () => void;
+  prefsHydrated: boolean;
   uiTheme: UiTheme;
   onUiThemeChange: (t: UiTheme) => void;
   openPanelFromLauncher: (target: "agent" | "prefs") => void;
@@ -32,6 +35,9 @@ export function BubbleDock({
   setOpenBubble,
   soundEnabled,
   onSoundToggle,
+  transitionsEnabled,
+  onTransitionsToggle,
+  prefsHydrated,
   uiTheme,
   onUiThemeChange,
   openPanelFromLauncher,
@@ -71,6 +77,35 @@ export function BubbleDock({
                     aria-hidden
                     className={`pointer-events-none absolute top-1 left-1 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.06)] transition-transform duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] ${
                       soundEnabled ? "translate-x-6" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="shrink-0 text-[var(--fg)]">Persona transitions</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={prefsHydrated ? transitionsEnabled : false}
+                  aria-label={
+                    transitionsEnabled ? "Disable persona transition animations" : "Enable persona transition animations"
+                  }
+                  disabled={!prefsHydrated}
+                  onClick={onTransitionsToggle}
+                  className="relative h-8 w-14 shrink-0 rounded-full transition-[background-color] duration-200 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:opacity-50"
+                  style={{
+                    backgroundColor: transitionsEnabled
+                      ? "var(--accent)"
+                      : "color-mix(in srgb, var(--muted) 22%, var(--surface-bg))",
+                    boxShadow: transitionsEnabled
+                      ? "inset 0 1px 0 rgba(255,255,255,0.22)"
+                      : "inset 0 1px 2px rgba(0,0,0,0.08)",
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    className={`pointer-events-none absolute top-1 left-1 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.06)] transition-transform duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+                      transitionsEnabled ? "translate-x-6" : "translate-x-0"
                     }`}
                   />
                 </button>
