@@ -1,0 +1,65 @@
+# 07 — Open Questions, Decisions & Risks
+
+Live list. As we settle each, move it from "Open" to "Decided" with the rationale.
+
+---
+
+## Decided (from the discussion so far)
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| D1 | Personas are audience-targeted **entry points**; no forced traversal; unified view is the easter-egg. | Ratul provides the right door per audience. Resolves fragmentation worry. |
+| D2 | Build a **generic content spine**; personas are extensions. | ~90% shared shape; keeps Tier-3 personas nearly free. |
+| D3 | **Phone-first capture apps** as authenticated PWA routes in the one app. | Frictionless capture is what keeps content flowing. |
+| D4 | **Blog-per-persona.** | Highest ROI: content + SEO + credibility in one. |
+| D5 | **Public/private visibility** on every entry; trader gets dual view via RLS. | Real portfolio, curated public vs full private. |
+| D6 | **Entirely free** stack: Supabase + R2/Cloudinary + Leaflet/OSM + Lightweight Charts + PWA. | Hard budget constraint = $0 now. |
+| D7 | **One app, route-groups** — not separate deployed apps. | One auth/model/deploy; still feels app-like on phone. |
+| D8 | **Fill rooms before building new ones**; strict phasing. | A full 2-persona site beats an empty 6-persona one. |
+| D9 | **Gamer is the lightest persona**, auto-populated or cut. | Least brand value; not worth bespoke engineering. |
+| D10 | **Self-host curated photos** (R2/Cloudinary); **Instagram = secondary social/reach channel only**; **Google Drive = private backup + docs**, not live CDN. | IG compresses quality + strips EXIF, killing the photography persona's core features; Drive isn't a CDN. Flickr kept as EXIF-preserving fallback. |
+| D11 | **Don't harden/polish the current shell**; scalability comes from Phase 0 (DB-backed, SSR), not a polish pass on placeholder content. | Shell is about to be rearchitected; polishing it is wasted work. Fold responsiveness in per-piece; mobile-correctness prioritized early (capture apps are phone-first). |
+| D12 | **Stay on Vercel for now** (portfolio is already deployed there). Keep Cloudflare as the migration path *if* the site goes commercial. | Don't move a working deployment; Vercel's commercial-use limit only matters once paying clients arrive, and migration is cheap later. Supersedes the earlier Cloudflare lean in Q3. |
+| D13 | **Supabase security defaults:** Data API **ON**, "auto-expose new tables" **OFF**, "automatic RLS" **ON**. | Defense in depth — every new table is private by default (hidden from public API + RLS-locked) until we explicitly expose it and write a policy. Directly fixes the assessment's security 2/5. RLS policies + exposure become versioned SQL in the repo during Phase 0. |
+| D14 | **Next.js is the backend layer** — no separate backend service, no raw client-side Supabase for sensitive ops. Public reads via Server Components (anon key + RLS); writes via Server Actions / Route Handlers holding `service_role` server-only. | Keeps "one app", free, same deploy. Server layer hosts validation, P&L calc, EXIF, visibility masking, rate limiting (fixes assessment's unguarded API stubs). RLS is the second line of defense. Secrets never reach the browser; `service_role` never in a `NEXT_PUBLIC_*` var. |
+
+---
+
+## Open — need Ratul's call
+
+| # | Question | Why it matters | Leaning |
+|---|----------|----------------|---------|
+| Q1 | **Background GPS acceptable as foreground-only for now?** | PWAs can't do reliable background geo (esp iOS). | Ship foreground-first; Capacitor wrapper later if needed. |
+| Q2 | **Trader public view: what exactly is shown?** Absolute P&L? % returns? Position sizes hidden? | Privacy + credibility + "not advice." | Show % returns + equity curve publicly; hide absolute sizes. Confirm. |
+| Q3 | ~~Hosting: Cloudflare vs Vercel Hobby?~~ **→ DECIDED (D12): stay on Vercel.** | Already deployed there; Cloudflare only if it goes commercial. | Closed. |
+| Q4 | **Which capture app first after Engineer — Photo or Trade?** | Trade is highest-value (daily) but most complex; Photo is simplest to prove the loop. | Photo first (prove loop cheaply), then Trade. Per current phasing. |
+| Q5 | **Custom domain now or later?** | The one thing genuinely worth ~$10/yr for brand; otherwise a free subdomain. | Get a domain early; it's the cheapest brand upgrade. Ratul's call given $0 rule. |
+| Q6 | **Keep the existing persona-switching UI as the easter-egg, as-is?** | It's well-built; now it's the "know me more" layer, not primary nav. | Keep it; repurpose as the unified/easter-egg view. |
+| Q7 | **Storage: R2 vs Cloudinary vs Supabase-only to start?** | Photos strain free storage first. | Start Supabase storage; add R2 when photos grow. Confirm appetite for CF setup. |
+| Q8 | **Auth provider details** (email magic-link vs GitHub OAuth for the single admin). | Minor; just Ratul logs in. | Supabase magic-link. |
+
+---
+
+## Risks to keep watching
+
+| Risk | Severity | Mitigation |
+|------|----------|------------|
+| **Scope explosion** (platform, not portfolio) | High | Strict phasing (`06`); prove the loop before fanning out. |
+| **Maintenance treadmill** (6 personas + blogs) | Med-High | Capture apps lower friction; honest per-persona cadence; Tier-3 stays light. |
+| **Free storage caps** (hi-res photos) | Medium | Originals private + optimized derivatives; R2 when needed; cheap paid upgrade later. |
+| **Supabase free-tier pausing** on inactivity | Low | Scheduled keep-alive ping; or a cron hit. |
+| **Vercel commercial-use terms** | Low-Med | Prefer Cloudflare; be ready to migrate. |
+| **Background GPS unreliability** | Medium | Foreground-first; manual override; Capacitor later. |
+| **Free-tier terms change over time** | Med | Re-verify limits before each phase; keep PocketBase as self-host fallback. |
+| **Cleverness over clarity** (carried from assessment) | Medium | Each persona page must be legible to its audience in 5s. |
+| **Legal/financial framing (trader)** | Medium | Clear "not financial advice" disclaimer; never expose others' data. |
+
+---
+
+## Explicitly out of scope (for now)
+
+- Native mobile apps (PWA first).
+- Multi-user / other people's accounts (single admin = Ratul).
+- Selling/e-commerce (print sales, commissions checkout) — revisit if photography/art demand it.
+- Any paid service until the $0 constraint is lifted.
+- Broker/exchange API auto-import for trades (manual journal first).
