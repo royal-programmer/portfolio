@@ -9,10 +9,21 @@
  * the stub today and will point at the Supabase-backed provider once that
  * lands — no caller changes, because both satisfy `ContentApi`.
  */
+import { hasSupabaseEnv } from "../db/client";
 import { stubProvider } from "./stub-provider";
+import { supabaseProvider } from "./supabase-provider";
 import type { ContentApi } from "./types";
 
-const activeProvider: ContentApi = stubProvider;
+/**
+ * Provider selection is by environment:
+ *   - Supabase env present  → real, DB-backed content.
+ *   - Supabase env absent    → in-memory fixtures (local dev, CI, previews).
+ *
+ * Deterministic per environment, so Cursor's local dev (no `.env.local`) always
+ * gets the stub, and production (env set + schema applied) gets Supabase — with
+ * zero caller changes either way.
+ */
+const activeProvider: ContentApi = hasSupabaseEnv() ? supabaseProvider : stubProvider;
 
 // Bound convenience functions (ergonomic + tree-shakeable) matching ContentApi.
 export const listPersonas: ContentApi["listPersonas"] = (opts) =>
