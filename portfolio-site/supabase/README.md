@@ -10,6 +10,7 @@ so the schema is reproducible and reviewable (never clicked together in the UI).
 | `migrations/0001_content_schema.sql` | Enums + tables: `personas`, `entries`, `media`, `groups`, `entry_groups`, `blog_posts`, `strategies`, `updated_at` triggers. |
 | `migrations/0002_rls_policies.sql` | `admins` table + `is_admin()`, enables RLS, grants Data API access, and all read/write policies. |
 | `migrations/0003_seed_personas.sql` | Seeds the six persona rows (idempotent). |
+| `migrations/0004_service_role_grants.sql` | Grants table privileges to `service_role` (needed because "auto-expose new tables" is OFF). |
 
 All three are safe to re-run (guarded enums, `if not exists`, `on conflict` upsert,
 `drop policy if exists` before create).
