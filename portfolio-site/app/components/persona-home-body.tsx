@@ -122,7 +122,7 @@ export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, Perso
               </PersonaMotionSlot>
             </section>
             <PersonaMotionSlot id="eng-projects" dir="down" exitOrder={2} enterOrder={2}>
-              <ProjectsGrid entries={engineerEntries} />
+              <ProjectsGrid entries={engineerEntries} personaSlug="engineer" />
             </PersonaMotionSlot>
           </>
         )}

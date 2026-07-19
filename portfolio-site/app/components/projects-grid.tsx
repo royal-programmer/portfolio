@@ -1,13 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
 import type { Entry } from "@/lib/content";
 
 type ProjectsGridProps = {
   entries: Entry[];
+  /** Persona segment used for detail links, e.g. `engineer`. */
+  personaSlug?: string;
 };
 
-export function ProjectsGrid({ entries }: ProjectsGridProps) {
+export function ProjectsGrid({ entries, personaSlug = "engineer" }: ProjectsGridProps) {
   const projects = entries.filter((entry) => entry.type === "project");
 
   if (projects.length === 0) {
@@ -31,6 +34,7 @@ export function ProjectsGrid({ entries }: ProjectsGridProps) {
     <section className="mx-auto grid w-full max-w-6xl gap-6 px-6 pb-24 md:grid-cols-3 md:px-10">
       {projects.map((entry, idx) => {
         const stack = entry.type === "project" ? entry.data.techStack : [];
+        const detailHref = `/${personaSlug}/${entry.slug}`;
         return (
           <motion.article
             key={entry.id}
@@ -57,12 +61,18 @@ export function ProjectsGrid({ entries }: ProjectsGridProps) {
               </ul>
             ) : null}
             <div className="mt-5 flex flex-wrap gap-3 text-sm">
+              <Link
+                href={detailHref}
+                className="font-medium text-[var(--accent)] underline-offset-4 hover:underline"
+              >
+                View project
+              </Link>
               {entry.type === "project" && entry.data.deployedUrl ? (
                 <a
                   href={entry.data.deployedUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="font-medium text-[var(--accent)] underline-offset-4 hover:underline"
+                  className="font-medium text-[var(--muted)] underline-offset-4 hover:underline"
                 >
                   Live
                 </a>
@@ -72,7 +82,7 @@ export function ProjectsGrid({ entries }: ProjectsGridProps) {
                   href={entry.data.repoUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="font-medium text-[var(--accent)] underline-offset-4 hover:underline"
+                  className="font-medium text-[var(--muted)] underline-offset-4 hover:underline"
                 >
                   Code
                 </a>
