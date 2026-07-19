@@ -31,15 +31,23 @@ Decisions confirmed: slug stays **`photographer`**; invalid/unlaunched slugs kee
 bad URL and show the funny page; Home still uses hardcoded `PERSONA_CONTENT` (not yet
 wired to `ContentApi`).
 
-### Pending — Ratul (external setup; unblocks the DB path)
+### ✅ LIVE DB VERIFIED (2026-07-19)
 
-1. Apply `supabase/migrations/0001 → 0002 → 0003` (SQL editor or CLI). See `supabase/README.md`.
-2. Auth: enable Email provider, **turn off public sign-ups**.
-3. Create your user, then `insert into admins (user_id) values ('<uuid>');`.
-4. Put real values in `portfolio-site/.env.local` **and** Vercel env:
-   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+`node scripts/verify-db.mjs` → **all checks passed** against the real Supabase
+project (`wgvwwiqromxlrocpnsoc`):
+- anon sees only the 3 published personas (RLS read filter) ✅
+- service_role sees all 6 (grants + RLS bypass) ✅
+- a private entry is invisible to anon (visibility gate holds) ✅
 
-Until step 4, the app runs on stub fixtures — which is fine for local dev.
+Required an extra migration `0004_service_role_grants.sql` (auto-expose-off had
+stripped service_role's table grants).
+
+### Done — Ratul (external setup)
+
+1. ✅ Applied migrations `0001 → 0004` (SQL editor).
+2. ✅ Email auth on, public sign-ups off.
+3. ✅ Admin user created + registered in `admins`.
+4. ✅ `portfolio-site/.env.local` set. ⏳ Vercel env deferred to deployment time.
 
 ### Pending — Cursor (UI lane)
 
