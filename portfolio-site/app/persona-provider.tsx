@@ -1,8 +1,20 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import {
+  isLaunchedPersona,
+  type LaunchedPersona,
+} from "@/lib/content/types";
 
-export type Persona = "engineer" | "trader" | "photographer";
+/** Runtime persona union — kept in sync with `LaunchedPersona` from the content contract. */
+export type Persona = LaunchedPersona;
 
 export const PERSONA_ORDER: Persona[] = ["engineer", "trader", "photographer"];
 
@@ -11,53 +23,75 @@ const STORAGE_KEY = "portfolio-persona";
 type PersonaContextValue = {
   persona: Persona;
   setPersona: (p: Persona) => void;
+  /** True after the first client sync from route or sessionStorage. */
+  personaHydrated: boolean;
 };
 
 const PersonaContext = createContext<PersonaContextValue | null>(null);
 
+function readStoredPersona(): Persona | null {
+  try {
+    const saved = sessionStorage.getItem(STORAGE_KEY);
+    if (saved && isLaunchedPersona(saved)) return saved;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function personaFromPathname(pathname: string): Persona | null {
+  const segment = pathname.split("/").filter(Boolean)[0];
+  if (segment && isLaunchedPersona(segment)) return segment;
+  return null;
+}
+
 export function PersonaProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [persona, setPersonaState] = useState<Persona>("engineer");
+  const [personaHydrated, setPersonaHydrated] = useState(false);
 
   const setPersona = useCallback((p: Persona) => {
     setPersonaState(p);
   }, []);
 
+  // Route wins; on `/` restore session (or engineer if never set).
   useEffect(() => {
+    const fromRoute = personaFromPathname(pathname);
+    if (fromRoute) {
+      queueMicrotask(() => {
+        setPersonaState(fromRoute);
+        setPersonaHydrated(true);
+      });
+      return;
+    }
+
+    if (pathname === "/" || pathname === "") {
+      const stored = readStoredPersona();
+      queueMicrotask(() => {
+        setPersonaState(stored ?? "engineer");
+        setPersonaHydrated(true);
+      });
+      return;
+    }
+
+    queueMicrotask(() => setPersonaHydrated(true));
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!personaHydrated) return;
     document.documentElement.setAttribute("data-persona", persona);
     try {
       sessionStorage.setItem(STORAGE_KEY, persona);
     } catch {
       /* ignore */
     }
-  }, [persona]);
+  }, [persona, personaHydrated]);
 
-  useEffect(() => {
-    const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
-    if (!nav) return;
-
-    if (nav.type === "reload" || nav.type === "navigate") {
-      try {
-        sessionStorage.removeItem(STORAGE_KEY);
-      } catch {
-        /* ignore */
-      }
-      queueMicrotask(() => setPersonaState("engineer"));
-      return;
-    }
-
-    if (nav.type === "back_forward") {
-      try {
-        const saved = sessionStorage.getItem(STORAGE_KEY);
-        if (saved === "trader" || saved === "photographer" || saved === "engineer") {
-          queueMicrotask(() => setPersonaState(saved));
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-  }, []);
-
-  return <PersonaContext.Provider value={{ persona, setPersona }}>{children}</PersonaContext.Provider>;
+  return (
+    <PersonaContext.Provider value={{ persona, setPersona, personaHydrated }}>
+      {children}
+    </PersonaContext.Provider>
+  );
 }
 
 export function usePersona() {
