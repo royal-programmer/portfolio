@@ -11,6 +11,7 @@ so the schema is reproducible and reviewable (never clicked together in the UI).
 | `migrations/0002_rls_policies.sql` | `admins` table + `is_admin()`, enables RLS, grants Data API access, and all read/write policies. |
 | `migrations/0003_seed_personas.sql` | Seeds the six persona rows (idempotent). |
 | `migrations/0004_service_role_grants.sql` | Grants table privileges to `service_role` (needed because "auto-expose new tables" is OFF). |
+| `migrations/0005_add_entry_slug.sql` | Adds `entries.slug` (unique per persona) for clean `/[persona]/[slug]` detail URLs. |
 
 All three are safe to re-run (guarded enums, `if not exists`, `on conflict` upsert,
 `drop policy if exists` before create).

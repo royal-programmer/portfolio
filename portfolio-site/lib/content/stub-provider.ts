@@ -50,6 +50,13 @@ export const stubProvider: ContentApi = {
     return entry as Entry;
   },
 
+  async getEntryBySlug(persona: PersonaSlug, slug, opts) {
+    const entry = STUB_ENTRIES.find((e) => e.personaSlug === persona && e.slug === slug);
+    if (!entry) return null;
+    if (!isVisible(entry.visibility, opts)) return null;
+    return entry as Entry;
+  },
+
   async listBlogPosts(persona: PersonaSlug, opts) {
     return STUB_BLOG_POSTS.filter(
       (b) => b.personaSlug === persona && isVisible(b.visibility, opts),

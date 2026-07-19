@@ -91,6 +91,7 @@ function mapEntry(r: Row): Entry {
     id: r.id as string,
     personaSlug: r.persona_slug as PersonaSlug,
     type: r.type as EntryType,
+    slug: (r.slug as string) ?? "",
     title: r.title as string,
     summary: (r.summary as string) ?? undefined,
     body: (r.body as string) ?? undefined,
@@ -168,6 +169,17 @@ export const supabaseProvider: ContentApi = {
       .from("entries")
       .select(ENTRY_SELECT)
       .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? mapEntry(data) : null;
+  },
+
+  async getEntryBySlug(persona: PersonaSlug, slug, opts) {
+    const { data, error } = await db(opts)
+      .from("entries")
+      .select(ENTRY_SELECT)
+      .eq("persona_slug", persona)
+      .eq("slug", slug)
       .maybeSingle();
     if (error) throw error;
     return data ? mapEntry(data) : null;

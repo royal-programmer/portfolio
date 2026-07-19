@@ -33,6 +33,8 @@ export const getPersona: ContentApi["getPersona"] = (slug, opts) =>
 export const listEntries: ContentApi["listEntries"] = (persona, opts) =>
   activeProvider.listEntries(persona, opts);
 export const getEntry: ContentApi["getEntry"] = (id, opts) => activeProvider.getEntry(id, opts);
+export const getEntryBySlug: ContentApi["getEntryBySlug"] = (persona, slug, opts) =>
+  activeProvider.getEntryBySlug(persona, slug, opts);
 export const listBlogPosts: ContentApi["listBlogPosts"] = (persona, opts) =>
   activeProvider.listBlogPosts(persona, opts);
 export const getBlogPost: ContentApi["getBlogPost"] = (persona, slug, opts) =>

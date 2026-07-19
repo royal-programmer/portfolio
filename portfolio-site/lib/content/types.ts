@@ -236,6 +236,8 @@ export interface BaseEntry<T extends EntryType = EntryType> {
   id: string;
   personaSlug: PersonaSlug;
   type: T;
+  /** URL-safe slug, unique within a persona. Powers `/[persona]/[slug]`. */
+  slug: string;
   title: string;
   summary?: string;
   /** Long-form markdown body. */
@@ -313,6 +315,12 @@ export interface ContentApi {
   getPersona(slug: string, opts?: ContentQueryOptions): Promise<Persona | null>;
   listEntries(persona: PersonaSlug, opts?: ContentQueryOptions): Promise<Entry[]>;
   getEntry(id: string, opts?: ContentQueryOptions): Promise<Entry | null>;
+  /** Fetch a single entry by its persona + slug (for detail pages). */
+  getEntryBySlug(
+    persona: PersonaSlug,
+    slug: string,
+    opts?: ContentQueryOptions,
+  ): Promise<Entry | null>;
   listBlogPosts(persona: PersonaSlug, opts?: ContentQueryOptions): Promise<BlogPost[]>;
   getBlogPost(
     persona: PersonaSlug,
