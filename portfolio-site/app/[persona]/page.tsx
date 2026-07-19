@@ -1,29 +1,16 @@
 import type { Metadata } from "next";
 import {
+  getPersona,
   isLaunchedPersona,
   LAUNCHED_PERSONAS,
   type LaunchedPersona,
-} from "@/lib/content/types";
+} from "@/lib/content";
 import { HomePage } from "../components/home-page";
+import { loadHomeContent } from "../load-home-content";
 import { InvalidPersonaView } from "./invalid-persona-view";
 
 type PersonaPageProps = {
   params: Promise<{ persona: string }>;
-};
-
-const PERSONA_META: Record<LaunchedPersona, { title: string; description: string }> = {
-  engineer: {
-    title: "Engineer Mode | Ratul Roy",
-    description: "Fast, scalable web products with premium UX.",
-  },
-  trader: {
-    title: "Trader Mode | Ratul Roy",
-    description: "Setups, probabilities, and system-first execution.",
-  },
-  photographer: {
-    title: "Photographer Mode | Ratul Roy",
-    description: "Light, composition, and visual storytelling.",
-  },
 };
 
 export function generateStaticParams() {
@@ -32,23 +19,42 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: PersonaPageProps): Promise<Metadata> {
   const { persona } = await params;
-  if (isLaunchedPersona(persona)) {
-    return PERSONA_META[persona];
+  if (!isLaunchedPersona(persona)) {
+    return {
+      title: "Persona not found | Ratul Roy",
+      description: "That persona mode isn’t available on this site.",
+      robots: { index: false, follow: false },
+    };
   }
+
+  const record = await getPersona(persona);
+  if (!record) {
+    return {
+      title: `${persona} | Ratul Roy`,
+      description: "Multi-persona portfolio.",
+    };
+  }
+
   return {
-    title: "Persona not found | Ratul Roy",
-    description: "That persona mode isn’t available on this site.",
-    robots: { index: false, follow: false },
+    title: `${record.label} | Ratul Roy`,
+    description: record.body,
   };
 }
 
 export default async function PersonaPage({ params }: PersonaPageProps) {
   const { persona } = await params;
 
-  if (isLaunchedPersona(persona)) {
-    return <HomePage routePersona={persona} />;
+  if (!isLaunchedPersona(persona)) {
+    return <InvalidPersonaView attempted={persona} />;
   }
 
-  // Keep the bad segment in the URL (no replace) so the mistake stays shareable/debuggable.
-  return <InvalidPersonaView attempted={persona} />;
+  const { personas, engineerEntries } = await loadHomeContent();
+  const launched = persona as LaunchedPersona;
+  return (
+    <HomePage
+      routePersona={launched}
+      personas={personas}
+      engineerEntries={engineerEntries}
+    />
+  );
 }

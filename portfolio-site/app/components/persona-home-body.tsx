@@ -2,6 +2,7 @@
 
 import { BarChart3, CalendarDays, ImageIcon } from "lucide-react";
 import { forwardRef } from "react";
+import type { Entry } from "@/lib/content";
 import type { Persona } from "../persona-provider";
 import type { PersonaContent } from "./site-content";
 import { HomeHero } from "./home-hero";
@@ -103,10 +104,11 @@ function PhotographerGalleryStrip() {
 type PersonaHomeBodyProps = {
   persona: Persona;
   content: PersonaContent;
+  engineerEntries: Entry[];
 };
 
 export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, PersonaHomeBodyProps>(
-  function PersonaHomeBody({ persona, content }, ref) {
+  function PersonaHomeBody({ persona, content, engineerEntries }, ref) {
     return (
       <PersonaMotionOrchestrator ref={ref}>
         {persona === "engineer" && (
@@ -120,7 +122,7 @@ export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, Perso
               </PersonaMotionSlot>
             </section>
             <PersonaMotionSlot id="eng-projects" dir="down" exitOrder={2} enterOrder={2}>
-              <ProjectsGrid />
+              <ProjectsGrid entries={engineerEntries} />
             </PersonaMotionSlot>
           </>
         )}

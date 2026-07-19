@@ -54,7 +54,7 @@ export function PersonaProvider({ children }: { children: React.ReactNode }) {
     setPersonaState(p);
   }, []);
 
-  // Route wins; on `/` restore session (or engineer if never set).
+  // Route wins; on `/` or `/whoami` restore session (or engineer if never set).
   useEffect(() => {
     const fromRoute = personaFromPathname(pathname);
     if (fromRoute) {
@@ -65,7 +65,7 @@ export function PersonaProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (pathname === "/" || pathname === "") {
+    if (pathname === "/" || pathname === "" || pathname === "/whoami") {
       const stored = readStoredPersona();
       queueMicrotask(() => {
         setPersonaState(stored ?? "engineer");

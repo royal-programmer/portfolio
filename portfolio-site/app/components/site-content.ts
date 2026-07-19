@@ -1,39 +1,14 @@
 import { Monitor, Moon, Sun } from "lucide-react";
+import type { Persona as PersonaRecord } from "@/lib/content";
 import type { Persona } from "../persona-provider";
 
 export type UiTheme = "system" | "light" | "dark";
 
-export const PERSONA_CONTENT = {
-  engineer: {
-    label: "Engineer Mode",
-    eyebrow: "Developer + Software Engineer",
-    heading: "I design fast, scalable web products with premium UX.",
-    body: "Building clean systems, modern interfaces, and reliable backends from idea to launch.",
-    accent: "#3b82f6",
-    cta: "View engineering projects",
-    points: ["Next.js + TypeScript", "System architecture", "API and backend integration"],
-  },
-  trader: {
-    label: "Trader Mode",
-    eyebrow: "Quant Mind + Risk Discipline",
-    heading: "I track setups, probabilities, and execution with system-first thinking.",
-    body: "Focused on process quality, risk control, and repeatable decisions across market cycles.",
-    accent: "#22c55e",
-    cta: "Explore trading journal",
-    points: ["Risk-managed strategy", "Data-backed journaling", "Daily review workflow"],
-  },
-  photographer: {
-    label: "Photographer Mode",
-    eyebrow: "Lens Focus + Composition",
-    heading: "I capture light, shape stories, and design visuals.",
-    body: "From portraits to street scenes, I focus on framing, timing, and atmosphere.",
-    accent: "#ec4899",
-    cta: "View photography",
-    points: ["Portrait lighting", "Street composition", "Editing + color grading"],
-  },
-} as const;
-
-export type PersonaContent = (typeof PERSONA_CONTENT)[Persona];
+/** Presentation fields used by hero / identity panels — sourced from `@/lib/content`. */
+export type PersonaContent = Pick<
+  PersonaRecord,
+  "label" | "eyebrow" | "heading" | "body" | "accent" | "cta" | "points"
+>;
 
 export const PERSONA_BACKGROUNDS: Record<Persona, string> = {
   engineer:

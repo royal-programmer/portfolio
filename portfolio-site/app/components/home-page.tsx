@@ -20,18 +20,33 @@ import {
   CHAT_MIN_THINKING_MS,
   CHAT_TYPING_MIN_BUFFER_MS,
   KONAMI,
-  PERSONA_CONTENT,
   QUICK_STACK_EXIT_MS,
   SOCIAL_LINKS,
+  type PersonaContent,
   type UiTheme,
 } from "./site-content";
+import type { Entry, Persona as PersonaRecord } from "@/lib/content";
 
 type HomePageProps = {
   /** When set, this page was opened via `/[persona]` — play a one-shot enter motion. */
   routePersona?: Persona;
+  /** Published personas from `@/lib/content` (server-fetched). */
+  personas: PersonaRecord[];
+  /** Engineer project entries (may be empty against a fresh DB). */
+  engineerEntries: Entry[];
 };
 
-export function HomePage({ routePersona }: HomePageProps) {
+const CONTENT_FALLBACK: PersonaContent = {
+  label: "Portfolio",
+  eyebrow: "Loading",
+  heading: "Content is catching up.",
+  body: "Persona copy will appear once the content layer responds.",
+  accent: "#3b82f6",
+  cta: "Explore",
+  points: [],
+};
+
+export function HomePage({ routePersona, personas, engineerEntries }: HomePageProps) {
   const { persona, setPersona, personaHydrated } = usePersona();
   const pathname = usePathname();
   const router = useRouter();
@@ -61,7 +76,19 @@ export function HomePage({ routePersona }: HomePageProps) {
   const chatInnerRef = useRef<HTMLDivElement | null>(null);
   const leadInlineFieldRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const personaOrchestratorRef = useRef<PersonaMotionOrchestratorHandle | null>(null);
-  const content = useMemo(() => PERSONA_CONTENT[persona], [persona]);
+  const content = useMemo(() => {
+    const match = personas.find((p) => p.slug === persona);
+    if (!match) return CONTENT_FALLBACK;
+    return {
+      label: match.label,
+      eyebrow: match.eyebrow,
+      heading: match.heading,
+      body: match.body,
+      accent: match.accent,
+      cta: match.cta,
+      points: match.points,
+    };
+  }, [persona, personas]);
   const effectiveTransitionsRef = useRef(effectiveTransitions);
   effectiveTransitionsRef.current = effectiveTransitions;
 
@@ -548,7 +575,12 @@ export function HomePage({ routePersona }: HomePageProps) {
         aria-busy={washOpen}
         aria-live="polite"
       >
-        <PersonaHomeBody ref={personaOrchestratorRef} persona={persona} content={content} />
+        <PersonaHomeBody
+          ref={personaOrchestratorRef}
+          persona={persona}
+          content={content}
+          engineerEntries={engineerEntries}
+        />
       </div>
 
       <BubbleDock
