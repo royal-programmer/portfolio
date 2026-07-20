@@ -5,7 +5,33 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
-## Phase 0 — content engine (in progress)
+## Phase 1 — Engineer in depth (in progress)
+
+### Landed — Claude (data/capture lane)
+- `48d643d` entry **slug** (contract + providers + `0005` migration) → clean `/[persona]/[slug]` URLs.
+- `d29d87f` **admin write path**: `@supabase/ssr` cookie-bound client (`lib/db/server.ts`),
+  `requireAdmin()` guard, `/capture/login` (email+password, single admin), `/capture/admin`
+  (create Engineer projects + list existing), server actions (auth re-verified, RLS-scoped
+  writes), `0006` admins self-read policy.
+- Decisions `D17` (root=engineer, `/whoami`=card hub), `D18` (RLS-scoped admin writes).
+
+### Landed — Cursor (UI lane)
+- `21f0556` **project detail pages** `/[persona]/[slug]` + **`/whoami` persona hub**; "View project" now links through.
+
+### Verified
+- Full build green (routes: `/`, `/[persona]`, `/[persona]/[slug]`, `/whoami`, `/capture/login`, `/capture/admin`).
+- Auth guard smoke test: unauthenticated `/capture/admin` → 307 → `/capture/login`; login renders 200.
+
+### Pending — Ratul (to close the loop)
+1. Apply migrations **`0005`** (entry slug) and **`0006`** (admins self-read) in SQL editor.
+2. `npm run dev` → visit `/capture/login`, sign in (your admin email + password), create an
+   Engineer project (set visibility **public**), then check it renders on `/engineer` and its
+   detail page at `/engineer/<slug>`.
+3. `.mcp.json` (from `claude mcp add`) is untracked — decide whether to commit it (project-scoped MCP config; contains the project ref, no secrets).
+
+---
+
+## Phase 0 — content engine (COMPLETE, verified)
 
 **Branch:** `phase-0-content-engine` (shared working repo; not yet pushed).
 
