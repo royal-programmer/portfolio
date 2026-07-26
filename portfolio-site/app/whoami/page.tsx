@@ -48,8 +48,8 @@ export default async function WhoAmIPage() {
         }}
       />
 
-      <div className="relative z-10 mx-auto w-full max-w-5xl px-6 py-16 md:px-10 md:py-24">
-        <header className="mb-12 max-w-2xl space-y-4">
+      <div className="relative z-10 mx-auto w-full max-w-[90rem] px-4 py-14 sm:px-6 md:px-8 md:py-20 lg:px-10">
+        <header className="mb-10 max-w-2xl space-y-4 md:mb-12">
           <p className="font-mono text-xs tracking-[0.22em] text-stone-500 uppercase">Who am I</p>
           <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">Know me more</h1>
           <p className="text-lg leading-relaxed text-stone-600">

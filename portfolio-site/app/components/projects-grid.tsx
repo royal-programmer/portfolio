@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import type { Entry } from "@/lib/content";
+import { SITE_SECTION } from "./site-shell";
 
 type ProjectsGridProps = {
   entries: Entry[];
@@ -10,14 +11,90 @@ type ProjectsGridProps = {
   personaSlug?: string;
 };
 
+function ProjectCard({
+  entry,
+  personaSlug,
+  idx,
+  featured = false,
+}: {
+  entry: Entry;
+  personaSlug: string;
+  idx: number;
+  featured?: boolean;
+}) {
+  const stack = entry.type === "project" ? entry.data.techStack : [];
+  const detailHref = `/${personaSlug}/${entry.slug}`;
+
+  return (
+    <motion.article
+      initial={{ opacity: 0, y: 18 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: idx * 0.1 }}
+      viewport={{ once: true }}
+      className={`rounded-3xl border p-5 backdrop-blur-xl sm:p-6 ${featured ? "md:p-8" : ""}`}
+      style={{ backgroundColor: "var(--surface-bg)", borderColor: "var(--surface-border)" }}
+    >
+      <h3 className={`mb-3 font-semibold ${featured ? "text-2xl md:text-3xl" : "text-xl"}`}>
+        {entry.title}
+      </h3>
+      <p
+        className={`text-[var(--muted)] ${featured ? "max-w-3xl text-base md:text-lg" : "text-sm sm:text-base"}`}
+      >
+        {entry.summary ?? entry.body ?? ""}
+      </p>
+      {stack.length > 0 ? (
+        <ul className="mt-4 flex flex-wrap gap-2">
+          {stack.map((tech) => (
+            <li
+              key={tech}
+              className="rounded-full border px-2.5 py-0.5 text-xs text-[var(--muted)]"
+              style={{ borderColor: "var(--chip-border)", backgroundColor: "var(--chip-bg)" }}
+            >
+              {tech}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="mt-5 flex flex-wrap gap-3 text-sm">
+        <Link
+          href={detailHref}
+          className="min-h-11 inline-flex items-center font-medium text-[var(--accent)] underline-offset-4 hover:underline sm:min-h-0"
+        >
+          View project
+        </Link>
+        {entry.type === "project" && entry.data.deployedUrl ? (
+          <a
+            href={entry.data.deployedUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="min-h-11 inline-flex items-center font-medium text-[var(--muted)] underline-offset-4 hover:underline sm:min-h-0"
+          >
+            Live
+          </a>
+        ) : null}
+        {entry.type === "project" && entry.data.repoUrl ? (
+          <a
+            href={entry.data.repoUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="min-h-11 inline-flex items-center font-medium text-[var(--muted)] underline-offset-4 hover:underline sm:min-h-0"
+          >
+            Code
+          </a>
+        ) : null}
+      </div>
+    </motion.article>
+  );
+}
+
 export function ProjectsGrid({ entries, personaSlug = "engineer" }: ProjectsGridProps) {
   const projects = entries.filter((entry) => entry.type === "project");
 
   if (projects.length === 0) {
     return (
-      <section className="mx-auto w-full max-w-6xl px-6 pb-24 md:px-10">
+      <section className={SITE_SECTION}>
         <div
-          className="rounded-3xl border border-dashed px-6 py-12 text-center backdrop-blur-xl"
+          className="rounded-3xl border border-dashed px-5 py-10 text-center backdrop-blur-xl sm:px-6 sm:py-12"
           style={{ backgroundColor: "var(--surface-bg)", borderColor: "var(--surface-border)" }}
         >
           <h3 className="mb-2 text-xl font-semibold">Projects coming soon</h3>
@@ -30,67 +107,25 @@ export function ProjectsGrid({ entries, personaSlug = "engineer" }: ProjectsGrid
     );
   }
 
+  // Sparse grids: avoid a lonely half-row on wide screens.
+  const layoutClass =
+    projects.length === 1
+      ? "grid grid-cols-1"
+      : projects.length === 2
+        ? "grid grid-cols-1 gap-6 md:grid-cols-2"
+        : "grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3";
+
   return (
-    <section className="mx-auto grid w-full max-w-6xl gap-6 px-6 pb-24 md:grid-cols-3 md:px-10">
-      {projects.map((entry, idx) => {
-        const stack = entry.type === "project" ? entry.data.techStack : [];
-        const detailHref = `/${personaSlug}/${entry.slug}`;
-        return (
-          <motion.article
-            key={entry.id}
-            initial={{ opacity: 0, y: 18 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: idx * 0.1 }}
-            viewport={{ once: true }}
-            className="rounded-3xl border p-6 backdrop-blur-xl"
-            style={{ backgroundColor: "var(--surface-bg)", borderColor: "var(--surface-border)" }}
-          >
-            <h3 className="mb-3 text-xl font-semibold">{entry.title}</h3>
-            <p className="text-[var(--muted)]">{entry.summary ?? entry.body ?? ""}</p>
-            {stack.length > 0 ? (
-              <ul className="mt-4 flex flex-wrap gap-2">
-                {stack.map((tech) => (
-                  <li
-                    key={tech}
-                    className="rounded-full border px-2.5 py-0.5 text-xs text-[var(--muted)]"
-                    style={{ borderColor: "var(--chip-border)", backgroundColor: "var(--chip-bg)" }}
-                  >
-                    {tech}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            <div className="mt-5 flex flex-wrap gap-3 text-sm">
-              <Link
-                href={detailHref}
-                className="font-medium text-[var(--accent)] underline-offset-4 hover:underline"
-              >
-                View project
-              </Link>
-              {entry.type === "project" && entry.data.deployedUrl ? (
-                <a
-                  href={entry.data.deployedUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium text-[var(--muted)] underline-offset-4 hover:underline"
-                >
-                  Live
-                </a>
-              ) : null}
-              {entry.type === "project" && entry.data.repoUrl ? (
-                <a
-                  href={entry.data.repoUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium text-[var(--muted)] underline-offset-4 hover:underline"
-                >
-                  Code
-                </a>
-              ) : null}
-            </div>
-          </motion.article>
-        );
-      })}
+    <section className={`${SITE_SECTION} ${layoutClass}`}>
+      {projects.map((entry, idx) => (
+        <ProjectCard
+          key={entry.id}
+          entry={entry}
+          personaSlug={personaSlug}
+          idx={idx}
+          featured={projects.length === 1}
+        />
+      ))}
     </section>
   );
 }

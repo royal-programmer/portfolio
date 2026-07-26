@@ -54,7 +54,7 @@ export default async function PersonaEntryPage({ params }: ProjectDetailProps) {
 
   return (
     <main className="min-h-screen bg-[var(--page-bg)] text-[var(--fg)]">
-      <div className="mx-auto w-full max-w-3xl px-6 py-16 md:px-10">
+      <div className="mx-auto w-full max-w-4xl px-4 py-12 sm:px-6 md:px-8 md:py-16 lg:px-10">
         <Link
           href={`/${persona}`}
           className="text-sm font-medium text-[var(--accent)] underline-offset-4 hover:underline"

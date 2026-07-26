@@ -34,7 +34,7 @@ export function HomeHeader({ onLogoPointerDown, onLogoPointerUp }: HomeHeaderPro
   const showRMark = reducedMotion ? false : showMark;
 
   return (
-    <header className="relative z-[55] mx-auto w-full max-w-6xl px-3 pb-0 pt-1.5 md:px-10 md:pt-2.5">
+    <header className="relative z-[55] mx-auto w-full max-w-[90rem] px-4 pb-0 pt-1.5 sm:px-6 md:px-8 md:pt-2.5 lg:px-10">
       <div className="relative inline-flex">
         <span
           className="pointer-events-none absolute -inset-4 rounded-full opacity-75 blur-2xl"
