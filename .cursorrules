@@ -1,0 +1,37 @@
+# Cursor rules — Ratul's portfolio (multi-agent repo)
+
+You share this repo with another AI agent, Claude Code, which owns the
+data/platform lane. The full lane map + protocol lives in `AGENTS.md` (repo
+root) — read it. Summary, as HARD constraints:
+
+## Your lane (you may edit)
+- `portfolio-site/app/**` — public pages, layout, UI components
+  (`app/components/**`), hooks (`app/hooks/**`), styles
+  — EXCEPT the Claude-owned carve-outs below.
+
+## NEVER edit (Claude's lane)
+- `portfolio-site/lib/**`          (data layer / content API — consume read-only)
+- `portfolio-site/supabase/**`     (schema, migrations, RLS)
+- `portfolio-site/app/api/**`      (route handlers)
+- `portfolio-site/app/capture/**`  (admin/capture surfaces)
+- `portfolio-site/scripts/**`
+- `docs/claude-planning/**`        (planning docs + progress log)
+- `docs/assessment/**`             (historical, read-only)
+- `.claude/**`
+
+## The shared contract
+`portfolio-site/lib/content/types.ts` is the agreed interface. Import from
+`@/lib/content` only. If you need a new field/shape: STOP, tell Ratul what you
+need and why — do NOT edit the contract, define parallel local types, or work
+around it. Claude extends the contract, then you build on it.
+
+## Protocol
+- If a task requires touching a NEVER-edit path: stop and tell Ratul exactly
+  what you need from Claude instead.
+- Commit small and often. Shared config edits (`package.json`,
+  `next.config.ts`, `tsconfig.json`, …) require an explicit
+  `chore(config): …` commit-message callout.
+- No destructive git (`reset --hard`, `checkout -- <file>`, force-push) —
+  uncommitted work may belong to the other agent.
+- Before building on `lib/content` data, re-read the current exports — Claude
+  may have extended the contract since your last read.

@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(printf '%s' '{\"cwd\":\"c:\\\\\\\\Users\\\\\\\\ratul.roy\\\\\\\\Desktop\\\\\\\\Temp\\\\\\\\Portfolio\",\"tool_input\":{\"file_path\":\"c:\\\\\\\\Users\\\\\\\\ratul.roy\\\\\\\\Desktop\\\\\\\\Temp\\\\\\\\Portfolio\\\\\\\\portfolio-site\\\\\\\\app\\\\\\\\components\\\\\\\\home-page.tsx\"}}')",
+      "Bash(node -e ' *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/lane-guard.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}

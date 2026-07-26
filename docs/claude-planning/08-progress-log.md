@@ -18,12 +18,47 @@ session) can resume without re-deriving state. Newest first.
 ### Landed — Cursor (UI lane)
 - `21f0556` **project detail pages** `/[persona]/[slug]` + **`/whoami` persona hub**; "View project" now links through.
 
+### Landed — Claude: multi-agent collaboration protocol (2026-07-20)
+- Root **`AGENTS.md`** (lane map + hard rules, auto-read by both agents) + root `CLAUDE.md`
+  loader; **`.cursorrules`** mirror for Cursor; rationale in
+  `docs/claude-planning/09-collaboration-protocol.md` (locks rejected → partition + enforcement).
+- **Mechanical enforcement (Claude side):** `.claude/hooks/lane-guard.mjs` PreToolUse hook
+  blocks Claude Edit/Write into Cursor lanes (`app/**` minus `api/` + `capture/` carve-outs);
+  registered in `.claude/settings.json` (project-shared). Negotiated exceptions via the
+  script's `OVERRIDES` list, Ratul-approved only.
+
+### Agreed — UI roadmap coordination (2026-07-20)
+
+Cursor proposed engineer-page phases: **A** responsive density (wider shell ~1400–1600px,
+featured layout for sparse grids, mobile pass) → **B** project-card media carousel +
+detail gallery/video → **C** quick links / resume CTA / certifications + **C2** career
+timeline + **C3** recent-blog strip → **D** GitHub stats panel → **E** polish.
+
+Verified against the contract — Cursor's dependencies on Claude's lane:
+
+| Needs | Status | Claude action (priority order) |
+|-------|--------|-------------------------------|
+| `entry.media` populated | Contract ✅, pipeline ❌ | **1. Media upload pipeline** (buckets: private originals + public derivatives, admin upload, thumb/optimized). Same pipeline Photography needs later. |
+| Profile links / resume URL | ❌ not in contract | **2. Contract additions:** `Persona.links[]`, `resumeUrl`; new entry types `certification` + `milestone` (+ migration + admin). |
+| Cert/experience types | ❌ not in contract | (same as above — `milestone` powers the career timeline) |
+| `getGitHubStats()` | ❌ doesn't exist | **3. Cached server accessor**, GitHub API + optional token env. |
+| Blog strip (`listBlogPosts`) | ✅ live already | None — buildable now, empty-state until posts exist. |
+
+Sequencing agreed-in-principle: **Cursor does Phase A now (zero Claude deps) while Claude
+lands items 1–2 in parallel; Cursor does NOT scaffold Phase C against guessed shapes** —
+contract types land first, then C builds on real types (avoids rework).
+
+Recommendations relayed to Ratul on Cursor's open questions: width "comfortably wide"
+(~1400–1600px) not full-bleed; hover-only auto-cycle + tappable dots on mobile;
+**omit exact DOB from the public timeline** (privacy; start at school / "first line of
+code"); timeline teaser below projects, subpage if it grows; blog = 3-card row, no carousel.
+
 ### Verified
 - Full build green (routes: `/`, `/[persona]`, `/[persona]/[slug]`, `/whoami`, `/capture/login`, `/capture/admin`).
 - Auth guard smoke test: unauthenticated `/capture/admin` → 307 → `/capture/login`; login renders 200.
 
 ### Pending — Ratul (to close the loop)
-1. Apply migrations **`0005`** (entry slug) and **`0006`** (admins self-read) in SQL editor.
+1. ✅ ~~Apply migrations `0005` (entry slug) and `0006` (admins self-read)~~ — applied 2026-07-20.
 2. `npm run dev` → visit `/capture/login`, sign in (your admin email + password), create an
    Engineer project (set visibility **public**), then check it renders on `/engineer` and its
    detail page at `/engineer/<slug>`.
