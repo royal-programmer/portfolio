@@ -7,6 +7,46 @@ session) can resume without re-deriving state. Newest first.
 
 ## Phase 1 — Engineer in depth (in progress)
 
+### Landed — Claude: media upload pipeline (2026-07-20)
+
+Ships the reusable image pipeline (D19). Fully verified against the live DB.
+
+- **Deps** (`chore(config)`): `sharp` (derivatives) + `exifr` (EXIF); `next.config.ts`
+  `serverExternalPackages: ["sharp"]`.
+- **`supabase/migrations/0007_media_storage.sql`**: `originals` (private) + `media`
+  (public) buckets; storage RLS — admin-only writes via `is_admin()`, public read on `media`.
+- **`lib/media/config.ts`** (buckets, derivative specs, accepted types, size cap) +
+  **`lib/media/pipeline.ts`** — `ingestImage(client, params)`: downloads original →
+  sharp thumb(400)/optimized(1280)/full(2400) WebP, auto-oriented → uploads derivatives →
+  `exifr` EXIF+GPS → inserts media row. Transport-agnostic; caller supplies the client
+  (server action = RLS session client; script = service role).
+- **`lib/db/browser.ts`** — session-bound browser client for direct-to-storage upload
+  (bypasses the Vercel ~4.5MB body limit; no service key in the browser).
+- **`app/capture/actions.ts`** — `createProject` now returns `entryId`; new
+  `registerUploadedMedia({entryId, originalPath, …})` verifies admin, runs the pipeline,
+  revalidates the persona/detail/admin paths.
+- **`app/capture/admin/media-uploader.tsx`** + wired into `project-form.tsx` — after a
+  project is created, upload images (direct to `originals`, then finalize) with per-file
+  status + thumbnails.
+
+**Verified:** `scripts/verify-media.mjs` (live) — buckets present, original uploaded
+private, thumb+optimized+full generated, optimized publicly fetchable (200/webp), original
+NOT publicly fetchable (400), EXIF path graceful, anon sees public media via the entries
+join, temp data cleaned up → **ALL CHECKS PASSED**. Full `npm run build` green; `tsc`
+clean; lint clean on changed files.
+
+**Provider note for Cursor:** no contract change needed — `supabase-provider` already
+selects `media(*)` and maps it (sorted by `order`), so `entry.media` is populated the
+moment images are ingested. Build carousels straight off `entry.media[].thumbUrl /
+optimizedUrl / fullUrl` (+ `width`/`height` for aspect ratio, `alt`).
+
+### Pending — Ratul (to enable the uploader)
+1. **Apply `0007`** in the SQL editor. The smoke test already created the buckets, but only
+   `0007` installs the RLS **policies** that authorize the admin *session* to upload from the
+   browser. Until then `/capture/admin` image upload fails RLS (service-role scripts still work).
+2. Then in `/capture/admin`: create a project → add an image → confirm the thumbnail renders,
+   and that `entry.media` shows on `/engineer/<slug>` once Cursor's gallery lands.
+
 ### Landed — Claude (data/capture lane)
 - `48d643d` entry **slug** (contract + providers + `0005` migration) → clean `/[persona]/[slug]` URLs.
 - `d29d87f` **admin write path**: `@supabase/ssr` cookie-bound client (`lib/db/server.ts`),
