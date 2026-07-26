@@ -2,10 +2,11 @@
 
 import { BarChart3, CalendarDays, ImageIcon } from "lucide-react";
 import { forwardRef } from "react";
-import type { Entry } from "@/lib/content";
+import type { BlogPost, Entry } from "@/lib/content";
 import type { Persona } from "../persona-provider";
 import type { PersonaContent } from "./site-content";
 import { SITE_SHELL } from "./site-shell";
+import { BlogPostsStrip } from "./blog-posts-strip";
 import { HomeHero } from "./home-hero";
 import { IdentityPanel } from "./identity-panel";
 import {
@@ -106,10 +107,11 @@ type PersonaHomeBodyProps = {
   persona: Persona;
   content: PersonaContent;
   engineerEntries: Entry[];
+  engineerBlogPosts: BlogPost[];
 };
 
 export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, PersonaHomeBodyProps>(
-  function PersonaHomeBody({ persona, content, engineerEntries }, ref) {
+  function PersonaHomeBody({ persona, content, engineerEntries, engineerBlogPosts }, ref) {
     return (
       <PersonaMotionOrchestrator ref={ref}>
         {persona === "engineer" && (
@@ -124,6 +126,9 @@ export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, Perso
             </section>
             <PersonaMotionSlot id="eng-projects" dir="down" exitOrder={2} enterOrder={2}>
               <ProjectsGrid entries={engineerEntries} personaSlug="engineer" />
+            </PersonaMotionSlot>
+            <PersonaMotionSlot id="eng-blog" dir="down" exitOrder={3} enterOrder={3}>
+              <BlogPostsStrip posts={engineerBlogPosts} personaSlug="engineer" />
             </PersonaMotionSlot>
           </>
         )}

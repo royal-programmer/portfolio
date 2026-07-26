@@ -25,7 +25,7 @@ import {
   type PersonaContent,
   type UiTheme,
 } from "./site-content";
-import type { Entry, Persona as PersonaRecord } from "@/lib/content";
+import type { Entry, BlogPost, Persona as PersonaRecord } from "@/lib/content";
 
 type HomePageProps = {
   /** When set, this page was opened via `/[persona]` — play a one-shot enter motion. */
@@ -34,6 +34,8 @@ type HomePageProps = {
   personas: PersonaRecord[];
   /** Engineer project entries (may be empty against a fresh DB). */
   engineerEntries: Entry[];
+  /** Engineer blog posts for the recent-writing strip. */
+  engineerBlogPosts: BlogPost[];
 };
 
 const CONTENT_FALLBACK: PersonaContent = {
@@ -46,7 +48,12 @@ const CONTENT_FALLBACK: PersonaContent = {
   points: [],
 };
 
-export function HomePage({ routePersona, personas, engineerEntries }: HomePageProps) {
+export function HomePage({
+  routePersona,
+  personas,
+  engineerEntries,
+  engineerBlogPosts,
+}: HomePageProps) {
   const { persona, setPersona, personaHydrated } = usePersona();
   const pathname = usePathname();
   const router = useRouter();
@@ -580,6 +587,7 @@ export function HomePage({ routePersona, personas, engineerEntries }: HomePagePr
           persona={persona}
           content={content}
           engineerEntries={engineerEntries}
+          engineerBlogPosts={engineerBlogPosts}
         />
       </div>
 

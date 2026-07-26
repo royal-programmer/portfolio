@@ -48,13 +48,14 @@ export default async function PersonaPage({ params }: PersonaPageProps) {
     return <InvalidPersonaView attempted={persona} />;
   }
 
-  const { personas, engineerEntries } = await loadHomeContent();
+  const { personas, engineerEntries, engineerBlogPosts } = await loadHomeContent();
   const launched = persona as LaunchedPersona;
   return (
     <HomePage
       routePersona={launched}
       personas={personas}
       engineerEntries={engineerEntries}
+      engineerBlogPosts={engineerBlogPosts}
     />
   );
 }
