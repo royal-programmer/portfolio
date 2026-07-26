@@ -12,9 +12,16 @@ so the schema is reproducible and reviewable (never clicked together in the UI).
 | `migrations/0003_seed_personas.sql` | Seeds the six persona rows (idempotent). |
 | `migrations/0004_service_role_grants.sql` | Grants table privileges to `service_role` (needed because "auto-expose new tables" is OFF). |
 | `migrations/0005_add_entry_slug.sql` | Adds `entries.slug` (unique per persona) for clean `/[persona]/[slug]` detail URLs. |
+| `migrations/0006_admins_self_read.sql` | Lets an admin read their OWN `admins` row (so `is_admin()` works from the session client) without exposing the admin list. |
+| `migrations/0007_media_storage.sql` | Storage buckets (`originals` private, `media` public) + RLS policies: admin-only writes (via `is_admin()`), public read on `media`. Powers the media pipeline. |
 
-All three are safe to re-run (guarded enums, `if not exists`, `on conflict` upsert,
-`drop policy if exists` before create).
+All are safe to re-run (guarded enums, `if not exists`, `on conflict` upsert,
+`drop policy if exists` before create, bucket upsert).
+
+> **Media note:** the smoke test (`scripts/verify-media.mjs`) will create the two
+> buckets if missing, but only `0007` installs the RLS **policies** that let the
+> admin *session* (the browser direct-upload) write to storage. Apply `0007`
+> before using the uploader in `/capture/admin`, or uploads will fail RLS.
 
 ## How to apply
 

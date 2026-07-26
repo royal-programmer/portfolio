@@ -2,12 +2,32 @@
 
 import { useActionState } from "react";
 import { createProject, type ActionState } from "../actions";
+import { MediaUploader } from "./media-uploader";
 
 const inputCls = "rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2";
 const labelCls = "flex flex-col gap-1 text-sm";
 
 export function ProjectForm() {
   const [state, action, pending] = useActionState<ActionState, FormData>(createProject, {});
+
+  // Once the project exists we have its id — reveal the image uploader for it.
+  if (state.ok && state.entryId) {
+    return (
+      <div className="flex flex-col gap-4">
+        <p className="text-sm text-green-400">
+          Project created. Add images below, then reload to start another.
+        </p>
+        <MediaUploader entryId={state.entryId} />
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="self-start rounded-md border border-neutral-700 px-3 py-2 text-sm"
+        >
+          Create another project
+        </button>
+      </div>
+    );
+  }
 
   return (
     <form action={action} className="flex flex-col gap-4">
