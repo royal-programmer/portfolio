@@ -1,0 +1,76 @@
+# Weekly encrypted backup of the Supabase database.
+#
+# The repo is PUBLIC and workflow artifacts on public repos are downloadable by
+# any signed-in GitHub user — so the dump is encrypted (AES-256, gpg symmetric)
+# with BACKUP_PASSPHRASE before upload. Never upload plaintext dumps.
+#
+# Setup + restore steps: portfolio-site/supabase/README.md → "Keep-alive & backups".
+name: supabase-backup
+
+on:
+  schedule:
+    - cron: "41 3 * * 0" # Sundays, 03:41 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+
+      - name: Ensure Supabase is awake
+        env:
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: bash .github/scripts/supabase-ensure-awake.sh
+
+      - name: Check secrets
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          [[ -n "$SUPABASE_DB_URL" ]] || { echo "::error::SUPABASE_DB_URL secret missing"; exit 1; }
+          [[ -n "$BACKUP_PASSPHRASE" ]] || { echo "::error::BACKUP_PASSPHRASE secret missing — refusing to upload an unencrypted dump"; exit 1; }
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Dump roles, schema, data
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          mkdir -p dump
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f dump/roles.sql --role-only
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f dump/schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f dump/data.sql --data-only --use-copy
+          ls -la dump
+
+      - name: Encrypt
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          stamp="$(date -u +%Y-%m-%d)"
+          tar -czf "supabase-${stamp}.tar.gz" dump
+          gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 \
+            --passphrase "$BACKUP_PASSPHRASE" -o "supabase-${stamp}.tar.gz.gpg" "supabase-${stamp}.tar.gz"
+          rm -rf dump "supabase-${stamp}.tar.gz"
+          echo "STAMP=$stamp" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup-${{ env.STAMP }}
+          path: supabase-${{ env.STAMP }}.tar.gz.gpg
+          retention-days: 90
+          if-no-files-found: error
