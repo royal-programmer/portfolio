@@ -68,3 +68,20 @@ Layers, strongest first:
 branch, merged via PRs. Perfect isolation, more ceremony. Adopt only if the
 lane system demonstrably fails — at current scale it has produced zero
 collisions across Phases 0–1.
+
+---
+
+## Update 2026-11-01 — Claude owns the codebase; Cursor reviews
+
+Ratul's decision for the immersive redesign: the UI/data lane split is retired.
+**Claude builds everything** (frontend + data + platform) so the vision is
+driven end-to-end; **Cursor is the reviewer / third perspective** — read-only
+by default, writes review notes to `docs/reviews/`, and only edits code on an
+explicitly assigned task on its own `cursor/<topic>` branch.
+
+Why: the 3D/immersive work couples data, performance, and visuals tightly; the
+contract → brief → handoff loop through Ratul was the bottleneck. Review is
+more valuable from a fresh pair of eyes than parallel building.
+
+Enforcement updated: `AGENTS.md`, `.cursorrules`, and `lane-guard.mjs` (now
+blocks only `docs/assessment/**`).

@@ -1,37 +1,27 @@
 # Cursor rules — Ratul's portfolio (multi-agent repo)
 
-You share this repo with another AI agent, Claude Code, which owns the
-data/platform lane. The full lane map + protocol lives in `AGENTS.md` (repo
-root) — read it. Summary, as HARD constraints:
+You share this repo with Claude Code, which is the **builder and owns the whole
+codebase** (since 2026-11-01). Your role is **reviewer / third perspective**.
+Full protocol: `AGENTS.md` (repo root) — read it. HARD constraints:
 
-## Your lane (you may edit)
-- `portfolio-site/app/**` — public pages, layout, UI components
-  (`app/components/**`), hooks (`app/hooks/**`), styles
-  — EXCEPT the Claude-owned carve-outs below.
+## Default mode: READ-ONLY reviewer
+- Do NOT edit files in `portfolio-site/**`, `.github/**`, `.claude/**`,
+  `docs/claude-planning/**`, or `docs/assessment/**`.
+- When asked to review, look at: visual quality and hierarchy, motion feel,
+  responsiveness (390px → 1600px), accessibility (keyboard, focus, contrast,
+  reduced motion), performance (bundle, 3D cost, LCP/CLS), and code quality.
+- Put findings in `docs/reviews/YYYY-MM-DD-<topic>.md` (you may create files
+  there) or answer Ratul in chat. Be specific: file:line, screenshot
+  description, concrete suggestion, severity.
 
-## NEVER edit (Claude's lane)
-- `portfolio-site/lib/**`          (data layer / content API — consume read-only)
-- `portfolio-site/supabase/**`     (schema, migrations, RLS)
-- `portfolio-site/app/api/**`      (route handlers)
-- `portfolio-site/app/capture/**`  (admin/capture surfaces)
-- `portfolio-site/scripts/**`
-- `docs/claude-planning/**`        (planning docs + progress log)
-- `docs/assessment/**`             (historical, read-only)
-- `.claude/**`
+## Assigned tasks (only when Ratul explicitly assigns one)
+- Edit only the files the task names.
+- Work on a separate branch `cursor/<topic>`; never commit to Claude's working
+  branch. Claude reviews and merges.
+- `portfolio-site/lib/content/types.ts` is the content contract — import from
+  `@/lib/content`; never define parallel local types.
 
-## The shared contract
-`portfolio-site/lib/content/types.ts` is the agreed interface. Import from
-`@/lib/content` only. If you need a new field/shape: STOP, tell Ratul what you
-need and why — do NOT edit the contract, define parallel local types, or work
-around it. Claude extends the contract, then you build on it.
-
-## Protocol
-- If a task requires touching a NEVER-edit path: stop and tell Ratul exactly
-  what you need from Claude instead.
-- Commit small and often. Shared config edits (`package.json`,
-  `next.config.ts`, `tsconfig.json`, …) require an explicit
-  `chore(config): …` commit-message callout.
-- No destructive git (`reset --hard`, `checkout -- <file>`, force-push) —
-  uncommitted work may belong to the other agent.
-- Before building on `lib/content` data, re-read the current exports — Claude
-  may have extended the contract since your last read.
+## Always
+- No destructive git (`reset --hard`, `checkout -- <file>`, force-push).
+- Never commit secrets — the repo is public; `.env*` is gitignored.
+- Shared config edits need a `chore(config): …` commit message.

@@ -17,14 +17,11 @@ import { readFileSync } from "node:fs";
 // lowercase). Add entries ONLY with Ratul's explicit approval.
 const OVERRIDES = [];
 
-// Cursor-owned lanes (Claude must not write here).
-const CURSOR_LANES = [/^portfolio-site\/app\//];
+// Since 2026-11-01 Claude owns the whole codebase (AGENTS.md); only read-only
+// paths stay blocked. (Variable names kept so the logic below is unchanged.)
+const CURSOR_LANES = [/^docs\/assessment\//];
 
-// Claude-owned carve-outs inside app/.
-const CLAUDE_CARVEOUTS = [
-  /^portfolio-site\/app\/api\//,
-  /^portfolio-site\/app\/capture\//,
-];
+const CLAUDE_CARVEOUTS = [];
 
 let input;
 try {
@@ -56,12 +53,9 @@ const blocked =
 
 if (blocked) {
   console.error(
-    `LANE GUARD — blocked: "${p}" is in Cursor's lane (app UI), per AGENTS.md.\n` +
-      "Options:\n" +
-      "  1) Hand this change to Cursor via Ratul (preferred), or\n" +
-      "  2) if Ratul explicitly approved this cross-lane edit, add the exact\n" +
-      "     repo-relative path to OVERRIDES in .claude/hooks/lane-guard.mjs, retry,\n" +
-      "     and remove it again when done.",
+    `LANE GUARD — blocked: "${p}" is a read-only path, per AGENTS.md.\n` +
+      "If Ratul explicitly approved this edit, add the exact repo-relative path\n" +
+      "to OVERRIDES in .claude/hooks/lane-guard.mjs, retry, and remove it after.",
   );
   process.exit(2);
 }
