@@ -12,6 +12,15 @@ session) can resume without re-deriving state. Newest first.
 - Found: `phase-0-content-engine` (28 commits since July) was **never pushed** —
   GitHub has only `main`. Secret scan of those commits: clean. Push pending Ratul OK.
 
+## Dev tooling (2026-11-01)
+
+- Project `.mcp.json`: Playwright MCP + Chrome DevTools MCP (+ Supabase MCP). They use
+  **globally installed** binaries (`npm i -g @playwright/mcp chrome-devtools-mcp`) —
+  `npx …@latest` took ~35s per launch here and blew the 30s MCP startup limit.
+  `MCP_TIMEOUT=120000` set in `.claude/settings.local.json` (Node startup is slow on this machine).
+- Branch pushed; **PR #1** open → `main`. Merge held until Vercel has the Supabase env vars
+  (`main` auto-deploys to production).
+
 ## Restart + replan (2026-11-01)
 
 - Supabase free project had **auto-paused** (inactivity) → DNS NXDOMAIN → every

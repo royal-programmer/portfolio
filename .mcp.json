@@ -3,12 +3,12 @@
     "playwright": {
       "type": "stdio",
       "command": "cmd",
-      "args": ["/c", "npx", "-y", "@playwright/mcp@latest", "--browser", "chrome"]
+      "args": ["/c", "playwright-mcp", "--browser", "chrome"]
     },
     "chrome-devtools": {
       "type": "stdio",
       "command": "cmd",
-      "args": ["/c", "npx", "-y", "chrome-devtools-mcp@latest"]
+      "args": ["/c", "chrome-devtools-mcp", "--usageStatistics=false"]
     },
     "supabase": {
       "type": "http",
