@@ -70,7 +70,7 @@ else bad(`service_role should see 6 personas, saw ${adminPersonas.length}`);
 const probe = `_verify_probe_${Date.now()}`;
 const { data: inserted, error: e3 } = await admin
   .from("entries")
-  .insert({ persona_slug: "engineer", type: "project", title: probe, visibility: "private" })
+  .insert({ persona_slug: "engineer", type: "project", title: probe, slug: probe.replace(/_/g, "-"), visibility: "private" })
   .select("id")
   .single();
 

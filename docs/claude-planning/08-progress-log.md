@@ -5,6 +5,22 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Restart + replan (2026-11-01)
+
+- Supabase free project had **auto-paused** (inactivity) → DNS NXDOMAIN → every
+  public page 500'd. Ratul resumed it; `verify-db.mjs` → **ALL CHECKS PASSED**
+  (script fixed: probe insert now sets `slug`, required since `0005`).
+- Dev server hung compiling `/`: a stray `~/package-lock.json` made Next infer the
+  home dir as root → pinned `turbopack.root` (`d946095`). Dev currently run with
+  `next dev --webpack` (faster/more reliable on this machine).
+- **New plan:** [11-replan-2026-11.md](./11-replan-2026-11.md) — stabilize →
+  design system v2 → Engineer contract → 3D/immersive Engineer PoC → persona
+  "world transitions" → other worlds → launch quality.
+- **Requested from Ratul:** approve keep-alive + backup GitHub workflows (`.github/`
+  is outside both lanes).
+
+---
+
 ## Phase 1 — Engineer in depth (in progress)
 
 ### Landed — Claude: media upload pipeline (2026-07-20)
