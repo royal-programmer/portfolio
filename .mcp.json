@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@playwright/mcp@latest", "--browser", "chrome"]
+    },
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "chrome-devtools-mcp@latest"]
+    },
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=wgvwwiqromxlrocpnsoc"
+    }
+  }
+}

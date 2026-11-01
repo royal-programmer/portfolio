@@ -4,12 +4,15 @@ Headless-Chrome walk of the running site (live Supabase data), desktop 1440px
 and mobile 390px. Feeds Stage 1 of [11-replan-2026-11.md](./11-replan-2026-11.md).
 Screenshots can't capture motion/hover feel — those need a human pass.
 
+> **Lesson:** raw headless screenshots gave 3 false positives. Future audits use Playwright MCP
+> (true device emulation, waits for animations) + Chrome DevTools MCP (perf traces).
+
 ## Bugs
 | # | Where | Finding | Severity |
 |---|-------|---------|----------|
-| B1 | `/engineer` mobile (390px) | Hero card overflows the viewport — headline and body clipped at the right edge ("scalable we…") | High |
-| B2 | `/engineer` mobile | Project card (Roster) not visible in the capture; page is hero + ~1800px of background | High (verify) |
-| B3 | `/photographer` desktop | No hero/content rendered — only background + avatar (may be an entrance animation that never resolves, or missing content) | High (verify) |
+| B1 | `/engineer` mobile (390px) | ~~Hero card overflows~~ **False positive** — Ratul checked in real Chrome device mode: fine. Headless `--window-size` below Chrome's minimum width renders wider and crops. | — |
+| B2 | `/engineer` mobile | ~~Project card missing~~ **False positive** — Ratul sees Roster on scroll. | — |
+| B3 | `/photographer` desktop | ~~No content~~ **False positive** — renders in a real browser; screenshot fired before the entrance animation. | — |
 | B4 | Persona avatar | Engineer/Trader show the photo-style logo avatar; Photographer/mobile show the illustrated avatar — inconsistent identity | Low |
 
 ## Design / polish
