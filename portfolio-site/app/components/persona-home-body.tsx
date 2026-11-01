@@ -2,8 +2,11 @@
 
 import { BarChart3, CalendarDays, ImageIcon } from "lucide-react";
 import { forwardRef } from "react";
+import type { BlogPost, Entry } from "@/lib/content";
 import type { Persona } from "../persona-provider";
 import type { PersonaContent } from "./site-content";
+import { SITE_SHELL } from "./site-shell";
+import { BlogPostsStrip } from "./blog-posts-strip";
 import { HomeHero } from "./home-hero";
 import { IdentityPanel } from "./identity-panel";
 import {
@@ -103,15 +106,17 @@ function PhotographerGalleryStrip() {
 type PersonaHomeBodyProps = {
   persona: Persona;
   content: PersonaContent;
+  engineerEntries: Entry[];
+  engineerBlogPosts: BlogPost[];
 };
 
 export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, PersonaHomeBodyProps>(
-  function PersonaHomeBody({ persona, content }, ref) {
+  function PersonaHomeBody({ persona, content, engineerEntries, engineerBlogPosts }, ref) {
     return (
       <PersonaMotionOrchestrator ref={ref}>
         {persona === "engineer" && (
           <>
-            <section className="mx-auto grid w-full max-w-6xl gap-8 px-6 pb-8 pt-2 md:grid-cols-2 md:gap-10 md:px-10 md:pt-3">
+            <section className={`${SITE_SHELL} grid gap-6 pb-8 pt-2 sm:gap-8 md:grid-cols-2 md:gap-10 md:pt-3`}>
               <PersonaMotionSlot id="eng-hero" dir="left" exitOrder={0} enterOrder={0}>
                 <HomeHero persona={persona} content={content} />
               </PersonaMotionSlot>
@@ -120,14 +125,17 @@ export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, Perso
               </PersonaMotionSlot>
             </section>
             <PersonaMotionSlot id="eng-projects" dir="down" exitOrder={2} enterOrder={2}>
-              <ProjectsGrid />
+              <ProjectsGrid entries={engineerEntries} personaSlug="engineer" />
+            </PersonaMotionSlot>
+            <PersonaMotionSlot id="eng-blog" dir="down" exitOrder={3} enterOrder={3}>
+              <BlogPostsStrip posts={engineerBlogPosts} personaSlug="engineer" />
             </PersonaMotionSlot>
           </>
         )}
 
         {persona === "trader" && (
           <>
-            <section className="mx-auto grid w-full max-w-6xl gap-8 px-6 pb-8 pt-2 md:grid-cols-2 md:gap-10 md:px-10 md:pt-3">
+            <section className={`${SITE_SHELL} grid gap-6 pb-8 pt-2 sm:gap-8 md:grid-cols-2 md:gap-10 md:pt-3`}>
               <PersonaMotionSlot id="tr-hero" dir="left" exitOrder={0} enterOrder={0}>
                 <HomeHero persona={persona} content={content} />
               </PersonaMotionSlot>
@@ -138,7 +146,7 @@ export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, Perso
                 </div>
               </PersonaMotionSlot>
             </section>
-            <section className="mx-auto w-full max-w-6xl px-6 pb-10 md:px-10">
+            <section className={`${SITE_SHELL} pb-10`}>
               <PersonaMotionSlot id="tr-graph" dir="down" exitOrder={2} enterOrder={2}>
                 <TraderGraphCard />
               </PersonaMotionSlot>
@@ -148,7 +156,7 @@ export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, Perso
 
         {persona === "photographer" && (
           <>
-            <section className="mx-auto grid w-full max-w-6xl gap-8 px-6 pb-8 pt-2 md:grid-cols-2 md:gap-10 md:px-10 md:pt-3">
+            <section className={`${SITE_SHELL} grid gap-6 pb-8 pt-2 sm:gap-8 md:grid-cols-2 md:gap-10 md:pt-3`}>
               <PersonaMotionSlot id="ph-hero" dir="left" exitOrder={0} enterOrder={0}>
                 <HomeHero persona={persona} content={content} />
               </PersonaMotionSlot>
@@ -156,7 +164,7 @@ export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, Perso
                 <IdentityPanel persona={persona} content={content} />
               </PersonaMotionSlot>
             </section>
-            <section className="mx-auto w-full max-w-6xl px-6 pb-24 md:px-10">
+            <section className={`${SITE_SHELL} pb-16 md:pb-24`}>
               <PersonaMotionSlot id="ph-gallery" dir="down" exitOrder={2} enterOrder={2}>
                 <PhotographerGalleryStrip />
               </PersonaMotionSlot>

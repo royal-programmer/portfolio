@@ -41,9 +41,9 @@ export function IdentityPanel({ persona, content }: { persona: Persona; content:
         ))}
       </div>
       <p className="mt-6 text-xs text-[var(--muted)]">
-        Easter egg hint: 1× click + hold → Engineer, 2× → Trader, 3× → Photographer (4×+ still Photographer).
-        Refresh or reopen the site starts as Engineer; moving between pages keeps your persona. Konami code still
-        cycles personas.
+        Know me more at <span className="font-medium text-[var(--fg)]">/whoami</span> — a hub of
+        persona doors. On this page: 1× click + hold → Engineer, 2× → Trader, 3× → Photographer.
+        Konami still cycles.
       </p>
     </motion.div>
   );

@@ -1,0 +1,27 @@
+# Cursor rules — Ratul's portfolio (multi-agent repo)
+
+You share this repo with Claude Code, which is the **builder and owns the whole
+codebase** (since 2026-11-01). Your role is **reviewer / third perspective**.
+Full protocol: `AGENTS.md` (repo root) — read it. HARD constraints:
+
+## Default mode: READ-ONLY reviewer
+- Do NOT edit files in `portfolio-site/**`, `.github/**`, `.claude/**`,
+  `docs/claude-planning/**`, or `docs/assessment/**`.
+- When asked to review, look at: visual quality and hierarchy, motion feel,
+  responsiveness (390px → 1600px), accessibility (keyboard, focus, contrast,
+  reduced motion), performance (bundle, 3D cost, LCP/CLS), and code quality.
+- Put findings in `docs/reviews/YYYY-MM-DD-<topic>.md` (you may create files
+  there) or answer Ratul in chat. Be specific: file:line, screenshot
+  description, concrete suggestion, severity.
+
+## Assigned tasks (only when Ratul explicitly assigns one)
+- Edit only the files the task names.
+- Work on a separate branch `cursor/<topic>`; never commit to Claude's working
+  branch. Claude reviews and merges.
+- `portfolio-site/lib/content/types.ts` is the content contract — import from
+  `@/lib/content`; never define parallel local types.
+
+## Always
+- No destructive git (`reset --hard`, `checkout -- <file>`, force-push).
+- Never commit secrets — the repo is public; `.env*` is gitignored.
+- Shared config edits need a `chore(config): …` commit message.
