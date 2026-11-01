@@ -26,6 +26,15 @@ status() {
   curl -fsS --max-time 30 -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" "$api" | jq -r '.status'
 }
 
+token_problem=""
+if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]] && ! status >/dev/null 2>&1; then
+  # Expired / revoked / under-scoped token: still ping (keeps the DB awake),
+  # but fail the run at the end so GitHub emails the owner to rotate it.
+  token_problem="Management API rejected SUPABASE_ACCESS_TOKEN (expired, revoked, or missing permissions) — auto-restore is OFF until it is replaced."
+  echo "::error::$token_problem"
+  SUPABASE_ACCESS_TOKEN=""
+fi
+
 if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
   s="$(status)"
   echo "Project status: $s"
@@ -64,7 +73,11 @@ for attempt in 1 2 3 4 5 6; do
     -H "apikey: ${SUPABASE_ANON_KEY}" -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
     "${rest}/personas?select=slug&limit=1" || true)"
   echo "REST ping attempt $attempt → HTTP $code"
-  [[ "$code" == "200" ]] && { echo "Supabase is awake ✅"; exit 0; }
+  if [[ "$code" == "200" ]]; then
+    echo "Supabase is awake ✅"
+    [[ -z "$token_problem" ]] || { echo "::error::$token_problem"; exit 1; }
+    exit 0
+  fi
   sleep 20
 done
 
