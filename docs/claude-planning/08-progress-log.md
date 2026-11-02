@@ -5,6 +5,22 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Persona subdomains (2026-11-02) — D31
+
+- `proxy.ts` (Next 16 "proxy" = middleware) + `lib/site/hosts.ts` (subdomain ↔ persona map,
+  `NEXT_PUBLIC_ROOT_DOMAIN`, dev root `ratulroy.localhost`) + `lib/site/persona-link.tsx`
+  (`PersonaLink`/`HubLink`: same-host → client nav with clean paths, other host → full nav).
+  All persona links in `app/**` migrated.
+- Verified in dev (curl + Playwright): hub `/` → whoami; `/engineer/x` on hub → `code.` host;
+  `code.` `/roster` client-nav works; cross-persona → other subdomain; `www.`/`who.` → root;
+  `trader.` → `trade.`; unknown label → "persona not found"; `/capture` → root host;
+  plain `localhost:3000/engineer` unchanged. 0 console errors.
+- Gotcha: Next relativises redirect `Location` when the target equals its own origin
+  (`localhost`) → hub on plain localhost would loop; hence the `ratulroy.localhost` dev root.
+- Not yet: domain purchase + Vercel domain/DNS; persona switcher in `home-page.tsx` still
+  swaps in place (no host change) — replaced in the redesign; shared experience-mode pref
+  needs a parent-domain cookie.
+
 ## Ownership change (2026-11-01)
 
 - Ratul: **Claude takes over the frontend** — owns all of `portfolio-site/`; Cursor
