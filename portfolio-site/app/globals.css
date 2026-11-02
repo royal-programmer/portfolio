@@ -310,89 +310,66 @@ body {
 }
 
 /* ==========================================================================
-   Hub — prism dispersion (app/components/hub/prism-hub.tsx)
-   Every animation only describes the "from" state, so with animations off
-   (Lite / reduced motion) elements simply render in their final state.
+   Hub — "Refraction" scroll story (app/components/hub/hub-experience.tsx)
+   Animations only describe the "from" state, so with animations off (Lite /
+   reduced motion, via .xp-motion) everything renders in its final state.
    ========================================================================== */
 @keyframes hub-fade-in {
-  from { opacity: 0; transform: translateY(14px); filter: blur(6px); }
+  from { opacity: 0; transform: translateY(18px); filter: blur(8px); }
 }
 .hub-fade {
   animation: hub-fade-in var(--dur-3) var(--ease-out) both;
   animation-delay: var(--d, 0ms);
 }
 
-@keyframes hub-beam-draw {
-  from { stroke-dashoffset: 760; }
-  to { stroke-dashoffset: 0; }
-}
-.hub-beam {
-  stroke-dasharray: 760;
-  animation: hub-beam-draw 1100ms var(--ease-in-out) 300ms both;
-}
-
-@keyframes hub-ray-spread {
-  from { transform: scaleX(0); opacity: 0; }
-}
-.hub-ray {
-  transform-box: view-box;
-  transform-origin: 729px 410px;
-  animation: hub-ray-spread 1100ms var(--ease-out) both;
-  animation-delay: calc(1250ms + var(--i, 0) * 70ms);
-}
-/* Glow layer: CSS blur on the whole <svg> = one composited layer; the idle
-   "breathing" animates only its opacity (compositor-only, no repaint). */
-@keyframes hub-glow-breathe {
-  0%, 100% { opacity: 0.75; }
-  50% { opacity: 1; }
-}
-.hub-glow-layer {
-  filter: blur(14px);
-  will-change: opacity;
-  animation: hub-glow-breathe 6s ease-in-out 2.6s infinite;
-}
-.hub-ray-wrap {
-  transition: opacity var(--dur-2) var(--ease-out);
+/* Chapters fade up as they scroll in — CSS scroll-driven (no JS). */
+@supports (animation-timeline: view()) {
+  .hub-reveal {
+    animation: hub-fade-in linear both;
+    animation-timeline: view();
+    animation-range: entry 5% cover 30%;
+  }
 }
 
-@keyframes hub-prism-in {
-  from { opacity: 0; transform: scale(0.92); }
+@keyframes hub-phrase-in {
+  from { opacity: 0; transform: translateY(0.4em); filter: blur(4px); }
 }
-.hub-prism {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: hub-prism-in 900ms var(--ease-out) 450ms both;
+.hub-phrase {
+  animation: hub-phrase-in 500ms var(--ease-out) both;
 }
 
-@keyframes hub-door-in {
-  from { opacity: 0; transform: translateX(-14px); }
+@keyframes hub-flicker {
+  0%, 100% { opacity: 0.55; }
+  45% { opacity: 0.95; }
+  50% { opacity: 0.4; }
+  55% { opacity: 0.9; }
 }
-.hub-door {
-  animation: hub-door-in var(--dur-3) var(--ease-out) both;
-  animation-delay: calc(1500ms + var(--i, 0) * 90ms);
-}
-.hub-door-link {
-  transition: transform var(--dur-2) var(--ease-out), background-color var(--dur-2) var(--ease-out);
-}
-.hub-door-link:hover,
-.hub-door-link:focus-visible {
-  transform: translateX(6px);
-}
-.hub-door-arrow {
-  opacity: 0;
-  transform: translateX(-6px);
-  transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
-}
-.hub-door-link:hover .hub-door-arrow,
-.hub-door-link:focus-visible .hub-door-arrow {
-  opacity: 1;
-  transform: translateX(0);
+.hub-flicker {
+  animation: hub-flicker 3.2s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * -1.1s);
 }
 
-.hub-cursor-light {
-  background: radial-gradient(
-    420px circle at var(--mx, 35%) var(--my, 55%),
-    rgba(243, 241, 236, 0.06),
-    transparent 70%
-  );
+.hub-cta {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--c) 55%, transparent);
+  background: color-mix(in srgb, var(--c) 10%, transparent);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--c) 0%, transparent);
+  transition:
+    transform var(--dur-2) var(--ease-out),
+    box-shadow var(--dur-2) var(--ease-out),
+    background-color var(--dur-2) var(--ease-out);
+}
+.hub-cta:hover,
+.hub-cta:focus-visible {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--c) 20%, transparent);
+  box-shadow: 0 0 36px -4px color-mix(in srgb, var(--c) 70%, transparent);
+  outline: none;
+}
+.hub-cta-arrow {
+  transition: transform var(--dur-2) var(--ease-out);
+}
+.hub-cta:hover .hub-cta-arrow,
+.hub-cta:focus-visible .hub-cta-arrow {
+  transform: translateX(4px);
 }
