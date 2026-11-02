@@ -30,6 +30,71 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-instrument-serif);
+}
+
+/* ==========================================================================
+   Design system v2 — "one light, many colours"
+   Neutral "void + ink" base; every persona is a wavelength of one spectrum.
+   New/redesigned surfaces use ONLY these tokens. Legacy tokens below stay
+   until each persona world is rebuilt.
+   ========================================================================== */
+:root {
+  /* Base */
+  --void: #07070a;          /* page background */
+  --void-2: #0d0d12;        /* raised background */
+  --ink: #f3f1ec;           /* primary text — warm white, not blue-white */
+  --ink-dim: #a9a7a1;       /* secondary text */
+  --ink-faint: #6d6b67;     /* captions, meta */
+  --line: rgba(243, 241, 236, 0.12);
+  --line-strong: rgba(243, 241, 236, 0.24);
+  --glass: rgba(243, 241, 236, 0.04);
+
+  /* The spectrum — one wavelength per persona */
+  --wl-engineer: #4d8dff;
+  --wl-trader: #2fd47a;
+  --wl-photographer: #ff4fa3;
+  --wl-artist: #ffb02e;
+  --wl-ride: #22d3c5;
+  --wl-gamer: #9d6bff;
+  --wl-unlit: #3a3936;
+
+  /* Type scale (fluid) */
+  --step--1: clamp(0.78rem, 0.76rem + 0.1vw, 0.84rem);
+  --step-0: clamp(1rem, 0.96rem + 0.2vw, 1.125rem);
+  --step-1: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem);
+  --step-2: clamp(1.6rem, 1.4rem + 1vw, 2.2rem);
+  --step-3: clamp(2.2rem, 1.7rem + 2.4vw, 3.6rem);
+  --step-4: clamp(3rem, 2rem + 5vw, 6.5rem);
+  --step-5: clamp(3.6rem, 2rem + 8vw, 9.5rem);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);       /* expo-ish settle */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-1: 160ms;   /* hover, press */
+  --dur-2: 320ms;   /* small reveals */
+  --dur-3: 700ms;   /* section reveals */
+  --dur-4: 1400ms;  /* scene beats */
+}
+
+/* Lite: no decorative motion anywhere on v2 surfaces. */
+:root[data-experience="lite"] .xp-motion,
+:root[data-experience="lite"] .xp-motion * {
+  animation: none !important;
+  transition-duration: 0ms !important;
+}
+:root[data-experience="lite"] .xp-immersive-only {
+  display: none !important;
+}
+:root:not([data-experience="lite"]) .xp-lite-only {
+  display: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .xp-motion,
+  .xp-motion * {
+    animation: none !important;
+  }
 }
 
 :root[data-ui-theme="dark"] {
@@ -242,4 +307,92 @@ body {
     animation: none;
     opacity: 0.65;
   }
+}
+
+/* ==========================================================================
+   Hub — prism dispersion (app/components/hub/prism-hub.tsx)
+   Every animation only describes the "from" state, so with animations off
+   (Lite / reduced motion) elements simply render in their final state.
+   ========================================================================== */
+@keyframes hub-fade-in {
+  from { opacity: 0; transform: translateY(14px); filter: blur(6px); }
+}
+.hub-fade {
+  animation: hub-fade-in var(--dur-3) var(--ease-out) both;
+  animation-delay: var(--d, 0ms);
+}
+
+@keyframes hub-beam-draw {
+  from { stroke-dashoffset: 760; }
+  to { stroke-dashoffset: 0; }
+}
+.hub-beam {
+  stroke-dasharray: 760;
+  animation: hub-beam-draw 1100ms var(--ease-in-out) 300ms both;
+}
+
+@keyframes hub-ray-spread {
+  from { transform: scaleX(0); opacity: 0; }
+}
+.hub-ray {
+  transform-box: view-box;
+  transform-origin: 729px 410px;
+  animation: hub-ray-spread 1100ms var(--ease-out) both;
+  animation-delay: calc(1250ms + var(--i, 0) * 70ms);
+}
+/* Glow layer: CSS blur on the whole <svg> = one composited layer; the idle
+   "breathing" animates only its opacity (compositor-only, no repaint). */
+@keyframes hub-glow-breathe {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+.hub-glow-layer {
+  filter: blur(14px);
+  will-change: opacity;
+  animation: hub-glow-breathe 6s ease-in-out 2.6s infinite;
+}
+.hub-ray-wrap {
+  transition: opacity var(--dur-2) var(--ease-out);
+}
+
+@keyframes hub-prism-in {
+  from { opacity: 0; transform: scale(0.92); }
+}
+.hub-prism {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hub-prism-in 900ms var(--ease-out) 450ms both;
+}
+
+@keyframes hub-door-in {
+  from { opacity: 0; transform: translateX(-14px); }
+}
+.hub-door {
+  animation: hub-door-in var(--dur-3) var(--ease-out) both;
+  animation-delay: calc(1500ms + var(--i, 0) * 90ms);
+}
+.hub-door-link {
+  transition: transform var(--dur-2) var(--ease-out), background-color var(--dur-2) var(--ease-out);
+}
+.hub-door-link:hover,
+.hub-door-link:focus-visible {
+  transform: translateX(6px);
+}
+.hub-door-arrow {
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
+}
+.hub-door-link:hover .hub-door-arrow,
+.hub-door-link:focus-visible .hub-door-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.hub-cursor-light {
+  background: radial-gradient(
+    420px circle at var(--mx, 35%) var(--my, 55%),
+    rgba(243, 241, 236, 0.06),
+    transparent 70%
+  );
 }

@@ -1,125 +1,34 @@
 import type { Metadata } from "next";
-import { PersonaLink } from "@/lib/site/persona-link";
-import { ALL_PERSONAS, listPersonas, type Persona, type PersonaSlug } from "@/lib/content";
+import { listPersonas } from "@/lib/content";
+import { SPECTRUM_ORDER } from "@/lib/site/brand";
+import { PrismHub, type HubDoor } from "../components/hub/prism-hub";
 
 export const metadata: Metadata = {
-  title: "Who am I | Ratul Roy",
-  description: "Pick a door — Engineer, Trader, Photographer, and more personas on the way.",
+  title: "Ratul Roy — one light, many colours",
+  description:
+    "Engineer, trader, photographer — and more wavelengths on the way. Pick a colour to step into that world.",
 };
 
-type HubCard =
-  | { kind: "live"; persona: Persona }
-  | { kind: "soon"; slug: PersonaSlug };
-
-function buildHubCards(published: Persona[]): HubCard[] {
-  const bySlug = new Map(published.map((p) => [p.slug, p]));
-  return ALL_PERSONAS.map((slug) => {
-    const persona = bySlug.get(slug);
-    if (persona?.isPublished) return { kind: "live" as const, persona };
-    return { kind: "soon" as const, slug };
-  });
-}
-
-const SOON_LABELS: Record<PersonaSlug, string> = {
-  engineer: "Engineer",
-  trader: "Trader",
-  photographer: "Photographer",
-  artist: "Artist",
-  ride: "Rider",
-  gamer: "Gamer",
-};
+const INTRO =
+  "One person, refracted. An engineer who ships, a trader who keeps score, a photographer who chases light. Pick a colour to step into that world — the dark rays are wavelengths I haven’t lit yet.";
 
 /**
- * Explicit route (takes precedence over `/[persona]`).
- * Persona card hub — published doors link out; unpublished stay "coming soon".
+ * The hub (served at the bare root domain by proxy.ts, and at /whoami on hosts
+ * without subdomain routing). Doors follow the spectrum; unpublished personas
+ * render as unlit rays.
  */
 export default async function WhoAmIPage() {
   const published = await listPersonas();
-  const cards = buildHubCards(published);
+  const bySlug = new Map(published.map((p) => [p.slug, p]));
 
-  return (
-    <main className="relative min-h-screen overflow-hidden text-stone-900">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(ellipse 70% 50% at 50% 0%, #efe6d8 0%, transparent 55%), linear-gradient(165deg, #f7f1e8 0%, #e7eef6 45%, #f1e9e1 100%)",
-        }}
-      />
+  const doors: HubDoor[] = SPECTRUM_ORDER.map((slug) => {
+    const persona = bySlug.get(slug);
+    return {
+      slug,
+      live: Boolean(persona?.isPublished),
+      eyebrow: persona?.eyebrow ?? "",
+    };
+  });
 
-      <div className="relative z-10 mx-auto w-full max-w-[90rem] px-4 py-14 sm:px-6 md:px-8 md:py-20 lg:px-10">
-        <header className="mb-10 max-w-2xl space-y-4 md:mb-12">
-          <p className="font-mono text-xs tracking-[0.22em] text-stone-500 uppercase">Who am I</p>
-          <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">Know me more</h1>
-          <p className="text-lg leading-relaxed text-stone-600">
-            Each door is a different audience entry. Pick one that fits — or wait for the rooms still
-            under construction.
-          </p>
-        </header>
-
-        <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {cards.map((card, idx) => {
-            if (card.kind === "live") {
-              const { persona } = card;
-              return (
-                <PersonaLink
-                  key={persona.slug}
-                  persona={persona.slug}
-                  className="group rounded-3xl border border-stone-300/80 bg-white/55 p-6 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:border-stone-400 hover:bg-white/80"
-                  style={{ animationDelay: `${idx * 40}ms` }}
-                >
-                  <span
-                    className="mb-4 inline-block h-2 w-10 rounded-full"
-                    style={{ backgroundColor: persona.accent }}
-                    aria-hidden
-                  />
-                  <h2 className="text-xl font-semibold tracking-tight">{persona.label}</h2>
-                  <p className="mt-1 text-xs uppercase tracking-[0.16em] text-stone-500">
-                    {persona.eyebrow}
-                  </p>
-                  <p className="mt-4 text-sm leading-relaxed text-stone-600">{persona.body}</p>
-                  <p
-                    className="mt-6 text-sm font-medium underline-offset-4 group-hover:underline"
-                    style={{ color: persona.accent }}
-                  >
-                    Enter →
-                  </p>
-                </PersonaLink>
-              );
-            }
-
-            return (
-              <div
-                key={card.slug}
-                className="rounded-3xl border border-dashed border-stone-300 bg-white/35 p-6 backdrop-blur"
-                aria-disabled="true"
-              >
-                <span className="mb-4 inline-block h-2 w-10 rounded-full bg-stone-300" aria-hidden />
-                <h2 className="text-xl font-semibold tracking-tight text-stone-500">
-                  {SOON_LABELS[card.slug]} Mode
-                </h2>
-                <p className="mt-1 text-xs uppercase tracking-[0.16em] text-stone-400">
-                  Not on stage yet
-                </p>
-                <p className="mt-4 text-sm leading-relaxed text-stone-500">
-                  This persona is planned. The door stays closed until there is real content behind
-                  it.
-                </p>
-                <p className="mt-6 text-sm font-medium text-stone-400">Coming soon</p>
-              </div>
-            );
-          })}
-        </section>
-
-        <p className="mt-12 text-sm text-stone-500">
-          Prefer a direct link? Try{" "}
-          <PersonaLink persona="engineer" className="font-medium text-stone-800 underline-offset-4 hover:underline">
-            /engineer
-          </PersonaLink>
-          .
-        </p>
-      </div>
-    </main>
-  );
+  return <PrismHub doors={doors} intro={INTRO} />;
 }
