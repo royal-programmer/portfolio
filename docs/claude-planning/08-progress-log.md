@@ -5,6 +5,21 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Design pass 1: hub + experience modes (2026-11-02)
+
+- **Design system v2** tokens in `globals.css`: void/ink base, one wavelength per persona
+  (`--wl-*`), fluid type scale `--step-*`, motion `--ease-*`/`--dur-*`; display face
+  Instrument Serif (`font-display`). Legacy tokens stay until each world is rebuilt.
+- **Experience modes (D26):** `lib/site/experience.ts` + `app/experience-provider.tsx` +
+  `ExperienceToggle`. Pre-paint boot script; Auto → Lite on reduced motion / data saver /
+  2g-3g / <4GB / <4 cores; cookie on the root domain (verified shared hub ↔ `code.`).
+  CSS hooks: `.xp-motion`, `.xp-immersive-only`, `.xp-lite-only`.
+- **Hub** (`app/components/hub/prism-hub.tsx`, served at the root / `/whoami`): beam → prism →
+  rays in spectral order onto doors; unlaunched personas = unlit rays; stacked layout < lg.
+- Perf: glow moved from SVG `feGaussianBlur` to a CSS-blurred composited layer; 59 fps in
+  Immersive (DevTools Chrome). Note: the Playwright window gets rAF-throttled to ~1 fps when
+  in the background — don't trust its fps numbers.
+
 ## Persona subdomains (2026-11-02) — D31
 
 - `proxy.ts` (Next 16 "proxy" = middleware) + `lib/site/hosts.ts` (subdomain ↔ persona map,
