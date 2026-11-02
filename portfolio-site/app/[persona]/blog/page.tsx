@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { PersonaLink } from "@/lib/site/persona-link";
 import { notFound } from "next/navigation";
 import { isLaunchedPersona, listBlogPosts } from "@/lib/content";
 import { SITE_SHELL } from "../../components/site-shell";
@@ -35,12 +35,12 @@ export default async function PersonaBlogIndexPage({ params }: BlogIndexProps) {
   return (
     <main className="min-h-screen bg-[var(--page-bg)] text-[var(--fg)]">
       <div className={`${SITE_SHELL} py-12 md:py-16`}>
-        <Link
-          href={`/${persona}`}
+        <PersonaLink
+          persona={persona}
           className="text-sm font-medium text-[var(--accent)] underline-offset-4 hover:underline"
         >
           ← Back to {persona}
-        </Link>
+        </PersonaLink>
 
         <header className="mt-8 mb-10 max-w-2xl space-y-3">
           <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Writing</p>
@@ -64,8 +64,9 @@ export default async function PersonaBlogIndexPage({ params }: BlogIndexProps) {
               const dateLabel = formatDate(post.publishedAt);
               return (
                 <li key={post.id}>
-                  <Link
-                    href={`/${persona}/blog/${post.slug}`}
+                  <PersonaLink
+                    persona={persona}
+                    path={`/blog/${post.slug}`}
                     className="block rounded-3xl border p-5 backdrop-blur-xl transition hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--surface-border))] sm:p-6"
                     style={{
                       backgroundColor: "var(--surface-bg)",
@@ -79,7 +80,7 @@ export default async function PersonaBlogIndexPage({ params }: BlogIndexProps) {
                     <p className="mt-2 line-clamp-3 text-sm text-[var(--muted)]">
                       {post.excerpt ?? post.body.slice(0, 180)}
                     </p>
-                  </Link>
+                  </PersonaLink>
                 </li>
               );
             })}

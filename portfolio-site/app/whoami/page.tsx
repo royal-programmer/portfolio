@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { PersonaLink } from "@/lib/site/persona-link";
 import { ALL_PERSONAS, listPersonas, type Persona, type PersonaSlug } from "@/lib/content";
 
 export const metadata: Metadata = {
@@ -63,9 +63,9 @@ export default async function WhoAmIPage() {
             if (card.kind === "live") {
               const { persona } = card;
               return (
-                <Link
+                <PersonaLink
                   key={persona.slug}
-                  href={`/${persona.slug}`}
+                  persona={persona.slug}
                   className="group rounded-3xl border border-stone-300/80 bg-white/55 p-6 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:border-stone-400 hover:bg-white/80"
                   style={{ animationDelay: `${idx * 40}ms` }}
                 >
@@ -85,7 +85,7 @@ export default async function WhoAmIPage() {
                   >
                     Enter →
                   </p>
-                </Link>
+                </PersonaLink>
               );
             }
 
@@ -114,9 +114,9 @@ export default async function WhoAmIPage() {
 
         <p className="mt-12 text-sm text-stone-500">
           Prefer a direct link? Try{" "}
-          <Link href="/engineer" className="font-medium text-stone-800 underline-offset-4 hover:underline">
+          <PersonaLink persona="engineer" className="font-medium text-stone-800 underline-offset-4 hover:underline">
             /engineer
-          </Link>
+          </PersonaLink>
           .
         </p>
       </div>

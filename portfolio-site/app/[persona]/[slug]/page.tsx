@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { PersonaLink } from "@/lib/site/persona-link";
 import { notFound } from "next/navigation";
 import {
   getEntryBySlug,
@@ -55,12 +55,12 @@ export default async function PersonaEntryPage({ params }: ProjectDetailProps) {
   return (
     <main className="min-h-screen bg-[var(--page-bg)] text-[var(--fg)]">
       <div className="mx-auto w-full max-w-4xl px-4 py-12 sm:px-6 md:px-8 md:py-16 lg:px-10">
-        <Link
-          href={`/${persona}`}
+        <PersonaLink
+          persona={persona}
           className="text-sm font-medium text-[var(--accent)] underline-offset-4 hover:underline"
         >
           ← Back to {persona}
-        </Link>
+        </PersonaLink>
 
         <article className="mt-8 space-y-6">
           <header className="space-y-3">

@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { PersonaLink } from "@/lib/site/persona-link";
+import type { PersonaSlug } from "@/lib/content/types";
 import { motion } from "framer-motion";
 import type { Entry } from "@/lib/content";
 import { SITE_SECTION } from "./site-shell";
@@ -23,7 +24,6 @@ function ProjectCard({
   featured?: boolean;
 }) {
   const stack = entry.type === "project" ? entry.data.techStack : [];
-  const detailHref = `/${personaSlug}/${entry.slug}`;
 
   return (
     <motion.article
@@ -56,12 +56,13 @@ function ProjectCard({
         </ul>
       ) : null}
       <div className="mt-5 flex flex-wrap gap-3 text-sm">
-        <Link
-          href={detailHref}
+        <PersonaLink
+          persona={personaSlug as PersonaSlug}
+          path={`/${entry.slug}`}
           className="min-h-11 inline-flex items-center font-medium text-[var(--accent)] underline-offset-4 hover:underline sm:min-h-0"
         >
           View project
-        </Link>
+        </PersonaLink>
         {entry.type === "project" && entry.data.deployedUrl ? (
           <a
             href={entry.data.deployedUrl}

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { PersonaLink, HubLink } from "@/lib/site/persona-link";
 import { useMemo } from "react";
 import { isPersonaSlug } from "@/lib/content/types";
 
@@ -130,24 +130,23 @@ export function InvalidPersonaView({ attempted }: InvalidPersonaViewProps) {
         <p className="text-base leading-relaxed text-stone-600">{copy.body}</p>
         <p className="text-sm text-stone-500">{copy.hint}</p>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            href="/"
+          <HubLink
             className="rounded-full bg-stone-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-stone-700"
           >
             Back home
-          </Link>
-          <Link
-            href="/engineer"
+          </HubLink>
+          <PersonaLink
+            persona="engineer"
             className="rounded-full border border-stone-300 bg-white/70 px-5 py-2.5 text-sm font-medium text-stone-800 backdrop-blur transition hover:border-stone-400"
           >
             Engineer mode
-          </Link>
-          <Link
-            href="/photographer"
+          </PersonaLink>
+          <PersonaLink
+            persona="photographer"
             className="rounded-full border border-stone-300 bg-white/70 px-5 py-2.5 text-sm font-medium text-stone-800 backdrop-blur transition hover:border-stone-400"
           >
             Photographer
-          </Link>
+          </PersonaLink>
         </div>
       </div>
     </main>
