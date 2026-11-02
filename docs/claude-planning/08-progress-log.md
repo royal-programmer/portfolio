@@ -5,6 +5,27 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Design pass 2: 3D "Refraction" hub (2026-11-02) — D32–D35
+
+- Deps (`chore(config)`): three, @react-three/fiber 9, drei 10, @react-three/postprocessing 3.
+- `app/components/hub/refraction-scene.tsx` (lazy, Immersive only): falling beam → glass prism
+  (MeshTransmissionMaterial, procedural Lightformer env, no network assets) → shader-drawn
+  continuous spectrum fan with persona bands (any count, MAX_BANDS 16); dust; cursor parallax;
+  camera follows the chapter in view; closing chapter folds the spectrum back to white.
+- `refraction-poster.tsx`: static SVG of the same composition = Lite backdrop + first paint.
+- `hub-experience.tsx`: scroll chapters, spectrum rail, cycling phrase (screen readers get one
+  sentence), per-world CTAs; `lib/site/spectrum.ts` (t → colour, auto-spread + pins, GLSL mirror).
+- **Perf (Intel UHD laptop, 1080p):** bloom was the cost (32 → 60 fps without). Now half-res
+  bloom + `QualityGovernor`: 4s warm-up, drop bloom if < 45 fps sustained, Lite if < 28 fps
+  without bloom; windows with frame gaps > 250 ms (hidden/throttled tab) are ignored — drei's
+  PerformanceMonitor degraded on warm-up jank and on background tabs. Measured 56–58 fps.
+- Dev on a TLS-intercepting network: run `NODE_OPTIONS=--use-system-ca npx next dev --webpack`
+  (Node trusts the Windows store; never NODE_TLS_REJECT_UNAUTHORIZED=0).
+- Tooling note: background Chrome windows are rAF-throttled to exactly ~1016 ms/frame — check
+  frame gaps before trusting any fps number.
+- Next: portal transition on CTA (fly along the band + colour flood), persona content fields
+  in the DB (phrase/CTA/pin/links), per-world 3D motifs, Engineer world redesign.
+
 ## Design pass 1: hub + experience modes (2026-11-02)
 
 - **Design system v2** tokens in `globals.css`: void/ink base, one wavelength per persona
