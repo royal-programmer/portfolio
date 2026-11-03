@@ -97,18 +97,18 @@ export function EntryGate({ compact, device, quality, onQuality, status, started
       role="dialog"
       aria-modal="true"
       aria-label="Choose how to enter"
-      className={`gate fixed inset-0 z-50 flex flex-col bg-[var(--void)] text-[var(--ink)] ${leaving ? `is-leaving is-leaving-${leaving}` : ""}`}
+      className={`gate fixed inset-0 z-50 flex flex-col overflow-y-auto bg-[var(--void)] text-[var(--ink)] ${leaving ? `is-leaving is-leaving-${leaving}` : ""}`}
     >
       <div className="flex items-center justify-between px-4 pt-5 sm:px-8 lg:px-12">
         <span className="font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase">ratulroy.me</span>
         <SoundToggle />
       </div>
 
-      <div className="relative flex flex-1 flex-col items-center justify-center px-4 sm:px-8">
+      <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-6 sm:px-8">
         <GatheringLight progress={shown} />
 
         {compact ? (
-          <div className="relative mt-16 flex w-full max-w-xs flex-col items-center gap-4 text-center">
+          <div className="relative mt-6 flex w-full max-w-xs flex-col items-center gap-4 text-center">
             <p className="font-mono text-[10px] tracking-[0.2em] text-[var(--ink-dim)] uppercase">
               {blocked ? "3D couldn’t start here" : canEnter ? "Ready" : `Gathering light · ${pct}%`}
             </p>
@@ -118,14 +118,14 @@ export function EntryGate({ compact, device, quality, onQuality, status, started
             </button>
           </div>
         ) : (
-          <div className="gate-panel relative mt-14 w-full max-w-4xl">
+          <div className="gate-panel relative mt-4 w-full max-w-4xl">
             <p className="text-center font-mono text-[10px] tracking-[0.24em] text-[var(--ink-faint)] uppercase">Ratul Roy · one mind, many perspectives</p>
             <h1 className="mt-5 text-center font-display text-[length:clamp(2.6rem,1.6rem+4vw,5.4rem)] leading-[0.95] tracking-[-0.02em]">
               Choose how you
               <span className="italic text-[var(--ink-dim)]"> step in.</span>
             </h1>
 
-            <div className="mt-12 grid gap-10 sm:grid-cols-[1fr_auto_1fr] sm:gap-12">
+            <div className="mt-8 grid gap-7 sm:mt-12 sm:grid-cols-[1fr_auto_1fr] sm:gap-12">
               {/* Immersive */}
               <section aria-labelledby="gate-immersive" className="flex flex-col">
                 <h2 id="gate-immersive" className="font-display text-[length:var(--step-3)] leading-none">
@@ -159,7 +159,7 @@ export function EntryGate({ compact, device, quality, onQuality, status, started
                         →
                       </span>
                     </button>
-                    <p className="mt-3 min-h-4 text-xs text-[var(--ink-faint)]" aria-live="polite">
+                    <p className="mt-3 text-xs text-[var(--ink-faint)] empty:hidden sm:min-h-4 sm:empty:block" aria-live="polite">
                       {slow ? "Taking longer than usual — Normal view is ready right now." : device?.preferNormal ? "This device may struggle with 3D — Normal is recommended." : ""}
                     </p>
                   </div>
@@ -174,13 +174,13 @@ export function EntryGate({ compact, device, quality, onQuality, status, started
                   Normal
                 </h2>
                 <p className="mt-2 font-mono text-[10px] tracking-[0.16em] text-[var(--ink-faint)] uppercase">Animated · lighter · instant</p>
-                <p className="mt-5 max-w-xs text-xs leading-relaxed text-[var(--ink-dim)]">
+                <p className="mt-5 max-w-xs text-xs leading-relaxed text-[var(--ink-dim)] max-sm:hidden">
                   The same story without 3D. Kinder to older devices and slow connections.
                 </p>
                 <button
                   type="button"
                   onClick={onNormal}
-                  className="mt-auto inline-flex min-h-12 w-full items-center justify-between gap-4 rounded-full border border-[var(--line)] px-6 text-sm text-[var(--ink-dim)] transition-colors duration-[var(--dur-1)] hover:border-[var(--line-strong)] hover:text-[var(--ink)] max-sm:mt-7"
+                  className="mt-auto inline-flex min-h-12 w-full items-center justify-between gap-4 rounded-full border border-[var(--line)] px-6 text-sm text-[var(--ink-dim)] transition-colors duration-[var(--dur-1)] hover:border-[var(--line-strong)] hover:text-[var(--ink)] max-sm:mt-4"
                 >
                   Normal view <span aria-hidden>→</span>
                 </button>

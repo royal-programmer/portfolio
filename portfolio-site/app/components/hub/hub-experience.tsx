@@ -456,7 +456,9 @@ export function HubExperience({ chapters, upcoming }: Props) {
         </button>
         <div className="flex items-center gap-5">
           {ready && experience === "immersive" ? <QualityMenu value={quality} className="hidden md:block" /> : null}
-          <SoundToggle className="hidden sm:inline-flex" />
+          <span className="hidden sm:block">
+            <SoundToggle />
+          </span>
           <ModeSwitch />
         </div>
       </header>
@@ -569,7 +571,9 @@ export function HubExperience({ chapters, upcoming }: Props) {
           </div>
           <footer className="mt-24 flex items-center justify-between pb-8 font-mono text-[10px] tracking-[0.16em] text-[var(--ink-faint)] uppercase">
             <span>© {new Date().getFullYear()} Ratul Roy</span>
-            <SoundToggle className="sm:hidden" />
+            <span className="sm:hidden">
+              <SoundToggle />
+            </span>
           </footer>
         </section>
       </main>
