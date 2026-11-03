@@ -15,7 +15,7 @@ import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { SPECTRUM_GLSL } from "@/lib/site/spectrum";
 import { useVr } from "./clock";
-import { SOFT_POINT_FRAGMENT, WORLD, coneRadius, easeIn, seeded } from "./util";
+import { SOFT_POINT_FRAGMENT, WORLD, clamp01, coneRadius, easeIn, seeded } from "./util";
 
 // ---------------------------------------------------------------------------
 // Approaching light
@@ -72,18 +72,20 @@ export function ApproachLight() {
     if (!m) return;
     const k = clock.current;
     const s = state.current;
-    const shown = s.phase === "sky" || s.phase === "approach" || s.phase === "impact";
-    m.visible = shown && k.sky > 0.01;
+    // Stays through the split: the glare thins out as the white becomes the pillar.
+    const after = s.phase === "split" ? clamp01(k.phaseT / 2.2) : s.phase === "climb" ? 1 : 0;
+    const shown = s.phase === "sky" || s.phase === "approach" || s.phase === "impact" || (s.phase === "split" && after < 1);
+    m.visible = shown && k.sky > 0.01 && !s.skipped;
     if (!m.visible) return;
     const p = k.approach;
     // A far point that grows until it fills the view (distance 60 → scale ≈ 260 covers it).
-    const scale = 2.4 + 265 * Math.pow(p, 3.2);
+    const scale = 2.4 + 265 * Math.pow(p, 3.2) + after * 120;
     m.scale.setScalar(scale);
     m.position.copy(WORLD.lightFrom);
     m.quaternion.copy(camera.quaternion);
     const pulse = 0.85 + 0.15 * Math.sin(k.t * 1.3);
     material.uniforms.uTime.value = k.t;
-    material.uniforms.uIntensity.value = (0.9 + 1.6 * p) * pulse * k.sky;
+    material.uniforms.uIntensity.value = (0.9 + 1.6 * p) * pulse * k.sky * (1 - after) * (1 - after);
     material.uniforms.uChroma.value = easeIn((p - 0.6) / 0.4);
   });
 
@@ -111,6 +113,7 @@ uniform float uTime;
 uniform float uOpen;    // 0…1 how far up the split has reached
 uniform float uAlpha;
 uniform float uShift;
+uniform float uChroma;  // 0 = still white, 1 = fully separated into colour
 varying vec2 vUv;
 varying vec3 vN;
 varying vec3 vW;
@@ -120,7 +123,7 @@ void main() {
   float reach = uOpen * 1.05;
   float mask = smoothstep(reach, reach - 0.12, h);
   if (mask <= 0.001) discard;
-  vec3 col = spectrum(fract(u + uShift));
+  vec3 col = mix(vec3(1.0), spectrum(fract(u + uShift)), uChroma);
   // Brilliant where the light has just split (near the apex), thinning as it rises.
   float glow = exp(-h * 12.0) * 2.4 + exp(-h * 2.5) * 0.12 + 0.025;
   // Soft bands drifting up the wall — no grids, no hard lines.
@@ -131,7 +134,7 @@ void main() {
   float facing = abs(dot(normalize(vN), V));
   float dens = mix(1.3, 0.6, facing);
   float a = (glow + (s1 + s2) * (0.5 + glow * 0.4) + head) * dens * mask * uAlpha;
-  col = mix(col, spectrum(fract(u + uShift + 0.08)), s1);
+  col = mix(col, mix(vec3(1.0), spectrum(fract(u + uShift + 0.08)), uChroma), s1);
   col = mix(col, vec3(1.0), head * 0.3 + exp(-h * 40.0) * 0.5);
   gl_FragColor = vec4(col * a, a);
 }
@@ -139,6 +142,7 @@ void main() {
 
 export function Cone() {
   const { clock } = useVr();
+  const group = useRef<THREE.Group>(null);
   const H = WORLD.coneHeight;
   const geometry = useMemo(() => {
     const g = new THREE.ConeGeometry(coneRadius(H), H, 128, 1, true);
@@ -156,7 +160,7 @@ export function Cone() {
         transparent: true,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
-        uniforms: { uTime: { value: 0 }, uOpen: { value: 0 }, uAlpha: { value: alpha }, uShift: { value: 0 } },
+        uniforms: { uTime: { value: 0 }, uOpen: { value: 0 }, uAlpha: { value: alpha }, uShift: { value: 0 }, uChroma: { value: 0 } },
       });
     return [make(THREE.BackSide, 0.7), make(THREE.FrontSide, 0.14)];
   }, []);
@@ -167,12 +171,20 @@ export function Cone() {
       m.uniforms.uTime.value = k.t;
       m.uniforms.uOpen.value = k.cone;
       m.uniforms.uShift.value = k.t * 0.004;
+      m.uniforms.uChroma.value = k.chroma;
+    }
+    // The wall starts as a narrow white pillar and fans out to the full cone.
+    const g = group.current;
+    if (g) {
+      const sx = Math.max(0.06, k.spread);
+      g.scale.set(sx, 1, sx);
+      g.visible = k.cone > 0.001;
     }
   });
 
   // Two passes: the inside walls bright, the outside faint.
   return (
-    <group position={WORLD.coneApex}>
+    <group ref={group} position={WORLD.coneApex}>
       <mesh geometry={geometry} material={mats[0]} renderOrder={2} frustumCulled={false} />
       <mesh geometry={geometry} material={mats[1]} renderOrder={3} frustumCulled={false} />
     </group>
@@ -192,6 +204,8 @@ uniform float uTime;
 uniform float uOpen;
 uniform float uLength;
 uniform float uShift;
+uniform float uSpread;  // 0 = every beam points straight up (one pillar), 1 = the full cone
+uniform float uChroma;  // 0 = white, 1 = colour
 varying vec3 vColor;
 varying float vAcross;
 varying float vAlong;
@@ -199,13 +213,18 @@ varying float vFade;
 void main() {
   // position.x = across (−0.5…0.5), position.y = along (0…1)
   float along = position.y;
-  vec3 p = aDir * along * uLength;
+  // The split: the beams start bundled and fan out, each to its own direction.
+  vec3 dir = normalize(vec3(aDir.x * uSpread, aDir.y, aDir.z * uSpread));
+  vec3 p = dir * along * uLength;
   vec3 toCam = cameraPosition - (modelMatrix * vec4(p, 1.0)).xyz;
-  vec3 side = normalize(cross(aDir, normalize(toCam)));
-  float w = aWidth * (0.35 + along * 2.2);
+  vec3 side = normalize(cross(dir, normalize(toCam)));
+  float w = aWidth * (0.35 + along * 2.2) * mix(0.6, 1.0, uSpread);
   p += side * position.x * w;
   float az = atan(aDir.z, aDir.x) / 6.2832;
-  vColor = spectrum(fract(az + uShift + aSeed * 0.04));
+  // Colour separates slightly later for beams nearer the axis — a soft front, not a switch.
+  float lean = length(aDir.xz) / 0.57;
+  float sep = smoothstep(0.0, 1.0, (uChroma - (1.0 - lean) * 0.35) / 0.65);
+  vColor = mix(vec3(1.0), spectrum(fract(az + uShift + aSeed * 0.04)), sep);
   vAcross = position.x * 2.0;
   vAlong = along;
   float reach = uOpen * 1.05;
@@ -261,7 +280,14 @@ export function Rays({ count }: { count: number }) {
       depthWrite: false,
       side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
-      uniforms: { uTime: { value: 0 }, uOpen: { value: 0 }, uLength: { value: WORLD.coneHeight * 0.9 }, uShift: { value: 0 } },
+      uniforms: {
+        uTime: { value: 0 },
+        uOpen: { value: 0 },
+        uLength: { value: WORLD.coneHeight * 0.9 },
+        uShift: { value: 0 },
+        uSpread: { value: 0 },
+        uChroma: { value: 0 },
+      },
     });
     return { geometry: g, material: m };
   }, [count]);
@@ -271,6 +297,8 @@ export function Rays({ count }: { count: number }) {
     material.uniforms.uTime.value = k.t;
     material.uniforms.uOpen.value = k.cone;
     material.uniforms.uShift.value = k.t * 0.004;
+    material.uniforms.uSpread.value = k.spread;
+    material.uniforms.uChroma.value = k.chroma;
   });
 
   return <mesh geometry={geometry} material={material} position={WORLD.coneApex} frustumCulled={false} renderOrder={3} />;
@@ -288,6 +316,8 @@ uniform float uPx;
 uniform float uOpen;
 uniform float uHeight;
 uniform float uTan;
+uniform float uSpread;
+uniform float uChroma;
 varying vec3 vColor;
 varying float vAlpha;
 void main() {
@@ -295,10 +325,10 @@ void main() {
   float hf = fract(aSeed * 3.7 + uTime * speed);
   float reach = uOpen * 1.05;
   float h = hf * uHeight;
-  float r = h * uTan * mix(0.86, 1.0, fract(aSeed * 9.1));
+  float r = h * uTan * mix(0.86, 1.0, fract(aSeed * 9.1)) * max(0.06, uSpread);
   vec3 p = vec3(cos(aAngle) * r, h, sin(aAngle) * r);
   float shown = smoothstep(reach, reach - 0.1, hf);
-  vColor = mix(spectrum(fract(aAngle / 6.2832 + 0.75)), vec3(1.0), 0.15);
+  vColor = mix(vec3(1.0), mix(spectrum(fract(aAngle / 6.2832 + 0.75)), vec3(1.0), 0.15), uChroma);
   vAlpha = shown * (0.35 + 0.65 * aSeed) * smoothstep(0.0, 0.05, hf) * smoothstep(1.0, 0.7, hf);
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   gl_PointSize = uPx * mix(1.0, 2.6, aSeed) / max(-mv.z, 0.2);
@@ -333,6 +363,8 @@ export function Photons({ count, px }: { count: number; px: number }) {
         uOpen: { value: 0 },
         uHeight: { value: WORLD.coneHeight },
         uTan: { value: Math.tan(WORLD.coneHalfAngle) },
+        uSpread: { value: 0 },
+        uChroma: { value: 0 },
       },
     });
     return { geometry: g, material: m };
@@ -342,6 +374,8 @@ export function Photons({ count, px }: { count: number; px: number }) {
     const k = clock.current;
     material.uniforms.uTime.value = k.t;
     material.uniforms.uOpen.value = k.cone;
+    material.uniforms.uSpread.value = k.spread;
+    material.uniforms.uChroma.value = k.chroma;
   });
 
   return <points geometry={geometry} material={material} position={WORLD.coneApex} frustumCulled={false} renderOrder={4} />;

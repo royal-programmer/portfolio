@@ -17,10 +17,8 @@ export const HUB_COPY = {
   headline: "One mind. Many perspectives.",
   /** Prefix of the cycling line: "I'm Ratul Roy. I <phrase>." */
   intro: "I’m Ratul Roy. I",
-  /** The pass through the glass, between the hero and the first world. */
-  throughEyebrow: "You are the prism",
-  throughTitle: "Every perspective starts as the same light.",
-  throughBody: "It passes through you and splits — into everything I do.",
+  /** Between the hero and the first world. One line; nothing explained. */
+  throughTitle: "Every perspective begins with the same sight.",
   moreTitle: "More colours on the way.",
   closingTitle: "Different perspectives. One person.",
   closingBody:

@@ -22,11 +22,14 @@ type ExperienceState = {
   chosen: boolean;
   /** Immersive quality; null until chosen or suggested by the gate. */
   quality: Quality | null;
+  /** True when the visitor set the quality by hand (now or earlier): the governor leaves it alone. */
+  qualityChosen: boolean;
   sound: boolean;
   /** False during SSR/first paint — render choice-dependent UI only when true. */
   ready: boolean;
   setExperience: (x: Experience) => void;
-  setQuality: (q: Quality) => void;
+  /** `persist: false` is for the governor — a session-only change that is not the visitor's choice. */
+  setQuality: (q: Quality, persist?: boolean) => void;
   setSound: (on: boolean) => void;
 };
 
@@ -37,6 +40,7 @@ export function ExperienceProvider({ children }: { children: React.ReactNode }) 
     experience: "immersive" as Experience,
     chosen: false,
     quality: null as Quality | null,
+    qualityChosen: false,
     sound: false,
     ready: false,
   });
@@ -45,8 +49,9 @@ export function ExperienceProvider({ children }: { children: React.ReactNode }) 
     const saved = readExperienceCookie();
     const experience = saved ?? defaultExperience();
     stampExperience(experience);
+    const quality = readQualityCookie();
     queueMicrotask(() =>
-      setState({ experience, chosen: saved !== null, quality: readQualityCookie(), sound: readSoundCookie(), ready: true }),
+      setState({ experience, chosen: saved !== null, quality, qualityChosen: quality !== null, sound: readSoundCookie(), ready: true }),
     );
   }, []);
 
@@ -55,9 +60,9 @@ export function ExperienceProvider({ children }: { children: React.ReactNode }) 
     stampExperience(experience);
     setState((s) => ({ ...s, experience, chosen: true }));
   }, []);
-  const setQuality = useCallback((quality: Quality) => {
-    writeCookie(QUALITY_COOKIE, quality, rootDomains());
-    setState((s) => ({ ...s, quality }));
+  const setQuality = useCallback((quality: Quality, persist = true) => {
+    if (persist) writeCookie(QUALITY_COOKIE, quality, rootDomains());
+    setState((s) => ({ ...s, quality, qualityChosen: s.qualityChosen || persist }));
   }, []);
   const setSound = useCallback((sound: boolean) => {
     writeCookie(SOUND_COOKIE, sound ? "on" : "off", rootDomains());

@@ -19,7 +19,7 @@ export type Phase = "gate" | "wear" | "blink" | "sky" | "approach" | "impact" | 
 export const PHASE_ORDER: Phase[] = ["gate", "wear", "blink", "sky", "approach", "impact", "split", "climb"];
 
 /** Fixed-length phases (seconds); `sky` waits for Space, `approach` is integrated. */
-export const PHASE_LENGTH = { wear: 1.45, blink: 1.3, impact: 0.35, split: 3.4 } as const;
+export const PHASE_LENGTH = { wear: 1.45, blink: 1.3, impact: 0.4, split: 5.2 } as const;
 
 export type VrState = {
   phase: Phase;

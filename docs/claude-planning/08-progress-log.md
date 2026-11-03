@@ -5,6 +5,42 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Round A feedback, second pass (2026-11-04)
+
+Ratul's notes on 4451890, all addressed:
+1. **Page opens on the loader.** The gate's still parts (wordmark, headline, "Gathering light") are
+   server-rendered inside the boot cover (`GateSkeleton`), so the first paint IS the loader; the live gate
+   fades in over it in the same places (gate-rise no longer blurs/translates). Hidden when the saved mode is Normal.
+2. **Slow time readout:** the ring tightens to a small circle, the dot stays, and `time ×0.27` sits beside
+   it — no arc, no percentage, no caption. Director writes `--tscale`.
+3. **Fluid cursor** (`vr/fluid.ts`): a 160 px GPU sim (velocity + dye + hue, vorticity confinement, no
+   pressure solve) stirred by the pointer, applied as a `postprocessing` Effect that bends the frame along
+   the flow and adds the dye as light. Runs in light-time (holding freezes the swirls). The composer now
+   runs at every quality level so Performance has it too (bloom/CA/noise still off there; MSAA 2).
+4. **Descenders** no longer clipped: SplitText masks get `linesClass: "split-line"` → GSAP names the mask
+   `split-mask-line-mask`, padded 0.12em/0.2em with negative margins; words enter from 125 %.
+5. **Sound:** `timeScale` now follows the scene's real time scale (glides): pitch −700 cents, filter
+   closes, a 36 Hz sub swells, a thin beating shimmer surfaces. `rush(speed)` raises the wind during the
+   approach; `impact()` = sub drop 90→36 Hz under the chime.
+6. **Copy:** "Put on the headset" · "Or proceed without the headset →" · "Every perspective begins with
+   the same sight." Eyebrow "You are the prism" and the explaining body line removed (no spoon-feeding).
+7. **Graphics setting is sticky:** a level the visitor set by hand (cookie present) is never changed by
+   the governor — it toasts once ("Running below 40 fps — Balanced would be smoother") instead. The
+   governor's own step-down is session-only (`setQuality(q, false)`), so it never masquerades as a choice.
+8. **The split is continuous:** impact raises a *white pillar* (beams bundled on the axis, `spread 0`,
+   `chroma 0`), the approach glare thins out over 2.2 s, then over the 5.2 s split the beams fan out
+   (`spread`) and the colour separates inside them (`chroma`, later for beams near the axis) while the
+   camera rides the J. Flash shortened to a 1.1 s bloom at 0.95 so the pillar is seen through it.
+- Measured (Intel UHD, dev, Performance, 1440×860): 60 fps gate/sky/approach, 56–60 fps climb, with the
+  composer + fluid on. Fluid sim 160×96 texels.
+- Lessons: fresh render targets are not cleared — clear them once or the sim starts from driver garbage
+  (fog everywhere). Vorticity strength 38 blows up a sim with no pressure projection; 7 with a velocity
+  clamp of 0.3 holds. `blendMode.opacity = 0` on a postprocessing Effect is not a clean A/B (frame went black).
+- Known: the dev server stalls for minutes when Supabase DNS fails (content fetch has no timeout/fallback) —
+  still on the pre-launch list.
+
+---
+
 ## Round A feedback fixes (2026-11-03)
 
 Ratul: "looks awesome now" + five notes. Done:

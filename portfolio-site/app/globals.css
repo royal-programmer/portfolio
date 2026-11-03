@@ -447,11 +447,12 @@ html.is-dragging * {
 @keyframes gate-in {
   from { opacity: 0; }
 }
+/* No rise or blur: the server-rendered skeleton already stands in these places. */
 .gate-panel {
-  animation: gate-rise 1100ms var(--ease-out) 250ms both;
+  animation: gate-rise 900ms var(--ease-out) both;
 }
 @keyframes gate-rise {
-  from { opacity: 0; transform: translateY(14px); filter: blur(10px); }
+  from { opacity: 0; }
 }
 .gate.is-leaving {
   pointer-events: none !important;
@@ -619,77 +620,59 @@ html.has-light-cursor .hub-v3 input[type="range"] {
 .light-cursor-ring.is-down::before {
   transform: scale(0.7);
 }
-.light-cursor-ring span {
+/* Slow time: the ring tightens to a clean circle and a small readout sits beside it. */
+html.is-holding .light-cursor-ring::before {
+  transform: scale(1.35);
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+  transition-duration: 700ms;
+}
+.light-cursor-time {
   position: absolute;
-  left: 50%;
-  top: calc(100% + 12px);
-  transform: translateX(-50%);
+  left: calc(100% + 16px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
   white-space: nowrap;
   font-family: var(--font-geist-mono), monospace;
-  font-size: 9px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--ink-dim);
-  opacity: 0;
-  transition: opacity 300ms var(--ease-out);
-}
-html.is-holding .light-cursor-ring::before {
-  transform: scale(2.4);
-  border-color: rgba(255, 255, 255, 0.18);
-  transition-duration: 1600ms;
-}
-html.is-holding .light-cursor-ring span {
-  opacity: 1;
-}
-/* Slow-time arc + percentage: fills as the scene's clock slows (--slow 0…100). */
-.light-cursor-arc {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg) scale(2.4);
-  opacity: 0;
-  transition: opacity 400ms var(--ease-out), transform 1600ms var(--ease-out);
-  overflow: visible;
-}
-.light-cursor-arc circle {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.12);
-  stroke-width: 1;
-}
-.light-cursor-arc circle + circle {
-  stroke: #fff;
-  stroke-linecap: round;
-  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.8));
-}
-.light-cursor-pct {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  font-family: var(--font-geist-mono), monospace;
-  font-weight: 400;
-  font-size: 10px;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  letter-spacing: 0.04em;
   color: var(--ink);
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
   opacity: 0;
-  transition: opacity 400ms var(--ease-out);
+  transition: opacity 350ms var(--ease-out), transform 500ms var(--ease-out);
 }
-html.is-holding .light-cursor-arc,
-html.is-holding .light-cursor-pct {
+html.is-holding .light-cursor-time {
   opacity: 1;
-}
-html.is-holding .light-cursor-dot {
-  opacity: 0;
+  transform: translateY(-50%);
 }
 
-/* Boot cover: void until the page knows how it opens. */
+/* Boot: the page opens on the loader (server-rendered), then this fades under the live gate. */
 .hub-boot {
   pointer-events: none;
-  transition: opacity 900ms var(--ease-out);
+  transition: opacity 800ms var(--ease-out);
 }
 .hub-boot.is-done {
   opacity: 0;
+  visibility: hidden;
+  transition: opacity 800ms var(--ease-out), visibility 0s 800ms;
+}
+.gate-skeleton-load {
+  animation: gate-skeleton-load 2.2s var(--ease-in-out) infinite;
+}
+@keyframes gate-skeleton-load {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+/* Returning in Normal mode there is no gate to open onto: plain void. */
+html[data-experience="normal"] .gate-skeleton {
+  visibility: hidden;
+}
+
+/* SplitText line masks clip at the line box; give descenders and ascenders room.
+   (GSAP derives the mask class from `linesClass: "split-line"` word by word → this name.) */
+.split-mask-line-mask {
+  padding: 0.12em 0.06em 0.2em;
+  margin: -0.12em -0.06em -0.2em;
 }
 
 /* ---------- Display type: Fraunces (D38 round A feedback) ----------

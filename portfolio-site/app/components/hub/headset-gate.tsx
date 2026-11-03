@@ -24,14 +24,38 @@ type Props = {
   status: LoadStatus;
   startedAt: number;
   leaving: boolean;
-  touch: boolean;
   onWear: () => void;
   onNormal: () => void;
 };
 
 const SLOW_AFTER_MS = 9000;
 
-export function HeadsetGate({ device, quality, onQuality, status, startedAt, leaving, touch, onWear, onNormal }: Props) {
+/**
+ * What the server sends before any script runs: the gate's still parts in the
+ * same places, so the page opens ON the loader and the live gate takes over
+ * without a jump. Hidden by CSS when the visitor's saved mode is Normal.
+ */
+export function GateSkeleton() {
+  return (
+    <div aria-hidden className="gate-skeleton flex h-full flex-col text-[var(--ink)]">
+      <div className="flex items-center justify-between px-4 pt-5 sm:px-8 lg:px-12">
+        <span className="font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase">ratulroy.me</span>
+      </div>
+      <div className="flex flex-1 flex-col items-center px-4 pt-[6svh] sm:px-8">
+        <p className="font-mono text-[10px] tracking-[0.24em] text-[var(--ink-faint)] uppercase">Ratul Roy</p>
+        <h1 className="mt-3 text-center font-display text-[length:clamp(1.9rem,1.2rem+2.4vw,3.4rem)] leading-[0.95] tracking-[-0.02em]">
+          One mind. <span className="italic text-[var(--ink-dim)]">Many perspectives.</span>
+        </h1>
+        <div className="flex-1" />
+        <p className="gate-skeleton-load mb-[9svh] font-mono text-[11px] tracking-[0.2em] text-[var(--ink-dim)] uppercase">Gathering light</p>
+        <p className="mb-6 min-h-4" />
+      </div>
+      <div className="h-[7.5rem] sm:h-[6.5rem]" />
+    </div>
+  );
+}
+
+export function HeadsetGate({ device, quality, onQuality, status, startedAt, leaving, onWear, onNormal }: Props) {
   const [pct, setPct] = useState(0);
   const [slow, setSlow] = useState(false);
 
@@ -57,7 +81,7 @@ export function HeadsetGate({ device, quality, onQuality, status, startedAt, lea
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Put on the headset, or choose Normal view"
+      aria-label="Put on the headset, or proceed without it"
       className={`gate pointer-events-none fixed inset-0 z-50 flex flex-col text-[var(--ink)] ${leaving ? "is-leaving" : ""} ${blocked ? "bg-[var(--void)]" : ""}`}
     >
       <div className="flex items-center justify-between px-4 pt-5 sm:px-8 lg:px-12">
@@ -94,7 +118,7 @@ export function HeadsetGate({ device, quality, onQuality, status, startedAt, lea
               onClick={onWear}
               className="gate-wear pointer-events-auto mb-[9svh] font-mono text-[11px] tracking-[0.2em] text-[var(--ink-dim)] uppercase transition-colors hover:text-[var(--ink)] disabled:cursor-progress"
             >
-              {ready ? (touch ? "Tap the headset to put it on" : "Click the headset to put it on") : `Gathering light · ${pct}%`}
+              {ready ? "Put on the headset" : `Gathering light · ${pct}%`}
               {ready ? <span aria-hidden className="gate-wear-line" /> : null}
             </button>
             <p className="mb-6 min-h-4 text-xs text-[var(--ink-faint)]" aria-live="polite">
@@ -121,7 +145,7 @@ export function HeadsetGate({ device, quality, onQuality, status, startedAt, lea
             onClick={onNormal}
             className="pointer-events-auto justify-self-start font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline sm:justify-self-end"
           >
-            Or the Normal view, without the headset →
+            Or proceed without the headset →
           </button>
         </div>
       ) : null}

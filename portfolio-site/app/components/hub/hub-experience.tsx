@@ -7,8 +7,8 @@
  *   wear      click it → it comes up to your face · blink · the night sky
  *   sky       one point of light far ahead · Press Space
  *   approach  the light comes at you, slow then fast (hold to slow time)
- *   impact    you are the prism · white
- *   split     the camera rides the J; the light opens into a cone of colour
+ *   impact    the strike · a white pillar stands up through you
+ *   split     the camera rides the J; the pillar fans out and the white separates into colour
  *   climb     scroll: spiral up through the cone (rounds B–D fill the worlds)
  *
  * HTML owns all content (screen readers, no-JS and Normal mode get the whole
@@ -29,7 +29,7 @@ import { PersonaLink } from "@/lib/site/persona-link";
 import { spectrumColor } from "@/lib/site/spectrum";
 import { useExperience } from "../../experience-provider";
 import { ModeSwitch, QualityMenu, QUALITY_LABEL, SoundToggle } from "../experience-controls";
-import { HeadsetGate, type LoadStatus } from "./headset-gate";
+import { GateSkeleton, HeadsetGate, type LoadStatus } from "./headset-gate";
 import { LightCursor } from "./light-cursor";
 import { RefractionPoster } from "./refraction-poster";
 import { atLeast, createVrState, type Band, type Phase } from "./vr/state";
@@ -78,7 +78,7 @@ class SceneBoundary extends Component<{ onFail: () => void; children: ReactNode 
 
 export function HubExperience({ chapters, upcoming }: Props) {
   const xp = useExperience();
-  const { experience, ready, chosen, setExperience, setQuality, sound } = xp;
+  const { experience, ready, chosen, setExperience, setQuality, qualityChosen, sound } = xp;
 
   const [device, setDevice] = useState<DeviceReport | null>(null);
   const [status, setStatus] = useState<LoadStatus>("loading");
@@ -201,9 +201,10 @@ export function HubExperience({ chapters, upcoming }: Props) {
       setPhase(next);
       if (next === "sky") setHint(touch ? "Tap to call the light" : "Press Space");
       if (next === "impact") {
-        ambient.chime(1);
+        ambient.impact();
+        // A short bloom, not a curtain: the white pillar is already there behind it.
         const f = flashRef.current;
-        if (f) gsap.fromTo(f, { opacity: 1 }, { opacity: 0, duration: 1.6, ease: "power2.out" });
+        if (f) gsap.fromTo(f, { opacity: 0.95 }, { opacity: 0, duration: 1.1, ease: "power1.out" });
       }
     },
     [setPhase, touch],
@@ -279,11 +280,19 @@ export function HubExperience({ chapters, upcoming }: Props) {
     setStatus("failed");
     setPhase("gate");
   }, [setPhase]);
+  const suggestedOnce = useRef(false);
   const onStepDown = useCallback(() => {
     const next = NEXT_LOWER[quality];
-    setQuality(next);
-    setToast(`Quality lowered to ${QUALITY_LABEL[next]} to keep it smooth`);
-  }, [quality, setQuality]);
+    if (qualityChosen) {
+      // The visitor set this level: never change it under them — say so, once.
+      if (suggestedOnce.current) return;
+      suggestedOnce.current = true;
+      setToast(`Running below 40 fps — ${QUALITY_LABEL[next]} would be smoother`);
+      return;
+    }
+    setQuality(next, false);
+    setToast(`Graphics lowered to ${QUALITY_LABEL[next]} to keep it smooth`);
+  }, [quality, qualityChosen, setQuality]);
   const onStruggle = useCallback(() => setStruggling(true), []);
 
   useEffect(() => {
@@ -434,7 +443,6 @@ export function HubExperience({ chapters, upcoming }: Props) {
         s.holding = true;
         heldOnce.current = true;
         setHint(null);
-        ambient.timeScale(0);
         document.documentElement.classList.add("is-holding");
       }, 260);
     };
@@ -446,7 +454,6 @@ export function HubExperience({ chapters, upcoming }: Props) {
       s.dragging = false;
       s.holding = false;
       start = null;
-      ambient.timeScale(1);
       document.documentElement.classList.remove("is-dragging", "is-holding");
     };
     const blur = () => up();
@@ -474,8 +481,9 @@ export function HubExperience({ chapters, upcoming }: Props) {
       const hero = root.querySelector<HTMLElement>("[data-hero-title]");
       const heroItems = root.querySelectorAll<HTMLElement>("[data-hero-item]");
       if (hero) {
-        const split = SplitText.create(hero, { type: "lines,words", mask: "lines" });
-        gsap.set(split.words, { yPercent: 115 });
+        // `split-line` → the masks get `split-line-mask`, padded so descenders are not clipped.
+        const split = SplitText.create(hero, { type: "lines,words", mask: "lines", linesClass: "split-line" });
+        gsap.set(split.words, { yPercent: 125 });
         gsap.set(heroItems, { autoAlpha: 0, y: 24, filter: "blur(8px)" });
         if (textLive) {
           gsap.to(split.words, { yPercent: 0, duration: 1.5, ease: "expo.out", stagger: 0.07, delay: 0.3 });
@@ -483,9 +491,9 @@ export function HubExperience({ chapters, upcoming }: Props) {
         }
       }
       root.querySelectorAll<HTMLElement>("[data-split]").forEach((el) => {
-        const split = SplitText.create(el, { type: "lines,words", mask: "lines" });
+        const split = SplitText.create(el, { type: "lines,words", mask: "lines", linesClass: "split-line" });
         gsap.from(split.words, {
-          yPercent: 110,
+          yPercent: 125,
           duration: 1.2,
           ease: "expo.out",
           stagger: 0.05,
@@ -624,15 +632,9 @@ export function HubExperience({ chapters, upcoming }: Props) {
 
         {/* ---------- Into the colour ---------- */}
         <section id="through" data-section className="flex min-h-[110svh] items-center justify-center px-4 text-center sm:px-8">
-          <div className="max-w-3xl">
-            <p className="font-mono text-[10px] tracking-[0.24em] text-[var(--ink-faint)] uppercase">{HUB_COPY.throughEyebrow}</p>
-            <h2 data-split className="mt-5 font-display text-[length:var(--step-4)] leading-[0.98] tracking-[-0.015em]">
-              {HUB_COPY.throughTitle}
-            </h2>
-            <div data-rise>
-              <p className="mx-auto mt-6 max-w-md text-[length:var(--step-0)] text-[var(--ink-dim)]">{HUB_COPY.throughBody}</p>
-            </div>
-          </div>
+          <h2 data-split className="max-w-3xl font-display text-[length:var(--step-4)] leading-[0.98] tracking-[-0.015em]">
+            {HUB_COPY.throughTitle}
+          </h2>
         </section>
 
         {chapters.map((c, i) => (
@@ -691,8 +693,11 @@ export function HubExperience({ chapters, upcoming }: Props) {
       </main>
 
       {/* ---------- Intro overlays ---------- */}
-      {/* Void until the page knows how it opens: no glimpse of anything else first. */}
-      <div aria-hidden className={`hub-boot fixed inset-0 z-[45] bg-[var(--void)] ${decided ? "is-done" : ""}`} />
+      {/* Before any script runs the page IS the loader: the gate's still parts, server-rendered.
+          The live gate fades in over it in the same places; this fades away once the page has decided. */}
+      <div aria-hidden className={`hub-boot fixed inset-0 z-[45] bg-[var(--void)] ${decided ? "is-done" : ""}`}>
+        <GateSkeleton />
+      </div>
       <div ref={flashRef} aria-hidden className="vr-flash fixed inset-0 z-40 opacity-0" />
       {blink ? (
         <svg aria-hidden className="vr-blink fixed inset-0 z-40 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -721,7 +726,7 @@ export function HubExperience({ chapters, upcoming }: Props) {
         </div>
       ) : null}
 
-      {ready ? <LightCursor holdHint="slowing time" /> : null}
+      {ready ? <LightCursor /> : null}
 
       {struggling ? (
         <div role="alertdialog" aria-label="Performance" className="fixed inset-x-4 bottom-6 z-40 mx-auto flex max-w-md flex-col gap-4 rounded-2xl border border-[var(--line)] bg-[rgba(10,10,14,0.9)] p-5 backdrop-blur-xl sm:flex-row sm:items-center">
@@ -750,7 +755,6 @@ export function HubExperience({ chapters, upcoming }: Props) {
           status={device && !device.webgl ? "unsupported" : status}
           startedAt={startedAt}
           leaving={leaving}
-          touch={touch}
           onWear={wear}
           onNormal={goNormal}
         />

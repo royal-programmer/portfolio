@@ -1,17 +1,28 @@
 /**
- * Ambient sound for the light journey (D36) — synthesised with Web Audio, no
+ * Ambient sound for the VR journey (D38) — synthesised with Web Audio, no
  * audio files. Off by default; starts only from a user gesture.
  *
- *   drone   two soft low tones + filtered "air", slowly breathing
- *   depth   scroll progress opens the filter (the world brightens as you travel)
- *   hold    holding "slows time": the drone detunes downward
- *   chime   a glassy shimmer when the light strikes the prism / you enter a world
+ *   drone      two soft low tones + filtered "air", slowly breathing
+ *   depth      journey progress opens the filter (the world brightens)
+ *   rush       the approach: wind rises with the light's speed
+ *   timeScale  slowing time: pitch falls, the filter closes, a sub swells and
+ *              a thin high shimmer appears — the "underwater" feeling. Follows
+ *              the scene's real time scale, so it glides rather than switches.
+ *   chime      a glassy shimmer when the light strikes / you enter a world
+ *   impact     the strike: a sub drop under the chime
  */
 type Engine = {
   ctx: AudioContext;
   master: GainNode;
   filter: BiquadFilterNode;
   oscs: OscillatorNode[];
+  wind: GainNode;
+  windBand: BiquadFilterNode;
+  sub: GainNode;
+  subOsc: OscillatorNode;
+  shimmer: GainNode;
+  depth: number;
+  scale: number;
 };
 
 let engine: Engine | null = null;
@@ -49,7 +60,7 @@ function build(): Engine | null {
   lfo.connect(lfoGain).connect(oscs[2].detune);
   lfo.start();
 
-  // "Air": looped filtered noise.
+  // "Air": looped filtered noise. Also the wind of the approach.
   const len = ctx.sampleRate * 2;
   const buf = ctx.createBuffer(1, len, ctx.sampleRate);
   const data = buf.getChannelData(0);
@@ -57,16 +68,46 @@ function build(): Engine | null {
   const noise = ctx.createBufferSource();
   noise.buffer = buf;
   noise.loop = true;
-  const band = ctx.createBiquadFilter();
-  band.type = "bandpass";
-  band.frequency.value = 900;
-  band.Q.value = 0.6;
-  const ng = ctx.createGain();
-  ng.gain.value = 0.025;
-  noise.connect(band).connect(ng).connect(filter);
+  const windBand = ctx.createBiquadFilter();
+  windBand.type = "bandpass";
+  windBand.frequency.value = 900;
+  windBand.Q.value = 0.6;
+  const wind = ctx.createGain();
+  wind.gain.value = 0.025;
+  noise.connect(windBand).connect(wind).connect(filter);
   noise.start();
 
-  return { ctx, master, filter, oscs };
+  // Sub: felt more than heard; swells when time slows and on impact.
+  const subOsc = ctx.createOscillator();
+  subOsc.type = "sine";
+  subOsc.frequency.value = 36;
+  const sub = ctx.createGain();
+  sub.gain.value = 0;
+  subOsc.connect(sub).connect(master);
+  subOsc.start();
+
+  // Shimmer: a thin, slowly beating high pair that surfaces when time slows.
+  const shimmer = ctx.createGain();
+  shimmer.gain.value = 0;
+  for (const f of [1318.5, 1324.5]) {
+    const o = ctx.createOscillator();
+    o.type = "sine";
+    o.frequency.value = f;
+    const g = ctx.createGain();
+    g.gain.value = 0.5;
+    o.connect(g).connect(shimmer);
+    o.start();
+  }
+  shimmer.connect(master);
+
+  return { ctx, master, filter, oscs, wind, windBand, sub, subOsc, shimmer, depth: 0, scale: 1 };
+}
+
+function applyFilter(e: Engine) {
+  // Depth opens the filter; slowed time closes it again (muffled, underwater).
+  const open = 380 + Math.pow(e.depth, 1.3) * 2200;
+  const f = open * (0.18 + 0.82 * e.scale);
+  e.filter.frequency.setTargetAtTime(f, e.ctx.currentTime, 0.25);
 }
 
 export const ambient = {
@@ -88,14 +129,28 @@ export const ambient = {
   /** 0…1 journey progress → filter opens. */
   depth(p: number) {
     if (!engine) return;
-    const f = 380 + Math.pow(Math.min(1, Math.max(0, p)), 1.3) * 2200;
-    engine.filter.frequency.setTargetAtTime(f, engine.ctx.currentTime, 0.3);
+    engine.depth = Math.min(1, Math.max(0, p));
+    applyFilter(engine);
   },
-  /** Time-bend while holding: 1 = normal, 0 = fully slowed. */
+  /** 0…1 how fast the light is rushing at you: the wind rises and sharpens. */
+  rush(speed: number) {
+    if (!engine) return;
+    const s = Math.min(1, Math.max(0, speed));
+    const now = engine.ctx.currentTime;
+    engine.wind.gain.setTargetAtTime(0.025 + s * s * 0.16, now, 0.2);
+    engine.windBand.frequency.setTargetAtTime(900 + s * 1900, now, 0.2);
+  },
+  /** Time scale: 1 = normal, 0.1 = fully slowed. Glides; call as often as it changes. */
   timeScale(s: number) {
     if (!engine) return;
-    const cents = (1 - s) * -240;
-    for (const o of engine.oscs) o.detune.setTargetAtTime(cents, engine.ctx.currentTime, 0.25);
+    const k = Math.min(1, Math.max(0, (s - 0.1) / 0.9)); // 1 normal … 0 slowed
+    engine.scale = k;
+    const now = engine.ctx.currentTime;
+    const cents = (1 - k) * -700;
+    for (const o of engine.oscs) o.detune.setTargetAtTime(cents, now, 0.3);
+    engine.sub.gain.setTargetAtTime((1 - k) * 0.2, now, 0.35);
+    engine.shimmer.gain.setTargetAtTime((1 - k) * 0.012, now, 0.5);
+    applyFilter(engine);
   },
   chime(pitch = 1) {
     if (!engine || engine.master.gain.value < 0.01) return;
@@ -113,5 +168,19 @@ export const ambient = {
       o.start(now);
       o.stop(now + 2.5);
     });
+  },
+  /** The strike: a sub drop under the chime, then the wind falls away. */
+  impact() {
+    if (!engine || engine.master.gain.value < 0.01) return;
+    const { ctx, sub, subOsc, wind } = engine;
+    const now = ctx.currentTime;
+    subOsc.frequency.cancelScheduledValues(now);
+    subOsc.frequency.setValueAtTime(90, now);
+    subOsc.frequency.exponentialRampToValueAtTime(36, now + 1.4);
+    sub.gain.cancelScheduledValues(now);
+    sub.gain.setValueAtTime(0.5, now);
+    sub.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+    wind.gain.setTargetAtTime(0.025, now, 0.6);
+    this.chime(1);
   },
 };
