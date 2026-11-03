@@ -5,6 +5,33 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Hub round 1: the light journey (2026-11-03) — D36, D37
+
+- Deps (`chore(config)`): gsap 3.13 (ScrollTrigger + SplitText), lenis 1.3.
+- **Entry gate** (`app/components/hub/entry-gate.tsx`): device analysis (`lib/site/device.ts`: WebGL
+  renderer → tier → suggested quality), quality slider, Enter (progress while the scene compiles behind
+  the gate) / Normal (instant); "taking longer than usual" after 9 s; WebGL missing/failed said plainly.
+  Returning visitors in the same session get the compact loader (auto-enters, Skip always visible).
+- **Modes:** `lib/site/experience.ts` rewritten — `immersive | normal` + quality + sound cookies on the root
+  domain; no Auto. `experience-toggle.tsx` → `experience-controls.tsx` (ModeSwitch, QualityMenu, SoundToggle).
+- **Scene** (`app/components/hub/journey/*`, replaces `refraction-scene.tsx`): beam with haze + pulses,
+  impact flash + sparks, custom glass shader (analytic per-channel refraction, AA edges, internal light
+  path; no transmission buffer → no grain), camera path through the prism onto a river of colour,
+  photons along each stream, cursor-reactive dust, a world teaser per persona (lattice / candles /
+  aperture), closing fold to white. Drag = look around (springs home), hold = slow time.
+  Shader compile errors / context loss → graceful "3D couldn't start" + Normal.
+- **Page:** Lenis smooth scroll, GSAP word-mask reveals, light cursor, synthesised ambient sound.
+- **Measured (Intel UHD 620-class laptop, dev build):** ready behind the gate in ~1.6 s; Performance 60 fps
+  at 1440×860; Balanced ~40 fps (bloom), so the device analysis correctly suggests Performance here.
+  Mobile (390 px emulated): no horizontal overflow, gate fits one screen.
+- **Lessons:** `THREE.Color` can't parse CSS `hsl(h s% l%)` (silently white) — use `setHSL`.
+  `modelMatrix` isn't available in fragment shaders. Background tabs throttle rAF (check focus before
+  trusting fps).
+- **Next:** round 2 = Normal mode with full motion (replace the static poster) + ending polish;
+  round 3 = portal into each world (D37), richer world scenes, phone tuning, sound design.
+
+---
+
 ## Design pass 2: 3D "Refraction" hub (2026-11-02) — D32–D35
 
 - Deps (`chore(config)`): three, @react-three/fiber 9, drei 10, @react-three/postprocessing 3.
