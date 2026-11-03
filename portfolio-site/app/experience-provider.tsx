@@ -2,58 +2,72 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import {
-  applyExperience,
-  readPrefCookie,
-  writePrefCookie,
-  type AutoReason,
+  EXPERIENCE_COOKIE,
+  QUALITY_COOKIE,
+  SOUND_COOKIE,
+  defaultExperience,
+  readExperienceCookie,
+  readQualityCookie,
+  readSoundCookie,
+  stampExperience,
+  writeCookie,
   type Experience,
-  type ExperiencePref,
+  type Quality,
 } from "@/lib/site/experience";
 import { rootDomains } from "@/lib/site/hosts";
 
 type ExperienceState = {
-  pref: ExperiencePref;
   experience: Experience;
-  /** Why Auto chose what it chose, or "chosen" when the visitor picked. */
-  reason: AutoReason | "chosen";
-  /** False during SSR/first paint — render pref-dependent UI only when true. */
+  /** True once the visitor has made a choice (now or on an earlier visit). */
+  chosen: boolean;
+  /** Immersive quality; null until chosen or suggested by the gate. */
+  quality: Quality | null;
+  sound: boolean;
+  /** False during SSR/first paint — render choice-dependent UI only when true. */
   ready: boolean;
-  setPref: (pref: ExperiencePref) => void;
+  setExperience: (x: Experience) => void;
+  setQuality: (q: Quality) => void;
+  setSound: (on: boolean) => void;
 };
 
 const ExperienceContext = createContext<ExperienceState | null>(null);
 
 export function ExperienceProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<Omit<ExperienceState, "setPref">>({
-    pref: "auto",
-    // SSR default; the boot script already stamped the real value on <html>.
-    experience: "lite",
-    reason: "capable",
+  const [state, setState] = useState({
+    experience: "immersive" as Experience,
+    chosen: false,
+    quality: null as Quality | null,
+    sound: false,
     ready: false,
   });
 
   useEffect(() => {
-    const pref = readPrefCookie();
-    const resolved = applyExperience(pref);
-    queueMicrotask(() => setState({ pref, ...resolved, ready: true }));
-
-    // Auto follows live OS changes to the reduced-motion setting.
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const onChange = () => {
-      const current = readPrefCookie();
-      if (current === "auto") setState({ pref: current, ...applyExperience(current), ready: true });
-    };
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
+    const saved = readExperienceCookie();
+    const experience = saved ?? defaultExperience();
+    stampExperience(experience);
+    queueMicrotask(() =>
+      setState({ experience, chosen: saved !== null, quality: readQualityCookie(), sound: readSoundCookie(), ready: true }),
+    );
   }, []);
 
-  const setPref = useCallback((pref: ExperiencePref) => {
-    writePrefCookie(pref, rootDomains());
-    setState({ pref, ...applyExperience(pref), ready: true });
+  const setExperience = useCallback((experience: Experience) => {
+    writeCookie(EXPERIENCE_COOKIE, experience, rootDomains());
+    stampExperience(experience);
+    setState((s) => ({ ...s, experience, chosen: true }));
+  }, []);
+  const setQuality = useCallback((quality: Quality) => {
+    writeCookie(QUALITY_COOKIE, quality, rootDomains());
+    setState((s) => ({ ...s, quality }));
+  }, []);
+  const setSound = useCallback((sound: boolean) => {
+    writeCookie(SOUND_COOKIE, sound ? "on" : "off", rootDomains());
+    setState((s) => ({ ...s, sound }));
   }, []);
 
   return (
-    <ExperienceContext.Provider value={{ ...state, setPref }}>{children}</ExperienceContext.Provider>
+    <ExperienceContext.Provider value={{ ...state, setExperience, setQuality, setSound }}>
+      {children}
+    </ExperienceContext.Provider>
   );
 }
 
