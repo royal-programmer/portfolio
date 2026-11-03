@@ -5,10 +5,11 @@ reads as *designed*, not generated. When in doubt, cut.
 
 ## Idea
 
-You travel **as the light**. A beam falls from the sky, strikes a prism, and
-splits. Each colour is a part of Ratul, with its own world on the horizon. At
-the end everything folds back into one white light. Every visual is a piece of
-that one idea. Nothing is decorative for its own sake.
+You travel **as the light**, wearing a headset (full spec: `14-vr-journey-concept.md`, D38). A light comes at
+you out of a night sky and hits you head-on: you are the prism. It splits into a cone of colour, and you climb
+through it in a spiral where every part of Ratul drifts by and assembles into something you can step into. At
+the end the colours fade and you take the headset off. Every visual is a piece of that one idea. Nothing is
+decorative for its own sake. No HUD text on screen.
 
 ## Type
 

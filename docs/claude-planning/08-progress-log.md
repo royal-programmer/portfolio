@@ -5,6 +5,22 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Hub concept reset: the VR journey (2026-11-03) — D38
+
+- Ratul reviewed round 1: good, "not out of the world". Over several messages we agreed a new hub concept;
+  the complete spec is `14-vr-journey-concept.md` (flow, persona order and assemblies, rights, perf, Normal
+  mode, rounds A–D). Round-1's prism/river scene will be replaced; the gate, quality slider, governor, light
+  cursor, sound and Lenis/GSAP stack carry over.
+- Decisions inside D38: no on-screen HUD text; Ratul's own screenshots of VS Code / TradingView / Valorant /
+  CS2 etc. allowed; hub trading numbers illustrative (percentages only); ride routes as light lines (no map
+  tiles); CC0-only 3D models restyled in our material; all credits in the browser console.
+- Ratul is collecting screenshots in `Desktop/portfolio-shots` for round B.
+- **Next:** round A (headset gate + wear, night sky, Space/Tap, accelerating light + hold-to-slow, head-on
+  impact, J-split into the cone). Ratul may switch the builder model to Fable for it; everything needed is
+  in D38 + doc 14.
+
+---
+
 ## Hub round 1: the light journey (2026-11-03) — D36, D37
 
 - Deps (`chore(config)`): gsap 3.13 (ScrollTrigger + SplitText), lenis 1.3.
