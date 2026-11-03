@@ -20,6 +20,7 @@ import { VrContext, createClock, useVr, type VrClock } from "./clock";
 import { Headset } from "./headset";
 import { ApproachLight, Cone, Photons, Rays } from "./light";
 import { Dome, Stars } from "./sky";
+import { Space } from "./space";
 import { PHASE_LENGTH, type Band, type Phase, type VrState } from "./state";
 import { WORLD, clamp01, coneRadius, ease, easeInOut } from "./util";
 
@@ -61,7 +62,7 @@ type Props = {
 
 function Director({ sectionT, onPhaseEnd }: { sectionT: Array<number | null>; onPhaseEnd: (p: Phase) => void }) {
   const { clock, state } = useVr();
-  const live = useRef({ c: 0, px: 0, py: 0, yaw: 0, pitch: 0, fov: FOV, hover: false, ended: "" as Phase | "" });
+  const live = useRef({ c: 0, px: 0, py: 0, yaw: 0, pitch: 0, fov: FOV, hover: false, slow: -1, ended: "" as Phase | "" });
   const tmp = useMemo(
     () => ({
       pos: new THREE.Vector3(),
@@ -118,10 +119,15 @@ function Director({ sectionT, onPhaseEnd }: { sectionT: Array<number | null>; on
     k.tint = t ?? k.tint;
     k.tintAmount = THREE.MathUtils.damp(k.tintAmount, k.cone * (t === null ? 0.12 : 0.25 + 0.45 * near), 3, dt);
 
-    // Headset hover → page cursor.
+    // Headset hover → page cursor; time scale → the cursor's slow-time ring.
     if (L.hover !== s.hover) {
       L.hover = s.hover;
       document.documentElement.classList.toggle("is-headset-hover", s.hover);
+    }
+    const slow = Math.round(((1 - k.scale) / 0.9) * 100);
+    if (slow !== L.slow) {
+      L.slow = slow;
+      document.documentElement.style.setProperty("--slow", String(Math.max(0, Math.min(100, slow))));
     }
 
     // ---- Camera ----
@@ -323,6 +329,7 @@ export default function VrScene({ sectionT, state, quality, onPhaseEnd, onWear, 
 
         <Dome />
         <Stars count={preset.stars} px={px} />
+        <Space />
         <Headset onWear={onWear} />
         <ApproachLight />
         <Cone />

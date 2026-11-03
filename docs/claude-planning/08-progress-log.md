@@ -5,6 +5,24 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Round A feedback fixes (2026-11-03)
+
+Ratul: "looks awesome now" + five notes. Done:
+1. **No glimpse of the old view before the gate** — a void cover (`.hub-boot`) is in the server HTML and
+   only fades once the page has decided how to open; the Normal poster stays hidden until then.
+2. **Graphics setting labels:** Performance · Balanced · **Quality** (was "Best"); top bar says "Graphics · …".
+3. **Type:** display face is now **Fraunces** (variable: opsz 144, SOFT 60, WONK 1, weight 330) via
+   `next/font/google`; hero headline no longer `nowrap`, max size 7 rem, so nothing clips.
+4. **Slow-time ring:** while holding, the cursor grows an arc that fills with the real time scale and shows
+   the percentage (Director writes `--slow` 0–100 on `<html>`; the cursor reads it each frame).
+5. **Company in the sky** (`vr/space.tsx`, all in code): shooting stars, two planets (one ringed, lit from
+   the light's side), a satellite with a blinking lamp on a slow arc, a tiny rocket crossing far away with
+   an exhaust glow. Scaled by sky visibility so they never compete with the light.
+- Lesson: `active` is a reserved word in GLSL (shader failed → gate said 3D couldn't start). Caught by
+  `ContextWatch`, which is exactly what it is for.
+
+---
+
 ## VR journey round A: headset → sky → the light → the split (2026-11-03) — D38
 
 - **Scene rewritten** as `app/components/hub/vr/*` (replaces `hub/journey/*` and `entry-gate.tsx`):

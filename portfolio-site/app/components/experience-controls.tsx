@@ -11,7 +11,7 @@ import { useExperience } from "../experience-provider";
 export const QUALITY_LABEL: Record<Quality, string> = {
   performance: "Performance",
   balanced: "Balanced",
-  best: "Best",
+  best: "Quality",
 };
 
 export function QualitySlider({
@@ -30,7 +30,7 @@ export function QualitySlider({
   return (
     <div className={className}>
       <label htmlFor={id} className="sr-only">
-        Quality
+        Graphics setting
       </label>
       <input
         id={id}
@@ -139,7 +139,7 @@ export function QualityMenu({ value, className = "" }: { value: Quality; classNa
         onClick={() => setOpen((v) => !v)}
         className="inline-flex min-h-8 items-center gap-2 font-mono text-[10px] tracking-[0.16em] text-[var(--ink-dim)] uppercase transition-colors hover:text-[var(--ink)]"
       >
-        Quality · {QUALITY_LABEL[value]}
+        Graphics · {QUALITY_LABEL[value]}
       </button>
       {open ? (
         <div className="absolute top-full right-0 mt-3 w-64 rounded-2xl border border-[var(--line)] bg-[rgba(10,10,14,0.88)] p-5 backdrop-blur-xl">

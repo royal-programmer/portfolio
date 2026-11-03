@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import { EXPERIENCE_BOOT_SCRIPT } from "@/lib/site/experience";
 import { ExperienceProvider } from "./experience-provider";
 import { PersonaProvider } from "./persona-provider";
@@ -15,12 +15,17 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-/** Display face (design system v2): editorial serif — the "legacy" voice. */
-const instrumentSerif = Instrument_Serif({
-  variable: "--font-instrument-serif",
-  weight: "400",
+/**
+ * Display face (D38 round A feedback: "fancy but readable"): Fraunces, a
+ * variable serif with optical sizes, a softness axis and "wonky" italics.
+ * Large sizes get the high-contrast, soft cut; it stays legible small.
+ */
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
   style: ["normal", "italic"],
+  axes: ["SOFT", "WONK", "opsz"],
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -39,7 +44,7 @@ export default function RootLayout({
       lang="en"
       // The boot script stamps data-experience before hydration.
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: EXPERIENCE_BOOT_SCRIPT }} />

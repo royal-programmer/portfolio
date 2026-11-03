@@ -92,6 +92,8 @@ export function HubExperience({ chapters, upcoming }: Props) {
   const [touch, setTouch] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const [blink, setBlink] = useState(false);
+  /** False until the page knows how it will open — a void cover hides everything until then. */
+  const [decided, setDecided] = useState(false);
 
   const vr = useRef(createVrState());
   const lenisRef = useRef<Lenis | null>(null);
@@ -141,6 +143,7 @@ export function HubExperience({ chapters, upcoming }: Props) {
       if (!report.webgl) setStatus("unsupported");
       if (!chosen || !seen) setGate("full");
       else if (experience === "immersive" && report.webgl) setGate("returning");
+      setDecided(true);
     });
     // Run once when the provider is ready.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -532,7 +535,7 @@ export function HubExperience({ chapters, upcoming }: Props) {
     >
       {/* ---------- Backdrop ---------- */}
       <div aria-hidden className="fixed inset-0 z-0">
-        <div className={`poster-alive absolute inset-0 transition-opacity duration-[1400ms] ${sceneWanted ? "opacity-0" : "opacity-100"}`}>
+        <div className={`poster-alive absolute inset-0 transition-opacity duration-[1400ms] ${sceneWanted || !decided ? "opacity-0" : "opacity-100"}`}>
           <RefractionPoster bands={bands} />
         </div>
         {sceneWanted ? (
@@ -606,9 +609,9 @@ export function HubExperience({ chapters, upcoming }: Props) {
         {/* ---------- Hero ---------- */}
         <section id="hero" data-section className="flex min-h-[100svh] items-end px-4 pb-14 sm:px-8 lg:items-center lg:px-12 lg:pb-0">
           <div className="max-w-3xl">
-            <h1 data-hero-title className="font-display text-[length:clamp(3.4rem,1.6rem+6.4vw,8.4rem)] leading-[0.92] tracking-[-0.025em]">
+            <h1 data-hero-title className="font-display text-[length:clamp(2.9rem,1rem+5.4vw,7rem)] leading-[0.96] tracking-[-0.02em] text-balance">
               <span className="block">One mind.</span>
-              <span className="block whitespace-nowrap italic text-[var(--ink-dim)]">Many perspectives.</span>
+              <span className="block italic text-[var(--ink-dim)]">Many perspectives.</span>
             </h1>
             <p data-hero-item className="mt-7 text-[length:var(--step-1)] text-[var(--ink-dim)]">
               {HUB_COPY.intro} <CyclingPhrase chapters={chapters} />
@@ -688,6 +691,8 @@ export function HubExperience({ chapters, upcoming }: Props) {
       </main>
 
       {/* ---------- Intro overlays ---------- */}
+      {/* Void until the page knows how it opens: no glimpse of anything else first. */}
+      <div aria-hidden className={`hub-boot fixed inset-0 z-[45] bg-[var(--void)] ${decided ? "is-done" : ""}`} />
       <div ref={flashRef} aria-hidden className="vr-flash fixed inset-0 z-40 opacity-0" />
       {blink ? (
         <svg aria-hidden className="vr-blink fixed inset-0 z-40 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">

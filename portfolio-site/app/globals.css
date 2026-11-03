@@ -30,7 +30,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-instrument-serif);
+  --font-display: var(--font-fraunces);
 }
 
 /* ==========================================================================
@@ -635,9 +635,73 @@ html.has-light-cursor .hub-v3 input[type="range"] {
 }
 html.is-holding .light-cursor-ring::before {
   transform: scale(2.4);
-  border-color: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.18);
   transition-duration: 1600ms;
 }
 html.is-holding .light-cursor-ring span {
   opacity: 1;
+}
+/* Slow-time arc + percentage: fills as the scene's clock slows (--slow 0…100). */
+.light-cursor-arc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg) scale(2.4);
+  opacity: 0;
+  transition: opacity 400ms var(--ease-out), transform 1600ms var(--ease-out);
+  overflow: visible;
+}
+.light-cursor-arc circle {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1;
+}
+.light-cursor-arc circle + circle {
+  stroke: #fff;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.8));
+}
+.light-cursor-pct {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-geist-mono), monospace;
+  font-weight: 400;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  opacity: 0;
+  transition: opacity 400ms var(--ease-out);
+}
+html.is-holding .light-cursor-arc,
+html.is-holding .light-cursor-pct {
+  opacity: 1;
+}
+html.is-holding .light-cursor-dot {
+  opacity: 0;
+}
+
+/* Boot cover: void until the page knows how it opens. */
+.hub-boot {
+  pointer-events: none;
+  transition: opacity 900ms var(--ease-out);
+}
+.hub-boot.is-done {
+  opacity: 0;
+}
+
+/* ---------- Display type: Fraunces (D38 round A feedback) ----------
+   Light weight, soft high-contrast cut at display sizes, wonky italics. */
+.font-display {
+  font-weight: 330;
+  font-variation-settings: "opsz" 144, "SOFT" 60, "WONK" 1;
+  font-feature-settings: "ss01", "liga";
+}
+.font-display .italic,
+.font-display em,
+em.font-display,
+.font-display i {
+  font-weight: 320;
 }

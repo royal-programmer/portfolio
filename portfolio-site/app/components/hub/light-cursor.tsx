@@ -8,9 +8,14 @@
  */
 import { useEffect, useRef } from "react";
 
+/** Circumference of the slow-time arc (r = 30 in a 64-unit box). */
+const ARC = 2 * Math.PI * 30;
+
 export function LightCursor({ holdHint }: { holdHint?: string }) {
   const dot = useRef<HTMLDivElement>(null);
   const ring = useRef<HTMLDivElement>(null);
+  const arc = useRef<SVGCircleElement>(null);
+  const pct = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     if (!window.matchMedia("(pointer: fine)").matches) return;
@@ -22,6 +27,7 @@ export function LightCursor({ holdHint }: { holdHint?: string }) {
     let visible = false;
     let raf = 0;
     let last = performance.now();
+    let lastSlow = -1;
 
     const move = (e: PointerEvent) => {
       if (e.pointerType !== "mouse") return;
@@ -56,6 +62,13 @@ export function LightCursor({ holdHint }: { holdHint?: string }) {
       r.y += (target.y - r.y) * kr;
       if (dot.current) dot.current.style.transform = `translate3d(${d.x}px, ${d.y}px, 0)`;
       if (ring.current) ring.current.style.transform = `translate3d(${r.x}px, ${r.y}px, 0)`;
+      // Slow-time ring: the scene writes --slow (0…100) while the visitor holds.
+      const slow = Number(root.style.getPropertyValue("--slow")) || 0;
+      if (slow !== lastSlow) {
+        lastSlow = slow;
+        if (arc.current) arc.current.style.strokeDashoffset = String(ARC * (1 - slow / 100));
+        if (pct.current) pct.current.textContent = `${slow}%`;
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -77,6 +90,13 @@ export function LightCursor({ holdHint }: { holdHint?: string }) {
   return (
     <>
       <div ref={ring} aria-hidden className="light-cursor-ring">
+        <svg className="light-cursor-arc" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="30" />
+          <circle ref={arc} cx="32" cy="32" r="30" strokeDasharray={ARC} strokeDashoffset={ARC} />
+        </svg>
+        <b ref={pct} className="light-cursor-pct">
+          0%
+        </b>
         <span>{holdHint}</span>
       </div>
       <div ref={dot} aria-hidden className="light-cursor-dot" />

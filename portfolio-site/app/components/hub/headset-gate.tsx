@@ -105,7 +105,7 @@ export function HeadsetGate({ device, quality, onQuality, status, startedAt, lea
       </div>
 
       {!blocked ? (
-        <div className="gate-panel grid gap-6 px-4 pb-6 sm:grid-cols-[minmax(0,20rem)_1fr_auto] sm:items-end sm:px-8 lg:px-12">
+        <div className="gate-panel grid gap-6 px-4 pb-8 sm:grid-cols-[minmax(0,20rem)_1fr_auto] sm:items-end sm:px-8 sm:pb-10 lg:px-12">
           <div className="pointer-events-auto">
             {device ? (
               <p className="text-xs leading-relaxed text-[var(--ink-dim)]">

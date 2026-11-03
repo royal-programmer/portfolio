@@ -18,9 +18,9 @@ export const HUB_COPY = {
   /** Prefix of the cycling line: "I'm Ratul Roy. I <phrase>." */
   intro: "I’m Ratul Roy. I",
   /** The pass through the glass, between the hero and the first world. */
-  throughEyebrow: "Into the glass",
+  throughEyebrow: "You are the prism",
   throughTitle: "Every perspective starts as the same light.",
-  throughBody: "Pass through it and it splits — into everything I do.",
+  throughBody: "It passes through you and splits — into everything I do.",
   moreTitle: "More colours on the way.",
   closingTitle: "Different perspectives. One person.",
   closingBody:

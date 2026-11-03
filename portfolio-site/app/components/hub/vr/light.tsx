@@ -77,7 +77,7 @@ export function ApproachLight() {
     if (!m.visible) return;
     const p = k.approach;
     // A far point that grows until it fills the view (distance 60 → scale ≈ 260 covers it).
-    const scale = 1.3 + 265 * Math.pow(p, 3.2);
+    const scale = 2.4 + 265 * Math.pow(p, 3.2);
     m.scale.setScalar(scale);
     m.position.copy(WORLD.lightFrom);
     m.quaternion.copy(camera.quaternion);
