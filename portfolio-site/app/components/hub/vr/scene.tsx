@@ -1,0 +1,336 @@
+"use client";
+/* eslint-disable react-hooks/immutability -- R3F idiom: GPU objects (materials, uniforms, the
+   camera, the shared clock ref) are mutated every frame inside useFrame, never during render. */
+
+/**
+ * The VR journey scene (D38). One Canvas for the whole hub: the headset in
+ * the gate, the sky, the light that comes at you, the cone of colour and the
+ * climb. The Director owns time, the phase timeline and the camera.
+ *
+ * Lazy-loaded; mounted while the gate shows (the headset IS the gate), so
+ * every shader is compiled before the visitor puts it on.
+ */
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Bloom, ChromaticAberration, EffectComposer, Noise, Vignette } from "@react-three/postprocessing";
+import { BlendFunction, type ChromaticAberrationEffect } from "postprocessing";
+import { useEffect, useMemo, useRef, type MutableRefObject } from "react";
+import * as THREE from "three";
+import type { Quality } from "@/lib/site/experience";
+import { VrContext, createClock, useVr, type VrClock } from "./clock";
+import { Headset } from "./headset";
+import { ApproachLight, Cone, Photons, Rays } from "./light";
+import { Dome, Stars } from "./sky";
+import { PHASE_LENGTH, type Band, type Phase, type VrState } from "./state";
+import { WORLD, clamp01, coneRadius, ease, easeInOut } from "./util";
+
+export type QualityPreset = { dpr: number; composer: boolean; bloomScale: number; msaa: number; photons: number; stars: number; rays: number };
+
+export function qualityPreset(q: Quality): QualityPreset {
+  const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
+  if (q === "best") return { dpr: Math.min(dpr, 2), composer: true, bloomScale: 1, msaa: 4, photons: 6000, stars: 4200, rays: 420 };
+  if (q === "balanced") return { dpr: Math.min(dpr, 1.5), composer: true, bloomScale: 0.5, msaa: 0, photons: 3200, stars: 3000, rays: 300 };
+  return { dpr: 1, composer: false, bloomScale: 0, msaa: 0, photons: 1500, stars: 2200, rays: 180 };
+}
+
+const FOV = 40;
+/** Speed of the light toward you at progress p (per second): slow, then rushing. ≈7 s in all. */
+const approachSpeed = (p: number) => 0.045 + 0.75 * p * p;
+
+/** The J: forward, then up, as the light splits. */
+const J_PATH = new THREE.CatmullRomCurve3(
+  [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0.15, -0.55), new THREE.Vector3(0.1, 1.4, -0.75), new THREE.Vector3(0, 3.2, -0.3)],
+  false,
+  "centripetal",
+);
+const CLIMB_BASE_Y = 3.2;
+
+type Props = {
+  bands: Band[];
+  /** Section kinds in page order; persona sections tint the sky. */
+  sectionT: Array<number | null>;
+  state: MutableRefObject<VrState>;
+  quality: Quality;
+  /** The scene finished a fixed-length phase; the page moves to the next. */
+  onPhaseEnd: (ended: Phase) => void;
+  onWear: () => void;
+  onReady: () => void;
+  onStepDown: () => void;
+  onStruggle: () => void;
+  onFail: () => void;
+};
+
+function Director({ sectionT, onPhaseEnd }: { sectionT: Array<number | null>; onPhaseEnd: (p: Phase) => void }) {
+  const { clock, state } = useVr();
+  const live = useRef({ c: 0, px: 0, py: 0, yaw: 0, pitch: 0, fov: FOV, hover: false, ended: "" as Phase | "" });
+  const tmp = useMemo(
+    () => ({
+      pos: new THREE.Vector3(),
+      dir: new THREE.Vector3(),
+      right: new THREE.Vector3(),
+      up: new THREE.Vector3(0, 1, 0),
+      look: new THREE.Vector3(),
+    }),
+    [],
+  );
+
+  useFrame(({ camera }, rawDt) => {
+    const dt = Math.min(rawDt, 0.1);
+    const k: VrClock = clock.current;
+    const s = state.current;
+    const L = live.current;
+    const now = performance.now();
+
+    // ---- Time ----
+    const canSlow = s.phase !== "gate" && s.phase !== "wear" && s.phase !== "blink";
+    k.dt = dt;
+    k.scale = THREE.MathUtils.damp(k.scale, s.holding && canSlow ? 0.1 : 1, s.holding ? 3.5 : 2, dt);
+    k.t += dt * k.scale;
+    k.phaseT = s.phaseAt ? (now - s.phaseAt) / 1000 : 0;
+
+    // ---- Phase timeline ----
+    const end = (p: Phase) => {
+      if (L.ended === p) return;
+      L.ended = p;
+      onPhaseEnd(p);
+    };
+    if (s.phase === "approach") {
+      s.approach = Math.min(1, s.approach + dt * k.scale * approachSpeed(s.approach));
+      if (s.approach >= 1) end("approach");
+    } else if (s.phase in PHASE_LENGTH && k.phaseT >= PHASE_LENGTH[s.phase as keyof typeof PHASE_LENGTH]) {
+      end(s.phase);
+    }
+    if (L.ended && L.ended !== s.phase) L.ended = ""; // the page moved on; arm again
+
+    // ---- Derived ----
+    k.approach = s.approach;
+    k.speed = clamp01(approachSpeed(s.approach) / 0.8) * (s.phase === "approach" ? 1 : 0);
+    const skyTarget = s.phase === "gate" || s.phase === "wear" ? 0.3 : 1;
+    k.sky = THREE.MathUtils.damp(k.sky, skyTarget, 2.5, dt);
+    const coneTarget = s.phase === "split" ? ease(k.phaseT / 1.6) : s.phase === "climb" ? 1 : 0;
+    k.cone = s.skipped ? 1 : coneTarget;
+    L.c = THREE.MathUtils.damp(L.c, s.c, 3.4, dt);
+    k.climb = s.phase === "climb" ? L.c : 0;
+
+    // Sky tint: the persona section nearest to the scroll.
+    const idx = Math.round(L.c);
+    const t = sectionT[idx] ?? null;
+    const near = 1 - Math.min(1, Math.abs(L.c - idx) * 1.4);
+    k.tint = t ?? k.tint;
+    k.tintAmount = THREE.MathUtils.damp(k.tintAmount, k.cone * (t === null ? 0.12 : 0.25 + 0.45 * near), 3, dt);
+
+    // Headset hover → page cursor.
+    if (L.hover !== s.hover) {
+      L.hover = s.hover;
+      document.documentElement.classList.toggle("is-headset-hover", s.hover);
+    }
+
+    // ---- Camera ----
+    let pitch = 0; // up from level
+    let yaw = 0; // around +y, 0 = looking −z
+    tmp.pos.set(0, 0, 0);
+    if (s.phase === "split") {
+      const u = easeInOut(k.phaseT / PHASE_LENGTH.split);
+      J_PATH.getPoint(u, tmp.pos);
+      const uu = clamp01((u - 0.15) / 0.85);
+      pitch = WORLD.splitPitch * easeInOut(uu);
+      yaw = -Math.PI / 2 * easeInOut(uu); // the horizontal look swings to +x, the helix tangent
+    } else if (s.phase === "climb") {
+      const c = L.c;
+      const y = CLIMB_BASE_Y + c * WORLD.climbRise;
+      const theta = c * WORLD.climbTurn;
+      const rCone = coneRadius(y - WORLD.coneApex.y);
+      // Stay well inside the cone: the rays are the view, the wall is the horizon.
+      const r = THREE.MathUtils.lerp(0.3, rCone * 0.22, THREE.MathUtils.smoothstep(c, 0, 0.7));
+      tmp.pos.set(Math.sin(theta) * r, y, -Math.cos(theta) * r);
+      pitch = WORLD.splitPitch * (1 - THREE.MathUtils.smoothstep(c, 0, 1.05));
+      yaw = -Math.PI / 2 - theta; // along the tangent
+    }
+
+    // Alive at rest: a slow breath; the approach adds a tremor as it rushes.
+    const tremor = k.speed * k.speed * 0.03;
+    tmp.pos.x += Math.sin(k.t * 0.21) * 0.05 + Math.sin(k.t * 61.7) * Math.sin(k.t * 23.1) * tremor;
+    tmp.pos.y += Math.sin(k.t * 0.17) * 0.04 + Math.sin(k.t * 47.3) * Math.cos(k.t * 31.9) * tremor;
+
+    // Pointer parallax (responsive, never floaty).
+    const pk = Math.min(1, dt * 6);
+    L.px += (s.px - L.px) * pk;
+    L.py += (s.py - L.py) * pk;
+
+    // Drag to look around (springs home a moment after release).
+    const home = !s.dragging && now - s.lastDragEnd > 1400;
+    if (home) {
+      s.yaw = THREE.MathUtils.damp(s.yaw, 0, 1.1, dt);
+      s.pitch = THREE.MathUtils.damp(s.pitch, 0, 1.1, dt);
+    }
+    L.yaw = THREE.MathUtils.damp(L.yaw, s.yaw, 6, dt);
+    L.pitch = THREE.MathUtils.damp(L.pitch, s.pitch, 6, dt);
+
+    const totalYaw = yaw + L.yaw + L.px * 0.06;
+    const totalPitch = Math.min(1.5, pitch + L.pitch + L.py * 0.05);
+    tmp.dir.set(Math.sin(totalYaw) * Math.cos(totalPitch), Math.sin(totalPitch), -Math.cos(totalYaw) * Math.cos(totalPitch));
+    camera.position.copy(tmp.pos);
+    camera.lookAt(tmp.look.copy(tmp.pos).add(tmp.dir));
+
+    // Lens: holding narrows the view; rushing widens it.
+    const cam = camera as THREE.PerspectiveCamera;
+    L.fov = THREE.MathUtils.damp(L.fov, FOV - (1 - k.scale) * 6 + k.speed * 12, 3, dt);
+    if (Math.abs(cam.fov - L.fov) > 0.01) {
+      cam.fov = L.fov;
+      cam.updateProjectionMatrix();
+    }
+  });
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Post effects
+// ---------------------------------------------------------------------------
+function Effects({ preset }: { preset: QualityPreset }) {
+  const { clock } = useVr();
+  const ca = useRef<ChromaticAberrationEffect>(null);
+  const offset = useMemo(() => new THREE.Vector2(0.0006, 0.0004), []);
+  useFrame(() => {
+    const k = clock.current;
+    const amount = 0.0004 + k.speed * 0.006 + (1 - k.scale) * 0.0025;
+    ca.current?.offset.set(amount, amount * 0.6);
+  });
+  return (
+    <EffectComposer multisampling={preset.msaa} enableNormalPass={false}>
+      <Bloom mipmapBlur resolutionScale={preset.bloomScale} levels={preset.msaa ? 7 : 5} intensity={1.0} luminanceThreshold={0.25} luminanceSmoothing={0.4} />
+      <ChromaticAberration ref={ca} offset={offset} radialModulation modulationOffset={0.25} />
+      <Vignette offset={0.25} darkness={0.7} />
+      <Noise premultiply blendFunction={BlendFunction.SCREEN} opacity={0.04} />
+    </EffectComposer>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Quality governor
+// ---------------------------------------------------------------------------
+/**
+ * Real frame rate in 1 s windows after a warm-up. Sustained < 40 fps → ask the
+ * page to step quality down; already at Performance and < 26 fps → `onStruggle`
+ * (the page OFFERS Normal view — it never switches silently). Long frame gaps
+ * (hidden or throttled tab) are discarded, not judged.
+ */
+function Governor({ quality, onStepDown, onStruggle }: { quality: Quality; onStepDown: () => void; onStruggle: () => void }) {
+  const s = useRef({ windowStart: -1, frames: 0, slow: 0, last: 0, done: false });
+  useEffect(() => {
+    s.current = { windowStart: -1, frames: 0, slow: 0, last: 0, done: false };
+  }, [quality]);
+  useFrame(({ clock }) => {
+    const st = s.current;
+    const now = clock.elapsedTime;
+    if (st.done) return;
+    if (st.windowStart < 0) {
+      st.windowStart = now + 3;
+      st.last = now;
+      return;
+    }
+    const gap = now - st.last;
+    st.last = now;
+    if (gap > 0.25 || document.hidden) {
+      st.frames = 0;
+      st.windowStart = now + 1;
+      return;
+    }
+    if (now < st.windowStart) return;
+    st.frames++;
+    const elapsed = now - st.windowStart;
+    if (elapsed < 1) return;
+    const fps = st.frames / elapsed;
+    st.frames = 0;
+    st.windowStart = now;
+    document.documentElement.dataset.sceneFps = fps.toFixed(0);
+    const floor = quality === "performance" ? 26 : 40;
+    st.slow = fps < floor ? st.slow + 1 : 0;
+    if (st.slow >= 3) {
+      st.done = true;
+      if (quality === "performance") onStruggle();
+      else onStepDown();
+    }
+  });
+  return null;
+}
+
+/** Compile every shader up front (while the gate shows), then report ready. */
+function Warmup({ onReady }: { onReady: () => void }) {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
+  const { clock, state } = useVr();
+  useEffect(() => {
+    // Dev-only handle for profiling and tests.
+    if (process.env.NODE_ENV !== "production") (window as unknown as { __vr?: unknown }).__vr = { gl, scene, clock, state };
+    let cancelled = false;
+    const run = async () => {
+      try {
+        await gl.compileAsync(scene, camera);
+      } catch {
+        gl.compile(scene, camera);
+      }
+      if (cancelled) return;
+      requestAnimationFrame(() => requestAnimationFrame(() => !cancelled && onReady()));
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [gl, scene, camera, clock, state, onReady]);
+  return null;
+}
+
+function ContextWatch({ onFail }: { onFail: () => void }) {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    gl.debug.onShaderError = (glCtx, _program, vs, fs) => {
+      console.error("[vr] shader error", glCtx.getShaderInfoLog(vs) || glCtx.getShaderInfoLog(fs));
+      onFail();
+    };
+    const el = gl.domElement;
+    const lost = (e: Event) => {
+      e.preventDefault();
+      onFail();
+    };
+    el.addEventListener("webglcontextlost", lost);
+    return () => el.removeEventListener("webglcontextlost", lost);
+  }, [gl, onFail]);
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Root
+// ---------------------------------------------------------------------------
+export default function VrScene({ sectionT, state, quality, onPhaseEnd, onWear, onReady, onStepDown, onStruggle, onFail }: Props) {
+  const clock = useRef<VrClock>(createClock());
+  const preset = useMemo(() => qualityPreset(quality), [quality]);
+  const px = 70 * preset.dpr;
+  const ctx = useMemo(() => ({ clock, state }), [state]);
+
+  return (
+    <Canvas
+      dpr={preset.dpr}
+      camera={{ position: [0, 0, 0], fov: FOV, near: 0.05, far: 500 }}
+      gl={{ antialias: !preset.composer, powerPreference: "high-performance", alpha: false }}
+      onCreated={({ gl }) => gl.setClearColor("#050507")}
+    >
+      <VrContext.Provider value={ctx}>
+        <Director sectionT={sectionT} onPhaseEnd={onPhaseEnd} />
+        <Governor quality={quality} onStepDown={onStepDown} onStruggle={onStruggle} />
+        <Warmup onReady={onReady} />
+        <ContextWatch onFail={onFail} />
+
+        <Dome />
+        <Stars count={preset.stars} px={px} />
+        <Headset onWear={onWear} />
+        <ApproachLight />
+        <Cone />
+        <Rays count={preset.rays} />
+        <Photons count={preset.photons} px={px} />
+
+        {preset.composer ? <Effects preset={preset} /> : null}
+      </VrContext.Provider>
+    </Canvas>
+  );
+}

@@ -5,6 +5,37 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## VR journey round A: headset → sky → the light → the split (2026-11-03) — D38
+
+- **Scene rewritten** as `app/components/hub/vr/*` (replaces `hub/journey/*` and `entry-gate.tsx`):
+  `state.ts` (phases: gate · wear · blink · sky · approach · impact · split · climb), `clock.ts`,
+  `headset.tsx` (own design in code: rounded dark-glass visor, one light strip, two lens rings, head band;
+  RoomEnvironment reflections, nothing downloaded), `sky.tsx` (dome + twinkling stars, spectrum tint while
+  climbing), `light.tsx` (approaching light with rays and a colour-splitting rim; cone of colour; **Rays** —
+  instanced beams fanning up from the apex so the inside of the cone is made of light; photons),
+  `scene.tsx` (Director: time, phase timeline, J-path camera, spiral climb; Effects; Governor; Warmup).
+- **Gate** is now `headset-gate.tsx`: the headset floats in the scene behind a quiet overlay (device line,
+  quality slider, "Best with sound", Normal link). Click the headset / Enter / Space → `wear` (turns to face
+  you, rises, lenses fill the view, lids close) → `blink` (eyes open onto the sky) → `sky` ("Press Space" /
+  "Tap") → `approach` (≈7.3 s, slow then rushing; hint "Click and hold to slow it down" at 28–90 %; hold
+  → time scale 0.1) → `impact` (white flash, chime) → `split` (3.4 s J: forward then up to 78°, cone and
+  rays open) → `climb` (scroll unlocked, hero text rises). "Skip intro" visible from the first second of
+  wear. Returning visitors in the same session land on the climb (`returning` loader, Skip → Normal).
+- **Climb (placeholder until round B):** helix inside the cone, camera tilting back to level over the first
+  section, sky tinted by the nearest persona's spectrum position. Page sections are unchanged HTML.
+- **Measured (Intel UHD laptop, dev build, 1440×860, Performance):** 60 fps at the gate, during the approach
+  and on the climb; 53 fps while the test harness polled every 50 ms. Gate ready ≈1.5 s. No horizontal
+  overflow at 500 px (the tool's narrowest window).
+- **Lessons:** `ConeGeometry` uv.y is 1 at the apex — my glow was 140 units away until flipped. Looking up
+  inside a cone shows only a ring at the edge; the split needs volume (rays), not just a wall. The
+  screenshot tool lags ≈3 s, so sub-2 s phases were captured by freezing `phaseAt` from inside the page
+  (`window.__vr`, dev only). A Supabase DNS blip (`ENOTFOUND`) 500s the whole hub — content fallback to
+  stubs when the provider is unreachable is worth doing before launch.
+- **Next:** round B — the drifting object field + the engineer laptop assembly with click-into-screen; the
+  climb camera and cone-wall brightness will be retuned around the objects.
+
+---
+
 ## Hub concept reset: the VR journey (2026-11-03) — D38
 
 - Ratul reviewed round 1: good, "not out of the world". Over several messages we agreed a new hub concept;

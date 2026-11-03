@@ -1,17 +1,17 @@
 "use client";
 
 /**
- * The hub (D36): an entry gate, then a scroll journey through one light.
+ * The hub (D38): the VR journey.
  *
- *   gate      Immersive or Normal (device analysed, quality suggested, 3D
- *             compiling behind it — nothing decided silently)
- *   hero      the light falls on the prism · "One mind. Many perspectives."
- *   through   you pass through the glass; the light splits
- *   persona…  one chapter per live persona, travelling down its stream
- *   more      upcoming colours flicker on the horizon
- *   end       everything folds back into one white light · say hello
+ *   gate      a headset floats in the dark; device analysed, quality suggested
+ *   wear      click it → it comes up to your face · blink · the night sky
+ *   sky       one point of light far ahead · Press Space
+ *   approach  the light comes at you, slow then fast (hold to slow time)
+ *   impact    you are the prism · white
+ *   split     the camera rides the J; the light opens into a cone of colour
+ *   climb     scroll: spiral up through the cone (rounds B–D fill the worlds)
  *
- * HTML owns all content (screen readers, no-JS, Normal mode get the whole
+ * HTML owns all content (screen readers, no-JS and Normal mode get the whole
  * story). Scroll is smoothed by Lenis; text is choreographed with GSAP.
  */
 import dynamic from "next/dynamic";
@@ -29,13 +29,12 @@ import { PersonaLink } from "@/lib/site/persona-link";
 import { spectrumColor } from "@/lib/site/spectrum";
 import { useExperience } from "../../experience-provider";
 import { ModeSwitch, QualityMenu, QUALITY_LABEL, SoundToggle } from "../experience-controls";
-import { EntryGate, type LoadStatus } from "./entry-gate";
-import { INTRO } from "./journey/light";
-import { createJourneyState, type Band, type SectionKind } from "./journey/state";
+import { HeadsetGate, type LoadStatus } from "./headset-gate";
 import { LightCursor } from "./light-cursor";
 import { RefractionPoster } from "./refraction-poster";
+import { atLeast, createVrState, type Band, type Phase } from "./vr/state";
 
-const JourneyScene = dynamic(() => import("./journey/journey-scene"), { ssr: false });
+const VrScene = dynamic(() => import("./vr/scene"), { ssr: false });
 
 gsap.registerPlugin(ScrollTrigger, SplitText);
 
@@ -43,8 +42,16 @@ export type HubChapter = { slug: PersonaSlug; t: number; body: string; points: s
 export type HubUpcoming = { slug: PersonaSlug; t: number };
 type Props = { chapters: HubChapter[]; upcoming: HubUpcoming[] };
 
+type SectionKind =
+  | { kind: "hero" }
+  | { kind: "through" }
+  | { kind: "persona"; t: number; slug: PersonaSlug }
+  | { kind: "more" }
+  | { kind: "end" };
+
 const GATE_SESSION_KEY = "xp-gate";
-const ENTER_DELAY_MS = 250;
+const NEXT_PHASE: Partial<Record<Phase, Phase>> = { wear: "blink", blink: "sky", approach: "impact", impact: "split", split: "climb" };
+const NEXT_LOWER: Record<Quality, Quality> = { best: "balanced", balanced: "performance", performance: "performance" };
 
 function sessionFlag(set?: boolean): boolean {
   try {
@@ -69,27 +76,30 @@ class SceneBoundary extends Component<{ onFail: () => void; children: ReactNode 
   }
 }
 
-const NEXT_LOWER: Record<Quality, Quality> = { best: "balanced", balanced: "performance", performance: "performance" };
-
 export function HubExperience({ chapters, upcoming }: Props) {
   const xp = useExperience();
   const { experience, ready, chosen, setExperience, setQuality, sound } = xp;
 
   const [device, setDevice] = useState<DeviceReport | null>(null);
-  const [gate, setGate] = useState<"full" | "compact" | null>(null);
-  const [leaving, setLeaving] = useState<"immersive" | "normal" | null>(null);
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [startedAt, setStartedAt] = useState(0);
-  const [entered, setEntered] = useState(false);
+  const [phase, setPhaseState] = useState<Phase>("gate");
+  const [gate, setGate] = useState<"full" | "returning" | null>(null);
+  const [leaving, setLeaving] = useState(false);
   const [struggling, setStruggling] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [active, setActive] = useState(0);
   const [touch, setTouch] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
+  const [blink, setBlink] = useState(false);
 
-  const journey = useRef(createJourneyState());
+  const vr = useRef(createVrState());
   const lenisRef = useRef<Lenis | null>(null);
   const anchors = useRef<number[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
+  const flashRef = useRef<HTMLDivElement>(null);
+  const eyeRef = useRef<SVGEllipseElement>(null);
+  const heldOnce = useRef(false);
 
   // ---- Story structure ---------------------------------------------------
   const sections: SectionKind[] = useMemo(
@@ -102,6 +112,7 @@ export function HubExperience({ chapters, upcoming }: Props) {
     ],
     [chapters, upcoming],
   );
+  const sectionT = useMemo(() => sections.map((s) => (s.kind === "persona" ? s.t : null)), [sections]);
   const bands: Band[] = useMemo(
     () =>
       [...chapters.map((c) => ({ t: c.t, lit: true, slug: c.slug })), ...upcoming.map((u) => ({ t: u.t, lit: false, slug: u.slug }))].sort(
@@ -111,7 +122,14 @@ export function HubExperience({ chapters, upcoming }: Props) {
   );
   const quality: Quality = xp.quality ?? device?.suggested ?? "balanced";
 
-  // ---- First mount: analyse, decide whether to show the gate --------------
+  const setPhase = useCallback((p: Phase) => {
+    vr.current.phase = p;
+    vr.current.phaseAt = performance.now();
+    document.documentElement.dataset.vrPhase = p;
+    setPhaseState(p);
+  }, []);
+
+  // ---- First mount: analyse, decide how to open ---------------------------
   useEffect(() => {
     if (!ready) return;
     const report = analyseDevice();
@@ -122,77 +140,142 @@ export function HubExperience({ chapters, upcoming }: Props) {
       setStartedAt(performance.now());
       if (!report.webgl) setStatus("unsupported");
       if (!chosen || !seen) setGate("full");
-      else if (experience === "immersive" && report.webgl) setGate("compact");
+      else if (experience === "immersive" && report.webgl) setGate("returning");
     });
     // Run once when the provider is ready.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
-  const sceneWanted =
-    !!device?.webgl && status !== "failed" && (gate !== null ? leaving !== "normal" : experience === "immersive");
-  const immersiveLive = entered && experience === "immersive" && status !== "failed";
+  const sceneWanted = !!device?.webgl && status !== "failed" && (gate !== null || experience === "immersive");
+  const immersiveLive = experience === "immersive" && status !== "failed" && atLeast(phase, "wear");
+  const introDone = phase === "climb";
 
-  // ---- Enter / leave ---------------------------------------------------------
-  const enter = useCallback(() => {
+  // ---- Phase transitions ------------------------------------------------------
+  const land = useCallback(() => {
+    // Straight onto the climb: no flash, cone open, scroll free.
+    vr.current.skipped = true;
+    vr.current.approach = 1;
+    setPhase("climb");
+    setBlink(false);
+    setHint(null);
+    setGate(null);
+    setLeaving(false);
+  }, [setPhase]);
+
+  const wear = useCallback(() => {
+    if (status !== "ready") return;
     sessionFlag(true);
     setExperience("immersive");
-    setLeaving("immersive");
+    setLeaving(true);
     window.scrollTo(0, 0);
-    journey.current.enteredAt = performance.now() + ENTER_DELAY_MS;
-    setEntered(true);
-    if (sound) {
-      ambient.start();
-      window.setTimeout(() => ambient.chime(1), ENTER_DELAY_MS + INTRO.impact * 1000);
-    }
+    vr.current.skipped = false;
+    vr.current.approach = 0;
+    setPhase("wear");
+    if (sound) ambient.start();
+    window.setTimeout(() => setGate(null), 900);
+    // The lenses close over the eyes just before the headset settles.
     window.setTimeout(() => {
-      setGate(null);
-      setLeaving(null);
-    }, 1100);
-  }, [setExperience, sound]);
+      if (vr.current.phase === "wear") setBlink(true);
+    }, 1000);
+  }, [status, setExperience, setPhase, sound]);
+
+  const startLight = useCallback(() => {
+    if (vr.current.phase !== "sky") return;
+    setPhase("approach");
+    setHint(null);
+  }, [setPhase]);
+
+  const skip = useCallback(() => {
+    sessionFlag(true);
+    land();
+  }, [land]);
+
+  const onPhaseEnd = useCallback(
+    (ended: Phase) => {
+      if (vr.current.phase !== ended) return;
+      const next = NEXT_PHASE[ended];
+      if (!next) return;
+      setPhase(next);
+      if (next === "sky") setHint(touch ? "Tap to call the light" : "Press Space");
+      if (next === "impact") {
+        ambient.chime(1);
+        const f = flashRef.current;
+        if (f) gsap.fromTo(f, { opacity: 1 }, { opacity: 0, duration: 1.6, ease: "power2.out" });
+      }
+    },
+    [setPhase, touch],
+  );
 
   const goNormal = useCallback(() => {
     sessionFlag(true);
     setExperience("normal");
-    setLeaving("normal");
-    setEntered(false);
-    journey.current.enteredAt = 0;
+    setLeaving(true);
+    setPhase("gate");
+    setBlink(false);
+    setHint(null);
     ambient.stop();
     window.setTimeout(() => {
       setGate(null);
-      setLeaving(null);
+      setLeaving(false);
     }, 500);
-  }, [setExperience]);
+  }, [setExperience, setPhase]);
 
-  // Compact gate goes in by itself once ready.
+  // Returning in the same session: land once ready.
   useEffect(() => {
-    if (gate === "compact" && status === "ready" && !leaving) queueMicrotask(enter);
-  }, [gate, status, leaving, enter]);
+    if (gate === "returning" && status === "ready") queueMicrotask(land);
+  }, [gate, status, land]);
 
   // Mode switched from the top bar.
   useEffect(() => {
     if (!device || gate) return;
-    if (experience === "immersive" && !entered && device.webgl) {
+    if (experience === "immersive" && phase === "gate" && device.webgl) {
       queueMicrotask(() => {
         setStatus((s) => (s === "failed" ? "loading" : s));
         setStartedAt(performance.now());
-        setGate("compact");
+        setGate("full");
       });
     }
-    if (experience === "normal" && entered) {
+    if (experience === "normal" && phase !== "gate") {
       queueMicrotask(() => {
-        setEntered(false);
+        setPhase("gate");
         setStruggling(false);
-        journey.current.enteredAt = 0;
         ambient.stop();
       });
     }
-  }, [experience, entered, gate, device]);
+  }, [experience, phase, gate, device, setPhase]);
+
+  // The blink: black, then the eyes open onto the sky.
+  useEffect(() => {
+    if (phase !== "blink" || !eyeRef.current) return;
+    const tl = gsap.timeline();
+    tl.fromTo(eyeRef.current, { attr: { rx: 0, ry: 0 } }, { attr: { rx: 95, ry: 14 }, duration: 0.55, ease: "power2.inOut", delay: 0.3 });
+    tl.to(eyeRef.current, { attr: { rx: 160, ry: 160 }, duration: 0.7, ease: "power3.in" });
+    return () => {
+      tl.kill();
+    };
+  }, [phase]);
+  useEffect(() => {
+    // Once the eyes are open the overlay goes, whatever happens next.
+    if (phase === "sky") window.setTimeout(() => setBlink(false), 400);
+  }, [phase]);
+
+  // Hint while the light approaches; sound follows the light.
+  useEffect(() => {
+    if (phase !== "approach") return;
+    const id = window.setInterval(() => {
+      const p = vr.current.approach;
+      ambient.depth(p);
+      if (!heldOnce.current && p > 0.28 && p < 0.9) setHint(touch ? "Touch and hold to slow it down" : "Click and hold to slow it down");
+      else setHint(null);
+    }, 120);
+    return () => window.clearInterval(id);
+  }, [phase, touch]);
 
   const onSceneReady = useCallback(() => setStatus("ready"), []);
   const onSceneFail = useCallback(() => {
     setStatus("failed");
-    setEntered(false);
-  }, []);
+    setPhase("gate");
+  }, [setPhase]);
   const onStepDown = useCallback(() => {
     const next = NEXT_LOWER[quality];
     setQuality(next);
@@ -208,12 +291,35 @@ export function HubExperience({ chapters, upcoming }: Props) {
 
   // ---- Sound follows the toggle (the toggle click is the user gesture) -----
   useEffect(() => {
-    if (!entered) return;
+    if (!immersiveLive) return;
     if (sound) ambient.start();
     else ambient.stop();
-  }, [sound, entered]);
+  }, [sound, immersiveLive]);
 
-  // ---- Smooth scroll + scroll → journey progress ----------------------------
+  // ---- Keyboard ---------------------------------------------------------------
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      const typing = document.activeElement && document.activeElement !== document.body && document.activeElement.tagName !== "BUTTON";
+      if (typing) return;
+      const p = vr.current.phase;
+      if (e.key === " " || e.key === "Enter") {
+        if (gate === "full" && p === "gate" && status === "ready") {
+          e.preventDefault();
+          wear();
+        } else if (p === "sky") {
+          e.preventDefault();
+          startLight();
+        } else if (p !== "climb" && p !== "gate") {
+          e.preventDefault();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [gate, status, wear, startLight]);
+
+  // ---- Smooth scroll + scroll → climb progress ---------------------------------
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const lenis = reduce ? null : new Lenis({ lerp: 0.14, wheelMultiplier: 0.9 });
@@ -239,13 +345,13 @@ export function HubExperience({ chapters, upcoming }: Props) {
     let lastActive = -1;
     const onScroll = () => {
       const c = progress(window.scrollY);
-      journey.current.c = c;
+      vr.current.c = c;
       const idx = Math.round(c);
       if (idx !== lastActive) {
         lastActive = idx;
         setActive(idx);
       }
-      ambient.depth(c / Math.max(1, anchors.current.length - 1));
+      if (vr.current.phase === "climb") ambient.depth(0.4 + (0.6 * c) / Math.max(1, anchors.current.length - 1));
     };
 
     measure();
@@ -278,21 +384,21 @@ export function HubExperience({ chapters, upcoming }: Props) {
     };
   }, []);
 
-  // Gate open → scroll locked.
+  // Scroll is locked until the climb (or in Normal mode, once the gate is gone).
+  const scrollFree = gate === null && (experience === "normal" || phase === "climb");
   useEffect(() => {
-    const locked = gate !== null;
-    document.documentElement.classList.toggle("scroll-locked", locked);
-    if (locked) lenisRef.current?.stop();
-    else lenisRef.current?.start();
-  }, [gate]);
+    document.documentElement.classList.toggle("scroll-locked", !scrollFree);
+    if (scrollFree) lenisRef.current?.start();
+    else lenisRef.current?.stop();
+  }, [scrollFree]);
 
-  // ---- Pointer: parallax, drag to look, hold to slow time -------------------
+  // ---- Pointer: parallax always; drag to look, hold to slow, tap to start ----
   useEffect(() => {
-    if (!immersiveLive) return;
-    const s = journey.current;
-    let start: { x: number; y: number; yaw: number; pitch: number; id: number } | null = null;
+    const s = vr.current;
+    let start: { x: number; y: number; yaw: number; pitch: number; id: number; at: number; type: string } | null = null;
     let holdTimer = 0;
-    const interactive = (t: EventTarget | null) => !!(t as Element | null)?.closest?.("a, button, input, label, [role='radio'], [role='dialog']");
+    const interactive = (t: EventTarget | null) => !!(t as Element | null)?.closest?.("a, button, input, label, [role='radio'], [role='alertdialog']");
+    const lookable = () => immersiveLive && atLeast(s.phase, "sky");
 
     const move = (e: PointerEvent) => {
       s.px = (e.clientX / window.innerWidth) * 2 - 1;
@@ -302,7 +408,7 @@ export function HubExperience({ chapters, upcoming }: Props) {
       const dy = e.clientY - start.y;
       if (!s.dragging && Math.hypot(dx, dy) > 8) {
         window.clearTimeout(holdTimer);
-        if (e.pointerType === "mouse") {
+        if (e.pointerType === "mouse" && lookable()) {
           s.dragging = true;
           s.holding = false;
           document.documentElement.classList.add("is-dragging");
@@ -318,16 +424,21 @@ export function HubExperience({ chapters, upcoming }: Props) {
       }
     };
     const down = (e: PointerEvent) => {
-      if (e.button !== 0 || interactive(e.target)) return;
-      start = { x: e.clientX, y: e.clientY, yaw: s.yaw, pitch: s.pitch, id: e.pointerId };
+      if (e.button !== 0 || interactive(e.target) || !lookable()) return;
+      start = { x: e.clientX, y: e.clientY, yaw: s.yaw, pitch: s.pitch, id: e.pointerId, at: performance.now(), type: e.pointerType };
       holdTimer = window.setTimeout(() => {
+        if (s.phase === "sky") return; // a long press before the light is called does nothing
         s.holding = true;
+        heldOnce.current = true;
+        setHint(null);
         ambient.timeScale(0);
         document.documentElement.classList.add("is-holding");
       }, 260);
     };
-    const up = () => {
+    const up = (e?: PointerEvent) => {
       window.clearTimeout(holdTimer);
+      const wasTap = !!start && !s.dragging && !s.holding && e && performance.now() - start.at < 400;
+      if (wasTap && s.phase === "sky") startLight();
       if (s.dragging) s.lastDragEnd = performance.now();
       s.dragging = false;
       s.holding = false;
@@ -335,42 +446,39 @@ export function HubExperience({ chapters, upcoming }: Props) {
       ambient.timeScale(1);
       document.documentElement.classList.remove("is-dragging", "is-holding");
     };
+    const blur = () => up();
     window.addEventListener("pointermove", move, { passive: true });
     window.addEventListener("pointerdown", down);
     window.addEventListener("pointerup", up);
-    window.addEventListener("pointercancel", up);
-    window.addEventListener("blur", up);
+    window.addEventListener("pointercancel", blur);
+    window.addEventListener("blur", blur);
     return () => {
       up();
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerdown", down);
       window.removeEventListener("pointerup", up);
-      window.removeEventListener("pointercancel", up);
-      window.removeEventListener("blur", up);
+      window.removeEventListener("pointercancel", blur);
+      window.removeEventListener("blur", blur);
     };
-  }, [immersiveLive]);
+  }, [immersiveLive, startLight]);
 
   // ---- Text choreography ------------------------------------------------------
-  const gateOpen = gate !== null;
+  const textLive = experience === "normal" ? gate === null : introDone;
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const ctx = gsap.context(() => {
-      // Hero: held until the gate lifts, then words rise out of their lines.
       const hero = root.querySelector<HTMLElement>("[data-hero-title]");
       const heroItems = root.querySelectorAll<HTMLElement>("[data-hero-item]");
       if (hero) {
         const split = SplitText.create(hero, { type: "lines,words", mask: "lines" });
         gsap.set(split.words, { yPercent: 115 });
         gsap.set(heroItems, { autoAlpha: 0, y: 24, filter: "blur(8px)" });
-        if (!gateOpen) {
-          const delay = journey.current.enteredAt ? INTRO.impact + 0.15 : 0.2;
-          gsap.to(split.words, { yPercent: 0, duration: 1.5, ease: "expo.out", stagger: 0.07, delay });
-          gsap.to(heroItems, { autoAlpha: 1, y: 0, filter: "blur(0px)", duration: 1.2, ease: "expo.out", stagger: 0.12, delay: delay + 0.5 });
+        if (textLive) {
+          gsap.to(split.words, { yPercent: 0, duration: 1.5, ease: "expo.out", stagger: 0.07, delay: 0.3 });
+          gsap.to(heroItems, { autoAlpha: 1, y: 0, filter: "blur(0px)", duration: 1.2, ease: "expo.out", stagger: 0.12, delay: 0.8 });
         }
       }
-
-      // Section titles: words rise as the section arrives, sink if you go back.
       root.querySelectorAll<HTMLElement>("[data-split]").forEach((el) => {
         const split = SplitText.create(el, { type: "lines,words", mask: "lines" });
         gsap.from(split.words, {
@@ -392,13 +500,12 @@ export function HubExperience({ chapters, upcoming }: Props) {
           scrollTrigger: { trigger: el, start: "top 80%", toggleActions: "play none none reverse" },
         });
       });
-      // Big chapter numerals drift against the scroll.
       root.querySelectorAll<HTMLElement>("[data-numeral]").forEach((el) => {
         gsap.fromTo(el, { yPercent: 30 }, { yPercent: -30, ease: "none", scrollTrigger: { trigger: el.parentElement, start: "top bottom", end: "bottom top", scrub: true } });
       });
     }, root);
     return () => ctx.revert();
-  }, [gateOpen]);
+  }, [textLive]);
 
   const jump = useCallback((id: string) => {
     const el = document.getElementById(id);
@@ -409,31 +516,35 @@ export function HubExperience({ chapters, upcoming }: Props) {
 
   const activeKind = sections[active];
   const activeSlug = activeKind?.kind === "persona" ? activeKind.slug : null;
-  const showScene = sceneWanted;
-  const hint = !ready
+  const inIntro = immersiveLive && !introDone;
+  const scrollHint = !ready
     ? ""
     : experience === "immersive"
       ? touch
-        ? "Scroll to travel · touch & hold to slow time"
-        : "Scroll to travel · drag to look · hold to slow time"
+        ? "Scroll to climb · touch & hold to slow time"
+        : "Scroll to climb · drag to look · hold to slow time"
       : "Scroll to follow the light";
 
   return (
-    <div ref={rootRef} className={`hub-v3 relative bg-[var(--void)] text-[var(--ink)] ${immersiveLive ? "is-immersive" : "is-normal"}`}>
+    <div
+      ref={rootRef}
+      className={`hub-v3 relative bg-[var(--void)] text-[var(--ink)] ${immersiveLive ? "is-immersive" : "is-normal"} ${textLive ? "" : "is-quiet"}`}
+    >
       {/* ---------- Backdrop ---------- */}
       <div aria-hidden className="fixed inset-0 z-0">
-        <div className={`poster-alive absolute inset-0 transition-opacity duration-[1400ms] ${immersiveLive ? "opacity-0" : "opacity-100"}`}>
+        <div className={`poster-alive absolute inset-0 transition-opacity duration-[1400ms] ${sceneWanted ? "opacity-0" : "opacity-100"}`}>
           <RefractionPoster bands={bands} />
         </div>
-        {showScene ? (
-          <div className={`absolute inset-0 transition-opacity duration-[900ms] ${immersiveLive ? "opacity-100" : "opacity-0"}`}>
+        {sceneWanted ? (
+          <div className="absolute inset-0">
             <SceneBoundary onFail={onSceneFail}>
-              <JourneyScene
-                sections={sections}
+              <VrScene
                 bands={bands}
-                state={journey}
-                active={immersiveLive}
+                sectionT={sectionT}
+                state={vr}
                 quality={quality}
+                onPhaseEnd={onPhaseEnd}
+                onWear={wear}
                 onReady={onSceneReady}
                 onStepDown={onStepDown}
                 onStruggle={onStruggle}
@@ -442,11 +553,11 @@ export function HubExperience({ chapters, upcoming }: Props) {
             </SceneBoundary>
           </div>
         ) : null}
-        <div className="hub-scrim absolute inset-0" />
+        <div className={`hub-scrim absolute inset-0 transition-opacity duration-[1200ms] ${textLive ? "opacity-100" : "opacity-0"}`} />
       </div>
 
       {/* ---------- Top bar ---------- */}
-      <header className="fixed inset-x-0 top-0 z-30 flex items-center justify-between gap-4 px-4 pt-5 sm:px-8 lg:px-12">
+      <header className={`fixed inset-x-0 top-0 z-30 flex items-center justify-between gap-4 px-4 pt-5 transition-opacity duration-700 sm:px-8 lg:px-12 ${gate ? "opacity-0" : "opacity-100"}`}>
         <button
           type="button"
           onClick={() => jump("hero")}
@@ -464,7 +575,7 @@ export function HubExperience({ chapters, upcoming }: Props) {
       </header>
 
       {/* ---------- Spectrum rail (lg+) ---------- */}
-      <nav aria-label="Chapters" className="fixed top-1/2 right-5 z-30 hidden -translate-y-1/2 flex-col gap-3 lg:flex">
+      <nav aria-label="Chapters" className={`fixed top-1/2 right-5 z-30 hidden -translate-y-1/2 flex-col gap-3 transition-opacity duration-700 lg:flex ${textLive ? "opacity-100" : "pointer-events-none opacity-0"}`}>
         {chapters.map((c) => {
           const id = personaIdentity(c.slug);
           const on = activeSlug === c.slug;
@@ -484,7 +595,7 @@ export function HubExperience({ chapters, upcoming }: Props) {
               </span>
               <span
                 className="block rounded-full transition-all duration-[var(--dur-2)]"
-                style={{ width: on ? 3 : 3, height: on ? 34 : 10, backgroundColor: color, boxShadow: on ? `0 0 18px ${color}` : "none", opacity: on ? 1 : 0.55 }}
+                style={{ width: 3, height: on ? 34 : 10, backgroundColor: color, boxShadow: on ? `0 0 18px ${color}` : "none", opacity: on ? 1 : 0.55 }}
               />
             </button>
           );
@@ -503,12 +614,12 @@ export function HubExperience({ chapters, upcoming }: Props) {
               {HUB_COPY.intro} <CyclingPhrase chapters={chapters} />
             </p>
             <p data-hero-item className="mt-14 font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase">
-              {hint} <span aria-hidden className="hub-scroll-cue" />
+              {scrollHint} <span aria-hidden className="hub-scroll-cue" />
             </p>
           </div>
         </section>
 
-        {/* ---------- Through the glass ---------- */}
+        {/* ---------- Into the colour ---------- */}
         <section id="through" data-section className="flex min-h-[110svh] items-center justify-center px-4 text-center sm:px-8">
           <div className="max-w-3xl">
             <p className="font-mono text-[10px] tracking-[0.24em] text-[var(--ink-faint)] uppercase">{HUB_COPY.throughEyebrow}</p>
@@ -525,7 +636,6 @@ export function HubExperience({ chapters, upcoming }: Props) {
           <PersonaChapter key={c.slug} chapter={c} index={i} total={chapters.length} />
         ))}
 
-        {/* ---------- More colours ---------- */}
         {upcoming.length ? (
           <section id="more" data-section className="flex min-h-[100svh] items-center px-4 sm:px-8 lg:px-12">
             <div className="max-w-xl">
@@ -557,7 +667,6 @@ export function HubExperience({ chapters, upcoming }: Props) {
             </h2>
             <div data-rise>
               <p className="mt-6 max-w-lg text-[length:var(--step-0)] leading-relaxed text-[var(--ink-dim)]">{HUB_COPY.closingBody}</p>
-              {/* Wrapped: GSAP moves the wrapper, the link keeps its own hover motion. */}
               <div className="mt-10">
                 <a
                   href={`mailto:${HUB_COPY.email}`}
@@ -578,7 +687,35 @@ export function HubExperience({ chapters, upcoming }: Props) {
         </section>
       </main>
 
-      {/* ---------- Overlays ---------- */}
+      {/* ---------- Intro overlays ---------- */}
+      <div ref={flashRef} aria-hidden className="vr-flash fixed inset-0 z-40 opacity-0" />
+      {blink ? (
+        <svg aria-hidden className="vr-blink fixed inset-0 z-40 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <defs>
+            <mask id="vr-eye">
+              <rect width="100" height="100" fill="#fff" />
+              <ellipse ref={eyeRef} cx="50" cy="50" rx="0" ry="0" fill="#000" />
+            </mask>
+          </defs>
+          <rect width="100" height="100" fill="#050507" mask="url(#vr-eye)" />
+        </svg>
+      ) : null}
+      {inIntro ? (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 grid grid-cols-[1fr_auto_1fr] items-end px-4 pb-6 sm:px-8 lg:px-12">
+          <span />
+          <p aria-live="polite" className={`vr-hint text-center font-mono text-[11px] tracking-[0.22em] text-[var(--ink-dim)] uppercase ${hint ? "is-on" : ""}`}>
+            {hint ?? ""}
+          </p>
+          <button
+            type="button"
+            onClick={skip}
+            className="pointer-events-auto justify-self-end font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline"
+          >
+            Skip intro →
+          </button>
+        </div>
+      ) : null}
+
       {ready ? <LightCursor holdHint="slowing time" /> : null}
 
       {struggling ? (
@@ -600,18 +737,26 @@ export function HubExperience({ chapters, upcoming }: Props) {
         </p>
       ) : null}
 
-      {gate ? (
-        <EntryGate
-          compact={gate === "compact"}
+      {gate === "full" ? (
+        <HeadsetGate
           device={device}
           quality={quality}
           onQuality={setQuality}
           status={device && !device.webgl ? "unsupported" : status}
           startedAt={startedAt}
           leaving={leaving}
-          onEnter={enter}
+          touch={touch}
+          onWear={wear}
           onNormal={goNormal}
         />
+      ) : null}
+      {gate === "returning" ? (
+        <div role="status" className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-[var(--void)]">
+          <p className="font-mono text-[10px] tracking-[0.24em] text-[var(--ink-dim)] uppercase">{status === "failed" ? "3D couldn’t start" : "Gathering light"}</p>
+          <button type="button" onClick={goNormal} className="font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase underline-offset-4 hover:text-[var(--ink)] hover:underline">
+            {status === "failed" ? "Continue in Normal view" : "Skip — Normal view"}
+          </button>
+        </div>
       ) : null}
     </div>
   );

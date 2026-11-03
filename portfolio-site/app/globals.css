@@ -434,7 +434,13 @@ html.is-dragging * {
   50% { transform: scale(1.035); filter: brightness(1.15) saturate(1.15); }
 }
 
-/* ---------- Entry gate ---------- */
+/* Before the intro is done, the page's text waits unseen (the scene is the page). */
+.hub-v3.is-quiet main,
+.hub-v3.is-quiet nav {
+  visibility: hidden;
+}
+
+/* ---------- Headset gate ---------- */
 .gate {
   animation: gate-in 900ms var(--ease-out) both;
 }
@@ -445,98 +451,61 @@ html.is-dragging * {
   animation: gate-rise 1100ms var(--ease-out) 250ms both;
 }
 @keyframes gate-rise {
-  from { opacity: 0; transform: translateY(18px); filter: blur(10px); }
+  from { opacity: 0; transform: translateY(14px); filter: blur(10px); }
 }
 .gate.is-leaving {
-  pointer-events: none;
+  pointer-events: none !important;
+  animation: gate-out 700ms var(--ease-in-out) forwards;
 }
-.gate.is-leaving-normal {
-  animation: gate-out 480ms var(--ease-in-out) forwards;
-}
-.gate.is-leaving-immersive {
-  animation: gate-out 1000ms var(--ease-in-out) forwards;
-}
-.gate.is-leaving-immersive .gate-panel,
-.gate.is-leaving-immersive > div:first-child,
-.gate.is-leaving-immersive > p {
-  animation: gate-fade 380ms var(--ease-out) forwards;
-}
-.gate.is-leaving-immersive .gate-light b {
-  animation: gate-strike 900ms var(--ease-in-out) forwards;
+.gate.is-leaving * {
+  pointer-events: none !important;
 }
 @keyframes gate-out {
   to { opacity: 0; visibility: hidden; }
 }
-@keyframes gate-fade {
-  to { opacity: 0; filter: blur(8px); }
+.gate-wear-line {
+  display: block;
+  width: 1px;
+  height: 26px;
+  margin: 12px auto 0;
+  background: linear-gradient(transparent, var(--ink-faint));
+  animation: gate-wear-line 2.4s var(--ease-in-out) infinite;
+  transform-origin: bottom;
 }
-/* The gathered point of light stretches into the falling beam. */
-@keyframes gate-strike {
-  40% { transform: translate(-50%, -50%) scale(1.4, 1.4); }
-  100% { transform: translate(-50%, -50%) scale(0.5, 120); opacity: 0; }
+@keyframes gate-wear-line {
+  0% { transform: scaleY(0); opacity: 1; }
+  60% { transform: scaleY(1); opacity: 1; }
+  100% { transform: scaleY(1); opacity: 0; }
+}
+html.is-headset-hover .light-cursor-ring::before {
+  transform: scale(1.8);
+  border-color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+}
+html.is-headset-hover canvas {
+  cursor: none;
 }
 
-.gate-light {
-  position: relative;
-  flex: none;
-  width: 100%;
-  height: clamp(64px, 13vh, 170px);
-}
-.gate-light b {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
+/* ---------- Intro overlays ---------- */
+.vr-flash {
+  pointer-events: none;
   background: #fff;
-  transform: translate(-50%, -50%) scale(calc(0.7 + var(--p, 0) * 0.6));
-  box-shadow:
-    0 0 12px 2px rgba(255, 255, 255, 0.9),
-    0 0 calc(30px + var(--p, 0) * 60px) calc(6px + var(--p, 0) * 14px) rgba(255, 250, 240, 0.22);
-  animation: gate-breathe 2.6s ease-in-out infinite;
 }
-@keyframes gate-breathe {
-  50% { filter: brightness(1.4); }
+.vr-blink {
+  pointer-events: none;
+  animation: vr-blink-in 420ms var(--ease-out) both;
 }
-.gate-light i {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 2px;
-  height: 2px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
+@keyframes vr-blink-in {
+  from { opacity: 0; }
+}
+.vr-hint {
   opacity: 0;
-  animation: gate-speck var(--s) var(--ease-in-out) var(--d) infinite;
+  transform: translateY(6px);
+  transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out);
 }
-@keyframes gate-speck {
-  0% { transform: rotate(var(--a)) translateX(var(--r)); opacity: 0; }
-  25% { opacity: 0.9; }
-  100% { transform: rotate(calc(var(--a) + 40deg)) translateX(0); opacity: 0; }
-}
-
-.gate-enter {
-  color: var(--ink);
-  isolation: isolate;
-  transition: border-color var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
-}
-.gate-enter-fill {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  transform-origin: left;
-  background: linear-gradient(90deg, rgba(243, 241, 236, 0.06), rgba(243, 241, 236, 0.14));
-  transition: background var(--dur-2) var(--ease-out);
-}
-.gate-enter:enabled {
-  border-color: var(--ink);
-  color: var(--void);
-}
-.gate-enter:enabled .gate-enter-fill {
-  background: var(--ink);
-  transform: none !important;
+.vr-hint.is-on {
+  opacity: 1;
+  transform: none;
 }
 
 /* ---------- Quality slider ---------- */
