@@ -514,6 +514,41 @@ html.is-portal-hover .light-cursor-ring::before {
   0%, 100% { transform: scale(0.8); opacity: 0.6; }
   50% { transform: scale(1.3); opacity: 1; }
 }
+/* The code world's boot: a small terminal, lines typed in turn, a block cursor that waits. */
+.hub-enter-term {
+  margin: 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  line-height: 1.9;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+}
+.hub-enter-term span {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  width: 0;
+  animation: hub-enter-type 420ms steps(28, end) forwards;
+  animation-delay: calc(var(--i) * 360ms);
+}
+.hub-enter-term span:first-child {
+  color: var(--c);
+}
+@keyframes hub-enter-type {
+  to { width: 100%; }
+}
+.hub-enter-caret {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  margin-left: 2px;
+  vertical-align: -2px;
+  background: var(--c);
+  animation: hub-enter-caret 900ms steps(1, end) infinite;
+}
+@keyframes hub-enter-caret {
+  50% { opacity: 0; }
+}
 /* Leaving through a doorway: the words go first, the colour follows. */
 .hub-v3.is-entering main,
 .hub-v3.is-entering nav,

@@ -1,31 +1,38 @@
 "use client";
-/* eslint-disable react-hooks/immutability -- R3F idiom: GPU objects (materials, uniforms,
-   instance matrices, the shared state ref) are mutated every frame inside useFrame. */
+/* eslint-disable react-hooks/immutability -- R3F idiom: uniforms are mutated every frame
+   inside useFrame, never during render. */
 
 /**
- * The object field on the climb (D38 round B).
+ * The object field on the climb (D38 rounds B–C).
  *
  * Everything already exists in space along the camera's helix; only the camera
- * moves. Objects fade in and out of the dark with distance (fog in the shader).
+ * moves. Objects fade in and out of the dark with distance (fog in the shader)
+ * and with their place on the climb, so each persona's stretch is its own.
  *
- *  - Slabs: glass panes with real content (code, glyphs) drifting around the
- *    path through a persona's stretch of the climb. One instanced draw.
- *  - EngineerAssembly: the laptop. Its parts (base, lid, keys, trackpad) drift
- *    loose, fly together as you reach the engineer's section, the lid unfolds
- *    toward you and the screen powers on. Lit, it is a doorway: the pointer
- *    over the screen is a portal hover; a tap flies the camera in.
+ *  - Slabs: glass panes with content from a drawn atlas (code, charts, camera
+ *    readouts, strokes, routes, HUDs, tool logos). One instanced draw per set.
+ *  - Each persona's assembly (./worlds): loose parts that fly together, power
+ *    on, and become a doorway. The shared machinery lives in ./assembly.
  *
  * Built in code, no models, no downloads; the look is the headset's dark glass.
  */
-import { useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
+import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { personaIdentity } from "@/lib/site/brand";
+import type { PersonaSlug } from "@/lib/content/types";
 import { SPECTRUM_GLSL } from "@/lib/site/spectrum";
 import { useVr } from "./clock";
-import { ATLAS_N, ENGINEER_ICONS, LAPTOP_SCREEN_SRC, makeIconAtlas, makeLaptopScreen, makeSlabAtlas, makeTraderAtlas } from "./screens";
+import { ATLAS_N, ENGINEER_ICONS, makeIconAtlas, makeSlabAtlas, makeTraderAtlas } from "./screens";
+import { makeArtistAtlas, makeGamerAtlas, makePhotographerAtlas, makeRideAtlas } from "./screens-worlds";
 import type { World } from "./state";
-import { climbPose, clamp01, easeInOut, makePose, seeded } from "./util";
+import { climbPose, makePose, seeded } from "./util";
+import { ArtistAssembly } from "./worlds/artist";
+import { EngineerAssembly } from "./worlds/engineer";
+import { GamerAssembly } from "./worlds/gamer";
+import { PhotographerAssembly } from "./worlds/photographer";
+import { RideAssembly } from "./worlds/ride";
+import { TraderAssembly } from "./worlds/trader";
 
 /** How far objects are seen: fully there inside NEAR, gone beyond FAR (world units). */
 const FOG_NEAR = 4;
@@ -128,7 +135,7 @@ type SlabsProps = {
 };
 
 /** Drifting panes along a persona's stretch of the climb. One instanced draw. */
-export function Slabs({ world, count, atlas, tiles, width, aspect, span = [0.8, 0.5], seed }: SlabsProps) {
+export function Slabs({ world, count, atlas, tiles, width, aspect, span = SPAN, seed }: SlabsProps) {
   const { clock, state } = useVr();
   const { geometry, material } = useMemo(() => {
     const rnd = seeded(seed + Math.round(world.c * 7));
@@ -208,329 +215,89 @@ export function Slabs({ world, count, atlas, tiles, width, aspect, span = [0.8, 
 }
 
 // ---------------------------------------------------------------------------
-// The laptop screen: black glass that boots into the editor
+// Worlds: each persona's stretch of the climb — its panes and its assembly
 // ---------------------------------------------------------------------------
-const screenFragment = /* glsl */ `
-${SPECTRUM_GLSL}
-uniform sampler2D tScreen;
-uniform float uPower;   // 0 off … 1 on
-uniform float uTime;
-uniform float uTint;
-uniform float uHover;
-varying vec2 vUv;
-void main() {
-  vec3 content = texture2D(tScreen, vUv).rgb;
-  // Boot: a thin line of light opens into the picture.
-  float open = smoothstep(0.0, 0.7, uPower);
-  float band = smoothstep(open, open - 0.02, abs(vUv.y - 0.5) * 2.0);
-  float line = exp(-pow((abs(vUv.y - 0.5) * 2.0 - open) * 40.0, 2.0)) * step(uPower, 0.98) * 1.4;
-  float lit = smoothstep(0.6, 1.0, uPower);
-  vec3 c = content * band * lit * (1.0 + uHover * 0.25);
-  c += spectrum(uTint) * line * step(0.001, uPower);
-  // A breath across the glass, so it is never a flat picture.
-  float sheen = smoothstep(0.0, 1.0, 1.0 - abs(vUv.x + vUv.y * 0.3 - 0.65 - sin(uTime * 0.2) * 0.1) * 4.0) * 0.03;
-  c += sheen * lit;
-  gl_FragColor = vec4(c + vec3(0.004), 1.0);
-}
-`;
-
-const KEY_COLS = 14;
-const KEY_ROWS = 5;
-/** Laptop body size (world units) — a 14" at arm's length. */
-const LAP_W = 1.9;
-const LAP_D = 1.25;
-const LAP_T = 0.055;
-const LID_T = 0.03;
-const OPEN_ANGLE = THREE.MathUtils.degToRad(104);
-
-type Part = { scatterIn: THREE.Vector3; scatterOut: THREE.Vector3; home: THREE.Vector3; spin: THREE.Vector3; seed: number };
-
-/** The engineer's laptop, scattered → assembled → lit → scattered again, by scroll. */
-export function EngineerAssembly({ world }: { world: World }) {
-  const { clock, state } = useVr();
-  const camera = useThree((s) => s.camera);
-  const size = useThree((s) => s.size);
-  const root = useRef<THREE.Group>(null);
-  const baseRef = useRef<THREE.Group>(null);
-  const lidPivot = useRef<THREE.Group>(null);
-  const lidRef = useRef<THREE.Group>(null);
-  const padRef = useRef<THREE.Mesh>(null);
-  const keysRef = useRef<THREE.InstancedMesh>(null);
-  const screenRef = useRef<THREE.Mesh>(null);
-  const live = useRef({ power: 0, hover: 0, lastHover: null as string | null });
-
-  // Where the assembly stands: ahead of the camera's pose at the section, a little to the right
-  // (the chapter's words sit on the left). Narrow screens see a narrower slice of the world:
-  // it moves toward the centre and further away.
-  const anchor = useMemo(() => {
-    const pose = climbPose(world.c);
-    const aspect = size.width / Math.max(1, size.height);
-    const narrow = THREE.MathUtils.clamp(1.67 / aspect, 1, 2.2);
-    const pos = pose.pos
-      .clone()
-      .addScaledVector(pose.fwd, 5.0 + (narrow - 1) * 2.2)
-      .addScaledVector(pose.right, 1.4 / narrow)
-      .add(new THREE.Vector3(0, -0.3 + (narrow - 1) * 1.1, 0)); // phones: above the words
-    // Same heading as the camera (its yaw is a left-handed turn, so Ry takes the negative):
-    // the hinge is at the far side and the open lid faces back at you.
-    return { pos, yaw: -pose.yaw };
-  }, [world.c, size.width, size.height]);
-
-  const parts = useMemo(() => {
-    const rnd = seeded(7 + Math.round(world.c * 13));
-    // Loose parts hang ahead of the camera half a section before (and after) the peak,
-    // so they are in view while they fly together, and as they drift apart again.
-    const before = climbPose(world.c - 0.55);
-    const after = climbPose(world.c + 0.55);
-    const scatter = (pose: ReturnType<typeof climbPose>, spread: number) =>
-      pose.pos
-        .clone()
-        .addScaledVector(pose.right, (rnd() * 2 - 1) * spread)
-        .addScaledVector(pose.fwd, 3 + rnd() * 7)
-        .add(new THREE.Vector3(0, (rnd() - 0.4) * spread, 0));
-    const make = (home: THREE.Vector3): Part => ({
-      scatterIn: scatter(before, 4.5),
-      scatterOut: scatter(after, 5.5),
-      home,
-      spin: new THREE.Vector3(rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1).multiplyScalar(2.5),
-      seed: rnd(),
-    });
-    const keys: Part[] = [];
-    const kw = (LAP_W * 0.84) / KEY_COLS;
-    const kd = (LAP_D * 0.48) / KEY_ROWS;
-    for (let r = 0; r < KEY_ROWS; r++) {
-      for (let c = 0; c < KEY_COLS; c++) {
-        keys.push(make(new THREE.Vector3((c - (KEY_COLS - 1) / 2) * kw, LAP_T / 2 + 0.012, -LAP_D * 0.46 + 0.08 + r * kd)));
-      }
-    }
-    return { base: make(new THREE.Vector3(0, 0, 0)), lid: make(new THREE.Vector3(0, 0, -LAP_D / 2)), pad: make(new THREE.Vector3(0, LAP_T / 2 + 0.002, LAP_D * 0.27)), keys, kw, kd };
-  }, [world.c]);
-
-  const geo = useMemo(
-    () => ({
-      base: new RoundedBoxGeometry(LAP_W, LAP_T, LAP_D, 3, 0.02),
-      lid: new RoundedBoxGeometry(LAP_W, LID_T, LAP_D * 0.98, 3, 0.015),
-      key: new RoundedBoxGeometry(parts.kw * 0.78, 0.018, parts.kd * 0.72, 2, 0.006),
-      pad: new RoundedBoxGeometry(LAP_W * 0.34, 0.004, LAP_D * 0.26, 2, 0.004),
-      screen: new THREE.PlaneGeometry(LAP_W * 0.93, LAP_D * 0.98 * 0.88),
-      bezelLight: new THREE.PlaneGeometry(LAP_W * 0.93 + 0.03, LAP_D * 0.98 * 0.88 + 0.03),
-      halo: new THREE.PlaneGeometry(LAP_W * 2.2, LAP_D * 0.98 * 0.88 * 2.4),
-    }),
-    [parts.kw, parts.kd],
-  );
-  const screenTex = useMemo(() => makeLaptopScreen(world.t), [world.t]);
-  const screenMat = useMemo(
-    () =>
-      new THREE.ShaderMaterial({
-        vertexShader: /* glsl */ `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-        fragmentShader: screenFragment,
-        uniforms: { tScreen: { value: screenTex }, uPower: { value: 0 }, uTime: { value: 0 }, uTint: { value: world.t }, uHover: { value: 0 } },
-      }),
-    [screenTex, world.t],
-  );
-  const mat = useMemo(() => {
-    const shell = new THREE.MeshPhysicalMaterial({ color: new THREE.Color("#0a0a10"), roughness: 0.28, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.15, envMapIntensity: 1.2 });
-    const key = new THREE.MeshStandardMaterial({ color: new THREE.Color("#0d0d13"), roughness: 0.6, metalness: 0.05, emissive: new THREE.Color("#000000"), emissiveIntensity: 1 });
-    const pad = new THREE.MeshPhysicalMaterial({ color: new THREE.Color("#0c0c12"), roughness: 0.15, metalness: 0.1, clearcoat: 1, envMapIntensity: 1.5 });
-    const bezel = new THREE.MeshBasicMaterial({ color: new THREE.Color("#000"), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
-    // A soft light behind the lid: the lit laptop is a doorway, and it should look like one.
-    const haloCanvas = document.createElement("canvas");
-    haloCanvas.width = haloCanvas.height = 128;
-    const hc = haloCanvas.getContext("2d")!;
-    const grad = hc.createRadialGradient(64, 64, 4, 64, 64, 64);
-    grad.addColorStop(0, "rgba(255,255,255,0.55)");
-    grad.addColorStop(0.35, "rgba(255,255,255,0.18)");
-    grad.addColorStop(1, "rgba(255,255,255,0)");
-    hc.fillStyle = grad;
-    hc.fillRect(0, 0, 128, 128);
-    const haloTex = new THREE.CanvasTexture(haloCanvas);
-    const halo = new THREE.MeshBasicMaterial({ map: haloTex, color: new THREE.Color("#000"), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
-    return { shell, key, pad, bezel, halo };
-  }, []);
-  const tint = useMemo(() => new THREE.Color().setHSL(((world.t * 285 - 15) / 360 + 1) % 1, 0.9, 0.62), [world.t]);
-  const tmp = useMemo(() => ({ m: new THREE.Matrix4(), p: new THREE.Vector3(), q: new THREE.Quaternion(), e: new THREE.Euler(), s: new THREE.Vector3(1, 1, 1), ray: new THREE.Raycaster(), ndc: new THREE.Vector2(), n: new THREE.Vector3(), w: new THREE.Vector3() }), []);
-
-  useEffect(() => () => screenTex.dispose(), [screenTex]);
-  useEffect(() => {
-    // Ratul's own screenshot, when there is one, replaces the drawn editor.
-    if (!LAPTOP_SCREEN_SRC) return;
-    let live = true;
-    new THREE.TextureLoader().load(LAPTOP_SCREEN_SRC, (t) => {
-      if (!live) return t.dispose();
-      t.colorSpace = THREE.SRGBColorSpace;
-      t.anisotropy = 4;
-      screenMat.uniforms.tScreen.value = t;
-    });
-    return () => {
-      live = false;
-    };
-  }, [screenMat]);
-
-  useFrame(() => {
-    const k = clock.current;
-    const s = state.current;
-    const g = root.current;
-    if (!g) return;
-    const shown = k.climb > 0 || s.phase === "climb";
-    g.visible = shown;
-    if (!shown) return;
-
-    const c = k.climb;
-    const d = c - world.c;
-    // gather: 0 scattered → 1 assembled; the parts meet over the section before, hold, then leave.
-    const gather = 1 - THREE.MathUtils.smoothstep(Math.abs(d), 0.22, 0.95);
-    const g3 = easeInOut(gather);
-    const open = THREE.MathUtils.smoothstep(gather, 0.55, 1); // the lid unfolds once the parts have met
-    const powerTarget = gather > 0.985 ? 1 : 0;
-    const L = live.current;
-    L.power = THREE.MathUtils.damp(L.power, powerTarget, powerTarget ? 1.6 : 5, k.dt);
-    const t = k.t;
-
-    // The whole assembly: anchored, breathing.
-    g.position.copy(anchor.pos);
-    g.position.y += Math.sin(t * 0.5) * 0.04;
-    g.rotation.set(Math.sin(t * 0.33) * 0.02, anchor.yaw + Math.sin(t * 0.21) * 0.03, Math.sin(t * 0.27) * 0.015);
-
-    const place = (obj: THREE.Object3D, part: Part) => {
-      const from = d < 0 ? part.scatterIn : part.scatterOut;
-      // Scatter positions are world space; bring them into the assembly's frame.
-      tmp.w.copy(from);
-      g.worldToLocal(tmp.w);
-      tmp.w.addScaledVector(
-        tmp.p.set(Math.sin(t * 0.3 + part.seed * 20), Math.sin(t * 0.27 + part.seed * 9), Math.cos(t * 0.23 + part.seed * 14)),
-        0.4,
-      );
-      obj.position.lerpVectors(tmp.w, part.home, g3);
-      const spin = (1 - g3) * (0.6 + part.seed) * 2;
-      obj.rotation.set(part.spin.x * spin + t * 0.1 * (1 - g3), part.spin.y * spin, part.spin.z * spin);
-    };
-    if (baseRef.current) place(baseRef.current, parts.base);
-    if (padRef.current) place(padRef.current, parts.pad);
-    if (lidPivot.current) {
-      place(lidPivot.current, parts.lid);
-      if (lidRef.current) lidRef.current.rotation.x = -OPEN_ANGLE * easeInOut(open) * g3 + (1 - g3) * 0.4;
-    }
-    const keys = keysRef.current;
-    if (keys) {
-      parts.keys.forEach((part, i) => {
-        const from = d < 0 ? part.scatterIn : part.scatterOut;
-        tmp.w.copy(from);
-        g.worldToLocal(tmp.w);
-        tmp.w.addScaledVector(tmp.p.set(Math.sin(t * 0.4 + part.seed * 20), Math.sin(t * 0.37 + part.seed * 9), Math.cos(t * 0.33 + part.seed * 14)), 0.5);
-        // Keys arrive a touch after the body, each in its own time.
-        const gk = easeInOut(clamp01((gather - 0.1 * part.seed) / (1 - 0.1 * part.seed)));
-        tmp.p.lerpVectors(tmp.w, part.home, gk);
-        const spin = (1 - gk) * 3;
-        tmp.e.set(part.spin.x * spin, part.spin.y * spin + t * 0.2 * (1 - gk), part.spin.z * spin);
-        tmp.q.setFromEuler(tmp.e);
-        tmp.m.compose(tmp.p, tmp.q, tmp.s);
-        keys.setMatrixAt(i, tmp.m);
-      });
-      keys.instanceMatrix.needsUpdate = true;
-      // Backlight comes with the power.
-      mat.key.emissive.copy(tint).multiplyScalar(0.1 * L.power);
-    }
-
-    // Screen, bezel light and the halo: lit = enterable, so it breathes, and brightens under the pointer.
-    screenMat.uniforms.uPower.value = L.power;
-    screenMat.uniforms.uTime.value = t;
-    const breath = 0.5 + 0.5 * Math.sin(t * 1.7);
-    mat.bezel.opacity = L.power * (0.16 + breath * 0.12 + L.hover * 0.3);
-    mat.bezel.color.copy(tint);
-    mat.halo.opacity = L.power * (0.22 + breath * 0.1 + L.hover * 0.35);
-    mat.halo.color.copy(tint);
-
-    // Portal: the pointer over the lit screen.
-    let hover: string | null = null;
-    const screen = screenRef.current;
-    if (screen && L.power > 0.9 && s.phase === "climb" && !s.portal) {
-      tmp.ndc.set(s.px, s.py);
-      tmp.ray.setFromCamera(tmp.ndc, camera);
-      if (tmp.ray.intersectObject(screen, false).length) hover = world.slug;
-    }
-    L.hover = THREE.MathUtils.damp(L.hover, hover ? 1 : 0, 8, k.dt);
-    screenMat.uniforms.uHover.value = L.hover;
-    if (hover !== L.lastHover) {
-      L.lastHover = hover;
-      s.portalHover = hover;
-    }
-    // Tell the Director where the screen is, for the fly-in.
-    if (screen && L.power > 0.5) {
-      screen.getWorldPosition(tmp.w);
-      tmp.n.set(0, 0, 1).applyQuaternion(screen.getWorldQuaternion(tmp.q));
-      s.portalAnchor = { x: tmp.w.x, y: tmp.w.y, z: tmp.w.z, nx: tmp.n.x, ny: tmp.n.y, nz: tmp.n.z };
-    }
-  });
-
-  return (
-    <group ref={root}>
-      <group ref={baseRef}>
-        <mesh geometry={geo.base} material={mat.shell} />
-      </group>
-      <mesh ref={padRef} geometry={geo.pad} material={mat.pad} />
-      <instancedMesh ref={keysRef} args={[geo.key, mat.key, parts.keys.length]} frustumCulled={false} />
-      {/* The lid pivots on the back edge of the base. */}
-      <group ref={lidPivot}>
-        <group ref={lidRef}>
-          {/* Lid lies flat on the base when closed (hinge at the back edge, lid extends forward). */}
-          <mesh geometry={geo.lid} material={mat.shell} position={[0, LAP_T / 2 + LID_T / 2, LAP_D * 0.49]} />
-          {/* Screen on the lid's inner face: it looks down at the keys when closed, at you when open. */}
-          <mesh ref={screenRef} geometry={geo.screen} material={screenMat} position={[0, LAP_T / 2 - 0.003, LAP_D * 0.49 + 0.02]} rotation-x={Math.PI / 2} />
-          <mesh geometry={geo.bezelLight} material={mat.bezel} position={[0, LAP_T / 2 - 0.004, LAP_D * 0.49 + 0.02]} rotation-x={Math.PI / 2} />
-          <mesh geometry={geo.halo} material={mat.halo} position={[0, LAP_T / 2 + LID_T + 0.01, LAP_D * 0.49 + 0.02]} rotation-x={Math.PI / 2} renderOrder={1} />
-        </group>
-      </group>
-    </group>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Worlds: the field for every persona that has one (round B: the engineer)
-// ---------------------------------------------------------------------------
-const CODE: [number, number] = [0, 8];
-const GLYPH: [number, number] = [8, 16];
-const ICONS: [number, number] = [0, ENGINEER_ICONS.length];
-const W_CODE: [number, number] = [1.6, 3];
+const SCREENS: [number, number] = [0, 8];
+const GLYPHS: [number, number] = [8, 16];
+const W_SCREEN: [number, number] = [1.6, 3];
 const W_GLYPH: [number, number] = [0.7, 1.2];
 const W_ICON: [number, number] = [0.5, 0.85];
-/** The trader's panes begin after the engineer's laptop has powered off. */
-const TRADER_SPAN: [number, number] = [0.6, 0.5];
+/** Panes begin after the previous persona's setup has powered off, and end before the next. */
+const SPAN: [number, number] = [0.6, 0.5];
 
-/** The engineer's stretch: code panes, glyphs, the tools; and the laptop. */
-function EngineerWorld({ world, slabs }: { world: World; slabs: number }) {
-  const atlas = useMemo(() => makeSlabAtlas(world.t), [world.t]);
-  const icons = useMemo(() => makeIconAtlas(ENGINEER_ICONS), []);
+type WorldProps = { world: World; slabs: number };
+
+/** Two pane sets from one 2:1 atlas: "screens" and "glyphs". */
+function Panes({ world, slabs, make, seed }: WorldProps & { make: (t: number) => THREE.Texture; seed: number }) {
+  const atlas = useMemo(() => make(world.t), [make, world.t]);
   useEffect(() => () => atlas.dispose(), [atlas]);
+  return (
+    <>
+      <Slabs world={world} count={Math.round(slabs * 0.5)} atlas={atlas} tiles={SCREENS} width={W_SCREEN} aspect={0.5} seed={seed} />
+      <Slabs world={world} count={Math.round(slabs * 0.3)} atlas={atlas} tiles={GLYPHS} width={W_GLYPH} aspect={0.5} seed={seed + 30} />
+    </>
+  );
+}
+
+function EngineerWorld({ world, slabs }: WorldProps) {
+  const icons = useMemo(() => makeIconAtlas(ENGINEER_ICONS), []);
   useEffect(() => () => icons.dispose(), [icons]);
   return (
     <>
-      <Slabs world={world} count={Math.round(slabs * 0.5)} atlas={atlas} tiles={CODE} width={W_CODE} aspect={0.5} seed={101} />
-      <Slabs world={world} count={Math.round(slabs * 0.25)} atlas={atlas} tiles={GLYPH} width={W_GLYPH} aspect={0.5} seed={131} />
-      <Slabs world={world} count={Math.round(slabs * 0.7)} atlas={icons} tiles={ICONS} width={W_ICON} aspect={1} seed={151} />
+      <Panes world={world} slabs={slabs} make={makeSlabAtlas} seed={101} />
+      <Slabs world={world} count={Math.round(slabs * 0.7)} atlas={icons} tiles={[0, ENGINEER_ICONS.length]} width={W_ICON} aspect={1} seed={151} />
       <EngineerAssembly world={world} />
     </>
   );
 }
+const TraderWorld = ({ world, slabs }: WorldProps) => (
+  <>
+    <Panes world={world} slabs={slabs} make={makeTraderAtlas} seed={201} />
+    <TraderAssembly world={world} />
+  </>
+);
+const PhotographerWorld = ({ world, slabs }: WorldProps) => (
+  <>
+    <Panes world={world} slabs={slabs} make={makePhotographerAtlas} seed={301} />
+    <PhotographerAssembly world={world} />
+  </>
+);
+const ArtistWorld = ({ world, slabs }: WorldProps) => (
+  <>
+    <Panes world={world} slabs={slabs} make={makeArtistAtlas} seed={401} />
+    <ArtistAssembly world={world} />
+  </>
+);
+const RideWorld = ({ world, slabs }: WorldProps) => (
+  <>
+    <Panes world={world} slabs={slabs} make={makeRideAtlas} seed={501} />
+    <RideAssembly world={world} />
+  </>
+);
+const GamerWorld = ({ world, slabs }: WorldProps) => (
+  <>
+    <Panes world={world} slabs={slabs} make={makeGamerAtlas} seed={601} />
+    <GamerAssembly world={world} handle={personaIdentity("gamer").handle ?? "gamer"} />
+  </>
+);
 
-/** The trader's stretch: charts and journal numbers (the desk itself is round C). */
-function TraderWorld({ world, slabs }: { world: World; slabs: number }) {
-  const atlas = useMemo(() => makeTraderAtlas(world.t), [world.t]);
-  useEffect(() => () => atlas.dispose(), [atlas]);
-  return (
-    <>
-      <Slabs world={world} count={Math.round(slabs * 0.55)} atlas={atlas} tiles={CODE} width={W_CODE} aspect={0.5} seed={201} span={TRADER_SPAN} />
-      <Slabs world={world} count={Math.round(slabs * 0.35)} atlas={atlas} tiles={GLYPH} width={W_GLYPH} aspect={0.5} seed={231} span={TRADER_SPAN} />
-    </>
-  );
-}
+const WORLDS: Record<PersonaSlug, (p: WorldProps) => React.JSX.Element> = {
+  engineer: EngineerWorld,
+  trader: TraderWorld,
+  photographer: PhotographerWorld,
+  artist: ArtistWorld,
+  ride: RideWorld,
+  gamer: GamerWorld,
+};
 
+/** Every published persona's stretch; a persona appears here the moment it is published. */
 export function Worlds({ worlds, slabs }: { worlds: World[]; slabs: number }) {
-  const engineer = worlds.find((w) => w.slug === "engineer");
-  const trader = worlds.find((w) => w.slug === "trader");
   return (
     <>
-      {engineer ? <EngineerWorld world={engineer} slabs={slabs} /> : null}
-      {trader ? <TraderWorld world={trader} slabs={slabs} /> : null}
+      {worlds.map((w) => {
+        const C = WORLDS[w.slug as PersonaSlug];
+        return C ? <C key={w.slug} world={w} slabs={slabs} /> : null;
+      })}
     </>
   );
 }

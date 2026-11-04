@@ -52,6 +52,8 @@ type SectionKind =
   | { kind: "end" };
 
 const GATE_SESSION_KEY = "xp-gate";
+/** The world last entered through its doorway: coming back lands on its section. */
+const WORLD_SESSION_KEY = "xp-world";
 const NEXT_PHASE: Partial<Record<Phase, Phase>> = { wear: "blink", blink: "sky", approach: "impact", impact: "split", split: "climb" };
 const NEXT_LOWER: Record<Quality, Quality> = { best: "balanced", balanced: "performance", performance: "performance" };
 
@@ -174,7 +176,24 @@ export function HubExperience({ chapters, upcoming }: Props) {
     setHint(null);
     setGate(null);
     setLeaving(false);
-  }, [setPhase]);
+    // Back from a world: stand where its doorway is, not at the start of the climb.
+    let from: string | null = null;
+    try {
+      from = sessionStorage.getItem(WORLD_SESSION_KEY);
+      sessionStorage.removeItem(WORLD_SESSION_KEY);
+    } catch {}
+    if (from) {
+      const el = document.getElementById(from);
+      if (el) {
+        const y = el.offsetTop + el.offsetHeight / 2 - window.innerHeight / 2;
+        requestAnimationFrame(() => {
+          window.scrollTo(0, y);
+          lenisRef.current?.scrollTo(y, { immediate: true, force: true });
+          vr.current.c = Math.max(0, sections.findIndex((s) => s.kind === "persona" && s.slug === from));
+        });
+      }
+    }
+  }, [setPhase, sections]);
 
   const wear = useCallback(() => {
     if (status !== "ready") return;
@@ -229,8 +248,13 @@ export function HubExperience({ chapters, upcoming }: Props) {
       vr.current.portal = { slug, at: performance.now() };
       vr.current.portalHover = null;
       sessionFlag(true);
+      try {
+        sessionStorage.setItem(WORLD_SESSION_KEY, slug);
+      } catch {}
       setEntering(world);
       ambient.chime(1.5);
+      // The photographer's doorway is a shutter: one quick white blink as you go through.
+      if (slug === "photographer" && flashRef.current) gsap.fromTo(flashRef.current, { opacity: 0.85 }, { opacity: 0, duration: 0.45, ease: "power2.out", delay: 0.05 });
       const target = personaHref(window.location.origin, world.slug as PersonaSlug);
       window.setTimeout(() => {
         if (target.crossOrigin) window.location.assign(target.href);
@@ -771,7 +795,16 @@ export function HubExperience({ chapters, upcoming }: Props) {
       <div ref={flashRef} aria-hidden className="vr-flash fixed inset-0 z-40 opacity-0" />
       {entering ? (
         <div ref={enterRef} aria-hidden className="hub-enter fixed inset-0 z-[46] flex items-center justify-center opacity-0" style={{ "--c": spectrumColor(entering.t) } as CSSProperties}>
-          <span className="hub-enter-light" />
+          {entering.slug === "engineer" ? (
+            // The code world boots like a terminal: three lines, typed, then the cursor waits.
+            <pre className="hub-enter-term">
+              <span style={{ "--i": 0 } as CSSProperties}>$ open {personaIdentity("engineer").subdomain}.{DISPLAY_ROOT}</span>
+              <span style={{ "--i": 1 } as CSSProperties}>resolving host … ok</span>
+              <span style={{ "--i": 2 } as CSSProperties}>starting session <i className="hub-enter-caret" /></span>
+            </pre>
+          ) : (
+            <span className="hub-enter-light" />
+          )}
         </div>
       ) : null}
       {blink ? (

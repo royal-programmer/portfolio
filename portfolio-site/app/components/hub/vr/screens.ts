@@ -158,7 +158,7 @@ function tokenize(line: string): Tok[] {
 }
 
 /** Editor palette: our void, warm ink, colour only where the light would be. */
-function palette(t: number) {
+export function palette(t: number) {
   const h = spectrumHue(t);
   return {
     bg: "#0b0b11",
@@ -183,6 +183,13 @@ function monoFamily(): string {
   return `${v ? v + ", " : ""}"Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
 }
 let MONO = "";
+/** The mono family string (set when a texture is first drawn). */
+export const mono = () => MONO || monoFamily();
+/** The display family (Fraunces via next/font), for the few words a screen shows large. */
+export function display(): string {
+  const v = typeof document === "undefined" ? "" : getComputedStyle(document.documentElement).getPropertyValue("--font-fraunces").trim();
+  return `${v ? v + ", " : ""}Fraunces, "Instrument Serif", Georgia, serif`;
+}
 
 type EditorOpts = {
   file: number;
@@ -278,7 +285,7 @@ function drawEditor(ctx: CanvasRenderingContext2D, x: number, y: number, w: numb
 
 const GLYPHS = ["{ }", "</>", "=>", "λ", "fn()", "0x1F", "&&", "#!"];
 
-function drawGlyph(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, glyph: string, t: number) {
+export function drawGlyph(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, glyph: string, t: number) {
   const P = palette(t);
   ctx.save();
   ctx.beginPath();
@@ -295,7 +302,7 @@ function drawGlyph(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 }
 
 /** A canvas texture that redraws itself once the web fonts are in (the first draw may be the fallback face). */
-function makeTexture(canvas: HTMLCanvasElement, draw: () => void) {
+export function makeTexture(canvas: HTMLCanvasElement, draw: () => void) {
   MONO = monoFamily();
   draw();
   const tex = new THREE.CanvasTexture(canvas);
@@ -321,7 +328,7 @@ export const ATLAS_TILES = ATLAS_N * ATLAS_N;
 // --- Trader: charts and the numbers a journal keeps (illustrative, never currency) -----------
 const TICKERS = ["+2.4%", "−0.8%", "1 : 3 R", "58% win", "0.5 R", "DD 4%", "+0.3 R ev", "4H"];
 
-function drawChart(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, t: number, seed: number) {
+export function drawChart(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, t: number, seed: number, labelPx = Math.round(h * 0.11)) {
   const P = palette(t);
   let a = (seed * 9301 + 49297) % 233280;
   const rnd = () => (a = (a * 9301 + 49297) % 233280) / 233280;
@@ -390,7 +397,7 @@ function drawChart(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   }
   // One number, the way a journal would note it.
   const last = vals[n - 1] - vals[0];
-  ctx.font = `${Math.round(h * 0.11)}px ${MONO}`;
+  ctx.font = `${labelPx}px ${MONO}`;
   ctx.textBaseline = "top";
   ctx.textAlign = "left";
   ctx.fillStyle = P.com;

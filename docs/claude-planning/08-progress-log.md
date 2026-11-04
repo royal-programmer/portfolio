@@ -5,6 +5,41 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Round C: every persona's assembly, on one pattern (2026-11-04)
+
+- **`vr/assembly.tsx` — the shared machinery.** `useAssembly({ world, root, screens, homes, offset,
+  screenMats, onFrame })` owns the anchor (ahead of the camera's pose at the section, aspect-aware),
+  the loose parts' scatter positions (half a section before / after), the gather curve, the power
+  ramp, the hover raycast against the screen meshes, the portal anchor for the Director's fly-in,
+  and the halo / bezel light. Each world builds its own meshes and places them in `onFrame` through
+  `place(obj, i, late)`. Parts shrink to 30 % while loose and the whole setup is hidden beyond
+  |c − c₀| ≥ 0.92, so nothing lingers into the next chapter. `makeScreenMaterial(tex, t, mode)`:
+  mode 0 boot line · 1 drawn left→right · 2 painted in stroke order (order in alpha).
+- **Worlds (`vr/worlds/`):** engineer (laptop, moved), trader (desk, two monitors on stands,
+  keyboard, mouse; charts draw themselves in), photographer (body, grip, prism housing, shutter
+  button; the lens arrives in front of the mount and screws on; the back display wakes with the
+  viewfinder readout; the page blinks the shutter on entry), artist (three legs, tray, canvas;
+  strokes paint in one by one), ride (frame of tubes, two wheels that turn, bars, seat, headlight
+  that comes on with a beam; a route panel beside it draws a glowing line with light pins — the
+  doorway), gamer (desk, tower with RGB strips, ultrawide + side monitor, keyboard with underglow,
+  mouse; the monitor boots to the handle, RGB cycles the spectrum).
+- **Panes per persona** (`screens-worlds.ts`): trader charts; photographer viewfinder frames and
+  readouts; artist stroke clusters and dabs; ride route snippets, speedo dials and compass / unit
+  glyphs; gamer HUD pieces (crosshair, minimap, bars, ammo) and the words of the game (GG, ACE,
+  1v3…). No invented records: percentages, settings, lines, terms.
+- **Registry:** `field.tsx` maps slug → world; a persona's stretch appears the moment it is
+  published (artist, ride, gamer are built and unexercised in the browser until then — they share
+  the hook and type-check, but have not been seen).
+- **Also:** the code world's exit is a three-line terminal boot with a block cursor (other worlds
+  keep the small light); coming back from a world lands on that world's section (`xp-world` in
+  sessionStorage); `public/hub/engineer/README.md` says what to drop there.
+- Verified (Intel UHD, Performance): engineer, trader and photographer stretches at c = 2 / 3 / 4,
+  hover on the camera's display → `portalHover: photographer`; no page errors. The dev console's
+  "Router action dispatched before initialization" is Next's Fast Refresh, not ours.
+- Open: Ratul's screenshots/photos for the screens; music player source decision; round D.
+
+---
+
 ## Round B feedback, first pass (2026-11-04)
 
 Ratul's notes on f402f2b, addressed:
