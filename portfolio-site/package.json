@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "hub:media": "node scripts/hub-media.mjs",
+    "predev": "node scripts/hub-media.mjs",
+    "prebuild": "node scripts/hub-media.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
