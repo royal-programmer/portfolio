@@ -1,5 +1,7 @@
 {
-  "models": [],
+  "models": [
+    "bike.glb"
+  ],
   "engineer": [],
   "trader": [],
   "photographer": [],

@@ -33,6 +33,7 @@ import { useExperience } from "../../experience-provider";
 import { ModeSwitch, QualityMenu, QUALITY_LABEL, SoundToggle } from "../experience-controls";
 import { ExitFrame, ExitSequence } from "./exit-sequence";
 import { GateSkeleton, HeadsetGate, type LoadStatus } from "./headset-gate";
+import { printCredits } from "@/lib/site/credits";
 import { LightCursor } from "./light-cursor";
 import { RefractionPoster } from "./refraction-poster";
 import { PORTAL_LENGTH, PORTAL_OUT_LENGTH, atLeast, createVrState, type Band, type Phase, type World } from "./vr/state";
@@ -106,6 +107,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   /** public/hub/media.json: Ratul's own pictures per persona (the photographer's sequence uses one). */
   const [media, setMedia] = useState<Partial<Record<string, string[]>>>({});
   const router = useRouter();
+  useEffect(() => void printCredits(), []);
   useEffect(() => {
     let live = true;
     fetch("/hub/media.json", { cache: "no-cache" })

@@ -5,8 +5,9 @@
 /**
  * The rider's bike (D38 round C feedback): a stylised sport bike built in code
  * — fairing, tank, seat hump, twin exhausts, bars, two wheels — with the kit
- * around it: helmet, tank bag, panniers, gloves, intercom. No make, no model:
- * no CC0 superbike exists and CC-BY needs on-screen credit. Powered, the
+ * around it: helmet, tank bag, panniers, gloves, intercom — or, when
+ * public/hub/models/bike.glb exists, a real low-poly sport bike re-skinned in
+ * the same finishes (CC-BY, credited in the console). Powered, the
  * headlight comes on with a beam and the route panel draws its glowing line
  * with light pins. The route panel is the doorway.
  */
@@ -48,29 +49,102 @@ function Wheel({ mats }: { mats: ReturnType<typeof useAssembly>["mats"] }) {
   );
 }
 
+type Mats = ReturnType<typeof useAssembly>["mats"];
+
+/** Which of the setup's finishes a baked colour becomes. */
+function finishOf(r: number, g: number, b: number): keyof Mats {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const sat = max === 0 ? 0 : (max - min) / max;
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  if (sat > 0.35 && lum > 0.12) return "shell"; // paint
+  if (lum > 0.75) return "shell"; // white paint, screen — same finish, so the body reads as one
+  if (lum > 0.3) return "metal"; // rims, forks, engine
+  return "matte"; // tyres, seat, rubber
+}
+
 /**
- * A CC0 bike from public/hub/models/bike.glb, re-skinned in the setup's materials and fitted to
- * the stylised bike's footprint (≈ 2.7 long, wheels on y = −0.46). Material names decide the finish:
- * tyre / rubber → matte, glass / light / lamp → glow, chrome / metal / exhaust → metal, else shell.
+ * Low-poly models bake their colours into a tiny palette texture with no material names.
+ * Read the colour under each triangle and split the geometry into the setup's finishes.
  */
-function BikeModel({ url, mats }: { url: string; mats: ReturnType<typeof useAssembly>["mats"] }) {
+function splitByPalette(mesh: THREE.Mesh, map: THREE.Texture, mats: Mats): boolean {
+  const img = map.image as CanvasImageSource & { width: number; height: number };
+  if (!img || !img.width) return false;
+  const cv = document.createElement("canvas");
+  cv.width = img.width;
+  cv.height = img.height;
+  const cx = cv.getContext("2d");
+  if (!cx) return false;
+  cx.drawImage(img, 0, 0);
+  const px = cx.getImageData(0, 0, cv.width, cv.height).data;
+  const geo = mesh.geometry.index ? mesh.geometry : mesh.geometry.toNonIndexed();
+  const uv = geo.getAttribute("uv") as THREE.BufferAttribute | undefined;
+  if (!uv) return false;
+  const index = geo.index ? Array.from(geo.index.array) : Array.from({ length: uv.count }, (_, i) => i);
+  const order: (keyof Mats)[] = ["shell", "matte", "metal", "glass"];
+  const buckets: Record<string, number[]> = { shell: [], matte: [], metal: [], glass: [] };
+  for (let i = 0; i < index.length; i += 3) {
+    const a = index[i], b = index[i + 1], c = index[i + 2];
+    const u = (uv.getX(a) + uv.getX(b) + uv.getX(c)) / 3;
+    const v = (uv.getY(a) + uv.getY(b) + uv.getY(c)) / 3;
+    const x = Math.min(cv.width - 1, Math.max(0, Math.floor((u - Math.floor(u)) * cv.width)));
+    // glTF UVs run top-down (GLTFLoader leaves flipY off); canvas rows do too.
+    const vv = map.flipY ? 1 - (v - Math.floor(v)) : v - Math.floor(v);
+    const y = Math.min(cv.height - 1, Math.max(0, Math.floor(vv * cv.height)));
+    const o = (y * cv.width + x) * 4;
+    buckets[finishOf(px[o] / 255, px[o + 1] / 255, px[o + 2] / 255)].push(a, b, c);
+  }
+  const merged: number[] = [];
+  const out = geo.clone();
+  out.clearGroups();
+  order.forEach((k, m) => {
+    const list = buckets[k];
+    if (!list.length) return;
+    out.addGroup(merged.length, list.length, m);
+    merged.push(...list);
+  });
+  out.setIndex(merged);
+  // Palette models ship without normals: unweld and compute flat ones so the finishes catch the light.
+  const flat = out.toNonIndexed();
+  flat.computeVertexNormals();
+  mesh.geometry = flat;
+  mesh.material = order.map((k) => mats[k]);
+  return true;
+}
+
+/**
+ * A bike from public/hub/models/bike.glb (CC-BY — credited in the console and in
+ * docs/claude-planning/15-credits.md), re-skinned in the setup's finishes and fitted to the
+ * stylised bike's footprint (≈ 2.7 long, wheels on y = −0.46). Palette-baked models are split by
+ * colour; models with named materials go by name: tyre / rubber → matte, glass / light / lamp →
+ * glow, chrome / metal / exhaust → metal, else shell.
+ */
+function BikeModel({ url, mats }: { url: string; mats: Mats }) {
   const { scene } = useGLTF(url);
   const fitted = useMemo(() => {
     const root = scene.clone(true);
     root.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
-      const name = `${m.name} ${(Array.isArray(m.material) ? m.material[0] : m.material)?.name ?? ""}`.toLowerCase();
-      m.material = /tyre|tire|rubber|seat/.test(name) ? mats.matte : /glass|light|lamp|led/.test(name) ? mats.glow : /chrome|metal|exhaust|rim|spoke|fork|engine/.test(name) ? mats.metal : mats.shell;
+      const src = (Array.isArray(m.material) ? m.material[0] : m.material) as THREE.MeshStandardMaterial | undefined;
+      const map = src?.map;
+      if (!(map && splitByPalette(m, map, mats))) {
+        const name = `${m.name} ${src?.name ?? ""}`.toLowerCase();
+        m.material = /tyre|tire|rubber|seat/.test(name) ? mats.matte : /glass|light|lamp|led/.test(name) ? mats.glow : /chrome|metal|exhaust|rim|spoke|fork|engine/.test(name) ? mats.metal : mats.shell;
+        if (!m.geometry.getAttribute("normal")) {
+          m.geometry = m.geometry.toNonIndexed();
+          m.geometry.computeVertexNormals();
+        }
+      }
       m.castShadow = m.receiveShadow = false;
     });
     const box = new THREE.Box3().setFromObject(root);
     const size = box.getSize(new THREE.Vector3());
     const centre = box.getCenter(new THREE.Vector3());
-    // Longest horizontal axis → x (side view), length 2.7.
+    // Longest horizontal axis → x (side view), front towards +x (the headlight beam), length 2.7.
     const k = 2.7 / Math.max(size.x, size.z, 0.001);
     const holder = new THREE.Group();
-    if (size.z > size.x) root.rotation.y = Math.PI / 2;
+    if (size.z > size.x) root.rotation.y = -Math.PI / 2;
     holder.add(root);
     holder.scale.setScalar(k);
     root.position.set(-centre.x, -box.min.y, -centre.z);

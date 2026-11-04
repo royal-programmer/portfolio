@@ -5,6 +5,35 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Round C feedback, fifth pass: real bike, loaders from frame one, console credits (2026-11-05)
+
+Ratul's answers to the fourth pass: pass-through "more or less resolved"; bring a
+real bike and credit it in the console (personal, non-commercial site — his call);
+the world loader must be the *sequence* from its first frame, not the finished frame.
+
+- **Real bike.** The Kawasaki he liked is Sketchfab "Free Standard" (not CC), 335 k
+  faces and login-gated — unusable. Poly Pizza downloads without login; its bikes
+  are CC-BY 3.0. Chose "Motorcycle" by Poly by Google (a proper sport bike, 6.4 k
+  triangles, 110 KB, `static.poly.pizza/<uuid>.glb`) → `public/hub/models/bike.glb`.
+  It is a single mesh with one palette texture and no material names or normals, so
+  `BikeModel` now **splits the geometry by the colour under each triangle** (paint →
+  shell, grey → metal, dark → matte; white paint → shell so the body reads as one),
+  unwelds and computes flat normals (without them our lit materials shaded it flat
+  grey), fits it to 2.7 units and turns it to face its headlight beam (−π/2: the
+  model's front is −z). Name heuristics remain for models with named materials.
+- **Credits in the console.** `lib/site/credits.ts` prints a collapsed `credits`
+  group once on the hub's first mount (bike · logos · fonts). Record of record:
+  `15-credits.md`; `public/hub/models/README.md` now says CC0 or CC-BY.
+- **Loaders from frame one.** `WorldBoot` on a direct visit renders `ExitSequence`
+  itself (server-rendered start state: empty terminal, bare chart) and lifts when it
+  ends or is skipped; through the hub and on repeat visits it is still the finished
+  `ExitFrame`. The trade chart's body starts `opacity: 0` in the markup (`data-body`,
+  released by the timeline) so the finished chart cannot flash before hydration.
+  Verified: trade direct visit shows the bare window at 0.3 s, candles by 3 s,
+  target hit at 4.5 s, page by 6.5 s.
+- Dev-only note: the hub returned one transient 500 during testing with a
+  Supabase-shaped error body — the pre-launch "fetch timeout / fallback" item stands.
+
 ## Round C feedback, fourth pass: no two setups at once, panes out of the lane, world loaders (2026-11-05)
 
 - **Pass-through, root cause:** two setups shared the same volume — the one leaving (|d| up to 1.0)

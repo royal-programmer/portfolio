@@ -224,9 +224,9 @@ const X0 = 60;
 const CW = (760 - X0) / (CANDLES + 10);
 const RUN = [4, 9, 15, 20, 24, 27];
 
-function TradeChart({ data, c, final }: { data: ReturnType<typeof useTradeData>; c: string; final?: boolean }) {
+function TradeChart({ data, c, final, hidden }: { data: ReturnType<typeof useTradeData>; c: string; final?: boolean; /** Start invisible in the markup: server-rendered as a page's loader, the finished chart must not flash before the timeline takes over. */ hidden?: boolean }) {
   return (
-    <div className="hub-exit-trade-grid">
+    <div className="hub-exit-trade-grid" data-body style={hidden ? { opacity: 0 } : undefined}>
       <ul className="hub-exit-list">
         {["plan", "entry", "stop", "target", "size", "review"].map((r) => (
           <li key={r} data-row>
@@ -293,6 +293,7 @@ function TraderExit({ world, onDone, delay = 0 }: Props) {
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ onComplete: () => done(), delay: delay / 1000 });
       tl.fromTo(el, { opacity: 0, scale: 0.97 }, { opacity: 1, scale: 1, duration: 0.25, ease: "power2.out" });
+      tl.set(el.querySelector("[data-body]"), { opacity: 1 }, 0);
       tl.from(el.querySelectorAll("[data-hd]"), { opacity: 0, y: -6, duration: 0.25, stagger: 0.05 }, "<0.05");
       tl.from(el.querySelectorAll("[data-row]"), { opacity: 0, x: -8, duration: 0.25, stagger: 0.04 }, "<0.1");
       tl.from(el.querySelectorAll("[data-grid]"), { scaleX: 0, transformOrigin: "left", duration: 0.3, stagger: 0.02 }, "<0.05");
@@ -315,7 +316,7 @@ function TraderExit({ world, onDone, delay = 0 }: Props) {
         <em data-hd>R : R 1 : 3</em>
         <em data-hd>risk 0.5 %</em>
       </div>
-      <TradeChart data={data} c={c} />
+      <TradeChart data={data} c={c} hidden />
     </div>
   );
 }
@@ -373,6 +374,7 @@ function PhotoExit({ world, onDone, photo, delay = 0 }: Props) {
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ onComplete: () => done(), delay: delay / 1000 });
       tl.fromTo(el, { opacity: 0, scale: 0.97 }, { opacity: 1, scale: 1, duration: 0.25, ease: "power2.out" });
+      tl.set(el.querySelector("[data-body]"), { opacity: 1 }, 0);
       tl.from(el.querySelectorAll("[data-grid]"), { opacity: 0, duration: 0.3, stagger: 0.03 }, "<0.05");
       // The live view: soft and blown out, pulling sharp and settling as the camera meters.
       const v = { blur: 18, bright: 1.9 };

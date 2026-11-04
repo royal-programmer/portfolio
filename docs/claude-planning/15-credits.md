@@ -1,6 +1,6 @@
 # 15 — Credits (third-party assets in the hub)
 
-Everything in the VR journey is built in code except the logos below. Credits go in
+Everything in the VR journey is built in code except the logos and the one model below. Credits go in
 the **browser console**, never on screen (D38). This file is the record.
 
 ## Logos (tool / language marks on the engineer's drifting panes)
@@ -20,9 +20,17 @@ devicon marks are the full-colour "original" versions.
 
 ## 3D models
 
-None yet. The headset, the laptop, the planets, satellite and rocket are built from
-primitives in code. If a CC0 model is ever used (Kenney, Quaternius, Poly Pizza CC0),
-record its source and licence here and in the console credits.
+Ratul's call (2026-11-05): a real bike beats a stylised one, and this is a personal,
+non-commercial site, so CC-BY is fine with the credit in the console (and here, in
+the public repo). Printed by `portfolio-site/lib/site/credits.ts` on the hub's first
+mount, as a collapsed `credits` group.
+
+| Model | Source | Licence | Use |
+|-------|--------|---------|-----|
+| Rider's bike (`public/hub/models/bike.glb`) | ["Motorcycle" by Poly by Google](https://poly.pizza/m/dse64pqMKAR), via Poly Pizza | CC BY 3.0 | Re-coloured in the setup's finishes (palette split by colour), fitted to 2.7 units, lit by the persona's light. 6.4 k triangles, 110 KB. |
+
+Everything else — headset, planets, laptop, desks, camera, easel, kit — is built from
+primitives in code.
 
 ## Fonts
 
