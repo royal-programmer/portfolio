@@ -9,7 +9,8 @@
  *   approach  the light comes at you, slow then faster (hold = slow time)
  *   impact    white flash — you are the prism
  *   split     the camera rides the J as the light splits into a cone above
- *   climb     scroll unlocked: spiral up through the cone (rounds B–D fill it)
+ *   climb     scroll unlocked: spiral up through the cone past the object field; each
+ *             persona's parts assemble and light up — tap a lit assembly to fly into its world
  *
  * Written by the page on events, read by the scene every frame — a plain
  * ref object, so nothing re-renders at 60 fps.
@@ -43,7 +44,19 @@ export type VrState = {
   hover: boolean;
   /** Intro was skipped or the visitor is returning: no flash, land on the climb. */
   skipped: boolean;
+  /** The lit assembly under the pointer (its persona), if any — set by the scene. */
+  portalHover: string | null;
+  /** Where that assembly's screen is (world) and which way it faces — set by the scene. */
+  portalAnchor: { x: number; y: number; z: number; nx: number; ny: number; nz: number } | null;
+  /** The visitor clicked a lit assembly: the camera flies into its screen, then the page leaves. */
+  portal: { slug: string; at: number } | null;
 };
+
+/** Seconds from the click on a lit assembly to the page leaving for its world. */
+export const PORTAL_LENGTH = 1.6;
+
+/** A persona world on the climb: where on the scroll it peaks, and its colour. */
+export type World = { slug: string; t: number; c: number };
 
 export function createVrState(): VrState {
   return {
@@ -60,6 +73,9 @@ export function createVrState(): VrState {
     holding: false,
     hover: false,
     skipped: false,
+    portalHover: null,
+    portalAnchor: null,
+    portal: null,
   };
 }
 

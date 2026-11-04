@@ -5,6 +5,49 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Round B: the climb, the object field, the engineer's laptop (2026-11-04)
+
+D38 round B shipped on `phase-0-content-engine`. The doorway pattern is proven end to end.
+- **One helix for everything** (`vr/util.ts` `climbPose(c)`): the camera's position, heading and
+  pitch at scroll progress `c` (page sections). The Director and the field read the same curve, so
+  what the camera meets is always in front of it. Turn per section eased from 162° to 90° — at 162°
+  "ahead" swung out of view before the parts could arrive.
+- **Object field** (`vr/field.tsx` `Slabs`): one instanced draw of glass panes with real content from a
+  2048 × 1024 canvas atlas (`vr/screens.ts`): eight editor tiles showing this site's own source
+  (fluid shader, `climbPose`, the sound engine, the Director) and eight code glyphs. Rounded-rect SDF,
+  colour fringe, rim in the persona's colour, fog by camera distance (4 → 15 units). Each pane sits
+  ahead of the camera's own pose at its point on the climb, so panes drift in and out of the dark.
+- **Engineer assembly** (`EngineerAssembly`): a laptop built in code (base, lid, 70 instanced keys,
+  trackpad, screen) whose parts hang loose half a section before the peak, fly together as the camera
+  reaches the section (`gather` = 1 − smoothstep(|c − c₀|, 0.22, 0.95)), unfold (lid 104°), power on
+  (boot line opens into the editor, key backlight), hold while |c − c₀| < 0.22, then drift apart ahead
+  again. The laptop's screen is a drawn editor of `fluid.ts` with tabs and a status bar;
+  `LAPTOP_SCREEN_SRC` swaps in Ratul's own screenshot once `public/hub/engineer/` has one.
+- **The doorway:** the lit screen is raycast against the pointer each frame (`state.portalHover`);
+  the Director toggles `html.is-portal-hover` + `--portal-c` so the cursor ring opens in the world's
+  colour. A tap (page `up` handler) → `enterWorld`: `state.portal = {slug, at}`; the Director flies the
+  camera into the screen over `PORTAL_LENGTH` 1.6 s (position lerps to 0.18 in front of the glass,
+  heading turns to face it, FOV −14°, parallax/drag fade out), the HTML fades (`is-entering`), the
+  world's colour rises over the last 0.6 s, then `personaHref` → full navigation to
+  `code.<root>` (or `router.push` on unrouted hosts). Scroll is locked while leaving.
+- Pointer-down now records the point too, so a finger tap (no move) can hit the doorway.
+- Narrow screens: the laptop moves toward the centre and further away (`anchor` depends on aspect).
+- Numeral "01" hidden in immersive mode (the objects carry the chapter now).
+- Screens use the site's mono face: `--font-geist-mono` read off the root; textures redraw on
+  `document.fonts.ready`.
+- Measured (Intel UHD, dev, Performance, 1440×860): 59–60 fps on the climb with the field, the laptop
+  and the fluid composer on. Verified by script: hover → `is-portal-hover`; click → flight → lands on
+  `http://code.ratulroy.localhost:3000/`.
+- Lessons: the camera's yaw is a left-handed turn (`dir = (sin yaw, ·, −cos yaw)`), so an object that
+  must face back along the path takes `rotation.y = −yaw` — the first build had every pane and the
+  laptop edge-on. Canvas rows count from the top; texture `v` from the bottom (atlas tile rows flipped).
+  Playwright screenshots take ~1.2 s on this machine: to inspect a 1.6 s flight, freeze it by giving
+  `state.portal.at` a getter.
+- Open for round C/D: the other five assemblies; returning from a world should land on that world's
+  section (today: hero); the drifting field is engineer-only, the gaps between personas are still rays.
+
+---
+
 ## Round A feedback, second pass (2026-11-04)
 
 Ratul's notes on 4451890, all addressed:

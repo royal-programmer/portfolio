@@ -9,12 +9,14 @@
  *   approach  the light comes at you, slow then fast (hold to slow time)
  *   impact    the strike · a white pillar stands up through you
  *   split     the camera rides the J; the pillar fans out and the white separates into colour
- *   climb     scroll: spiral up through the cone (rounds B–D fill the worlds)
+ *   climb     scroll: spiral up through the cone past the drifting field; each persona's objects
+ *             assemble and light up — a lit assembly is a doorway (tap it: the camera flies in)
  *
  * HTML owns all content (screen readers, no-JS and Normal mode get the whole
  * story). Scroll is smoothed by Lenis; text is choreographed with GSAP.
  */
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -25,14 +27,14 @@ import { ambient } from "@/lib/site/ambient-sound";
 import { DISPLAY_ROOT, HUB_COPY, personaIdentity } from "@/lib/site/brand";
 import { analyseDevice, type DeviceReport } from "@/lib/site/device";
 import type { Quality } from "@/lib/site/experience";
-import { PersonaLink } from "@/lib/site/persona-link";
+import { PersonaLink, personaHref } from "@/lib/site/persona-link";
 import { spectrumColor } from "@/lib/site/spectrum";
 import { useExperience } from "../../experience-provider";
 import { ModeSwitch, QualityMenu, QUALITY_LABEL, SoundToggle } from "../experience-controls";
 import { GateSkeleton, HeadsetGate, type LoadStatus } from "./headset-gate";
 import { LightCursor } from "./light-cursor";
 import { RefractionPoster } from "./refraction-poster";
-import { atLeast, createVrState, type Band, type Phase } from "./vr/state";
+import { PORTAL_LENGTH, atLeast, createVrState, type Band, type Phase, type World } from "./vr/state";
 
 const VrScene = dynamic(() => import("./vr/scene"), { ssr: false });
 
@@ -94,12 +96,16 @@ export function HubExperience({ chapters, upcoming }: Props) {
   const [blink, setBlink] = useState(false);
   /** False until the page knows how it will open — a void cover hides everything until then. */
   const [decided, setDecided] = useState(false);
+  /** The world being entered through its lit assembly (its colour fills the view, then we leave). */
+  const [entering, setEntering] = useState<World | null>(null);
+  const router = useRouter();
 
   const vr = useRef(createVrState());
   const lenisRef = useRef<Lenis | null>(null);
   const anchors = useRef<number[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
+  const enterRef = useRef<HTMLDivElement>(null);
   const eyeRef = useRef<SVGEllipseElement>(null);
   const heldOnce = useRef(false);
 
@@ -115,6 +121,11 @@ export function HubExperience({ chapters, upcoming }: Props) {
     [chapters, upcoming],
   );
   const sectionT = useMemo(() => sections.map((s) => (s.kind === "persona" ? s.t : null)), [sections]);
+  /** Where each persona peaks on the climb: its section's index is its scroll progress `c`. */
+  const worlds: World[] = useMemo(
+    () => sections.flatMap((s, i) => (s.kind === "persona" ? [{ slug: s.slug, t: s.t, c: i }] : [])),
+    [sections],
+  );
   const bands: Band[] = useMemo(
     () =>
       [...chapters.map((c) => ({ t: c.t, lit: true, slug: c.slug })), ...upcoming.map((u) => ({ t: u.t, lit: false, slug: u.slug }))].sort(
@@ -210,6 +221,25 @@ export function HubExperience({ chapters, upcoming }: Props) {
     [setPhase, touch],
   );
 
+  /** Through the doorway: the camera flies into the screen, the world's colour fills the view, we leave. */
+  const enterWorld = useCallback(
+    (slug: string) => {
+      const world = worlds.find((w) => w.slug === slug);
+      if (!world || vr.current.portal) return;
+      vr.current.portal = { slug, at: performance.now() };
+      vr.current.portalHover = null;
+      sessionFlag(true);
+      setEntering(world);
+      ambient.chime(1.5);
+      const target = personaHref(window.location.origin, world.slug as PersonaSlug);
+      window.setTimeout(() => {
+        if (target.crossOrigin) window.location.assign(target.href);
+        else router.push(target.href);
+      }, PORTAL_LENGTH * 1000);
+    },
+    [worlds, router],
+  );
+
   const goNormal = useCallback(() => {
     sessionFlag(true);
     setExperience("normal");
@@ -223,6 +253,17 @@ export function HubExperience({ chapters, upcoming }: Props) {
       setLeaving(false);
     }, 500);
   }, [setExperience, setPhase]);
+
+  // The world's colour rises over the last part of the flight in.
+  useEffect(() => {
+    const el = enterRef.current;
+    if (!entering || !el) return;
+    document.documentElement.classList.add("is-portal-hover");
+    const tw = gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.55, ease: "power2.in", delay: PORTAL_LENGTH - 0.6 });
+    return () => {
+      tw.kill();
+    };
+  }, [entering]);
 
   // Returning in the same session: land once ready.
   useEffect(() => {
@@ -396,8 +437,8 @@ export function HubExperience({ chapters, upcoming }: Props) {
     };
   }, []);
 
-  // Scroll is locked until the climb (or in Normal mode, once the gate is gone).
-  const scrollFree = gate === null && (experience === "normal" || phase === "climb");
+  // Scroll is locked until the climb (or in Normal mode, once the gate is gone), and again while leaving.
+  const scrollFree = gate === null && !entering && (experience === "normal" || phase === "climb");
   useEffect(() => {
     document.documentElement.classList.toggle("scroll-locked", !scrollFree);
     if (scrollFree) lenisRef.current?.start();
@@ -437,6 +478,9 @@ export function HubExperience({ chapters, upcoming }: Props) {
     };
     const down = (e: PointerEvent) => {
       if (e.button !== 0 || interactive(e.target) || !lookable()) return;
+      // A finger arrives without a move: the scene needs the point for the doorway test.
+      s.px = (e.clientX / window.innerWidth) * 2 - 1;
+      s.py = -((e.clientY / window.innerHeight) * 2 - 1);
       start = { x: e.clientX, y: e.clientY, yaw: s.yaw, pitch: s.pitch, id: e.pointerId, at: performance.now(), type: e.pointerType };
       holdTimer = window.setTimeout(() => {
         if (s.phase === "sky") return; // a long press before the light is called does nothing
@@ -450,6 +494,7 @@ export function HubExperience({ chapters, upcoming }: Props) {
       window.clearTimeout(holdTimer);
       const wasTap = !!start && !s.dragging && !s.holding && e && performance.now() - start.at < 400;
       if (wasTap && s.phase === "sky") startLight();
+      if (wasTap && s.phase === "climb" && s.portalHover) enterWorld(s.portalHover);
       if (s.dragging) s.lastDragEnd = performance.now();
       s.dragging = false;
       s.holding = false;
@@ -470,7 +515,7 @@ export function HubExperience({ chapters, upcoming }: Props) {
       window.removeEventListener("pointercancel", blur);
       window.removeEventListener("blur", blur);
     };
-  }, [immersiveLive, startLight]);
+  }, [immersiveLive, startLight, enterWorld]);
 
   // ---- Text choreography ------------------------------------------------------
   const textLive = experience === "normal" ? gate === null : introDone;
@@ -539,7 +584,7 @@ export function HubExperience({ chapters, upcoming }: Props) {
   return (
     <div
       ref={rootRef}
-      className={`hub-v3 relative bg-[var(--void)] text-[var(--ink)] ${immersiveLive ? "is-immersive" : "is-normal"} ${textLive ? "" : "is-quiet"}`}
+      className={`hub-v3 relative bg-[var(--void)] text-[var(--ink)] ${immersiveLive ? "is-immersive" : "is-normal"} ${textLive ? "" : "is-quiet"} ${entering ? "is-entering" : ""}`}
     >
       {/* ---------- Backdrop ---------- */}
       <div aria-hidden className="fixed inset-0 z-0">
@@ -552,6 +597,7 @@ export function HubExperience({ chapters, upcoming }: Props) {
               <VrScene
                 bands={bands}
                 sectionT={sectionT}
+                worlds={worlds}
                 state={vr}
                 quality={quality}
                 onPhaseEnd={onPhaseEnd}
@@ -699,6 +745,7 @@ export function HubExperience({ chapters, upcoming }: Props) {
         <GateSkeleton />
       </div>
       <div ref={flashRef} aria-hidden className="vr-flash fixed inset-0 z-40 opacity-0" />
+      {entering ? <div ref={enterRef} aria-hidden className="fixed inset-0 z-[46] opacity-0" style={{ backgroundColor: spectrumColor(entering.t, 70) }} /> : null}
       {blink ? (
         <svg aria-hidden className="vr-blink fixed inset-0 z-40 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
           <defs>

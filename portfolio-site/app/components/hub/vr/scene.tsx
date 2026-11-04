@@ -17,23 +17,25 @@ import { useEffect, useMemo, useRef, type MutableRefObject } from "react";
 import * as THREE from "three";
 import { ambient } from "@/lib/site/ambient-sound";
 import type { Quality } from "@/lib/site/experience";
+import { spectrumColor } from "@/lib/site/spectrum";
 import { VrContext, createClock, useVr, type VrClock } from "./clock";
+import { Worlds } from "./field";
 import { FluidEffect, FluidSim } from "./fluid";
 import { Headset } from "./headset";
 import { ApproachLight, Cone, Photons, Rays } from "./light";
 import { Dome, Stars } from "./sky";
 import { Space } from "./space";
-import { PHASE_LENGTH, type Band, type Phase, type VrState } from "./state";
-import { WORLD, clamp01, coneRadius, ease, easeInOut } from "./util";
+import { PHASE_LENGTH, PORTAL_LENGTH, type Band, type Phase, type VrState, type World } from "./state";
+import { clamp01, climbPose, ease, easeIn, easeInOut, makePose, WORLD } from "./util";
 
-export type QualityPreset = { dpr: number; bloomScale: number; msaa: number; photons: number; stars: number; rays: number };
+export type QualityPreset = { dpr: number; bloomScale: number; msaa: number; photons: number; stars: number; rays: number; slabs: number };
 
 /** Every level runs the composer (the fluid cursor lives there); Performance drops bloom and the extras. */
 export function qualityPreset(q: Quality): QualityPreset {
   const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
-  if (q === "best") return { dpr: Math.min(dpr, 2), bloomScale: 1, msaa: 4, photons: 6000, stars: 4200, rays: 420 };
-  if (q === "balanced") return { dpr: Math.min(dpr, 1.5), bloomScale: 0.5, msaa: 0, photons: 3200, stars: 3000, rays: 300 };
-  return { dpr: 1, bloomScale: 0, msaa: 2, photons: 1500, stars: 2200, rays: 180 };
+  if (q === "best") return { dpr: Math.min(dpr, 2), bloomScale: 1, msaa: 4, photons: 6000, stars: 4200, rays: 420, slabs: 34 };
+  if (q === "balanced") return { dpr: Math.min(dpr, 1.5), bloomScale: 0.5, msaa: 0, photons: 3200, stars: 3000, rays: 300, slabs: 26 };
+  return { dpr: 1, bloomScale: 0, msaa: 2, photons: 1500, stars: 2200, rays: 180, slabs: 18 };
 }
 
 const FOV = 40;
@@ -46,12 +48,13 @@ const J_PATH = new THREE.CatmullRomCurve3(
   false,
   "centripetal",
 );
-const CLIMB_BASE_Y = 3.2;
 
 type Props = {
   bands: Band[];
   /** Section kinds in page order; persona sections tint the sky. */
   sectionT: Array<number | null>;
+  /** Persona worlds on the climb (where each peaks, its colour). */
+  worlds: World[];
   state: MutableRefObject<VrState>;
   quality: Quality;
   /** The scene finished a fixed-length phase; the page moves to the next. */
@@ -63,9 +66,9 @@ type Props = {
   onFail: () => void;
 };
 
-function Director({ sectionT, onPhaseEnd }: { sectionT: Array<number | null>; onPhaseEnd: (p: Phase) => void }) {
+function Director({ sectionT, worlds, onPhaseEnd }: { sectionT: Array<number | null>; worlds: World[]; onPhaseEnd: (p: Phase) => void }) {
   const { clock, state } = useVr();
-  const live = useRef({ c: 0, px: 0, py: 0, yaw: 0, pitch: 0, fov: FOV, hover: false, tscale: "", sound: -1, ended: "" as Phase | "" });
+  const live = useRef({ c: 0, px: 0, py: 0, yaw: 0, pitch: 0, fov: FOV, hover: false, portalHover: null as string | null, tscale: "", sound: -1, ended: "" as Phase | "" });
   const tmp = useMemo(
     () => ({
       pos: new THREE.Vector3(),
@@ -73,6 +76,9 @@ function Director({ sectionT, onPhaseEnd }: { sectionT: Array<number | null>; on
       right: new THREE.Vector3(),
       up: new THREE.Vector3(0, 1, 0),
       look: new THREE.Vector3(),
+      pose: makePose(),
+      anchor: new THREE.Vector3(),
+      normal: new THREE.Vector3(),
     }),
     [],
   );
@@ -136,10 +142,17 @@ function Director({ sectionT, onPhaseEnd }: { sectionT: Array<number | null>; on
     k.tint = t ?? k.tint;
     k.tintAmount = THREE.MathUtils.damp(k.tintAmount, k.cone * (t === null ? 0.12 : 0.25 + 0.45 * near), 3, dt);
 
-    // Headset hover → page cursor; time scale → the cursor's "time ×0.27" and the sound.
+    // Headset / lit-assembly hover → page cursor; time scale → the cursor's "time ×0.27" and the sound.
     if (L.hover !== s.hover) {
       L.hover = s.hover;
       document.documentElement.classList.toggle("is-headset-hover", s.hover);
+    }
+    if (L.portalHover !== s.portalHover) {
+      L.portalHover = s.portalHover;
+      const root = document.documentElement;
+      root.classList.toggle("is-portal-hover", !!s.portalHover);
+      const w = worlds.find((x) => x.slug === s.portalHover);
+      if (w) root.style.setProperty("--portal-c", spectrumColor(w.t));
     }
     const tscale = k.scale.toFixed(2);
     if (tscale !== L.tscale) {
@@ -164,15 +177,32 @@ function Director({ sectionT, onPhaseEnd }: { sectionT: Array<number | null>; on
       pitch = WORLD.splitPitch * easeInOut(uu);
       yaw = -Math.PI / 2 * easeInOut(uu); // the horizontal look swings to +x, the helix tangent
     } else if (s.phase === "climb") {
-      const c = L.c;
-      const y = CLIMB_BASE_Y + c * WORLD.climbRise;
-      const theta = c * WORLD.climbTurn;
-      const rCone = coneRadius(y - WORLD.coneApex.y);
-      // Stay well inside the cone: the rays are the view, the wall is the horizon.
-      const r = THREE.MathUtils.lerp(0.3, rCone * 0.22, THREE.MathUtils.smoothstep(c, 0, 0.7));
-      tmp.pos.set(Math.sin(theta) * r, y, -Math.cos(theta) * r);
-      pitch = WORLD.splitPitch * (1 - THREE.MathUtils.smoothstep(c, 0, 1.05));
-      yaw = -Math.PI / 2 - theta; // along the tangent
+      const p = climbPose(L.c, tmp.pose);
+      tmp.pos.copy(p.pos);
+      pitch = p.pitch;
+      yaw = p.yaw;
+    }
+
+    // Through the doorway: the camera flies into the lit screen, straight on.
+    let into = 0;
+    if (s.portal && s.portalAnchor) {
+      const a = s.portalAnchor;
+      into = easeIn(clamp01((now - s.portal.at) / 1000 / PORTAL_LENGTH));
+      tmp.anchor.set(a.x, a.y, a.z);
+      tmp.normal.set(a.nx, a.ny, a.nz);
+      // End just in front of the glass, looking through it.
+      tmp.look.copy(tmp.anchor).addScaledVector(tmp.normal, 0.18);
+      tmp.pos.lerp(tmp.look, into);
+      const toward = tmp.dir.copy(tmp.anchor).sub(tmp.pos);
+      if (toward.lengthSq() > 1e-6) {
+        toward.normalize();
+        const wantYaw = Math.atan2(toward.x, -toward.z);
+        const wantPitch = Math.asin(THREE.MathUtils.clamp(toward.y, -1, 1));
+        let dy = wantYaw - yaw; // shortest turn
+        dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        yaw += dy * into;
+        pitch += (wantPitch - pitch) * into;
+      }
     }
 
     // Alive at rest: a slow breath; the approach adds a tremor as it rushes.
@@ -194,15 +224,16 @@ function Director({ sectionT, onPhaseEnd }: { sectionT: Array<number | null>; on
     L.yaw = THREE.MathUtils.damp(L.yaw, s.yaw, 6, dt);
     L.pitch = THREE.MathUtils.damp(L.pitch, s.pitch, 6, dt);
 
-    const totalYaw = yaw + L.yaw + L.px * 0.06;
-    const totalPitch = Math.min(1.5, pitch + L.pitch + L.py * 0.05);
+    const free = 1 - into;
+    const totalYaw = yaw + (L.yaw + L.px * 0.06) * free;
+    const totalPitch = Math.min(1.5, pitch + (L.pitch + L.py * 0.05) * free);
     tmp.dir.set(Math.sin(totalYaw) * Math.cos(totalPitch), Math.sin(totalPitch), -Math.cos(totalYaw) * Math.cos(totalPitch));
     camera.position.copy(tmp.pos);
     camera.lookAt(tmp.look.copy(tmp.pos).add(tmp.dir));
 
     // Lens: holding narrows the view; rushing widens it.
     const cam = camera as THREE.PerspectiveCamera;
-    L.fov = THREE.MathUtils.damp(L.fov, FOV - (1 - k.scale) * 6 + k.speed * 12, 3, dt);
+    L.fov = THREE.MathUtils.damp(L.fov, FOV - (1 - k.scale) * 6 + k.speed * 12 - into * 14, 3, dt);
     if (Math.abs(cam.fov - L.fov) > 0.01) {
       cam.fov = L.fov;
       cam.updateProjectionMatrix();
@@ -352,7 +383,7 @@ function ContextWatch({ onFail }: { onFail: () => void }) {
 // ---------------------------------------------------------------------------
 // Root
 // ---------------------------------------------------------------------------
-export default function VrScene({ sectionT, state, quality, onPhaseEnd, onWear, onReady, onStepDown, onStruggle, onFail }: Props) {
+export default function VrScene({ sectionT, worlds, state, quality, onPhaseEnd, onWear, onReady, onStepDown, onStruggle, onFail }: Props) {
   const clock = useRef<VrClock>(createClock());
   const preset = useMemo(() => qualityPreset(quality), [quality]);
   const px = 70 * preset.dpr;
@@ -366,7 +397,7 @@ export default function VrScene({ sectionT, state, quality, onPhaseEnd, onWear, 
       onCreated={({ gl }) => gl.setClearColor("#050507")}
     >
       <VrContext.Provider value={ctx}>
-        <Director sectionT={sectionT} onPhaseEnd={onPhaseEnd} />
+        <Director sectionT={sectionT} worlds={worlds} onPhaseEnd={onPhaseEnd} />
         <Governor quality={quality} onStepDown={onStepDown} onStruggle={onStruggle} />
         <Warmup onReady={onReady} />
         <ContextWatch onFail={onFail} />
@@ -379,6 +410,7 @@ export default function VrScene({ sectionT, state, quality, onPhaseEnd, onWear, 
         <Cone />
         <Rays count={preset.rays} />
         <Photons count={preset.photons} px={px} />
+        <Worlds worlds={worlds} slabs={preset.slabs} />
 
         <Effects preset={preset} />
       </VrContext.Provider>

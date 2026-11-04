@@ -486,6 +486,25 @@ html.is-headset-hover .light-cursor-ring::before {
 html.is-headset-hover canvas {
   cursor: none;
 }
+/* A lit assembly under the pointer is a doorway: the ring opens in that world's colour. */
+html.is-portal-hover .light-cursor-ring::before {
+  transform: scale(1.8);
+  border-color: color-mix(in srgb, var(--portal-c, var(--ink)) 90%, transparent);
+  background: color-mix(in srgb, var(--portal-c, var(--ink)) 14%, transparent);
+  box-shadow: 0 0 24px -2px color-mix(in srgb, var(--portal-c, var(--ink)) 60%, transparent);
+}
+/* On the climb the objects carry the chapter; the outlined numeral would fight them. */
+.hub-v3.is-immersive .hub-numeral {
+  display: none;
+}
+/* Leaving through a doorway: the words go first, the colour follows. */
+.hub-v3.is-entering main,
+.hub-v3.is-entering nav,
+.hub-v3.is-entering header {
+  opacity: 0;
+  transition: opacity 700ms var(--ease-in-out);
+  pointer-events: none;
+}
 
 /* ---------- Intro overlays ---------- */
 .vr-flash {

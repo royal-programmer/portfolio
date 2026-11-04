@@ -34,13 +34,40 @@ export const WORLD = {
   /** Height gained per page section while climbing. */
   climbRise: 9,
   /** Turn per section (radians). */
-  climbTurn: Math.PI * 0.9,
+  climbTurn: Math.PI * 0.5,
   /** Pitch the J ends on (radians up from level). */
   splitPitch: THREE.MathUtils.degToRad(78),
 };
 
 /** Radius of the cone at height h above the apex. */
 export const coneRadius = (h: number) => Math.max(0, h) * Math.tan(WORLD.coneHalfAngle);
+
+/** Height the J ends on; the climb starts here. */
+export const CLIMB_BASE_Y = 3.2;
+
+export type Pose = { pos: THREE.Vector3; yaw: number; pitch: number; fwd: THREE.Vector3; right: THREE.Vector3 };
+export const makePose = (): Pose => ({ pos: new THREE.Vector3(), yaw: 0, pitch: 0, fwd: new THREE.Vector3(), right: new THREE.Vector3() });
+
+/**
+ * Where the camera is and where it looks at climb progress `c` (page
+ * sections): a helix inside the cone, tilting from the J's pitch back to level.
+ * The object field is laid out against the same curve, so what the camera
+ * meets is always in front of it.
+ */
+export function climbPose(c: number, out: Pose = makePose()): Pose {
+  const y = CLIMB_BASE_Y + c * WORLD.climbRise;
+  const theta = c * WORLD.climbTurn;
+  const rCone = coneRadius(y - WORLD.coneApex.y);
+  // Stay well inside the cone: the rays are the view, the wall is the horizon.
+  const r = THREE.MathUtils.lerp(0.3, rCone * 0.22, THREE.MathUtils.smoothstep(c, 0, 0.7));
+  out.pos.set(Math.sin(theta) * r, y, -Math.cos(theta) * r);
+  out.pitch = WORLD.splitPitch * (1 - THREE.MathUtils.smoothstep(c, 0, 1.05));
+  out.yaw = -Math.PI / 2 - theta; // along the tangent
+  const cp = Math.cos(out.pitch);
+  out.fwd.set(Math.sin(out.yaw) * cp, Math.sin(out.pitch), -Math.cos(out.yaw) * cp);
+  out.right.set(Math.cos(out.yaw), 0, Math.sin(out.yaw));
+  return out;
+}
 
 export const SOFT_POINT_FRAGMENT = /* glsl */ `
 varying vec3 vColor;
