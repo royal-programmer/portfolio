@@ -992,6 +992,18 @@ em.font-display,
   transform: scale(1.9);
   opacity: 0;
 }
+/* A direct visit: the same window is the loader — it rises into place, holds, then lifts the same way. */
+.world-boot.is-direct .world-boot-frame {
+  transform: scale(1);
+  animation: world-boot-in 700ms var(--ease-out) both;
+}
+.world-boot.is-direct.is-lifting .world-boot-frame {
+  transform: scale(1.6);
+  opacity: 0;
+}
+@keyframes world-boot-in {
+  from { opacity: 0; transform: scale(0.96) translateY(10px); }
+}
 
 /* A world page opens dark: the cover lifts once it has drawn. */
 .world-boot {

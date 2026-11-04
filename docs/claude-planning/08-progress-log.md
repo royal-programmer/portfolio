@@ -5,6 +5,31 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Round C feedback, fourth pass: no two setups at once, panes out of the lane, world loaders (2026-11-05)
+
+- **Pass-through, root cause:** two setups shared the same volume — the one leaving (|d| up to 1.0)
+  and the next arriving both rode in front of the camera between chapters, and large flat parts
+  (desk, lid, base) crossed. Now a setup exists only over **|d| < 0.52** (presence 0.36 → 0.52,
+  gather 0.5 → 0.16, lock 0.22 → 0.08), so with chapters one section apart the leaving one is gone
+  before the next appears. Arriving setups come in low-right, leaving ones drift up-left. Loose
+  spread is wider (2.8 / 3.0, box ±3.2 × 2.0 × 1.8) and tumble is under half a turn (0.5), so big
+  parts keep clear while converging on radial paths. Not a collision solver: rare touches remain.
+- **Panes out of the lane:** while a setup gathers (c₀ − 0.6 … c₀ + 0.25) its panes keep to the left
+  (75 %) or far right (≥ 4.6 out); plus a 4.2-unit exclusion around the setup's spot.
+- **World loader on direct visits:** `WorldBoot` now opens every world page on its own window
+  (terminal / trade screen / viewfinder) — rising into place, holding 0.9 s, lifting with a zoom —
+  once per world per session; via the hub it is the continued zoom as before.
+- **Bike:** the Kawasaki ZX-6R on Sketchfab is "Free Standard" (not CC), 335 k faces, and needs a
+  Sketchfab/Epic login to download — not usable. Sketchfab downloads always need that login. Poly
+  Pizza downloads without login but its bikes are CC-BY 3.0, which needs attribution — a `/credits`
+  page linked from the footer would satisfy it (reasonable to the medium) if Ratul relaxes the
+  console-only rule. Decision pending.
+- Verified (window in front): key cloud → closed laptop → lit at c = 1.6 / 1.75 / 1.9; laptop base
+  leaving at 2.4 while the trader's first monitor arrives small and far at 2.6; desk lit at 2.85;
+  `code.` direct visit opens on the terminal frame (`world-boot is-direct`).
+
+---
+
 ## Round C feedback, third pass: no pops, one-piece blink, radial paths, less spin, zoom in, bike model path (2026-11-04)
 
 Ratul's six notes:

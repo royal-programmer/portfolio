@@ -142,16 +142,28 @@ export function Slabs({ world, count, atlas, tiles, width, aspect, span = SPAN, 
     const specs: SlabSpec[] = [];
     const pose = makePose();
     const tmp = new THREE.Vector3();
+    // Where the setup stands and the room it needs while it gathers: panes keep out of it.
+    const peak = climbPose(world.c);
+    const anchor = peak.pos.clone().addScaledVector(peak.fwd, 5).addScaledVector(peak.right, 1.4);
     for (let i = 0; i < count; i++) {
       // Each pane hangs ahead of the camera's pose at its own point of the climb
       // (the helix turns: "ahead" is where you look), more of them before the peak than after.
-      const u = rnd();
-      const c = world.c + (u < 0.65 ? -rnd() * span[0] : rnd() * span[1]);
+      let c = world.c;
+      for (let tries = 0; tries < 8; tries++) {
+        const u = rnd();
+        c = world.c + (u < 0.65 ? -rnd() * span[0] : rnd() * span[1]);
+        climbPose(c, pose);
+        // While the setup is gathering (it rides centre-right of the view, 5–10 units ahead) the
+        // panes keep to the left, or far out on the right: nothing crosses through it.
+        const gathering = c > world.c - 0.6 && c < world.c + 0.25;
+        const side = rnd() < (gathering ? 0.75 : 0.5) ? -1 : 1;
+        const off = (gathering && side > 0 ? 4.6 : 1.6) + rnd() * 4;
+        const up = (rnd() - 0.45) * 5;
+        tmp.copy(pose.pos).addScaledVector(pose.right, side * off).addScaledVector(pose.fwd, 3 + rnd() * 7).add(new THREE.Vector3(0, up, 0));
+        if (tmp.distanceTo(anchor) > 4.2) break;
+      }
       climbPose(c, pose);
-      const side = rnd() < 0.5 ? -1 : 1;
-      const off = 1.6 + rnd() * 4;
-      const up = (rnd() - 0.45) * 5;
-      tmp.copy(pose.pos).addScaledVector(pose.right, side * off).addScaledVector(pose.fwd, 3 + rnd() * 7).add(new THREE.Vector3(0, up, 0));
+      const side = tmp.clone().sub(pose.pos).dot(pose.right) < 0 ? -1 : 1;
       // Face back along the path (the camera's yaw is a left-handed turn; Ry needs its negative).
       const yaw = -pose.yaw + side * (0.35 + rnd() * 0.3);
       const w = width[0] + rnd() * (width[1] - width[0]);

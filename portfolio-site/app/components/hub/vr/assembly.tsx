@@ -88,17 +88,18 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
       const dir = home.clone().add(new THREE.Vector3((rnd() - 0.5) * 0.8, (rnd() - 0.5) * 0.8, (rnd() - 0.5) * 0.8));
       if (dir.lengthSq() < 1e-4) dir.set(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5);
       dir.normalize();
-      const out = home.clone().addScaledVector(dir, spread * (0.6 + rnd() * 0.6));
-      out.x = THREE.MathUtils.clamp(out.x, -2.8, 2.8);
-      out.y = THREE.MathUtils.clamp(out.y, -1.4, 1.8);
-      out.z = THREE.MathUtils.clamp(out.z, -1.6, 1.2);
+      const out = home.clone().addScaledVector(dir, spread * (0.7 + rnd() * 0.6));
+      out.x = THREE.MathUtils.clamp(out.x, -3.2, 3.2);
+      out.y = THREE.MathUtils.clamp(out.y, -1.6, 2.0);
+      out.z = THREE.MathUtils.clamp(out.z, -1.8, 1.4);
       return out;
     };
     return homes.map((home) => ({
-      scatterIn: scatter(home, 2.2),
-      scatterOut: scatter(home, 2.4),
+      scatterIn: scatter(home, 2.8),
+      scatterOut: scatter(home, 3.0),
       home,
-      spin: new THREE.Vector3(rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1).multiplyScalar(0.9),
+      // Under half a turn while loose: big flat parts keep clear of each other.
+      spin: new THREE.Vector3(rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1).multiplyScalar(0.5),
       seed: rnd(),
     }));
   }, [world.c, homes]);
@@ -125,13 +126,15 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
     const d = k.climb - world.c;
     // Shown only around its own chapter; it grows in from far and small, and shrinks away again —
     // nothing pops.
-    const shown = s.phase === "climb" && Math.abs(d) < 1.0;
+    // Windows are tight and do not overlap between neighbours (chapters are one section apart):
+    // a setup exists over |d| < 0.52, so the one leaving is gone before the next one appears.
+    const shown = s.phase === "climb" && Math.abs(d) < 0.52;
     g.visible = shown;
     if (!shown) return;
-    const presence = 1 - THREE.MathUtils.smoothstep(Math.abs(d), 0.72, 1.0);
+    const presence = 1 - THREE.MathUtils.smoothstep(Math.abs(d), 0.36, 0.52);
 
-    // gather: 0 scattered → 1 assembled; the parts meet over the section before, hold, then leave.
-    const gather = 1 - THREE.MathUtils.smoothstep(Math.abs(d), 0.22, 0.95);
+    // gather: 0 scattered → 1 assembled; the parts meet over the half section before, hold, then leave.
+    const gather = 1 - THREE.MathUtils.smoothstep(Math.abs(d), 0.16, 0.5);
     const g3 = easeInOut(gather);
     const open = THREE.MathUtils.smoothstep(gather, 0.55, 1);
     const powerTarget = gather > 0.985 ? 1 : 0;
@@ -146,13 +149,17 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
     // fixed spot in the world. Past the chapter it loosens again, still in view, then fades.
     // It follows the camera until the chapter is close (|d| < 0.2 sections), then glides onto its
     // spot: locking earlier would put the fixed spot (further along the helix) out of the frame.
-    const lock = 1 - THREE.MathUtils.smoothstep(Math.abs(d), 0.08, 0.2);
+    const lock = 1 - THREE.MathUtils.smoothstep(Math.abs(d), 0.08, 0.22);
     const cEff = world.c + (k.climb - world.c) * (1 - lock);
     climbPose(cEff, tmp.pose);
     // Far from its chapter it hangs further ahead and smaller; it comes up to arm's length as it gathers.
-    const far = (1 - presence) * 6 + (1 - g3) * 2.5;
-    tmp.at.copy(tmp.pose.pos).addScaledVector(tmp.pose.fwd, frame.fwd + far).addScaledVector(tmp.pose.right, frame.right);
-    tmp.at.y += frame.up;
+    // Arriving setups come in low and from the right; leaving ones drift up and to the left — so a
+    // world on its way out and the next one on its way in never share the same space.
+    const far = (1 - presence) * 5 + (1 - g3) * 2.0;
+    const loose = 1 - g3;
+    const side = d < 0 ? 1 : -1.2;
+    tmp.at.copy(tmp.pose.pos).addScaledVector(tmp.pose.fwd, frame.fwd + far).addScaledVector(tmp.pose.right, frame.right + side * loose * 1.6);
+    tmp.at.y += frame.up + (d < 0 ? -1.0 : 1.8) * loose;
     g.position.copy(tmp.at);
     g.position.y += Math.sin(t * 0.5) * 0.04;
     g.scale.setScalar(0.05 + 0.95 * easeInOut(presence));
