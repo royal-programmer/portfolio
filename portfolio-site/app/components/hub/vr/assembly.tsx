@@ -21,7 +21,7 @@ import * as THREE from "three";
 import { SPECTRUM_GLSL } from "@/lib/site/spectrum";
 import { useVr } from "./clock";
 import type { World } from "./state";
-import { climbPose, clamp01, easeInOut, seeded } from "./util";
+import { climbPose, clamp01, easeInOut, makePose, seeded } from "./util";
 
 export type Part = { scatterIn: THREE.Vector3; scatterOut: THREE.Vector3; home: THREE.Vector3; spin: THREE.Vector3; seed: number };
 
@@ -81,19 +81,13 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
 
   const parts = useMemo<Part[]>(() => {
     const rnd = seeded(7 + Math.round(world.c * 13));
-    // Loose parts hang ahead of the camera half a section before (and after) the peak,
-    // so they are in view while they fly together, and as they drift apart again.
-    const before = climbPose(world.c - 0.55);
-    const after = climbPose(world.c + 0.55);
-    const scatter = (pose: ReturnType<typeof climbPose>, spread: number) =>
-      pose.pos
-        .clone()
-        .addScaledVector(pose.right, (rnd() * 2 - 1) * spread)
-        .addScaledVector(pose.fwd, 3 + rnd() * 7)
-        .add(new THREE.Vector3(0, (rnd() - 0.4) * spread, 0));
+    // Loose positions, in the setup's own frame: a cloud around it that fits the view at the
+    // setup's distance (±2.6 across, ±1.6 up, a little depth), one for arriving, one for leaving.
+    const scatter = (spread: number) =>
+      new THREE.Vector3((rnd() * 2 - 1) * spread, (rnd() * 2 - 1) * spread * 0.6 + 0.3, (rnd() * 2 - 1) * spread * 0.5);
     return homes.map((home) => ({
-      scatterIn: scatter(before, 4.5),
-      scatterOut: scatter(after, 5.5),
+      scatterIn: scatter(2.6),
+      scatterOut: scatter(2.9),
       home,
       spin: new THREE.Vector3(rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1).multiplyScalar(2.5),
       seed: rnd(),
@@ -103,9 +97,15 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
   const tint = useMemo(() => new THREE.Color().setHSL(((world.t * 285 - 15) / 360 + 1) % 1, 0.9, 0.62), [world.t]);
   const mats = useLitMats();
   const tmp = useMemo(
-    () => ({ p: new THREE.Vector3(), q: new THREE.Quaternion(), ray: new THREE.Raycaster(), ndc: new THREE.Vector2(), n: new THREE.Vector3(), w: new THREE.Vector3() }),
+    () => ({ p: new THREE.Vector3(), q: new THREE.Quaternion(), ray: new THREE.Raycaster(), ndc: new THREE.Vector2(), n: new THREE.Vector3(), w: new THREE.Vector3(), pose: makePose(), at: new THREE.Vector3() }),
     [],
   );
+  // The frame offsets, resolved once (aspect-aware), reused to follow the camera while loose.
+  const frame = useMemo(() => {
+    const aspect = size.width / Math.max(1, size.height);
+    const narrow = THREE.MathUtils.clamp(1.67 / aspect, 1, 2.2);
+    return { fwd: (offset?.fwd ?? 5) + (narrow - 1) * 2.2, right: (offset?.right ?? 1.4) / narrow, up: (offset?.up ?? -0.3) + (narrow - 1) * 1.1 };
+  }, [size.width, size.height, offset?.fwd, offset?.right, offset?.up]);
   const L = useMemo<AssemblyLive>(() => ({ gather: 0, g3: 0, open: 0, power: 0, hover: 0, t: 0, d: -9 }), []);
 
   useFrame(() => {
@@ -126,21 +126,32 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
     const powerTarget = gather > 0.985 ? 1 : 0;
     const lv = live.current;
     lv.power = THREE.MathUtils.damp(lv.power, powerTarget, powerTarget ? 1.6 : 5, k.dt);
+    // Coming back out of this screen: it is on already, no boot.
+    if (s.portalOut?.slug === world.slug && powerTarget) lv.power = 1;
     const t = k.t;
 
-    // The whole assembly: anchored, breathing.
-    g.position.copy(anchor.pos);
+    // Entropy in frame (Ratul's call): while the parts are loose the whole setup rides in front
+    // of the camera — wherever it is on the climb — and as the chapter arrives it settles onto its
+    // fixed spot in the world. Past the chapter it loosens again, still in view, then fades.
+    // It follows the camera until the chapter is close (|d| < 0.2 sections), then glides onto its
+    // spot: locking earlier would put the fixed spot (further along the helix) out of the frame.
+    const lock = 1 - THREE.MathUtils.smoothstep(Math.abs(d), 0.08, 0.2);
+    const cEff = world.c + (k.climb - world.c) * (1 - lock);
+    climbPose(cEff, tmp.pose);
+    tmp.at.copy(tmp.pose.pos).addScaledVector(tmp.pose.fwd, frame.fwd).addScaledVector(tmp.pose.right, frame.right);
+    tmp.at.y += frame.up;
+    g.position.copy(tmp.at);
     g.position.y += Math.sin(t * 0.5) * 0.04;
-    g.rotation.set(Math.sin(t * 0.33) * 0.02, anchor.yaw + Math.sin(t * 0.21) * 0.03, Math.sin(t * 0.27) * 0.015);
+    const yawEff = -tmp.pose.yaw + (yawOffset ?? 0);
+    g.rotation.set(Math.sin(t * 0.33) * 0.02, yawEff + Math.sin(t * 0.21) * 0.03, Math.sin(t * 0.27) * 0.015);
 
     const place = (obj: THREE.Object3D, i: number, late = 0) => {
       const part = parts[i];
       if (!part) return;
+      // Loose positions are in the setup's own frame — a cloud around it, inside the view.
       const from = d < 0 ? part.scatterIn : part.scatterOut;
-      // Scatter positions are world space; bring them into the assembly's frame.
       tmp.w.copy(from);
-      g.worldToLocal(tmp.w);
-      tmp.w.addScaledVector(tmp.p.set(Math.sin(t * 0.3 + part.seed * 20), Math.sin(t * 0.27 + part.seed * 9), Math.cos(t * 0.23 + part.seed * 14)), 0.4);
+      tmp.w.addScaledVector(tmp.p.set(Math.sin(t * 0.3 + part.seed * 20), Math.sin(t * 0.27 + part.seed * 9), Math.cos(t * 0.23 + part.seed * 14)), 0.3);
       // Some parts arrive a touch later than the body, each in its own time.
       const gk = late > 0 ? easeInOut(clamp01((gather - late * part.seed) / (1 - late * part.seed))) : g3;
       obj.position.lerpVectors(tmp.w, part.home, gk);
@@ -178,7 +189,7 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
       s.portalHover = hover;
     }
     // Tell the Director where the screen is, for the fly-in.
-    if (first && lv.power > 0.5 && (!s.portal || s.portal.slug === world.slug)) {
+    if (first && lv.power > 0.5 && (!s.portal || s.portal.slug === world.slug) && (!s.portalOut || s.portalOut.slug === world.slug)) {
       first.getWorldPosition(tmp.w);
       tmp.n.set(0, 0, 1).applyQuaternion(first.getWorldQuaternion(tmp.q));
       s.portalAnchor = { x: tmp.w.x, y: tmp.w.y, z: tmp.w.z, nx: tmp.n.x, ny: tmp.n.y, nz: tmp.n.z };

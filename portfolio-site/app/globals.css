@@ -558,6 +558,15 @@ html.is-portal-hover .light-cursor-ring::before {
   pointer-events: none;
 }
 
+/* The eyes open: the scene starts soft and pulls into focus. */
+.hub-v3 canvas {
+  transition: filter 1400ms var(--ease-out);
+}
+html.is-focusing .hub-v3 canvas {
+  filter: blur(14px);
+  transition-duration: 0ms;
+}
+
 /* ---------- Intro overlays ---------- */
 .vr-flash {
   pointer-events: none;
@@ -963,6 +972,33 @@ em.font-display,
   border: 3px solid #f3f1ec;
   opacity: 0;
   pointer-events: none;
+}
+
+/* The photographer's live view behind the grid. */
+.vf-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+/* Back on the hub: the finished window shrinks away as the camera pulls out of the screen. */
+.hub-return {
+  pointer-events: none;
+  animation: hub-return var(--dur, 1.1s) var(--ease-in-out) forwards;
+}
+@keyframes hub-return {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.22); }
+}
+/* Arriving through the doorway: the same window, which zooms in and dissolves into the page. */
+.world-boot-frame {
+  transition: transform 700ms var(--ease-in-out), opacity 600ms var(--ease-in-out);
+}
+.world-boot.is-lifting .world-boot-frame {
+  transform: scale(1.12);
+  opacity: 0;
 }
 
 /* A world page opens dark: the cover lifts once it has drawn. */

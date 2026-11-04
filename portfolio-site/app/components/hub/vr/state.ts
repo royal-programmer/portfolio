@@ -50,12 +50,16 @@ export type VrState = {
   portalAnchor: { x: number; y: number; z: number; nx: number; ny: number; nz: number } | null;
   /** The visitor clicked a lit assembly: the camera flies into its screen, then the page leaves. */
   portal: { slug: string; at: number } | null;
+  /** Back from a world: the camera starts inside that screen and pulls out to the chapter. */
+  portalOut: { slug: string; at: number } | null;
   /** Lens: 0 normal, +1 pulled wide (watch the assembly whole), −0.5 tight. Keys − / + / 0. */
   zoom: number;
 };
 
-/** Seconds from the click on a lit assembly to the page leaving for its world. */
-export const PORTAL_LENGTH = 1.6;
+/** Seconds the camera takes to fly into a lit screen (the world's own sequence follows). */
+export const PORTAL_LENGTH = 0.8;
+/** Seconds the camera takes to pull back out of a screen when you return from its world. */
+export const PORTAL_OUT_LENGTH = 1.1;
 
 /** A persona world on the climb: where on the scroll it peaks, and its colour. */
 export type World = { slug: string; t: number; c: number };
@@ -78,6 +82,7 @@ export function createVrState(): VrState {
     portalHover: null,
     portalAnchor: null,
     portal: null,
+    portalOut: null,
     zoom: 0,
   };
 }

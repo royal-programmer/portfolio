@@ -5,6 +5,44 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Round C feedback, second pass: entropy in frame, doorway timing both ways, blink, bike (2026-11-04)
+
+Ratul's notes (seven points + drag + résumé for the terminal), all in:
+- **Entropy in frame** (`assembly.tsx`): while loose, the whole setup rides in front of the camera
+  wherever it is on the climb (`cEff` follows `k.climb`), the parts a cloud around it (±2.6 across,
+  ±1.6 up) inside the view; it locks onto its world spot only when the chapter is close
+  (`lock = 1 − smoothstep(|d|, 0.08, 0.2)`) and loosens again, still in view, past it. Locking by the
+  gather curve put the spot (sections further along the helix) out of frame — seen at c = 1.65.
+- **Doorway out:** the flight is 0.8 s (`PORTAL_LENGTH`), the cover rises in its last 0.3 s, and every
+  sequence waits `delay` = the flight before it starts, so nothing types before the screen fills.
+  The page leaves when the sequence ends. The world page opens on the **same finished window**
+  (`ExitFrame` inside `WorldBoot`, via `?via=hub`), which zooms in and dissolves — one motion
+  across two hosts. Without `via=hub` the cover is the small light.
+- **Doorway in** (back to the hub): `state.portalOut` — the camera starts inside the screen you left
+  and pulls out over 1.1 s (`PORTAL_OUT_LENGTH`); that setup is lit at once; the finished window
+  shrinks away over the scene (`.hub-return`). Landing already scrolled to that chapter.
+- **Blink:** feathered lids (radial-gradient ellipse in the mask, 45 % soft) and the scene starts
+  blurred and pulls into focus (`html.is-focusing` → canvas `filter: blur(14px)` → 0 over 1.4 s).
+- **Camera:** revolves slowly with the lens toward you while loose, turns to present the display
+  (three-quarter) as it opens.
+- **Photo exit:** a real live view when `public/hub/photographer/` has a photo — soft and blown out,
+  pulling sharp and settling (blur 18 → 0, brightness 1.9 → 1) while the bracket hunts and locks and
+  the settings tick to 400 · 1/250 · f/2.8; then the shutter. Without photos: the abstract light.
+- **Terminal:** `whoami`, `cat stack`, `uptime` from the résumé (2 years in production, 200+ users on
+  the last rebuild, 11 automations), `git log --oneline -1` = the real build commit
+  (`NEXT_PUBLIC_COMMIT` from `next.config.ts`: Vercel's env on deploys, git locally), `ls /engineer`
+  of published entries, `open royal-programmer`. Faster keys (13–31 ms). Dry, true, no fake output.
+- **Drag** is first-person now: drag right → look right.
+- **Bike:** no CC0 superbike exists (Poly Pizza's are CC-BY 3.0, Sketchfab's sport bikes CC-BY), so
+  it is a stylised sport bike in code — fairing, nose, tank, seat hump, belly pan, twin exhausts,
+  clip-ons, five-spoke wheels — with the kit: helmet with visor, tank bag, pannier, gloves, intercom.
+- **Artist:** a sheet lands on the canvas (late part) before the strokes paint in.
+- Verified: cloud → laptop → lit at c = 1.5 / 1.7 / 1.85, all in frame; exit cover rises after the
+  flight, terminal types, code page opens on the finished terminal; return lands on the chapter.
+- Media: no limit; 16 per persona per visit, random pick; keep files ≲ 2 MB.
+
+---
+
 ## Doorway sequences, dark world covers, media manifest (2026-11-04)
 
 Ratul's notes on the switch (slow, thin, wants typing / a chart playing out / a shutter):

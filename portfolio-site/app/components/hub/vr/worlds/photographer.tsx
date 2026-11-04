@@ -20,6 +20,7 @@ const LCD_H = 0.56;
 
 export function PhotographerAssembly({ world }: { world: World }) {
   const root = useRef<THREE.Group>(null);
+  const turn = useRef<THREE.Group>(null);
   const refs = useMemo(() => [0, 1, 2, 3, 4].map(() => ({ current: null as THREE.Group | null })), []);
   const lcd = useRef<THREE.Mesh>(null);
   const screens = useMemo(() => [lcd], []);
@@ -58,10 +59,16 @@ export function PhotographerAssembly({ world }: { world: World }) {
     screens,
     homes,
     screenMats,
-    yaw: 0.62,
     offset: { fwd: 4.6, right: 1.3, up: -0.1 },
     onFrame: (L, place) => {
       refs.forEach((r, i) => r.current && place(r.current, i));
+      // Loose: it revolves slowly with the lens toward you. Assembled: it turns to present the
+      // display (three-quarter, so the lens still shows on the left).
+      if (turn.current) {
+        const present = easeInOut(L.open);
+        turn.current.rotation.y = THREE.MathUtils.lerp(Math.PI + Math.sin(L.t * 0.35) * 0.5, 0.62, present) + (1 - L.g3) * L.t * 0.4;
+        turn.current.rotation.x = (1 - present) * Math.sin(L.t * 0.27) * 0.25;
+      }
       // The lens arrives in front of the mount and screws on: in along its axis, turning.
       const lens = refs[3].current;
       if (lens) {
@@ -74,6 +81,7 @@ export function PhotographerAssembly({ world }: { world: World }) {
 
   return (
     <group ref={root}>
+      <group ref={turn}>
       <group ref={(el) => void (refs[0].current = el)}>
         <mesh geometry={geo.body} material={mats.shell} />
         {/* Back display (+z, toward you). */}
@@ -97,6 +105,7 @@ export function PhotographerAssembly({ world }: { world: World }) {
       </group>
       <group ref={(el) => void (refs[4].current = el)}>
         <mesh geometry={geo.button} material={mats.glow} />
+      </group>
       </group>
     </group>
   );

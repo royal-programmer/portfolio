@@ -25,7 +25,7 @@ import { Headset } from "./headset";
 import { ApproachLight, Cone, Photons, Rays } from "./light";
 import { Dome, Stars } from "./sky";
 import { Space } from "./space";
-import { PHASE_LENGTH, PORTAL_LENGTH, type Band, type Phase, type VrState, type World } from "./state";
+import { PHASE_LENGTH, PORTAL_LENGTH, PORTAL_OUT_LENGTH, type Band, type Phase, type VrState, type World } from "./state";
 import { clamp01, climbPose, ease, easeIn, easeInOut, makePose, WORLD } from "./util";
 
 export type QualityPreset = { dpr: number; bloomScale: number; msaa: number; photons: number; stars: number; rays: number; slabs: number };
@@ -134,6 +134,8 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
     } else {
       k.cone = k.spread = k.chroma = 0;
     }
+    // Back from a world we land on its chapter: no ride up from the start of the climb.
+    if (s.portalOut && Math.abs(L.c - s.c) > 0.3) L.c = s.c;
     L.c = THREE.MathUtils.damp(L.c, s.c, 3.4, dt);
     k.climb = s.phase === "climb" ? L.c : 0;
 
@@ -186,11 +188,17 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
       yaw = p.yaw;
     }
 
-    // Through the doorway: the camera flies into the lit screen, straight on.
+    // Through the doorway: the camera flies into the lit screen, straight on — and back out
+    // of it when you return from that world.
     let into = 0;
-    if (s.portal && s.portalAnchor) {
+    if (s.portal) into = easeIn(clamp01((now - s.portal.at) / 1000 / PORTAL_LENGTH));
+    else if (s.portalOut) {
+      const u = clamp01((now - s.portalOut.at) / 1000 / PORTAL_OUT_LENGTH);
+      into = 1 - easeInOut(u);
+      if (u >= 1) s.portalOut = null;
+    }
+    if (into > 0 && s.portalAnchor) {
       const a = s.portalAnchor;
-      into = easeIn(clamp01((now - s.portal.at) / 1000 / PORTAL_LENGTH));
       tmp.anchor.set(a.x, a.y, a.z);
       tmp.normal.set(a.nx, a.ny, a.nz);
       // End just in front of the glass, looking through it.

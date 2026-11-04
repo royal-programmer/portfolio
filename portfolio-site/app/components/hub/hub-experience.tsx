@@ -31,11 +31,11 @@ import { PersonaLink, personaHref } from "@/lib/site/persona-link";
 import { spectrumColor } from "@/lib/site/spectrum";
 import { useExperience } from "../../experience-provider";
 import { ModeSwitch, QualityMenu, QUALITY_LABEL, SoundToggle } from "../experience-controls";
-import { ExitSequence } from "./exit-sequence";
+import { ExitFrame, ExitSequence } from "./exit-sequence";
 import { GateSkeleton, HeadsetGate, type LoadStatus } from "./headset-gate";
 import { LightCursor } from "./light-cursor";
 import { RefractionPoster } from "./refraction-poster";
-import { atLeast, createVrState, type Band, type Phase, type World } from "./vr/state";
+import { PORTAL_LENGTH, PORTAL_OUT_LENGTH, atLeast, createVrState, type Band, type Phase, type World } from "./vr/state";
 
 const VrScene = dynamic(() => import("./vr/scene"), { ssr: false });
 
@@ -101,7 +101,21 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   const [decided, setDecided] = useState(false);
   /** The world being entered through its lit assembly (its colour fills the view, then we leave). */
   const [entering, setEntering] = useState<World | null>(null);
+  /** The world just returned from: its finished window shrinks away as the camera pulls out. */
+  const [returning, setReturning] = useState<World | null>(null);
+  /** public/hub/media.json: Ratul's own pictures per persona (the photographer's sequence uses one). */
+  const [media, setMedia] = useState<Partial<Record<string, string[]>>>({});
   const router = useRouter();
+  useEffect(() => {
+    let live = true;
+    fetch("/hub/media.json", { cache: "no-cache" })
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((m) => live && setMedia(m))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
 
   const vr = useRef(createVrState());
   const lenisRef = useRef<Lenis | null>(null);
@@ -185,16 +199,21 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     } catch {}
     if (from) {
       const el = document.getElementById(from);
-      if (el) {
+      const world = worlds.find((w) => w.slug === from);
+      if (el && world) {
         const y = el.offsetTop + el.offsetHeight / 2 - window.innerHeight / 2;
         requestAnimationFrame(() => {
           window.scrollTo(0, y);
           lenisRef.current?.scrollTo(y, { immediate: true, force: true });
-          vr.current.c = Math.max(0, sections.findIndex((s) => s.kind === "persona" && s.slug === from));
+          vr.current.c = world.c;
+          // Start inside the screen you left and pull back out to the chapter.
+          vr.current.portalOut = { slug: from!, at: performance.now() + 200 };
+          setReturning(world);
+          window.setTimeout(() => setReturning(null), PORTAL_OUT_LENGTH * 1000 + 300);
         });
       }
     }
-  }, [setPhase, sections]);
+  }, [setPhase, sections, worlds]);
 
   const wear = useCallback(() => {
     if (status !== "ready") return;
@@ -269,8 +288,10 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   const leaveForWorld = useCallback(() => {
     if (!entering) return;
     const target = personaHref(window.location.origin, entering.slug as PersonaSlug);
-    if (target.crossOrigin) window.location.assign(target.href);
-    else router.push(target.href);
+    // `via=hub`: the world opens on the same finished window, so the two pages read as one motion.
+    const href = target.href + (target.href.includes("?") ? "&" : "?") + "via=hub";
+    if (target.crossOrigin) window.location.assign(href);
+    else router.push(href);
   }, [entering, router]);
 
   const goNormal = useCallback(() => {
@@ -292,7 +313,8 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     const el = enterRef.current;
     if (!entering || !el) return;
     document.documentElement.classList.add("is-portal-hover");
-    const tw = gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.45, ease: "power2.in", delay: 0.4 });
+    // The cover rises as the screen fills the view (the flight is PORTAL_LENGTH).
+    const tw = gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.in", delay: PORTAL_LENGTH - 0.3 });
     return () => {
       tw.kill();
     };
@@ -341,10 +363,16 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   useEffect(() => {
     if (phase !== "blink" || !eyeRef.current) return;
     const tl = gsap.timeline();
-    tl.fromTo(eyeRef.current, { attr: { rx: 0, ry: 0 } }, { attr: { rx: 95, ry: 14 }, duration: 0.55, ease: "power2.inOut", delay: 0.3 });
-    tl.to(eyeRef.current, { attr: { rx: 160, ry: 160 }, duration: 0.7, ease: "power3.in" });
+    // The gradient feathers the last 45 % of the ellipse, so it opens a touch larger than the view.
+    tl.fromTo(eyeRef.current, { attr: { rx: 0, ry: 0 } }, { attr: { rx: 120, ry: 22 }, duration: 0.6, ease: "power2.inOut", delay: 0.3 });
+    tl.to(eyeRef.current, { attr: { rx: 220, ry: 220 }, duration: 0.8, ease: "power3.in" });
+    // Eyes pull into focus as the lids open.
+    document.documentElement.classList.add("is-focusing");
+    const focus = window.setTimeout(() => document.documentElement.classList.remove("is-focusing"), 1800);
     return () => {
       tl.kill();
+      window.clearTimeout(focus);
+      document.documentElement.classList.remove("is-focusing");
     };
   }, [phase]);
   useEffect(() => {
@@ -528,8 +556,9 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         }
       }
       if (s.dragging) {
-        s.yaw = start.yaw - dx * 0.0042;
-        s.pitch = Math.max(-0.6, Math.min(0.6, start.pitch - dy * 0.0032));
+        // Drag right → look right, drag up → look up (first-person, Ratul's call).
+        s.yaw = start.yaw + dx * 0.0042;
+        s.pitch = Math.max(-0.6, Math.min(0.6, start.pitch + dy * 0.0032));
       }
     };
     const down = (e: PointerEvent) => {
@@ -805,15 +834,25 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       <div ref={flashRef} aria-hidden className="vr-flash fixed inset-0 z-40 opacity-0" />
       {entering ? (
         <div ref={enterRef} aria-hidden className="hub-enter fixed inset-0 z-[46] flex items-center justify-center opacity-0" style={{ "--c": spectrumColor(entering.t) } as CSSProperties}>
-          <ExitSequence world={entering} items={terminalItems} onDone={leaveForWorld} />
+          <ExitSequence world={entering} items={terminalItems} photo={media.photographer?.[0] ? `/hub/photographer/${media.photographer[0]}` : undefined} delay={Math.round(PORTAL_LENGTH * 1000)} onDone={leaveForWorld} />
+        </div>
+      ) : null}
+      {returning ? (
+        <div aria-hidden className="hub-return fixed inset-0 z-[46] flex items-center justify-center" style={{ "--dur": `${PORTAL_OUT_LENGTH}s` } as CSSProperties}>
+          <ExitFrame slug={returning.slug as PersonaSlug} t={returning.t} items={terminalItems} photo={media.photographer?.[0] ? `/hub/photographer/${media.photographer[0]}` : undefined} />
         </div>
       ) : null}
       {blink ? (
         <svg aria-hidden className="vr-blink fixed inset-0 z-40 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
           <defs>
+            {/* Soft lids: the opening is feathered, not cut. */}
+            <radialGradient id="vr-eye-soft">
+              <stop offset="55%" stopColor="#000" />
+              <stop offset="100%" stopColor="#fff" />
+            </radialGradient>
             <mask id="vr-eye">
               <rect width="100" height="100" fill="#fff" />
-              <ellipse ref={eyeRef} cx="50" cy="50" rx="0" ry="0" fill="#000" />
+              <ellipse ref={eyeRef} cx="50" cy="50" rx="0" ry="0" fill="url(#vr-eye-soft)" />
             </mask>
           </defs>
           <rect width="100" height="100" fill="#050507" mask="url(#vr-eye)" />
