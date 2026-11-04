@@ -3,8 +3,9 @@
  *
  *   node scripts/hub-media.mjs        (also runs before `next build` / `next dev` via package.json)
  *
- * Scans public/hub/<persona>/ for images and writes public/hub/media.json:
- *   { "engineer": ["vscode-1.webp", …], "photographer": ["…"], … }
+ * Scans public/hub/<persona>/ for images (and public/hub/models/ for .glb files)
+ * and writes public/hub/media.json:
+ *   { "models": ["bike.glb"], "engineer": ["vscode-1.webp", …], "photographer": ["…"], … }
  * The scene reads that file; nothing else needs to change when files are added.
  * Images are served through Next's image optimizer, so size on disk is not a
  * concern for the scene — keep them under ~1 MB each anyway for git's sake.
@@ -19,6 +20,12 @@ const PERSONAS = ["engineer", "trader", "photographer", "artist", "ride", "gamer
 const IMAGE = /\.(jpe?g|png|webp|avif)$/i;
 
 const out = {};
+// 3D models (CC0 only — see docs/claude-planning/15-credits.md): public/hub/models/*.glb
+try {
+  out.models = readdirSync(join(root, "models")).filter((f) => /\.glb$/i.test(f)).sort();
+} catch {
+  out.models = [];
+}
 for (const persona of PERSONAS) {
   const dir = join(root, persona);
   let files = [];

@@ -225,9 +225,9 @@ const W_ICON: [number, number] = [0.5, 0.85];
 /** Panes begin after the previous persona's setup has powered off, and end before the next. */
 const SPAN: [number, number] = [0.6, 0.5];
 
-type WorldProps = { world: World; slabs: number; /** Ratul's own pictures for this persona (public/hub/<persona>/…). */ media: string[] };
+type WorldProps = { world: World; slabs: number; /** Ratul's own pictures for this persona (public/hub/<persona>/…). */ media: string[]; /** CC0 models in public/hub/models/. */ models: string[] };
 
-type HubMedia = Partial<Record<PersonaSlug, string[]>>;
+type HubMedia = Partial<Record<PersonaSlug, string[]>> & { models?: string[] };
 const NO_MEDIA: string[] = [];
 
 /** public/hub/media.json, written by scripts/hub-media.mjs: which of Ratul's pictures exist per persona. */
@@ -305,10 +305,10 @@ const ArtistWorld = ({ world, slabs }: WorldProps) => (
     <ArtistAssembly world={world} />
   </>
 );
-const RideWorld = ({ world, slabs }: WorldProps) => (
+const RideWorld = ({ world, slabs, models }: WorldProps) => (
   <>
     <Panes world={world} slabs={slabs} make={makeRideAtlas} seed={501} />
-    <RideAssembly world={world} />
+    <RideAssembly world={world} modelUrl={models.includes("bike.glb") ? "/hub/models/bike.glb" : undefined} />
   </>
 );
 const GamerWorld = ({ world, slabs }: WorldProps) => (
@@ -334,7 +334,7 @@ export function Worlds({ worlds, slabs }: { worlds: World[]; slabs: number }) {
     <>
       {worlds.map((w) => {
         const C = WORLDS[w.slug as PersonaSlug];
-        return C ? <C key={w.slug} world={w} slabs={slabs} media={media[w.slug as PersonaSlug] ?? NO_MEDIA} /> : null;
+        return C ? <C key={w.slug} world={w} slabs={slabs} media={media[w.slug as PersonaSlug] ?? NO_MEDIA} models={media.models ?? NO_MEDIA} /> : null;
       })}
     </>
   );

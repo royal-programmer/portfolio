@@ -5,6 +5,35 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Round C feedback, third pass: no pops, one-piece blink, radial paths, less spin, zoom in, bike model path (2026-11-04)
+
+Ratul's six notes:
+1. **Nothing pops.** A setup is present over |d| < 1.0 with `presence = 1 − smoothstep(|d|, 0.72, 1.0)`:
+   it scales from 5 % and hangs up to 6 units further ahead while far, coming up to arm's length as
+   it gathers, and shrinks away the same way past the chapter. Loose parts are 55 % size.
+2. **The blink is one motion.** The eyelid ellipse grows in a single ease (width leads, height follows:
+   `rx = 260·u^0.75`, `ry = 260·u^1.6`) with the blur released from the same `u`, driven by a plain
+   animation frame that outlives the phase change (the old version was two tweens + a timed
+   removal + a CSS blur transition = three visible steps, and its overlay could miss its mount when
+   the 1 s timer lost the race to the phase change under load — it mounts with the phase now).
+   Found while measuring: the Playwright window runs at 1 fps when occluded; bring it to front
+   before timing anything.
+3. **Bike:** no CC0 superbike found (Poly Pizza and Sketchfab sport bikes are CC-BY; the Sketchfab
+   search API's licence filter returned nothing). The scene now takes a model: drop a CC0 `bike.glb`
+   in `public/hub/models/` (README there), `scripts/hub-media.mjs` lists it under `models`, and
+   `RideAssembly` loads it with `useGLTF`, re-skins by material name (tyre → matte, glass/light →
+   glow, chrome/exhaust → metal, else shell), fits it to 2.7 long with wheels on y = −0.46, keeps
+   the kit and the route panel around it. The stylised bike stays as the fallback.
+4. **Parts no longer cross:** loose positions lie out along the ray from the setup's centre through
+   each part's home (plus jitter, clamped to the view), so every part converges radially.
+5. **Spin:** tumble under one turn (spin 0.9, drift 0.06/0.05 per second); camera revolve 0.18.
+6. **Zoom in:** the finished window pushes in to 1.3× over 0.32 s before the page leaves; the world
+   page's frame starts at 1.3× and keeps zooming to 1.9× while it dissolves.
+- Verified (window in front): eye opens continuously 0 → 260 across blink into sky; cloud → laptop
+  → lit at c = 1.3 / 1.55 / 1.8 in frame; trader converging at 2.6, lit at 2.8.
+
+---
+
 ## Round C feedback, second pass: entropy in frame, doorway timing both ways, blink, bike (2026-11-04)
 
 Ratul's notes (seven points + drag + résumé for the terminal), all in:

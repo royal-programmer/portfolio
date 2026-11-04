@@ -10,7 +10,8 @@
  * headlight comes on with a beam and the route panel draws its glowing line
  * with light pins. The route panel is the doorway.
  */
-import { useEffect, useMemo, useRef } from "react";
+import { useGLTF } from "@react-three/drei";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { Halo, Tube, makeScreenMaterial, useAssembly } from "../assembly";
@@ -47,7 +48,39 @@ function Wheel({ mats }: { mats: ReturnType<typeof useAssembly>["mats"] }) {
   );
 }
 
-export function RideAssembly({ world }: { world: World }) {
+/**
+ * A CC0 bike from public/hub/models/bike.glb, re-skinned in the setup's materials and fitted to
+ * the stylised bike's footprint (≈ 2.7 long, wheels on y = −0.46). Material names decide the finish:
+ * tyre / rubber → matte, glass / light / lamp → glow, chrome / metal / exhaust → metal, else shell.
+ */
+function BikeModel({ url, mats }: { url: string; mats: ReturnType<typeof useAssembly>["mats"] }) {
+  const { scene } = useGLTF(url);
+  const fitted = useMemo(() => {
+    const root = scene.clone(true);
+    root.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const name = `${m.name} ${(Array.isArray(m.material) ? m.material[0] : m.material)?.name ?? ""}`.toLowerCase();
+      m.material = /tyre|tire|rubber|seat/.test(name) ? mats.matte : /glass|light|lamp|led/.test(name) ? mats.glow : /chrome|metal|exhaust|rim|spoke|fork|engine/.test(name) ? mats.metal : mats.shell;
+      m.castShadow = m.receiveShadow = false;
+    });
+    const box = new THREE.Box3().setFromObject(root);
+    const size = box.getSize(new THREE.Vector3());
+    const centre = box.getCenter(new THREE.Vector3());
+    // Longest horizontal axis → x (side view), length 2.7.
+    const k = 2.7 / Math.max(size.x, size.z, 0.001);
+    const holder = new THREE.Group();
+    if (size.z > size.x) root.rotation.y = Math.PI / 2;
+    holder.add(root);
+    holder.scale.setScalar(k);
+    root.position.set(-centre.x, -box.min.y, -centre.z);
+    holder.position.y = -0.46;
+    return holder;
+  }, [scene, mats]);
+  return <primitive object={fitted} />;
+}
+
+export function RideAssembly({ world, modelUrl }: { world: World; /** A CC0 .glb in public/hub/models, when there is one. */ modelUrl?: string }) {
   const root = useRef<THREE.Group>(null);
   const N = 11;
   const refs = useMemo(() => Array.from({ length: N }, () => ({ current: null as THREE.Group | null })), []);
@@ -129,6 +162,42 @@ export function RideAssembly({ world }: { world: World }) {
   useEffect(() => {
     accent.emissive.copy(tint).multiplyScalar(0.08);
   }, [accent, tint]);
+
+  if (modelUrl) {
+    // The real bike as one piece (plus its light), the kit and the route panel around it.
+    return (
+      <group ref={root}>
+        <group ref={(el) => void (refs[0].current = el)}>
+          <Suspense fallback={null}>
+            <BikeModel url={modelUrl} mats={mats} />
+          </Suspense>
+          <mesh geometry={geo.beam} material={beamMat} position={[2.7, 0.3, 0]} />
+        </group>
+        <group ref={(el) => void (refs[5].current = el)}>
+          <mesh ref={panel} geometry={geo.panel} material={mat} />
+          <mesh geometry={geo.light} material={mats.bezel} position={[0, 0, -0.001]} />
+          <Halo width={PANEL_W} height={PANEL_H} material={mats.halo} position={[0, 0, -0.04]} />
+        </group>
+        <group ref={(el) => void (refs[6].current = el)}>
+          <mesh geometry={geo.helmet} material={mats.shell} />
+          <mesh geometry={geo.visor} material={visorMat} rotation-y={0.4} />
+        </group>
+        <group ref={(el) => void (refs[7].current = el)}>
+          <mesh geometry={geo.tankBag} material={fabric} />
+        </group>
+        <group ref={(el) => void (refs[8].current = el)}>
+          <mesh geometry={geo.pannier} material={fabric} />
+        </group>
+        <group ref={(el) => void (refs[9].current = el)}>
+          <mesh geometry={geo.glove} material={fabric} position={[-0.07, 0, 0]} rotation-z={0.2} />
+          <mesh geometry={geo.glove} material={fabric} position={[0.07, 0, 0.04]} rotation-z={-0.15} />
+        </group>
+        <group ref={(el) => void (refs[10].current = el)}>
+          <mesh geometry={geo.intercom} material={mats.glow} />
+        </group>
+      </group>
+    );
+  }
 
   return (
     <group ref={root}>

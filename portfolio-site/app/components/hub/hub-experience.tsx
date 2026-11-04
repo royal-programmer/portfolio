@@ -123,6 +123,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   const rootRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
   const enterRef = useRef<HTMLDivElement>(null);
+  const blinkRaf = useRef(0);
   const eyeRef = useRef<SVGEllipseElement>(null);
   const heldOnce = useRef(false);
 
@@ -290,8 +291,14 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     const target = personaHref(window.location.origin, entering.slug as PersonaSlug);
     // `via=hub`: the world opens on the same finished window, so the two pages read as one motion.
     const href = target.href + (target.href.includes("?") ? "&" : "?") + "via=hub";
-    if (target.crossOrigin) window.location.assign(href);
-    else router.push(href);
+    const go = () => {
+      if (target.crossOrigin) window.location.assign(href);
+      else router.push(href);
+    };
+    // The window pushes in toward you as we go; the world page picks the zoom up where it left off.
+    const win = enterRef.current?.querySelector<HTMLElement>(".hub-exit");
+    if (win) gsap.to(win, { scale: 1.3, duration: 0.32, ease: "power2.in", onComplete: go });
+    else go();
   }, [entering, router]);
 
   const goNormal = useCallback(() => {
@@ -362,23 +369,34 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   // The blink: black, then the eyes open onto the sky.
   useEffect(() => {
     if (phase !== "blink" || !eyeRef.current) return;
-    const tl = gsap.timeline();
-    // The gradient feathers the last 45 % of the ellipse, so it opens a touch larger than the view.
-    tl.fromTo(eyeRef.current, { attr: { rx: 0, ry: 0 } }, { attr: { rx: 120, ry: 22 }, duration: 0.6, ease: "power2.inOut", delay: 0.3 });
-    tl.to(eyeRef.current, { attr: { rx: 220, ry: 220 }, duration: 0.8, ease: "power3.in" });
-    // Eyes pull into focus as the lids open.
-    document.documentElement.classList.add("is-focusing");
-    const focus = window.setTimeout(() => document.documentElement.classList.remove("is-focusing"), 1800);
-    return () => {
-      tl.kill();
-      window.clearTimeout(focus);
-      document.documentElement.classList.remove("is-focusing");
+    // One continuous opening: the lids part as a slit that rounds out as it grows past the view
+    // (the gradient feathers the last 45 % of the ellipse). The blur releases in step with it, and
+    // the overlay leaves only once the opening is wider than the screen — no visible step. Driven
+    // by a plain animation frame, not a tween: the scene's loop is the one clock that never stalls.
+    const canvas = rootRef.current?.querySelector<HTMLCanvasElement>("canvas") ?? null;
+    const eye = eyeRef.current;
+    setBlink(true); // stays mounted through the sky until the opening is wider than the view
+    const t0 = performance.now() + 250;
+    const LEN = 1700;
+    // The loop outlives the phase: the sky arrives while the lids are still opening, and the
+    // opening must not stop (or the blur snap) when it does. Cancelled only on unmount.
+    if (blinkRaf.current) cancelAnimationFrame(blinkRaf.current);
+    const frame = (now: number) => {
+      const x = Math.min(1, Math.max(0, (now - t0) / LEN));
+      const u = x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2; // ease in-out
+      // Width leads, height follows: a slit first, then round.
+      eye.setAttribute("rx", (260 * Math.pow(u, 0.75)).toFixed(2));
+      eye.setAttribute("ry", (260 * Math.pow(u, 1.6)).toFixed(2));
+      if (canvas) canvas.style.filter = u < 0.999 ? `blur(${(16 * Math.pow(1 - u, 1.4)).toFixed(2)}px)` : "";
+      if (x < 1) blinkRaf.current = requestAnimationFrame(frame);
+      else {
+        blinkRaf.current = 0;
+        setBlink(false);
+      }
     };
+    blinkRaf.current = requestAnimationFrame(frame);
   }, [phase]);
-  useEffect(() => {
-    // Once the eyes are open the overlay goes, whatever happens next.
-    if (phase === "sky") window.setTimeout(() => setBlink(false), 400);
-  }, [phase]);
+  useEffect(() => () => cancelAnimationFrame(blinkRaf.current), []);
 
   // Hint while the light approaches; sound follows the light.
   useEffect(() => {
@@ -842,7 +860,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
           <ExitFrame slug={returning.slug as PersonaSlug} t={returning.t} items={terminalItems} photo={media.photographer?.[0] ? `/hub/photographer/${media.photographer[0]}` : undefined} />
         </div>
       ) : null}
-      {blink ? (
+      {blink || phase === "blink" ? (
         <svg aria-hidden className="vr-blink fixed inset-0 z-40 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
           <defs>
             {/* Soft lids: the opening is feathered, not cut. */}

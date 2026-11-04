@@ -66,7 +66,7 @@ export function PhotographerAssembly({ world }: { world: World }) {
       // display (three-quarter, so the lens still shows on the left).
       if (turn.current) {
         const present = easeInOut(L.open);
-        turn.current.rotation.y = THREE.MathUtils.lerp(Math.PI + Math.sin(L.t * 0.35) * 0.5, 0.62, present) + (1 - L.g3) * L.t * 0.4;
+        turn.current.rotation.y = THREE.MathUtils.lerp(Math.PI + Math.sin(L.t * 0.35) * 0.5, 0.62, present) + (1 - L.g3) * L.t * 0.18;
         turn.current.rotation.x = (1 - present) * Math.sin(L.t * 0.27) * 0.25;
       }
       // The lens arrives in front of the mount and screws on: in along its axis, turning.

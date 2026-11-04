@@ -81,15 +81,24 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
 
   const parts = useMemo<Part[]>(() => {
     const rnd = seeded(7 + Math.round(world.c * 13));
-    // Loose positions, in the setup's own frame: a cloud around it that fits the view at the
-    // setup's distance (±2.6 across, ±1.6 up, a little depth), one for arriving, one for leaving.
-    const scatter = (spread: number) =>
-      new THREE.Vector3((rnd() * 2 - 1) * spread, (rnd() * 2 - 1) * spread * 0.6 + 0.3, (rnd() * 2 - 1) * spread * 0.5);
+    // Loose positions, in the setup's own frame: each part sits out along the ray from the
+    // setup's centre through its home (plus a little jitter), so parts converge along radial
+    // paths and do not cross each other on the way in or out. The cloud fits the view.
+    const scatter = (home: THREE.Vector3, spread: number) => {
+      const dir = home.clone().add(new THREE.Vector3((rnd() - 0.5) * 0.8, (rnd() - 0.5) * 0.8, (rnd() - 0.5) * 0.8));
+      if (dir.lengthSq() < 1e-4) dir.set(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5);
+      dir.normalize();
+      const out = home.clone().addScaledVector(dir, spread * (0.6 + rnd() * 0.6));
+      out.x = THREE.MathUtils.clamp(out.x, -2.8, 2.8);
+      out.y = THREE.MathUtils.clamp(out.y, -1.4, 1.8);
+      out.z = THREE.MathUtils.clamp(out.z, -1.6, 1.2);
+      return out;
+    };
     return homes.map((home) => ({
-      scatterIn: scatter(2.6),
-      scatterOut: scatter(2.9),
+      scatterIn: scatter(home, 2.2),
+      scatterOut: scatter(home, 2.4),
       home,
-      spin: new THREE.Vector3(rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1).multiplyScalar(2.5),
+      spin: new THREE.Vector3(rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1).multiplyScalar(0.9),
       seed: rnd(),
     }));
   }, [world.c, homes]);
@@ -114,10 +123,12 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
     const g = root.current;
     if (!g) return;
     const d = k.climb - world.c;
-    // Shown only around its own chapter: once the parts have scattered they are gone.
-    const shown = s.phase === "climb" && Math.abs(d) < 0.92;
+    // Shown only around its own chapter; it grows in from far and small, and shrinks away again —
+    // nothing pops.
+    const shown = s.phase === "climb" && Math.abs(d) < 1.0;
     g.visible = shown;
     if (!shown) return;
+    const presence = 1 - THREE.MathUtils.smoothstep(Math.abs(d), 0.72, 1.0);
 
     // gather: 0 scattered → 1 assembled; the parts meet over the section before, hold, then leave.
     const gather = 1 - THREE.MathUtils.smoothstep(Math.abs(d), 0.22, 0.95);
@@ -138,10 +149,13 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
     const lock = 1 - THREE.MathUtils.smoothstep(Math.abs(d), 0.08, 0.2);
     const cEff = world.c + (k.climb - world.c) * (1 - lock);
     climbPose(cEff, tmp.pose);
-    tmp.at.copy(tmp.pose.pos).addScaledVector(tmp.pose.fwd, frame.fwd).addScaledVector(tmp.pose.right, frame.right);
+    // Far from its chapter it hangs further ahead and smaller; it comes up to arm's length as it gathers.
+    const far = (1 - presence) * 6 + (1 - g3) * 2.5;
+    tmp.at.copy(tmp.pose.pos).addScaledVector(tmp.pose.fwd, frame.fwd + far).addScaledVector(tmp.pose.right, frame.right);
     tmp.at.y += frame.up;
     g.position.copy(tmp.at);
     g.position.y += Math.sin(t * 0.5) * 0.04;
+    g.scale.setScalar(0.05 + 0.95 * easeInOut(presence));
     const yawEff = -tmp.pose.yaw + (yawOffset ?? 0);
     g.rotation.set(Math.sin(t * 0.33) * 0.02, yawEff + Math.sin(t * 0.21) * 0.03, Math.sin(t * 0.27) * 0.015);
 
@@ -155,10 +169,10 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
       // Some parts arrive a touch later than the body, each in its own time.
       const gk = late > 0 ? easeInOut(clamp01((gather - late * part.seed) / (1 - late * part.seed))) : g3;
       obj.position.lerpVectors(tmp.w, part.home, gk);
-      const spin = (1 - gk) * (0.6 + part.seed) * 2;
-      obj.rotation.set(part.spin.x * spin + t * 0.1 * (1 - gk), part.spin.y * spin, part.spin.z * spin);
-      // Loose parts are small and far; they grow into place and shrink away again.
-      obj.scale.setScalar(0.3 + 0.7 * gk);
+      // A slow tumble while loose (under a turn), settling to its home orientation.
+      const spin = (1 - gk) * (0.6 + part.seed);
+      obj.rotation.set(part.spin.x * spin + t * 0.06 * (1 - gk), part.spin.y * spin + t * 0.05 * (1 - gk), part.spin.z * spin);
+      obj.scale.setScalar(0.55 + 0.45 * gk);
     };
 
     L.gather = gather;
