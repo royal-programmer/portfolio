@@ -50,6 +50,8 @@ export type VrState = {
   portalAnchor: { x: number; y: number; z: number; nx: number; ny: number; nz: number } | null;
   /** The visitor clicked a lit assembly: the camera flies into its screen, then the page leaves. */
   portal: { slug: string; at: number } | null;
+  /** Lens: 0 normal, +1 pulled wide (watch the assembly whole), −0.5 tight. Keys − / + / 0. */
+  zoom: number;
 };
 
 /** Seconds from the click on a lit assembly to the page leaving for its world. */
@@ -76,6 +78,7 @@ export function createVrState(): VrState {
     portalHover: null,
     portalAnchor: null,
     portal: null,
+    zoom: 0,
   };
 }
 

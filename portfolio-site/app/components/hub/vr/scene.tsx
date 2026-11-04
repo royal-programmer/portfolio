@@ -233,7 +233,9 @@ function Director({ sectionT, worlds, onPhaseEnd }: { sectionT: Array<number | n
 
     // Lens: holding narrows the view; rushing widens it.
     const cam = camera as THREE.PerspectiveCamera;
-    L.fov = THREE.MathUtils.damp(L.fov, FOV - (1 - k.scale) * 6 + k.speed * 12 - into * 14, 3, dt);
+    // Lens: holding narrows the view; rushing widens it; the visitor's zoom opens it right up.
+    const zoomed = FOV * (1 + s.zoom * 0.95);
+    L.fov = THREE.MathUtils.damp(L.fov, zoomed - (1 - k.scale) * 6 + k.speed * 12 - into * 14, 3, dt);
     if (Math.abs(cam.fov - L.fov) > 0.01) {
       cam.fov = L.fov;
       cam.updateProjectionMatrix();

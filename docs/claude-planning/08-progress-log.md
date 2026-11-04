@@ -5,6 +5,38 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Round B feedback, first pass (2026-11-04)
+
+Ratul's notes on f402f2b, addressed:
+1. **Field per persona.** Panes carry their place on the climb (`aC`) and fade by it as well as by
+   distance, so the engineer's code is gone before the trader's chapter. The trader's stretch has
+   its own panes: eight drawn charts (candles / glowing line, random walk, "+0.8%" the way a journal
+   notes it — never currency) and eight numbers ("58% win", "1 : 3 R", "DD 4%"). `makeTraderAtlas`.
+2. **Tool and language logos** on the engineer's panes: square icon atlas from
+   `public/hub/icons/*.svg`, copied by `scripts/hub-icons.mjs` from simple-icons (CC0) and devicon
+   (MIT): TypeScript, Next.js, React, Node, Python, C#, .NET, Java, VS Code, Cursor, Claude, Git,
+   Docker, PostgreSQL, Supabase, Three.js. Licences in `15-credits.md`; console credits in round D.
+3. **The lit laptop invites the click:** a soft halo behind the lid and a breathing bezel light in
+   the engineer's blue, both stronger under the pointer; the screen brightens too.
+4. **Hold and move = look while time is slow.** Dragging no longer cancels the hold: the 260 ms
+   hold starts slow time, moving after that turns the view (`dragging` and `holding` together).
+   Moving before the hold lands is still a plain drag.
+5. **Back from a world** came back to a blue page (the browser restores the page from its cache
+   mid-flight). `pageshow` with `persisted` resets portal / entering state and resumes the audio
+   context. After a reload the context starts suspended: `ambient.resume()` on the first
+   pointer-down or key.
+6. **The drone buzzed:** the 82 Hz triangle is a sine now, levels trimmed.
+7. **Exit is dark, not blue:** the camera still dives into the screen; the cover is the void with
+   one small breathing light in the world's colour (from 0.8 s before the leave). The engineer
+   world's own dark opening comes with its redesign.
+8. **Lens keys on the climb:** `-` pulls the view wide (watch the assembly whole), `+` tightens,
+   `0` resets. Ctrl +/− stays the browser's zoom on purpose.
+- Open: a music player (needs Ratul's pick of source: YouTube IFrame + Data API key, or paste-a-link);
+  returning from a world should land on that world's section; the parts fly in at the frame's edge
+  on the approach (the laptop enters the view at c ≈ 1.85) — zoom out to watch them meet.
+
+---
+
 ## Round B: the climb, the object field, the engineer's laptop (2026-11-04)
 
 D38 round B shipped on `phase-0-content-engine`. The doorway pattern is proven end to end.

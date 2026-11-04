@@ -50,7 +50,8 @@ function build(): Engine | null {
     o.start();
     return o;
   };
-  const oscs = [tone(55, "sine", 0.32), tone(82.4, "triangle", 0.1), tone(110.3, "sine", 0.12), tone(164.8, "sine", 0.035)];
+  // Sines only: the triangle's harmonics read as a buzz through the filter (Ratul, round B).
+  const oscs = [tone(55, "sine", 0.26), tone(82.4, "sine", 0.09), tone(110.3, "sine", 0.1), tone(164.8, "sine", 0.03)];
 
   // Slow breathing on the upper partial.
   const lfo = ctx.createOscillator();
@@ -119,6 +120,11 @@ export const ambient = {
     void ctx.resume();
     master.gain.cancelScheduledValues(ctx.currentTime);
     master.gain.setTargetAtTime(0.55, ctx.currentTime, 1.2);
+  },
+  /** After a reload the context starts suspended: resume on the first gesture. */
+  resume() {
+    if (!engine || engine.ctx.state !== "suspended") return;
+    void engine.ctx.resume();
   },
   stop() {
     if (!engine) return;

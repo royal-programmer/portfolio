@@ -23,7 +23,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { SPECTRUM_GLSL } from "@/lib/site/spectrum";
 import { useVr } from "./clock";
-import { ATLAS_N, ATLAS_TILES, LAPTOP_SCREEN_SRC, makeLaptopScreen, makeSlabAtlas } from "./screens";
+import { ATLAS_N, ENGINEER_ICONS, LAPTOP_SCREEN_SRC, makeIconAtlas, makeLaptopScreen, makeSlabAtlas, makeTraderAtlas } from "./screens";
 import type { World } from "./state";
 import { climbPose, clamp01, easeInOut, makePose, seeded } from "./util";
 
@@ -40,7 +40,9 @@ attribute vec3 aRot;     // yaw, pitch, roll
 attribute vec2 aSize;
 attribute vec2 aTile;
 attribute float aSeed;
+attribute float aC;      // where on the climb this pane belongs
 uniform float uTime;
+uniform float uCam;      // where the camera is on the climb
 varying vec2 vUv;
 varying vec2 vTile;
 varying float vFog;
@@ -64,7 +66,11 @@ void main() {
   vec3 world = aPos + drift + local;
   vec4 mv = viewMatrix * vec4(world, 1.0);
   float dist = length(mv.xyz);
-  vFog = smoothstep(${FOG_FAR.toFixed(1)}, ${FOG_NEAR.toFixed(1)}, dist);
+  // Fog by distance, and by place on the climb: a pane is for its own stretch of the path —
+  // it has faded before the next persona's chapter, even where it would still be in range.
+  float along = uCam - aC;
+  float stretch = smoothstep(0.45, 0.1, along) * smoothstep(1.1, 0.7, -along);
+  vFog = smoothstep(${FOG_FAR.toFixed(1)}, ${FOG_NEAR.toFixed(1)}, dist) * stretch;
   gl_Position = projectionMatrix * mv;
 }
 `;
@@ -73,6 +79,7 @@ ${SPECTRUM_GLSL}
 uniform sampler2D tAtlas;
 uniform float uTint;
 uniform float uShow;
+uniform float uAtlasN;
 varying vec2 vUv;
 varying vec2 vTile;
 varying float vFog;
@@ -89,7 +96,7 @@ void main() {
   if (body <= 0.001) discard;
   // Content from the atlas, with a hair of colour fringe at the edges of the pane.
   vec2 fringe = p * 0.004;
-  vec2 base = (vTile + 0.03 + vUv * 0.94) / ${ATLAS_N.toFixed(1)};
+  vec2 base = (vTile + 0.03 + vUv * 0.94) / uAtlasN;
   float r = texture2D(tAtlas, base + fringe).r;
   float g = texture2D(tAtlas, base).g;
   float b = texture2D(tAtlas, base - fringe).b;
@@ -104,20 +111,35 @@ void main() {
 }
 `;
 
-type SlabSpec = { pos: THREE.Vector3; rot: THREE.Vector3; size: THREE.Vector2; tile: THREE.Vector2; seed: number };
+type SlabSpec = { pos: THREE.Vector3; rot: THREE.Vector3; size: THREE.Vector2; tile: THREE.Vector2; seed: number; c: number };
 
-/** Drifting panes along a persona's stretch of the climb. */
-export function Slabs({ world, count, atlas }: { world: World; count: number; atlas: THREE.Texture }) {
+type SlabsProps = {
+  world: World;
+  count: number;
+  atlas: THREE.Texture;
+  /** Tile indices to draw from, [from, to). */
+  tiles: [number, number];
+  /** Pane width range (world units) and height as a fraction of width. */
+  width: [number, number];
+  aspect: number;
+  /** Stretch of the climb these panes occupy, relative to the world's peak: [before, after]. */
+  span?: [number, number];
+  seed: number;
+};
+
+/** Drifting panes along a persona's stretch of the climb. One instanced draw. */
+export function Slabs({ world, count, atlas, tiles, width, aspect, span = [0.8, 0.5], seed }: SlabsProps) {
   const { clock, state } = useVr();
   const { geometry, material } = useMemo(() => {
-    const rnd = seeded(101 + Math.round(world.c * 7));
+    const rnd = seeded(seed + Math.round(world.c * 7));
     const specs: SlabSpec[] = [];
     const pose = makePose();
     const tmp = new THREE.Vector3();
     for (let i = 0; i < count; i++) {
-      // Spread over the section before and after the assembly, each pane ahead of the camera's
-      // pose at its own point of the climb (the helix turns fast: "ahead" is where you look).
-      const c = world.c + (rnd() * 2 - 1) * 0.95;
+      // Each pane hangs ahead of the camera's pose at its own point of the climb
+      // (the helix turns: "ahead" is where you look), more of them before the peak than after.
+      const u = rnd();
+      const c = world.c + (u < 0.65 ? -rnd() * span[0] : rnd() * span[1]);
       climbPose(c, pose);
       const side = rnd() < 0.5 ? -1 : 1;
       const off = 1.6 + rnd() * 4;
@@ -125,16 +147,16 @@ export function Slabs({ world, count, atlas }: { world: World; count: number; at
       tmp.copy(pose.pos).addScaledVector(pose.right, side * off).addScaledVector(pose.fwd, 3 + rnd() * 7).add(new THREE.Vector3(0, up, 0));
       // Face back along the path (the camera's yaw is a left-handed turn; Ry needs its negative).
       const yaw = -pose.yaw + side * (0.35 + rnd() * 0.3);
-      const code = rnd() < 0.62;
-      const w = code ? 1.6 + rnd() * 1.4 : 0.7 + rnd() * 0.5;
-      const tile = code ? Math.floor(rnd() * 8) : 8 + Math.floor(rnd() * (ATLAS_TILES - 8));
+      const w = width[0] + rnd() * (width[1] - width[0]);
+      const tile = tiles[0] + Math.floor(rnd() * (tiles[1] - tiles[0]));
       specs.push({
         pos: tmp.clone(),
         rot: new THREE.Vector3(yaw, (rnd() - 0.5) * 0.4, (rnd() - 0.5) * 0.25),
-        size: new THREE.Vector2(w, w * 0.5),
+        size: new THREE.Vector2(w, w * aspect),
         // Canvas rows count from the top; texture v from the bottom.
         tile: new THREE.Vector2(tile % ATLAS_N, ATLAS_N - 1 - Math.floor(tile / ATLAS_N)),
         seed: rnd(),
+        c,
       });
     }
     const base = new THREE.PlaneGeometry(1, 1);
@@ -146,19 +168,22 @@ export function Slabs({ world, count, atlas }: { world: World; count: number; at
     const rot = new Float32Array(count * 3);
     const size = new Float32Array(count * 2);
     const tile = new Float32Array(count * 2);
-    const seed = new Float32Array(count);
+    const seedA = new Float32Array(count);
+    const cA = new Float32Array(count);
     specs.forEach((s, i) => {
       pos.set([s.pos.x, s.pos.y, s.pos.z], i * 3);
       rot.set([s.rot.x, s.rot.y, s.rot.z], i * 3);
       size.set([s.size.x, s.size.y], i * 2);
       tile.set([s.tile.x, s.tile.y], i * 2);
-      seed[i] = s.seed;
+      seedA[i] = s.seed;
+      cA[i] = s.c;
     });
     g.setAttribute("aPos", new THREE.InstancedBufferAttribute(pos, 3));
     g.setAttribute("aRot", new THREE.InstancedBufferAttribute(rot, 3));
     g.setAttribute("aSize", new THREE.InstancedBufferAttribute(size, 2));
     g.setAttribute("aTile", new THREE.InstancedBufferAttribute(tile, 2));
-    g.setAttribute("aSeed", new THREE.InstancedBufferAttribute(seed, 1));
+    g.setAttribute("aSeed", new THREE.InstancedBufferAttribute(seedA, 1));
+    g.setAttribute("aC", new THREE.InstancedBufferAttribute(cA, 1));
     g.instanceCount = count;
     const m = new THREE.ShaderMaterial({
       vertexShader: slabVertex,
@@ -167,14 +192,15 @@ export function Slabs({ world, count, atlas }: { world: World; count: number; at
       premultipliedAlpha: true,
       depthWrite: false,
       side: THREE.DoubleSide,
-      uniforms: { tAtlas: { value: atlas }, uTime: { value: 0 }, uTint: { value: world.t }, uShow: { value: 0 } },
+      uniforms: { tAtlas: { value: atlas }, uTime: { value: 0 }, uCam: { value: 0 }, uTint: { value: world.t }, uShow: { value: 0 }, uAtlasN: { value: ATLAS_N } },
     });
     return { geometry: g, material: m };
-  }, [world, count, atlas]);
+  }, [world, count, atlas, tiles, width, aspect, span, seed]);
 
   useFrame(() => {
     const k = clock.current;
     material.uniforms.uTime.value = k.t;
+    material.uniforms.uCam.value = k.climb;
     material.uniforms.uShow.value = state.current.phase === "climb" ? 1 : 0;
   });
 
@@ -288,6 +314,7 @@ export function EngineerAssembly({ world }: { world: World }) {
       pad: new RoundedBoxGeometry(LAP_W * 0.34, 0.004, LAP_D * 0.26, 2, 0.004),
       screen: new THREE.PlaneGeometry(LAP_W * 0.93, LAP_D * 0.98 * 0.88),
       bezelLight: new THREE.PlaneGeometry(LAP_W * 0.93 + 0.03, LAP_D * 0.98 * 0.88 + 0.03),
+      halo: new THREE.PlaneGeometry(LAP_W * 2.2, LAP_D * 0.98 * 0.88 * 2.4),
     }),
     [parts.kw, parts.kd],
   );
@@ -306,7 +333,19 @@ export function EngineerAssembly({ world }: { world: World }) {
     const key = new THREE.MeshStandardMaterial({ color: new THREE.Color("#0d0d13"), roughness: 0.6, metalness: 0.05, emissive: new THREE.Color("#000000"), emissiveIntensity: 1 });
     const pad = new THREE.MeshPhysicalMaterial({ color: new THREE.Color("#0c0c12"), roughness: 0.15, metalness: 0.1, clearcoat: 1, envMapIntensity: 1.5 });
     const bezel = new THREE.MeshBasicMaterial({ color: new THREE.Color("#000"), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
-    return { shell, key, pad, bezel };
+    // A soft light behind the lid: the lit laptop is a doorway, and it should look like one.
+    const haloCanvas = document.createElement("canvas");
+    haloCanvas.width = haloCanvas.height = 128;
+    const hc = haloCanvas.getContext("2d")!;
+    const grad = hc.createRadialGradient(64, 64, 4, 64, 64, 64);
+    grad.addColorStop(0, "rgba(255,255,255,0.55)");
+    grad.addColorStop(0.35, "rgba(255,255,255,0.18)");
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    hc.fillStyle = grad;
+    hc.fillRect(0, 0, 128, 128);
+    const haloTex = new THREE.CanvasTexture(haloCanvas);
+    const halo = new THREE.MeshBasicMaterial({ map: haloTex, color: new THREE.Color("#000"), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
+    return { shell, key, pad, bezel, halo };
   }, []);
   const tint = useMemo(() => new THREE.Color().setHSL(((world.t * 285 - 15) / 360 + 1) % 1, 0.9, 0.62), [world.t]);
   const tmp = useMemo(() => ({ m: new THREE.Matrix4(), p: new THREE.Vector3(), q: new THREE.Quaternion(), e: new THREE.Euler(), s: new THREE.Vector3(1, 1, 1), ray: new THREE.Raycaster(), ndc: new THREE.Vector2(), n: new THREE.Vector3(), w: new THREE.Vector3() }), []);
@@ -392,11 +431,14 @@ export function EngineerAssembly({ world }: { world: World }) {
       mat.key.emissive.copy(tint).multiplyScalar(0.1 * L.power);
     }
 
-    // Screen + bezel light.
+    // Screen, bezel light and the halo: lit = enterable, so it breathes, and brightens under the pointer.
     screenMat.uniforms.uPower.value = L.power;
     screenMat.uniforms.uTime.value = t;
-    mat.bezel.opacity = L.power * 0.12;
+    const breath = 0.5 + 0.5 * Math.sin(t * 1.7);
+    mat.bezel.opacity = L.power * (0.16 + breath * 0.12 + L.hover * 0.3);
     mat.bezel.color.copy(tint);
+    mat.halo.opacity = L.power * (0.22 + breath * 0.1 + L.hover * 0.35);
+    mat.halo.color.copy(tint);
 
     // Portal: the pointer over the lit screen.
     let hover: string | null = null;
@@ -435,6 +477,7 @@ export function EngineerAssembly({ world }: { world: World }) {
           {/* Screen on the lid's inner face: it looks down at the keys when closed, at you when open. */}
           <mesh ref={screenRef} geometry={geo.screen} material={screenMat} position={[0, LAP_T / 2 - 0.003, LAP_D * 0.49 + 0.02]} rotation-x={Math.PI / 2} />
           <mesh geometry={geo.bezelLight} material={mat.bezel} position={[0, LAP_T / 2 - 0.004, LAP_D * 0.49 + 0.02]} rotation-x={Math.PI / 2} />
+          <mesh geometry={geo.halo} material={mat.halo} position={[0, LAP_T / 2 + LID_T + 0.01, LAP_D * 0.49 + 0.02]} rotation-x={Math.PI / 2} renderOrder={1} />
         </group>
       </group>
     </group>
@@ -444,15 +487,50 @@ export function EngineerAssembly({ world }: { world: World }) {
 // ---------------------------------------------------------------------------
 // Worlds: the field for every persona that has one (round B: the engineer)
 // ---------------------------------------------------------------------------
-export function Worlds({ worlds, slabs }: { worlds: World[]; slabs: number }) {
-  const engineer = worlds.find((w) => w.slug === "engineer");
-  const atlas = useMemo(() => (engineer ? makeSlabAtlas(engineer.t) : null), [engineer]);
-  useEffect(() => () => atlas?.dispose(), [atlas]);
-  if (!engineer || !atlas) return null;
+const CODE: [number, number] = [0, 8];
+const GLYPH: [number, number] = [8, 16];
+const ICONS: [number, number] = [0, ENGINEER_ICONS.length];
+const W_CODE: [number, number] = [1.6, 3];
+const W_GLYPH: [number, number] = [0.7, 1.2];
+const W_ICON: [number, number] = [0.5, 0.85];
+/** The trader's panes begin after the engineer's laptop has powered off. */
+const TRADER_SPAN: [number, number] = [0.6, 0.5];
+
+/** The engineer's stretch: code panes, glyphs, the tools; and the laptop. */
+function EngineerWorld({ world, slabs }: { world: World; slabs: number }) {
+  const atlas = useMemo(() => makeSlabAtlas(world.t), [world.t]);
+  const icons = useMemo(() => makeIconAtlas(ENGINEER_ICONS), []);
+  useEffect(() => () => atlas.dispose(), [atlas]);
+  useEffect(() => () => icons.dispose(), [icons]);
   return (
     <>
-      <Slabs world={engineer} count={slabs} atlas={atlas} />
-      <EngineerAssembly world={engineer} />
+      <Slabs world={world} count={Math.round(slabs * 0.5)} atlas={atlas} tiles={CODE} width={W_CODE} aspect={0.5} seed={101} />
+      <Slabs world={world} count={Math.round(slabs * 0.25)} atlas={atlas} tiles={GLYPH} width={W_GLYPH} aspect={0.5} seed={131} />
+      <Slabs world={world} count={Math.round(slabs * 0.7)} atlas={icons} tiles={ICONS} width={W_ICON} aspect={1} seed={151} />
+      <EngineerAssembly world={world} />
+    </>
+  );
+}
+
+/** The trader's stretch: charts and journal numbers (the desk itself is round C). */
+function TraderWorld({ world, slabs }: { world: World; slabs: number }) {
+  const atlas = useMemo(() => makeTraderAtlas(world.t), [world.t]);
+  useEffect(() => () => atlas.dispose(), [atlas]);
+  return (
+    <>
+      <Slabs world={world} count={Math.round(slabs * 0.55)} atlas={atlas} tiles={CODE} width={W_CODE} aspect={0.5} seed={201} span={TRADER_SPAN} />
+      <Slabs world={world} count={Math.round(slabs * 0.35)} atlas={atlas} tiles={GLYPH} width={W_GLYPH} aspect={0.5} seed={231} span={TRADER_SPAN} />
+    </>
+  );
+}
+
+export function Worlds({ worlds, slabs }: { worlds: World[]; slabs: number }) {
+  const engineer = worlds.find((w) => w.slug === "engineer");
+  const trader = worlds.find((w) => w.slug === "trader");
+  return (
+    <>
+      {engineer ? <EngineerWorld world={engineer} slabs={slabs} /> : null}
+      {trader ? <TraderWorld world={trader} slabs={slabs} /> : null}
     </>
   );
 }

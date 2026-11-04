@@ -313,10 +313,155 @@ function makeTexture(canvas: HTMLCanvasElement, draw: () => void) {
   return tex;
 }
 
-/** Tiles per side of the slab atlas; a tile's (col,row) → uv offset = (col, row) / ATLAS_N. */
+/** Tiles per side of every atlas; a tile's (col,row) → uv offset = (col, row) / ATLAS_N. */
 export const ATLAS_N = 4;
-/** Tile count: the first eight are code, the last eight glyphs. */
+/** Tile count: in each 2:1 atlas the first eight are "screens", the last eight "glyphs". */
 export const ATLAS_TILES = ATLAS_N * ATLAS_N;
+
+// --- Trader: charts and the numbers a journal keeps (illustrative, never currency) -----------
+const TICKERS = ["+2.4%", "−0.8%", "1 : 3 R", "58% win", "0.5 R", "DD 4%", "+0.3 R ev", "4H"];
+
+function drawChart(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, t: number, seed: number) {
+  const P = palette(t);
+  let a = (seed * 9301 + 49297) % 233280;
+  const rnd = () => (a = (a * 9301 + 49297) % 233280) / 233280;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.fillStyle = P.bg;
+  ctx.fillRect(x, y, w, h);
+  // Grid: faint, few.
+  ctx.strokeStyle = "rgba(243,241,236,0.07)";
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(x, y + (h * i) / 4);
+    ctx.lineTo(x + w, y + (h * i) / 4);
+    ctx.stroke();
+  }
+  // A random walk with drift, as candles on even tiles and a line on odd ones.
+  const n = 48;
+  const vals: number[] = [];
+  let v = 0.5;
+  for (let i = 0; i < n; i++) {
+    v += (rnd() - 0.47) * 0.08;
+    v = Math.min(0.92, Math.max(0.08, v));
+    vals.push(v);
+  }
+  const px = (i: number) => x + w * 0.06 + ((w * 0.88) / (n - 1)) * i;
+  const py = (val: number) => y + h * 0.9 - val * h * 0.78;
+  const col = P.accent;
+  if (seed % 2 === 0) {
+    const cw = (w * 0.88) / n;
+    for (let i = 1; i < n; i++) {
+      const o = vals[i - 1];
+      const c = vals[i];
+      const up = c >= o;
+      const hi = Math.max(o, c) + rnd() * 0.03;
+      const lo = Math.min(o, c) - rnd() * 0.03;
+      ctx.strokeStyle = up ? col : "rgba(243,241,236,0.45)";
+      ctx.fillStyle = up ? col : P.bg;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(px(i), py(hi));
+      ctx.lineTo(px(i), py(lo));
+      ctx.stroke();
+      ctx.fillRect(px(i) - cw * 0.3, py(Math.max(o, c)), cw * 0.6, Math.max(1, py(Math.min(o, c)) - py(Math.max(o, c))));
+      if (!up) ctx.strokeRect(px(i) - cw * 0.3, py(Math.max(o, c)), cw * 0.6, Math.max(1, py(Math.min(o, c)) - py(Math.max(o, c))));
+    }
+  } else {
+    ctx.beginPath();
+    vals.forEach((val, i) => (i ? ctx.lineTo(px(i), py(val)) : ctx.moveTo(px(i), py(val))));
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 14;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.lineTo(px(n - 1), y + h);
+    ctx.lineTo(px(0), y + h);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, y, 0, y + h);
+    grad.addColorStop(0, `hsla(${spectrumHue(t)} 90% 62% / 0.28)`);
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+  // One number, the way a journal would note it.
+  const last = vals[n - 1] - vals[0];
+  ctx.font = `${Math.round(h * 0.11)}px ${MONO}`;
+  ctx.textBaseline = "top";
+  ctx.textAlign = "left";
+  ctx.fillStyle = P.com;
+  ctx.fillText(seed % 2 === 0 ? "4H" : "1D", x + w * 0.06, y + h * 0.07);
+  ctx.textAlign = "right";
+  ctx.fillStyle = last >= 0 ? col : "rgba(243,241,236,0.6)";
+  ctx.fillText(`${last >= 0 ? "+" : "−"}${(Math.abs(last) * 6).toFixed(1)}%`, x + w * 0.94, y + h * 0.07);
+  ctx.restore();
+}
+
+/** Trader panes: eight charts, eight journal numbers. */
+export function makeTraderAtlas(t: number): THREE.Texture {
+  const TW = 512;
+  const TH = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = TW * ATLAS_N;
+  canvas.height = TH * ATLAS_N;
+  const ctx = canvas.getContext("2d")!;
+  return makeTexture(canvas, () => {
+    ctx.fillStyle = "#0b0b11";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < ATLAS_TILES; i++) {
+      const x = (i % ATLAS_N) * TW;
+      const y = Math.floor(i / ATLAS_N) * TH;
+      if (i < 8) drawChart(ctx, x, y, TW, TH, t, i + 3);
+      else drawGlyph(ctx, x, y, TW, TH, TICKERS[i - 8], t);
+    }
+  });
+}
+
+/**
+ * Square tiles of tool / language logos from public/hub/icons (see scripts/hub-icons.mjs).
+ * The texture starts blank and fills in as each SVG arrives.
+ */
+export function makeIconAtlas(files: string[]): THREE.Texture {
+  const S = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = S * ATLAS_N;
+  canvas.height = S * ATLAS_N;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#0b0b11";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  files.slice(0, ATLAS_TILES).forEach((file, i) => {
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+      const x = (i % ATLAS_N) * S;
+      const y = Math.floor(i / ATLAS_N) * S;
+      const pad = S * 0.24;
+      const box = S - pad * 2;
+      const r = Math.min(box / img.width, box / img.height);
+      const w = img.width * r;
+      const h = img.height * r;
+      ctx.drawImage(img, x + (S - w) / 2, y + (S - h) / 2, w, h);
+      tex.needsUpdate = true;
+    };
+    img.src = `/hub/icons/${file}`;
+  });
+  return tex;
+}
+
+/** The engineer's tools, in the order they appear (max 16 per atlas). */
+export const ENGINEER_ICONS = [
+  "typescript.svg", "nextdotjs.svg", "react.svg", "nodedotjs.svg",
+  "python.svg", "csharp.svg", "dotnet.svg", "java.svg",
+  "vscode.svg", "cursor.svg", "claude.svg", "git.svg",
+  "docker.svg", "postgresql.svg", "supabase.svg", "threedotjs.svg",
+];
 
 /** One 2048 × 1024 atlas of 16 tiles, 512 × 256 each (2:1, like the panes). */
 export function makeSlabAtlas(t: number): THREE.Texture {

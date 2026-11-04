@@ -497,6 +497,23 @@ html.is-portal-hover .light-cursor-ring::before {
 .hub-v3.is-immersive .hub-numeral {
   display: none;
 }
+/* Through the doorway: the view darkens into the screen; one small light in the world's colour
+   holds the eye while the world loads. */
+.hub-enter {
+  background: var(--void);
+}
+.hub-enter-light {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--c);
+  box-shadow: 0 0 18px 4px color-mix(in srgb, var(--c) 70%, transparent);
+  animation: hub-enter-light 1.4s var(--ease-in-out) infinite;
+}
+@keyframes hub-enter-light {
+  0%, 100% { transform: scale(0.8); opacity: 0.6; }
+  50% { transform: scale(1.3); opacity: 1; }
+}
 /* Leaving through a doorway: the words go first, the colour follows. */
 .hub-v3.is-entering main,
 .hub-v3.is-entering nav,

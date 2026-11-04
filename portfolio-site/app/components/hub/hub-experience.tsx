@@ -259,11 +259,26 @@ export function HubExperience({ chapters, upcoming }: Props) {
     const el = enterRef.current;
     if (!entering || !el) return;
     document.documentElement.classList.add("is-portal-hover");
-    const tw = gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.55, ease: "power2.in", delay: PORTAL_LENGTH - 0.6 });
+    const tw = gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.7, ease: "power2.in", delay: PORTAL_LENGTH - 0.8 });
     return () => {
       tw.kill();
     };
   }, [entering]);
+
+  // Back from a world: the browser may restore this page from its cache mid-flight (colour up,
+  // camera inside the screen). Put everything back where it was.
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (!e.persisted) return;
+      vr.current.portal = null;
+      vr.current.portalHover = null;
+      setEntering(null);
+      document.documentElement.classList.remove("is-portal-hover");
+      ambient.resume();
+    };
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, []);
 
   // Returning in the same session: land once ready.
   useEffect(() => {
@@ -356,6 +371,13 @@ export function HubExperience({ chapters, upcoming }: Props) {
       const typing = document.activeElement && document.activeElement !== document.body && document.activeElement.tagName !== "BUTTON";
       if (typing) return;
       const p = vr.current.phase;
+      ambient.resume();
+      if (p === "climb" && !e.ctrlKey && !e.metaKey && (e.key === "-" || e.key === "_" || e.key === "=" || e.key === "+" || e.key === "0")) {
+        // Lens: − pulls the view wide (watch an assembly whole), + tightens, 0 resets.
+        const s = vr.current;
+        s.zoom = e.key === "0" ? 0 : Math.max(-0.5, Math.min(1, s.zoom + (e.key === "-" || e.key === "_" ? 0.25 : -0.25)));
+        return;
+      }
       if (e.key === " " || e.key === "Enter") {
         if (gate === "full" && p === "gate" && status === "ready") {
           e.preventDefault();
@@ -460,12 +482,13 @@ export function HubExperience({ chapters, upcoming }: Props) {
       const dx = e.clientX - start.x;
       const dy = e.clientY - start.y;
       if (!s.dragging && Math.hypot(dx, dy) > 8) {
-        window.clearTimeout(holdTimer);
         if (e.pointerType === "mouse" && lookable()) {
+          // Moving while held keeps time slow and looks around; moving early is a plain drag.
+          if (!s.holding) window.clearTimeout(holdTimer);
           s.dragging = true;
-          s.holding = false;
           document.documentElement.classList.add("is-dragging");
         } else {
+          window.clearTimeout(holdTimer);
           start = null; // touch: moving means scrolling
           s.holding = false;
           return;
@@ -477,6 +500,7 @@ export function HubExperience({ chapters, upcoming }: Props) {
       }
     };
     const down = (e: PointerEvent) => {
+      ambient.resume();
       if (e.button !== 0 || interactive(e.target) || !lookable()) return;
       // A finger arrives without a move: the scene needs the point for the doorway test.
       s.px = (e.clientX / window.innerWidth) * 2 - 1;
@@ -745,7 +769,11 @@ export function HubExperience({ chapters, upcoming }: Props) {
         <GateSkeleton />
       </div>
       <div ref={flashRef} aria-hidden className="vr-flash fixed inset-0 z-40 opacity-0" />
-      {entering ? <div ref={enterRef} aria-hidden className="fixed inset-0 z-[46] opacity-0" style={{ backgroundColor: spectrumColor(entering.t, 70) }} /> : null}
+      {entering ? (
+        <div ref={enterRef} aria-hidden className="hub-enter fixed inset-0 z-[46] flex items-center justify-center opacity-0" style={{ "--c": spectrumColor(entering.t) } as CSSProperties}>
+          <span className="hub-enter-light" />
+        </div>
+      ) : null}
       {blink ? (
         <svg aria-hidden className="vr-blink fixed inset-0 z-40 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
           <defs>
