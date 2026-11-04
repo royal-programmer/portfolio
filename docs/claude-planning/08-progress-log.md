@@ -5,6 +5,28 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Round D, second pass: Normal mode as a motion piece, the phone pass (2026-11-05)
+
+- **Normal mode** (`hub/normal-journey.tsx`): "the headset stays off" is now the same
+  story as a flat, scroll-driven 2D canvas, no WebGL — drawn in the still poster's own
+  1600×900 space so it takes over from the SSR poster without a seam. Hero → through:
+  the white ray falls onto the prism and the spectrum fans open. The climb: the view
+  follows the light (zooms about the prism exit and **turns through the spectrum**, so
+  each persona's colour comes round to point right in turn and washes the sky), panes
+  drift past, and that persona's setup draws itself as line-work in its own light —
+  one icon per world (laptop, desk, camera, easel, bike, tower), stroked in by
+  nearness, glowing on its chapter, letting go after. The ending drains the colour to
+  stars. Progress is the page's own `state.c`; reduced motion keeps the scroll-follow
+  and drops the breathing; redraws pause when the tab is hidden; DPR capped at 1.5.
+- **Phone pass.** Portrait screens: the setup now sits at the centre of the upper half
+  (`frame.right × (1 − portrait)`, `up + 0.5·portrait`) instead of off the right edge,
+  and the Director opens the lens (`FOV × (1 + 0.45·portrait)`) so the climb is not a
+  keyhole. Header fits at 390 px: Music is icon-only and Sound is bars-only under `sm`
+  (labels stay for screen readers), tighter gaps. Checked at 390×844: gate, engineer,
+  photographer, Normal mode.
+- Still open in round D: a sound-design pass (per-world ambience, lighter wind on the
+  climb) and the Jamendo id (Ratul).
+
 ## Round D, first pass: the ending and the rewind, the music dock (2026-11-05)
 
 Ratul: "go round D". Scope from `14-vr-journey-concept.md`: ending (fade, empty sky,

@@ -36,6 +36,7 @@ import { GateSkeleton, HeadsetGate, type LoadStatus } from "./headset-gate";
 import { printCredits } from "@/lib/site/credits";
 import { LightCursor } from "./light-cursor";
 import { MusicButton, MusicDock } from "./music-player";
+import { NormalJourney } from "./normal-journey";
 import { RefractionPoster } from "./refraction-poster";
 import { PORTAL_LENGTH, PORTAL_OUT_LENGTH, REWIND_LENGTH, atLeast, createVrState, type Band, type Phase, type World } from "./vr/state";
 
@@ -748,6 +749,8 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         <div className={`poster-alive absolute inset-0 transition-opacity duration-[1400ms] ${sceneWanted || !decided ? "opacity-0" : "opacity-100"}`}>
           <RefractionPoster bands={bands} />
         </div>
+        {/* Normal mode: the same journey as a flat motion piece, over the still poster it started from. */}
+        {decided && !sceneWanted && experience === "normal" ? <NormalJourney state={vr} worlds={worlds} sectionT={sectionT} /> : null}
         {sceneWanted ? (
           <div className="absolute inset-0">
             <SceneBoundary onFail={onSceneFail}>
@@ -780,9 +783,12 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         >
           {DISPLAY_ROOT}
         </button>
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-3 sm:gap-5">
           {ready && experience === "immersive" ? <QualityMenu value={quality} className="hidden md:block" /> : null}
-          <MusicButton className="hidden sm:inline-flex" />
+          <MusicButton />
+          <span className="sm:hidden">
+            <SoundToggle compact />
+          </span>
           <span className="hidden sm:block">
             <SoundToggle />
           </span>

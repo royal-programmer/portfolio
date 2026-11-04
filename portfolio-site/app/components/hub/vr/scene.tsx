@@ -70,6 +70,11 @@ type Props = {
 
 function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: Array<number | null>; worlds: World[]; onPhaseEnd: (p: Phase) => void; onPortalHover?: (slug: string | null) => void }) {
   const { clock, state } = useVr();
+  const size = useThree((s) => s.size);
+  // Phones hold the view upright: the vertical field is the fixed one, so open it up or the
+  // climb becomes a keyhole.
+  const portrait = clamp01((1.2 - size.width / Math.max(1, size.height)) / 0.6);
+  const fovBase = FOV * (1 + portrait * 0.45);
   const live = useRef({ c: 0, px: 0, py: 0, yaw: 0, pitch: 0, fov: FOV, hover: false, portalHover: null as string | null, tscale: "", sound: -1, ended: "" as Phase | "" });
   const tmp = useMemo(
     () => ({
@@ -260,7 +265,7 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
     // Lens: holding narrows the view; rushing widens it.
     const cam = camera as THREE.PerspectiveCamera;
     // Lens: holding narrows the view; rushing widens it; the visitor's zoom opens it right up.
-    const zoomed = FOV * (1 + s.zoom * 0.95);
+    const zoomed = fovBase * (1 + s.zoom * 0.95);
     L.fov = THREE.MathUtils.damp(L.fov, zoomed - (1 - k.scale) * 6 + k.speed * 12 - into * 14, 3, dt);
     if (Math.abs(cam.fov - L.fov) > 0.01) {
       cam.fov = L.fov;

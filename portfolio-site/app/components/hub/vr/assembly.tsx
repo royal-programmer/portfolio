@@ -114,7 +114,14 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
   const frame = useMemo(() => {
     const aspect = size.width / Math.max(1, size.height);
     const narrow = THREE.MathUtils.clamp(1.67 / aspect, 1, 2.2);
-    return { fwd: (offset?.fwd ?? 5) + (narrow - 1) * 2.2, right: (offset?.right ?? 1.4) / narrow, up: (offset?.up ?? -0.3) + (narrow - 1) * 1.1 };
+    // Portrait (phones): the copy sits in the lower half, so the setup goes to the centre of the
+    // upper half instead of beside the text.
+    const portrait = clamp01((1.2 - aspect) / 0.6);
+    return {
+      fwd: (offset?.fwd ?? 5) + (narrow - 1) * 2.2,
+      right: ((offset?.right ?? 1.4) / narrow) * (1 - portrait),
+      up: (offset?.up ?? -0.3) + (narrow - 1) * 1.1 + portrait * 0.5,
+    };
   }, [size.width, size.height, offset?.fwd, offset?.right, offset?.up]);
   const L = useMemo<AssemblyLive>(() => ({ gather: 0, g3: 0, open: 0, power: 0, hover: 0, t: 0, d: -9 }), []);
 

@@ -93,7 +93,7 @@ export function ModeSwitch({ className = "" }: { className?: string }) {
   );
 }
 
-export function SoundToggle({ className = "" }: { className?: string }) {
+export function SoundToggle({ className = "", compact = false }: { className?: string; /** Bars only (phones): the label stays for screen readers. */ compact?: boolean }) {
   const { sound, setSound } = useExperience();
   return (
     <button
@@ -108,7 +108,7 @@ export function SoundToggle({ className = "" }: { className?: string }) {
         <i />
         <i />
       </span>
-      Sound {sound ? "on" : "off"}
+      <span className={compact ? "sr-only" : ""}>Sound {sound ? "on" : "off"}</span>
     </button>
   );
 }

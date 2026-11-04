@@ -22,7 +22,7 @@ export function MusicButton({ className = "" }: { className?: string }) {
       className={`group inline-flex min-h-8 items-center gap-2 font-mono text-[10px] tracking-[0.16em] text-[var(--ink-dim)] uppercase transition-colors hover:text-[var(--ink)] ${className}`}
     >
       <span aria-hidden className={`music-note ${m.playing ? "is-on" : ""}`} />
-      Music
+      <span className="sr-only sm:not-sr-only">Music</span>
     </button>
   );
 }
