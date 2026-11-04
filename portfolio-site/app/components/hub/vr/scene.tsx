@@ -25,7 +25,7 @@ import { Headset } from "./headset";
 import { ApproachLight, Cone, Photons, Rays } from "./light";
 import { Dome, Stars } from "./sky";
 import { Space } from "./space";
-import { PHASE_LENGTH, PORTAL_LENGTH, PORTAL_OUT_LENGTH, type Band, type Phase, type VrState, type World } from "./state";
+import { PHASE_LENGTH, PORTAL_LENGTH, REWIND_LENGTH, PORTAL_OUT_LENGTH, type Band, type Phase, type VrState, type World } from "./state";
 import { clamp01, climbPose, ease, easeIn, easeInOut, makePose, WORLD } from "./util";
 
 export type QualityPreset = { dpr: number; bloomScale: number; msaa: number; photons: number; stars: number; rays: number; slabs: number };
@@ -137,14 +137,26 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
     // Back from a world we land on its chapter: no ride up from the start of the climb.
     if (s.portalOut && Math.abs(L.c - s.c) > 0.3) L.c = s.c;
     L.c = THREE.MathUtils.damp(L.c, s.c, 3.4, dt);
+    // The rewind: a fast dive back down the whole climb, rushing like the approach did.
+    let rewind = 0;
+    if (s.rewind) {
+      rewind = clamp01((now - s.rewind.at) / 1000 / REWIND_LENGTH);
+      L.c = s.rewind.from * (1 - rewind * rewind);
+      k.speed = Math.max(k.speed, Math.sin(rewind * Math.PI));
+    }
     k.climb = s.phase === "climb" ? L.c : 0;
+    // The ending: past the last world the colours fade and the sky empties.
+    const lastWorld = worlds.length ? worlds[worlds.length - 1].c : 0;
+    const endC = sectionT.length - 1;
+    k.ending = s.phase === "climb" ? THREE.MathUtils.smoothstep(L.c, lastWorld + 0.45, Math.max(lastWorld + 0.5, endC - 0.05)) : 0;
+    if (s.phase === "climb") k.cone = 1 - k.ending;
 
     // Sky tint: the persona section nearest to the scroll.
     const idx = Math.round(L.c);
     const t = sectionT[idx] ?? null;
     const near = 1 - Math.min(1, Math.abs(L.c - idx) * 1.4);
     k.tint = t ?? k.tint;
-    k.tintAmount = THREE.MathUtils.damp(k.tintAmount, k.cone * (t === null ? 0.12 : 0.25 + 0.45 * near), 3, dt);
+    k.tintAmount = THREE.MathUtils.damp(k.tintAmount, k.cone * (t === null ? 0.12 : 0.25 + 0.45 * near) * (1 - k.ending), 3, dt);
 
     // Headset / lit-assembly hover → page cursor; time scale → the cursor's "time ×0.27" and the sound.
     if (L.hover !== s.hover) {
@@ -186,6 +198,9 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
       tmp.pos.copy(p.pos);
       pitch = p.pitch;
       yaw = p.yaw;
+      // The ending tilts the head back up into the empty sky; the rewind looks back down the climb.
+      pitch += (1.22 - pitch) * easeInOut(k.ending);
+      pitch -= 0.9 * easeInOut(rewind) * (1 - rewind * 0.5);
     }
 
     // Through the doorway: the camera flies into the lit screen, straight on — and back out

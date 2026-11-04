@@ -12,7 +12,8 @@ import type { VrState } from "./state";
  *   chroma   0…1 how far the white has separated into colour
  *   climb    damped scroll progress (sections)
  *   sky      0…1 how visible the sky/stars are (0 in the gate)
- *   speed    0…1 sense of rushing (stars, lens) during the approach
+ *   speed    0…1 sense of rushing (stars, lens) during the approach and the rewind
+ *   ending   0…1 past the last world: the colours fade, the camera tilts up into an empty sky
  */
 export type VrClock = {
   t: number;
@@ -26,13 +27,14 @@ export type VrClock = {
   climb: number;
   sky: number;
   speed: number;
+  ending: number;
   /** Position of the spectrum the sky is tinted with (0…1), and how much. */
   tint: number;
   tintAmount: number;
 };
 
 export function createClock(): VrClock {
-  return { t: 0, dt: 0, scale: 1, phaseT: 0, approach: 0, cone: 0, spread: 0, chroma: 0, climb: 0, sky: 0, speed: 0, tint: 0.5, tintAmount: 0 };
+  return { t: 0, dt: 0, scale: 1, phaseT: 0, approach: 0, cone: 0, spread: 0, chroma: 0, climb: 0, sky: 0, speed: 0, ending: 0, tint: 0.5, tintAmount: 0 };
 }
 
 export type VrContextValue = {

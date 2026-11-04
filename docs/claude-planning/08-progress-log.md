@@ -5,6 +5,40 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Round D, first pass: the ending and the rewind, the music dock (2026-11-05)
+
+Ratul: "go round D". Scope from `14-vr-journey-concept.md`: ending (fade, empty sky,
+"Take off your headset", reverse rewind), Normal mode, phone tuning, sound design,
+console credits (done in the fifth pass). This pass: the ending and the music.
+
+- **Ending.** Past the last world (`lastWorld.c + 0.45` → the end section) `k.ending`
+  rises: the beams close (`k.cone = 1 − ending`), the sky tint and the slab field fade
+  with it, and the head tilts back up into the empty night sky (pitch → 1.22 rad).
+  Under the closing copy, one quiet mono line with a breathing ring: **Take off your
+  headset** (immersive only).
+- **Rewind.** Click it: `state.rewind = {at, from}`; the Director dives `L.c` from
+  `from` to 0 over `REWIND_LENGTH` 1.5 s (`1 − u²`), rushing (`k.speed`), looking back
+  down the climb; the lids close over the last 640 ms (the eye mounts open — `rx` is
+  render-time 260 while closing — then runs shut in 400 ms, blur returning), the phase
+  returns to `gate` with the headset screen while shut, then the eyes open onto it
+  over 900 ms: the start again. Sound: `ambient.rewind()` — the drone pitches down
+  like a tape stop, a whoosh falls through the rising wind, then silence. One lids
+  runner (`runLids(dir, len, delay, onEnd)`) now drives the intro's opening too.
+  Measured: lids mount 1.14 s, shut 1.57 s, gate 1.65 s, open again 2.03–2.84 s.
+- **Music dock.** Top bar: *Music* (next to Sound). A small glass dock bottom-right:
+  paste a YouTube or SoundCloud link (plays in that service's own visible player —
+  their terms — driven by postMessage for pause/play) or search Jamendo (CC, free,
+  no ads; each track links back to Jamendo as its API terms 4.1 require; our
+  `/api/music/search` route holds `JAMENDO_CLIENT_ID` server-side, caches 5 min).
+  One source at a time; the ambient drone **ducks** to 22 % under music
+  (`ambient.duck`). The last source is remembered in `localStorage` but never
+  auto-plays: a "Play the link you left" tile waits for a tap. Links verified
+  (iframe mounts, state persists). **Jamendo search is unverified:** Jamendo's public
+  test id is suspended on their side, so the route reports "not set up" until Ratul
+  registers a free client id (devportal.jamendo.com) and sets `JAMENDO_CLIENT_ID`.
+- Pending in round D: Normal mode as a real scroll-driven motion piece, the phone
+  pass, sound polish.
+
 ## Round C feedback, fifth pass: real bike, loaders from frame one, console credits (2026-11-05)
 
 Ratul's answers to the fourth pass: pass-through "more or less resolved"; bring a

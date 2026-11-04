@@ -220,7 +220,7 @@ export function Slabs({ world, count, atlas, tiles, width, aspect, span = SPAN, 
     const k = clock.current;
     material.uniforms.uTime.value = k.t;
     material.uniforms.uCam.value = k.climb;
-    material.uniforms.uShow.value = state.current.phase === "climb" ? 1 : 0;
+    material.uniforms.uShow.value = state.current.phase === "climb" ? 1 - k.ending : 0;
   });
 
   return <mesh geometry={geometry} material={material} frustumCulled={false} renderOrder={6} />;

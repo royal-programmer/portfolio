@@ -35,8 +35,9 @@ import { ExitFrame, ExitSequence } from "./exit-sequence";
 import { GateSkeleton, HeadsetGate, type LoadStatus } from "./headset-gate";
 import { printCredits } from "@/lib/site/credits";
 import { LightCursor } from "./light-cursor";
+import { MusicButton, MusicDock } from "./music-player";
 import { RefractionPoster } from "./refraction-poster";
-import { PORTAL_LENGTH, PORTAL_OUT_LENGTH, atLeast, createVrState, type Band, type Phase, type World } from "./vr/state";
+import { PORTAL_LENGTH, PORTAL_OUT_LENGTH, REWIND_LENGTH, atLeast, createVrState, type Band, type Phase, type World } from "./vr/state";
 
 const VrScene = dynamic(() => import("./vr/scene"), { ssr: false });
 
@@ -98,6 +99,9 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   const [touch, setTouch] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const [blink, setBlink] = useState(false);
+  /** "Take off your headset": the dive back down the climb, lids closing, back to the gate. */
+  const [rewinding, setRewinding] = useState(false);
+  const [closing, setClosing] = useState(false);
   /** False until the page knows how it will open — a void cover hides everything until then. */
   const [decided, setDecided] = useState(false);
   /** The world being entered through its lit assembly (its colour fills the view, then we leave). */
@@ -317,6 +321,76 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     }, 500);
   }, [setExperience, setPhase]);
 
+  // The lids: one runner for the intro's opening, the rewind's closing and the re-opening on the
+  // headset screen. A plain animation frame, not a tween: the scene's loop is the one clock that
+  // never stalls. The gradient feathers the last 45 % of the ellipse; the blur follows the opening.
+  const runLids = useCallback((dir: "open" | "close", len: number, delay = 0, onEnd?: () => void) => {
+    const canvas = rootRef.current?.querySelector<HTMLCanvasElement>("canvas") ?? null;
+    const eye = eyeRef.current;
+    if (!eye) return;
+    const t0 = performance.now() + delay;
+    if (blinkRaf.current) cancelAnimationFrame(blinkRaf.current);
+    const frame = (now: number) => {
+      const x = Math.min(1, Math.max(0, (now - t0) / len));
+      // Opening eases in and out as a slit that rounds; closing is quick and lands hard.
+      const u = dir === "open" ? (x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2) : 1 - x * x;
+      eye.setAttribute("rx", (260 * Math.pow(u, 0.75)).toFixed(2));
+      eye.setAttribute("ry", (260 * Math.pow(u, 1.6)).toFixed(2));
+      if (canvas) canvas.style.filter = u < 0.999 && u > 0.001 ? `blur(${(16 * Math.pow(1 - u, 1.4)).toFixed(2)}px)` : "";
+      if (x < 1) blinkRaf.current = requestAnimationFrame(frame);
+      else {
+        blinkRaf.current = 0;
+        onEnd?.();
+      }
+    };
+    blinkRaf.current = requestAnimationFrame(frame);
+  }, []);
+
+  // ---- Ending: take off the headset ------------------------------------------
+  const rewind = useCallback(() => {
+    const s = vr.current;
+    if (s.phase !== "climb" || s.rewind || s.portal) return;
+    s.rewind = { at: performance.now(), from: s.c };
+    s.zoom = 0;
+    setRewinding(true);
+    setHint(null);
+    ambient.rewind();
+    const ms = REWIND_LENGTH * 1000;
+    const lids = window.setTimeout(() => setClosing(true), ms - 640);
+    const back = window.setTimeout(() => {
+      s.rewind = null;
+      s.skipped = false;
+      s.approach = 0;
+      s.c = 0;
+      s.yaw = s.pitch = 0;
+      window.scrollTo(0, 0);
+      lenisRef.current?.scrollTo(0, { immediate: true, force: true });
+      setPhase("gate");
+      setStartedAt(performance.now());
+      setGate("full");
+      ambient.stop();
+      setRewinding(false);
+      // Shut for a beat over the headset screen, then the eyes open on it: the start again.
+      runLids("open", 900, 300, () => {
+        setClosing(false);
+        setBlink(false);
+      });
+    }, ms + 120);
+    return () => {
+      window.clearTimeout(lids);
+      window.clearTimeout(back);
+    };
+  }, [setPhase, runLids]);
+
+  // The lids close over the end of the dive (the eye mounts open, then runs shut).
+  useEffect(() => {
+    if (!closing) return;
+    setBlink(true);
+  }, [closing]);
+  useEffect(() => {
+    if (closing && blink) runLids("close", 400);
+  }, [closing, blink, runLids]);
+
   // The world's colour rises over the last part of the flight in.
   useEffect(() => {
     const el = enterRef.current;
@@ -368,36 +442,13 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     }
   }, [experience, phase, gate, device, setPhase]);
 
-  // The blink: black, then the eyes open onto the sky.
+  // The blink: black, then the eyes open onto the sky. The loop outlives the phase: the sky
+  // arrives while the lids are still opening, and the opening must not stop when it does.
   useEffect(() => {
-    if (phase !== "blink" || !eyeRef.current) return;
-    // One continuous opening: the lids part as a slit that rounds out as it grows past the view
-    // (the gradient feathers the last 45 % of the ellipse). The blur releases in step with it, and
-    // the overlay leaves only once the opening is wider than the screen — no visible step. Driven
-    // by a plain animation frame, not a tween: the scene's loop is the one clock that never stalls.
-    const canvas = rootRef.current?.querySelector<HTMLCanvasElement>("canvas") ?? null;
-    const eye = eyeRef.current;
+    if (phase !== "blink") return;
     setBlink(true); // stays mounted through the sky until the opening is wider than the view
-    const t0 = performance.now() + 250;
-    const LEN = 1700;
-    // The loop outlives the phase: the sky arrives while the lids are still opening, and the
-    // opening must not stop (or the blur snap) when it does. Cancelled only on unmount.
-    if (blinkRaf.current) cancelAnimationFrame(blinkRaf.current);
-    const frame = (now: number) => {
-      const x = Math.min(1, Math.max(0, (now - t0) / LEN));
-      const u = x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2; // ease in-out
-      // Width leads, height follows: a slit first, then round.
-      eye.setAttribute("rx", (260 * Math.pow(u, 0.75)).toFixed(2));
-      eye.setAttribute("ry", (260 * Math.pow(u, 1.6)).toFixed(2));
-      if (canvas) canvas.style.filter = u < 0.999 ? `blur(${(16 * Math.pow(1 - u, 1.4)).toFixed(2)}px)` : "";
-      if (x < 1) blinkRaf.current = requestAnimationFrame(frame);
-      else {
-        blinkRaf.current = 0;
-        setBlink(false);
-      }
-    };
-    blinkRaf.current = requestAnimationFrame(frame);
-  }, [phase]);
+    runLids("open", 1700, 250, () => setBlink(false));
+  }, [phase, runLids]);
   useEffect(() => () => cancelAnimationFrame(blinkRaf.current), []);
 
   // Hint while the light approaches; sound follows the light.
@@ -541,7 +592,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   }, []);
 
   // Scroll is locked until the climb (or in Normal mode, once the gate is gone), and again while leaving.
-  const scrollFree = gate === null && !entering && (experience === "normal" || phase === "climb");
+  const scrollFree = gate === null && !entering && !rewinding && (experience === "normal" || phase === "climb");
   useEffect(() => {
     document.documentElement.classList.toggle("scroll-locked", !scrollFree);
     if (scrollFree) lenisRef.current?.start();
@@ -553,7 +604,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     const s = vr.current;
     let start: { x: number; y: number; yaw: number; pitch: number; id: number; at: number; type: string } | null = null;
     let holdTimer = 0;
-    const interactive = (t: EventTarget | null) => !!(t as Element | null)?.closest?.("a, button, input, label, [role='radio'], [role='alertdialog']");
+    const interactive = (t: EventTarget | null) => !!(t as Element | null)?.closest?.("a, button, input, label, iframe, [role='radio'], [role='alertdialog'], [role='dialog']");
     const lookable = () => immersiveLive && atLeast(s.phase, "sky");
 
     const move = (e: PointerEvent) => {
@@ -690,7 +741,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   return (
     <div
       ref={rootRef}
-      className={`hub-v3 relative bg-[var(--void)] text-[var(--ink)] ${immersiveLive ? "is-immersive" : "is-normal"} ${textLive ? "" : "is-quiet"} ${entering ? "is-entering" : ""}`}
+      className={`hub-v3 relative bg-[var(--void)] text-[var(--ink)] ${immersiveLive ? "is-immersive" : "is-normal"} ${textLive ? "" : "is-quiet"} ${entering || rewinding ? "is-entering" : ""}`}
     >
       {/* ---------- Backdrop ---------- */}
       <div aria-hidden className="fixed inset-0 z-0">
@@ -731,6 +782,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         </button>
         <div className="flex items-center gap-5">
           {ready && experience === "immersive" ? <QualityMenu value={quality} className="hidden md:block" /> : null}
+          <MusicButton className="hidden sm:inline-flex" />
           <span className="hidden sm:block">
             <SoundToggle />
           </span>
@@ -833,6 +885,13 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
                   Say hello <span aria-hidden>→</span>
                 </a>
                 <p className="mt-4 font-mono text-xs text-[var(--ink-faint)]">{HUB_COPY.email}</p>
+                {immersiveLive && introDone ? (
+                  // The one line in the empty sky (D38): click it and the journey rewinds to the headset.
+                  <button type="button" onClick={rewind} className="vr-takeoff">
+                    <span aria-hidden className="vr-takeoff-ring" />
+                    Take off your headset
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -872,7 +931,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
             </radialGradient>
             <mask id="vr-eye">
               <rect width="100" height="100" fill="#fff" />
-              <ellipse ref={eyeRef} cx="50" cy="50" rx="0" ry="0" fill="url(#vr-eye-soft)" />
+              <ellipse ref={eyeRef} cx="50" cy="50" rx={closing ? 260 : 0} ry={closing ? 260 : 0} fill="url(#vr-eye-soft)" />
             </mask>
           </defs>
           <rect width="100" height="100" fill="#050507" mask="url(#vr-eye)" />
@@ -895,6 +954,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       ) : null}
 
       {ready ? <LightCursor /> : null}
+      <MusicDock />
 
       {struggling ? (
         <div role="alertdialog" aria-label="Performance" className="fixed inset-x-4 bottom-6 z-40 mx-auto flex max-w-md flex-col gap-4 rounded-2xl border border-[var(--line)] bg-[rgba(10,10,14,0.9)] p-5 backdrop-blur-xl sm:flex-row sm:items-center">

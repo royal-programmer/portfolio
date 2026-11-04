@@ -23,6 +23,10 @@ type Engine = {
   shimmer: GainNode;
   depth: number;
   scale: number;
+  /** The drone is on (start was called, stop was not). */
+  on: boolean;
+  /** 1 normally; lower while music plays over it. */
+  duck: number;
 };
 
 let engine: Engine | null = null;
@@ -101,7 +105,7 @@ function build(): Engine | null {
   }
   shimmer.connect(master);
 
-  return { ctx, master, filter, oscs, wind, windBand, sub, subOsc, shimmer, depth: 0, scale: 1 };
+  return { ctx, master, filter, oscs, wind, windBand, sub, subOsc, shimmer, depth: 0, scale: 1, on: false, duck: 1 };
 }
 
 function applyFilter(e: Engine) {
@@ -118,8 +122,18 @@ export const ambient = {
     if (!engine) return;
     const { ctx, master } = engine;
     void ctx.resume();
+    engine.on = true;
     master.gain.cancelScheduledValues(ctx.currentTime);
-    master.gain.setTargetAtTime(0.55, ctx.currentTime, 1.2);
+    master.gain.setTargetAtTime(0.55 * engine.duck, ctx.currentTime, 1.2);
+  },
+  /** Music is playing over the drone: sit under it (the small sounds stay as they are). */
+  duck(on: boolean) {
+    if (!engine) return;
+    engine.duck = on ? 0.22 : 1;
+    if (!engine.on) return;
+    const { ctx, master } = engine;
+    master.gain.cancelScheduledValues(ctx.currentTime);
+    master.gain.setTargetAtTime(0.55 * engine.duck, ctx.currentTime, on ? 0.6 : 1.2);
   },
   /** After a reload the context starts suspended: resume on the first gesture. */
   resume() {
@@ -128,6 +142,7 @@ export const ambient = {
   },
   stop() {
     if (!engine) return;
+    engine.on = false;
     const { ctx, master } = engine;
     master.gain.cancelScheduledValues(ctx.currentTime);
     master.gain.setTargetAtTime(0, ctx.currentTime, 0.4);
@@ -264,6 +279,38 @@ export const ambient = {
       o.start(now);
       o.stop(now + 2.5);
     });
+  },
+  /** The rewind: the drone winds down like a tape stop, a whoosh falls through the wind, then silence. */
+  rewind() {
+    if (!engine || engine.master.gain.value < 0.01) return;
+    const { ctx, oscs, wind, windBand, master } = engine;
+    const now = ctx.currentTime;
+    for (const o of oscs) {
+      o.detune.cancelScheduledValues(now);
+      o.detune.setValueAtTime(o.detune.value, now);
+      o.detune.linearRampToValueAtTime(-2400, now + 1.4);
+    }
+    wind.gain.cancelScheduledValues(now);
+    wind.gain.setValueAtTime(Math.max(0.02, wind.gain.value), now);
+    wind.gain.linearRampToValueAtTime(0.22, now + 1.0);
+    wind.gain.linearRampToValueAtTime(0.0001, now + 1.6);
+    windBand.frequency.cancelScheduledValues(now);
+    windBand.frequency.setValueAtTime(900, now);
+    windBand.frequency.exponentialRampToValueAtTime(3400, now + 1.2);
+    const o = ctx.createOscillator();
+    o.type = "triangle";
+    o.frequency.setValueAtTime(1400, now);
+    o.frequency.exponentialRampToValueAtTime(50, now + 1.4);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.07, now + 0.15);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 1.5);
+    o.connect(g).connect(master);
+    o.start(now);
+    o.stop(now + 1.6);
+    master.gain.cancelScheduledValues(now);
+    master.gain.setValueAtTime(master.gain.value, now);
+    master.gain.setTargetAtTime(0, now + 1.25, 0.2);
   },
   /** The strike: a sub drop under the chime, then the wind falls away. */
   impact() {

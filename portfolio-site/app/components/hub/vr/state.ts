@@ -54,7 +54,12 @@ export type VrState = {
   portalOut: { slug: string; at: number } | null;
   /** Lens: 0 normal, +1 pulled wide (watch the assembly whole), −0.5 tight. Keys − / + / 0. */
   zoom: number;
+  /** "Take off your headset": the camera dives back down the climb from `from`, then the lids close. */
+  rewind: { at: number; from: number } | null;
 };
+
+/** Seconds the rewind dive takes (the lids close over its last part). */
+export const REWIND_LENGTH = 1.5;
 
 /** Seconds the camera takes to fly into a lit screen (the world's own sequence follows). */
 export const PORTAL_LENGTH = 0.8;
@@ -84,6 +89,7 @@ export function createVrState(): VrState {
     portal: null,
     portalOut: null,
     zoom: 0,
+    rewind: null,
   };
 }
 
