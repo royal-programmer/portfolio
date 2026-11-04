@@ -1,0 +1,170 @@
+[
+  {
+    "persona": "engineer",
+    "file": "typescript.svg",
+    "title": "TypeScript",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "nextdotjs.svg",
+    "title": "Next.js",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "react.svg",
+    "title": "React",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "nodedotjs.svg",
+    "title": "Node.js",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "python.svg",
+    "title": "Python",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "dotnet.svg",
+    "title": ".NET",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "tailwindcss.svg",
+    "title": "Tailwind CSS",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "threedotjs.svg",
+    "title": "Three.js",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "docker.svg",
+    "title": "Docker",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "git.svg",
+    "title": "Git",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "github.svg",
+    "title": "GitHub",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "postgresql.svg",
+    "title": "PostgreSQL",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "supabase.svg",
+    "title": "Supabase",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "vercel.svg",
+    "title": "Vercel",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "postman.svg",
+    "title": "Postman",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "claude.svg",
+    "title": "Claude",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "cursor.svg",
+    "title": "Cursor",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "sap.svg",
+    "title": "SAP",
+    "source": "simple-icons",
+    "licence": "CC0-1.0"
+  },
+  {
+    "persona": "engineer",
+    "file": "vscode.svg",
+    "title": "vscode",
+    "source": "devicon",
+    "licence": "MIT"
+  },
+  {
+    "persona": "engineer",
+    "file": "csharp.svg",
+    "title": "csharp",
+    "source": "devicon",
+    "licence": "MIT"
+  },
+  {
+    "persona": "engineer",
+    "file": "java.svg",
+    "title": "java",
+    "source": "devicon",
+    "licence": "MIT"
+  },
+  {
+    "persona": "engineer",
+    "file": "oracle.svg",
+    "title": "oracle",
+    "source": "devicon",
+    "licence": "MIT"
+  },
+  {
+    "persona": "engineer",
+    "file": "powershell.svg",
+    "title": "powershell",
+    "source": "devicon",
+    "licence": "MIT"
+  },
+  {
+    "persona": "engineer",
+    "file": "azure.svg",
+    "title": "azure",
+    "source": "devicon",
+    "licence": "MIT"
+  }
+]
