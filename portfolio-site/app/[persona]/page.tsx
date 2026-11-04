@@ -6,6 +6,7 @@ import {
   type LaunchedPersona,
 } from "@/lib/content";
 import { HomePage } from "../components/home-page";
+import { WorldBoot } from "../components/world-boot";
 import { loadHomeContent } from "../load-home-content";
 import { InvalidPersonaView } from "./invalid-persona-view";
 
@@ -50,12 +51,17 @@ export default async function PersonaPage({ params }: PersonaPageProps) {
 
   const { personas, engineerEntries, engineerBlogPosts } = await loadHomeContent();
   const launched = persona as LaunchedPersona;
+  const accent = personas.find((p) => p.slug === launched)?.accent ?? "#f3f1ec";
   return (
-    <HomePage
-      routePersona={launched}
-      personas={personas}
-      engineerEntries={engineerEntries}
-      engineerBlogPosts={engineerBlogPosts}
-    />
+    <>
+      {/* Opens dark, like the doorway that led here; lifts once the page has drawn. */}
+      <WorldBoot color={accent} />
+      <HomePage
+        routePersona={launched}
+        personas={personas}
+        engineerEntries={engineerEntries}
+        engineerBlogPosts={engineerBlogPosts}
+      />
+    </>
   );
 }

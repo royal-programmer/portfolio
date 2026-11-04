@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { Halo, makeScreenMaterial, useAssembly } from "../assembly";
-import { LAPTOP_SCREEN_SRC, makeLaptopScreen } from "../screens";
+import { makeLaptopScreen, optimized } from "../screens";
 import type { World } from "../state";
 import { easeInOut } from "../util";
 
@@ -25,7 +25,7 @@ const OPEN_ANGLE = THREE.MathUtils.degToRad(104);
 const SCREEN_W = LAP_W * 0.93;
 const SCREEN_H = LAP_D * 0.98 * 0.88;
 
-export function EngineerAssembly({ world }: { world: World }) {
+export function EngineerAssembly({ world, screenSrc }: { world: World; /** Ratul's own screenshot for the laptop, if there is one. */ screenSrc?: string }) {
   const root = useRef<THREE.Group>(null);
   const baseRef = useRef<THREE.Group>(null);
   const lidPivot = useRef<THREE.Group>(null);
@@ -60,9 +60,9 @@ export function EngineerAssembly({ world }: { world: World }) {
   useEffect(() => () => screenTex.dispose(), [screenTex]);
   useEffect(() => {
     // Ratul's own screenshot, when there is one, replaces the drawn editor.
-    if (!LAPTOP_SCREEN_SRC) return;
+    if (!screenSrc) return;
     let live = true;
-    new THREE.TextureLoader().load(LAPTOP_SCREEN_SRC, (t) => {
+    new THREE.TextureLoader().load(optimized(screenSrc, 1080), (t) => {
       if (!live) return t.dispose();
       t.colorSpace = THREE.SRGBColorSpace;
       t.anisotropy = 4;
@@ -71,7 +71,7 @@ export function EngineerAssembly({ world }: { world: World }) {
     return () => {
       live = false;
     };
-  }, [screenMat]);
+  }, [screenMat, screenSrc]);
 
   const tmp = useMemo(() => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), e: new THREE.Euler(), s: new THREE.Vector3(1, 1, 1), o: new THREE.Object3D() }), []);
   const screens = useMemo(() => [screenRef], []);

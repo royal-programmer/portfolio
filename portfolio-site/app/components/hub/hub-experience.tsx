@@ -31,10 +31,11 @@ import { PersonaLink, personaHref } from "@/lib/site/persona-link";
 import { spectrumColor } from "@/lib/site/spectrum";
 import { useExperience } from "../../experience-provider";
 import { ModeSwitch, QualityMenu, QUALITY_LABEL, SoundToggle } from "../experience-controls";
+import { ExitSequence } from "./exit-sequence";
 import { GateSkeleton, HeadsetGate, type LoadStatus } from "./headset-gate";
 import { LightCursor } from "./light-cursor";
 import { RefractionPoster } from "./refraction-poster";
-import { PORTAL_LENGTH, atLeast, createVrState, type Band, type Phase, type World } from "./vr/state";
+import { atLeast, createVrState, type Band, type Phase, type World } from "./vr/state";
 
 const VrScene = dynamic(() => import("./vr/scene"), { ssr: false });
 
@@ -42,7 +43,7 @@ gsap.registerPlugin(ScrollTrigger, SplitText);
 
 export type HubChapter = { slug: PersonaSlug; t: number; body: string; points: string[] };
 export type HubUpcoming = { slug: PersonaSlug; t: number };
-type Props = { chapters: HubChapter[]; upcoming: HubUpcoming[] };
+type Props = { chapters: HubChapter[]; upcoming: HubUpcoming[]; /** Published engineer project slugs (the terminal's `ls`). */ terminalItems?: string[] };
 
 type SectionKind =
   | { kind: "hero" }
@@ -80,7 +81,7 @@ class SceneBoundary extends Component<{ onFail: () => void; children: ReactNode 
   }
 }
 
-export function HubExperience({ chapters, upcoming }: Props) {
+export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props) {
   const xp = useExperience();
   const { experience, ready, chosen, setExperience, setQuality, qualityChosen, sound } = xp;
 
@@ -240,7 +241,16 @@ export function HubExperience({ chapters, upcoming }: Props) {
     [setPhase, touch],
   );
 
-  /** Through the doorway: the camera flies into the screen, the world's colour fills the view, we leave. */
+  /** The pointer is on a lit screen: warm that world so the switch is instant (dev compiles it now). */
+  const warmed = useRef(new Set<string>());
+  const onPortalHover = useCallback((slug: string | null) => {
+    if (!slug || warmed.current.has(slug)) return;
+    warmed.current.add(slug);
+    const target = personaHref(window.location.origin, slug as PersonaSlug);
+    fetch(target.href, { mode: "no-cors", credentials: "include", cache: "force-cache" }).catch(() => {});
+  }, []);
+
+  /** Through the doorway: the camera flies into the screen; the world's own sequence runs; we leave when it ends. */
   const enterWorld = useCallback(
     (slug: string) => {
       const world = worlds.find((w) => w.slug === slug);
@@ -253,16 +263,15 @@ export function HubExperience({ chapters, upcoming }: Props) {
       } catch {}
       setEntering(world);
       ambient.chime(1.5);
-      // The photographer's doorway is a shutter: one quick white blink as you go through.
-      if (slug === "photographer" && flashRef.current) gsap.fromTo(flashRef.current, { opacity: 0.85 }, { opacity: 0, duration: 0.45, ease: "power2.out", delay: 0.05 });
-      const target = personaHref(window.location.origin, world.slug as PersonaSlug);
-      window.setTimeout(() => {
-        if (target.crossOrigin) window.location.assign(target.href);
-        else router.push(target.href);
-      }, PORTAL_LENGTH * 1000);
     },
-    [worlds, router],
+    [worlds],
   );
+  const leaveForWorld = useCallback(() => {
+    if (!entering) return;
+    const target = personaHref(window.location.origin, entering.slug as PersonaSlug);
+    if (target.crossOrigin) window.location.assign(target.href);
+    else router.push(target.href);
+  }, [entering, router]);
 
   const goNormal = useCallback(() => {
     sessionFlag(true);
@@ -283,7 +292,7 @@ export function HubExperience({ chapters, upcoming }: Props) {
     const el = enterRef.current;
     if (!entering || !el) return;
     document.documentElement.classList.add("is-portal-hover");
-    const tw = gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.7, ease: "power2.in", delay: PORTAL_LENGTH - 0.8 });
+    const tw = gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.45, ease: "power2.in", delay: 0.4 });
     return () => {
       tw.kill();
     };
@@ -649,6 +658,7 @@ export function HubExperience({ chapters, upcoming }: Props) {
                 state={vr}
                 quality={quality}
                 onPhaseEnd={onPhaseEnd}
+                onPortalHover={onPortalHover}
                 onWear={wear}
                 onReady={onSceneReady}
                 onStepDown={onStepDown}
@@ -795,16 +805,7 @@ export function HubExperience({ chapters, upcoming }: Props) {
       <div ref={flashRef} aria-hidden className="vr-flash fixed inset-0 z-40 opacity-0" />
       {entering ? (
         <div ref={enterRef} aria-hidden className="hub-enter fixed inset-0 z-[46] flex items-center justify-center opacity-0" style={{ "--c": spectrumColor(entering.t) } as CSSProperties}>
-          {entering.slug === "engineer" ? (
-            // The code world boots like a terminal: three lines, typed, then the cursor waits.
-            <pre className="hub-enter-term">
-              <span style={{ "--i": 0 } as CSSProperties}>$ open {personaIdentity("engineer").subdomain}.{DISPLAY_ROOT}</span>
-              <span style={{ "--i": 1 } as CSSProperties}>resolving host … ok</span>
-              <span style={{ "--i": 2 } as CSSProperties}>starting session <i className="hub-enter-caret" /></span>
-            </pre>
-          ) : (
-            <span className="hub-enter-light" />
-          )}
+          <ExitSequence world={entering} items={terminalItems} onDone={leaveForWorld} />
         </div>
       ) : null}
       {blink ? (

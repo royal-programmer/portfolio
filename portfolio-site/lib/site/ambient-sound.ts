@@ -158,6 +158,96 @@ export const ambient = {
     engine.shimmer.gain.setTargetAtTime((1 - k) * 0.012, now, 0.5);
     applyFilter(engine);
   },
+  /** One keystroke: a short filtered click. */
+  key() {
+    if (!engine || engine.master.gain.value < 0.01) return;
+    const { ctx } = engine;
+    const now = ctx.currentTime;
+    const len = 0.03;
+    const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * len), ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const band = ctx.createBiquadFilter();
+    band.type = "bandpass";
+    band.frequency.value = 2600 + Math.random() * 1400;
+    band.Q.value = 1.2;
+    const g = ctx.createGain();
+    g.gain.value = 0.16;
+    src.connect(band).connect(g).connect(engine.master);
+    src.start(now);
+  },
+  /** Focus lock: two quick high beeps. */
+  lock() {
+    if (!engine || engine.master.gain.value < 0.01) return;
+    const { ctx } = engine;
+    const now = ctx.currentTime;
+    [0, 0.09].forEach((dt) => {
+      const o = ctx.createOscillator();
+      o.type = "sine";
+      o.frequency.value = 2200;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, now + dt);
+      g.gain.linearRampToValueAtTime(0.08, now + dt + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + dt + 0.06);
+      o.connect(g).connect(engine!.master);
+      o.start(now + dt);
+      o.stop(now + dt + 0.08);
+    });
+  },
+  /** The shutter: mirror up, curtain, mirror down — three clicks and a thump. */
+  shutter() {
+    if (!engine || engine.master.gain.value < 0.01) return;
+    const { ctx } = engine;
+    const now = ctx.currentTime;
+    const click = (at: number, gain: number, f: number) => {
+      const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.02), ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const band = ctx.createBiquadFilter();
+      band.type = "bandpass";
+      band.frequency.value = f;
+      band.Q.value = 0.8;
+      const g = ctx.createGain();
+      g.gain.value = gain;
+      src.connect(band).connect(g).connect(engine!.master);
+      src.start(now + at);
+    };
+    click(0, 0.35, 1800);
+    click(0.07, 0.25, 900);
+    click(0.16, 0.3, 1400);
+    const o = ctx.createOscillator();
+    o.type = "sine";
+    o.frequency.setValueAtTime(140, now);
+    o.frequency.exponentialRampToValueAtTime(60, now + 0.12);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.25, now);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+    o.connect(g).connect(engine.master);
+    o.start(now);
+    o.stop(now + 0.15);
+  },
+  /** Target hit: a rising two-note tick. */
+  target() {
+    if (!engine || engine.master.gain.value < 0.01) return;
+    const { ctx } = engine;
+    const now = ctx.currentTime;
+    [[880, 0], [1320, 0.12]].forEach(([f, dt]) => {
+      const o = ctx.createOscillator();
+      o.type = "triangle";
+      o.frequency.value = f;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, now + dt);
+      g.gain.linearRampToValueAtTime(0.09, now + dt + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + dt + 0.35);
+      o.connect(g).connect(engine!.master);
+      o.start(now + dt);
+      o.stop(now + dt + 0.4);
+    });
+  },
   chime(pitch = 1) {
     if (!engine || engine.master.gain.value < 0.01) return;
     const { ctx } = engine;

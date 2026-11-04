@@ -24,23 +24,26 @@
  * `Persona` union in `app/persona-provider.tsx`. Kept as a separate type so the
  * data layer can reference personas that aren't wired into the switcher yet.
  */
-export type LaunchedPersona = "engineer" | "trader" | "photographer";
+export type LaunchedPersona = "engineer" | "trader" | "photographer" | "artist" | "ride" | "gamer";
 
 /** Every planned persona (see docs/claude-planning/02-persona-catalog.md). */
-export type PersonaSlug = LaunchedPersona | "artist" | "ride" | "gamer";
+export type PersonaSlug = LaunchedPersona;
 
+/**
+ * Every persona has a world page (D38 round C, Ratul's call: build the pages
+ * rather than show "more to come"). Whether a persona appears on the hub is
+ * still its `isPublished` flag in the content store.
+ */
 export const LAUNCHED_PERSONAS: readonly LaunchedPersona[] = [
   "engineer",
   "trader",
   "photographer",
-] as const;
-
-export const ALL_PERSONAS: readonly PersonaSlug[] = [
-  ...LAUNCHED_PERSONAS,
   "artist",
   "ride",
   "gamer",
 ] as const;
+
+export const ALL_PERSONAS: readonly PersonaSlug[] = [...LAUNCHED_PERSONAS] as const;
 
 /** Runtime guard — useful for validating a `[persona]` route param. */
 export function isPersonaSlug(value: string): value is PersonaSlug {

@@ -59,6 +59,8 @@ type Props = {
   quality: Quality;
   /** The scene finished a fixed-length phase; the page moves to the next. */
   onPhaseEnd: (ended: Phase) => void;
+  /** The pointer moved onto / off a lit assembly's screen (the page warms that world). */
+  onPortalHover?: (slug: string | null) => void;
   onWear: () => void;
   onReady: () => void;
   onStepDown: () => void;
@@ -66,7 +68,7 @@ type Props = {
   onFail: () => void;
 };
 
-function Director({ sectionT, worlds, onPhaseEnd }: { sectionT: Array<number | null>; worlds: World[]; onPhaseEnd: (p: Phase) => void }) {
+function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: Array<number | null>; worlds: World[]; onPhaseEnd: (p: Phase) => void; onPortalHover?: (slug: string | null) => void }) {
   const { clock, state } = useVr();
   const live = useRef({ c: 0, px: 0, py: 0, yaw: 0, pitch: 0, fov: FOV, hover: false, portalHover: null as string | null, tscale: "", sound: -1, ended: "" as Phase | "" });
   const tmp = useMemo(
@@ -153,6 +155,7 @@ function Director({ sectionT, worlds, onPhaseEnd }: { sectionT: Array<number | n
       root.classList.toggle("is-portal-hover", !!s.portalHover);
       const w = worlds.find((x) => x.slug === s.portalHover);
       if (w) root.style.setProperty("--portal-c", spectrumColor(w.t));
+      onPortalHover?.(s.portalHover);
     }
     const tscale = k.scale.toFixed(2);
     if (tscale !== L.tscale) {
@@ -385,7 +388,7 @@ function ContextWatch({ onFail }: { onFail: () => void }) {
 // ---------------------------------------------------------------------------
 // Root
 // ---------------------------------------------------------------------------
-export default function VrScene({ sectionT, worlds, state, quality, onPhaseEnd, onWear, onReady, onStepDown, onStruggle, onFail }: Props) {
+export default function VrScene({ sectionT, worlds, state, quality, onPhaseEnd, onPortalHover, onWear, onReady, onStepDown, onStruggle, onFail }: Props) {
   const clock = useRef<VrClock>(createClock());
   const preset = useMemo(() => qualityPreset(quality), [quality]);
   const px = 70 * preset.dpr;
@@ -399,7 +402,7 @@ export default function VrScene({ sectionT, worlds, state, quality, onPhaseEnd, 
       onCreated={({ gl }) => gl.setClearColor("#050507")}
     >
       <VrContext.Provider value={ctx}>
-        <Director sectionT={sectionT} worlds={worlds} onPhaseEnd={onPhaseEnd} />
+        <Director sectionT={sectionT} worlds={worlds} onPhaseEnd={onPhaseEnd} onPortalHover={onPortalHover} />
         <Governor quality={quality} onStepDown={onStepDown} onStruggle={onStruggle} />
         <Warmup onReady={onReady} />
         <ContextWatch onFail={onFail} />

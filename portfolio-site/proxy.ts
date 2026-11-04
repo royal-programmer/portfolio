@@ -39,7 +39,12 @@ export function proxy(request: NextRequest) {
       return NextResponse.redirect(hostUrl(request, parsed.root, null, pathname), 308);
 
     case "hub": {
-      if (pathname === "/") return NextResponse.rewrite(new URL("/whoami", request.url));
+      if (pathname === "/") {
+        // Keep the query (dev preview flags and the like) across the rewrite.
+        const hub = new URL("/whoami", request.url);
+        hub.search = request.nextUrl.search;
+        return NextResponse.rewrite(hub);
+      }
       if (first === "whoami") return NextResponse.redirect(hostUrl(request, parsed.root, null, "/"));
       if (isPersonaSlug(first)) {
         return NextResponse.redirect(hostUrl(request, parsed.root, SUBDOMAIN_BY_PERSONA[first], rest));

@@ -52,7 +52,7 @@ export const STUB_PERSONAS: Persona[] = [
     order: 2,
   },
   // Planned personas — present in data but NOT yet published, so the public
-  // site 404s them until they have real content ("fill rooms before building").
+  // Published (D38 round C): each has a world page and a place on the hub's climb.
   {
     slug: "artist",
     label: "Artist Mode",
@@ -62,7 +62,7 @@ export const STUB_PERSONAS: Persona[] = [
     accent: "#f59e0b",
     cta: "View artwork",
     points: ["Sketching", "Watercolor", "Digital"],
-    isPublished: false,
+    isPublished: true,
     order: 3,
   },
   {
@@ -74,7 +74,7 @@ export const STUB_PERSONAS: Persona[] = [
     accent: "#14b8a6",
     cta: "View rides",
     points: ["Routes", "Places", "Experiences"],
-    isPublished: false,
+    isPublished: true,
     order: 4,
   },
   {
@@ -86,7 +86,7 @@ export const STUB_PERSONAS: Persona[] = [
     accent: "#8b5cf6",
     cta: "View collection",
     points: ["Steam", "Epic", "Progress"],
-    isPublished: false,
+    isPublished: true,
     order: 5,
   },
 ];

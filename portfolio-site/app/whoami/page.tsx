@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ALL_PERSONAS, listPersonas } from "@/lib/content";
+import { ALL_PERSONAS, listEntries, listPersonas } from "@/lib/content";
 import { HUB_COPY } from "@/lib/site/brand";
 import { placeOnSpectrum } from "@/lib/site/spectrum";
 import { HubExperience, type HubChapter, type HubUpcoming } from "../components/hub/hub-experience";
@@ -16,8 +16,15 @@ export const metadata: Metadata = {
  * unpublished ones are "more colours on the way". Every persona gets its
  * place on the continuous spectrum (pinned or auto-spread).
  */
-export default async function WhoAmIPage() {
-  const published = (await listPersonas()).filter((p) => p.isPublished).sort((a, b) => a.order - b.order);
+export default async function WhoAmIPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  // Dev only: `?preview=all` shows unpublished personas on the climb (their worlds are built
+  // before their content is published). Production ignores it.
+  const { preview } = await searchParams;
+  const previewAll = process.env.NODE_ENV !== "production" && preview === "all";
+  const [allPersonas, engineerEntries] = await Promise.all([listPersonas({ includeNonPublic: previewAll }), listEntries("engineer")]);
+  const published = allPersonas.filter((p) => p.isPublished || previewAll).sort((a, b) => a.order - b.order);
+  // The code world's terminal lists what is really published there.
+  const terminalItems = engineerEntries.filter((e) => e.visibility === "public").map((e) => e.slug);
   const liveSlugs = new Set(published.map((p) => p.slug));
   const upcomingSlugs = ALL_PERSONAS.filter((s) => !liveSlugs.has(s));
 
@@ -33,5 +40,5 @@ export default async function WhoAmIPage() {
   }));
   const upcoming: HubUpcoming[] = upcomingSlugs.map((slug) => ({ slug, t: placed.get(slug) ?? 0.5 }));
 
-  return <HubExperience chapters={chapters} upcoming={upcoming} />;
+  return <HubExperience chapters={chapters} upcoming={upcoming} terminalItems={terminalItems} />;
 }

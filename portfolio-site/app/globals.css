@@ -759,3 +759,224 @@ em.font-display,
 .font-display i {
   font-weight: 320;
 }
+
+/* ---------- Through the doorway: the window each world opens (≈70 % of the view) ---------- */
+.hub-exit {
+  position: relative;
+  width: min(70vw, 1100px);
+  height: min(62vh, 640px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: 12px;
+  background: #0a0a0f;
+  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.9);
+}
+@media (max-width: 640px) {
+  .hub-exit {
+    width: calc(100vw - 32px);
+    height: 70vh;
+  }
+}
+.hub-exit-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+.hub-exit-bar span {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+}
+.hub-exit-bar span:first-child {
+  background: color-mix(in srgb, var(--c) 70%, transparent);
+}
+.hub-exit-bar b {
+  margin-left: 10px;
+  font-weight: 400;
+  color: var(--ink-dim);
+}
+.hub-exit-bar em {
+  margin-left: 18px;
+  font-style: normal;
+}
+.hub-exit-body {
+  flex: 1;
+  margin: 0;
+  padding: 18px 20px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 13px;
+  line-height: 2;
+  letter-spacing: 0.03em;
+  color: var(--ink-dim);
+  white-space: pre-wrap;
+}
+.hub-exit-body span {
+  display: block;
+}
+.hub-exit-body .is-cmd {
+  color: var(--ink);
+}
+.hub-exit-body .is-out {
+  color: var(--ink-faint);
+}
+.hub-exit-term .hub-enter-caret {
+  background: var(--c);
+}
+
+/* Trader */
+.hub-exit-trade-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  min-height: 0;
+}
+.hub-exit-list {
+  margin: 0;
+  padding: 14px 0;
+  list-style: none;
+  border-right: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.hub-exit-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+}
+.hub-exit-list li i {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 70%, transparent);
+}
+.hub-exit-trade-grid svg {
+  width: 100%;
+  height: 100%;
+}
+@media (max-width: 640px) {
+  .hub-exit-trade-grid {
+    grid-template-columns: 1fr;
+  }
+  .hub-exit-list {
+    display: none;
+  }
+}
+
+/* Photographer */
+.hub-exit-photo {
+  aspect-ratio: 3 / 2;
+  height: auto;
+  max-height: 62vh;
+  background: #07070a;
+}
+.hub-exit-vf {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 50% at 62% 42%, color-mix(in srgb, var(--c) 22%, transparent), transparent 70%);
+}
+.hub-exit-vf .vf-v,
+.hub-exit-vf .vf-h {
+  position: absolute;
+  background: rgba(243, 241, 236, 0.1);
+}
+.hub-exit-vf .vf-v {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+.hub-exit-vf .vf-h {
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+.vf-corner {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border: 2px solid rgba(243, 241, 236, 0.85);
+}
+.vf-corner.tl { top: 5%; left: 4%; border-right: 0; border-bottom: 0; }
+.vf-corner.tr { top: 5%; right: 4%; border-left: 0; border-bottom: 0; }
+.vf-corner.bl { bottom: 5%; left: 4%; border-right: 0; border-top: 0; }
+.vf-corner.br { bottom: 5%; right: 4%; border-left: 0; border-top: 0; }
+.vf-focus {
+  position: absolute;
+  left: 62%;
+  top: 42%;
+  width: 9%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border: 2px solid rgba(243, 241, 236, 0.9);
+  transition: border-color 120ms;
+}
+.vf-focus.is-locked {
+  border-color: var(--c);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--c) 60%, transparent);
+}
+.vf-top,
+.vf-read {
+  position: absolute;
+  margin: 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: rgba(243, 241, 236, 0.85);
+}
+.vf-top {
+  top: 6%;
+  right: 4%;
+  color: rgba(243, 241, 236, 0.5);
+}
+.vf-read {
+  left: 4%;
+  bottom: 6%;
+  display: flex;
+  gap: 2.4em;
+  font-variant-numeric: tabular-nums;
+}
+.vf-black {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+}
+.vf-black.is-on {
+  opacity: 1;
+}
+.vf-frame {
+  position: absolute;
+  inset: 0;
+  border: 3px solid #f3f1ec;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* A world page opens dark: the cover lifts once it has drawn. */
+.world-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--void, #050507);
+  transition: opacity 600ms var(--ease-in-out, ease);
+}
+.world-boot.is-lifting {
+  opacity: 0;
+  pointer-events: none;
+}

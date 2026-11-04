@@ -17,13 +17,13 @@
  * Built in code, no models, no downloads; the look is the headset's dark glass.
  */
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 import { personaIdentity } from "@/lib/site/brand";
 import type { PersonaSlug } from "@/lib/content/types";
 import { SPECTRUM_GLSL } from "@/lib/site/spectrum";
 import { useVr } from "./clock";
-import { ATLAS_N, ENGINEER_ICONS, makeIconAtlas, makeSlabAtlas, makeTraderAtlas } from "./screens";
+import { ATLAS_N, ENGINEER_ICONS, makeIconAtlas, makeImageAtlas, makeSlabAtlas, makeTraderAtlas } from "./screens";
 import { makeArtistAtlas, makeGamerAtlas, makePhotographerAtlas, makeRideAtlas } from "./screens-worlds";
 import type { World } from "./state";
 import { climbPose, makePose, seeded } from "./util";
@@ -225,10 +225,39 @@ const W_ICON: [number, number] = [0.5, 0.85];
 /** Panes begin after the previous persona's setup has powered off, and end before the next. */
 const SPAN: [number, number] = [0.6, 0.5];
 
-type WorldProps = { world: World; slabs: number };
+type WorldProps = { world: World; slabs: number; /** Ratul's own pictures for this persona (public/hub/<persona>/…). */ media: string[] };
+
+type HubMedia = Partial<Record<PersonaSlug, string[]>>;
+const NO_MEDIA: string[] = [];
+
+/** public/hub/media.json, written by scripts/hub-media.mjs: which of Ratul's pictures exist per persona. */
+function useHubMedia(): HubMedia {
+  const [media, setMedia] = useState<HubMedia>({});
+  useEffect(() => {
+    let live = true;
+    fetch("/hub/media.json", { cache: "no-cache" })
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((m: HubMedia) => live && setMedia(m))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  return media;
+}
+
+/** Panes of Ratul's own pictures: up to 16 per persona, spread through its stretch. */
+function Pictures({ world, slabs, urls, tileW, tileH, seed }: { world: World; slabs: number; urls: string[]; tileW: number; tileH: number; seed: number }) {
+  const atlas = useMemo(() => makeImageAtlas(urls, tileW, tileH), [urls, tileW, tileH]);
+  useEffect(() => () => atlas.dispose(), [atlas]);
+  const n = Math.min(urls.length, 16);
+  const tiles = useMemo<[number, number]>(() => [0, n], [n]);
+  return <Slabs world={world} count={Math.min(Math.round(slabs * 0.6), n * 2)} atlas={atlas} tiles={tiles} width={W_PICTURE} aspect={tileH / tileW} seed={seed} />;
+}
+const W_PICTURE: [number, number] = [1.6, 2.8];
 
 /** Two pane sets from one 2:1 atlas: "screens" and "glyphs". */
-function Panes({ world, slabs, make, seed }: WorldProps & { make: (t: number) => THREE.Texture; seed: number }) {
+function Panes({ world, slabs, make, seed }: { world: World; slabs: number; make: (t: number) => THREE.Texture; seed: number }) {
   const atlas = useMemo(() => make(world.t), [make, world.t]);
   useEffect(() => () => atlas.dispose(), [atlas]);
   return (
@@ -239,14 +268,17 @@ function Panes({ world, slabs, make, seed }: WorldProps & { make: (t: number) =>
   );
 }
 
-function EngineerWorld({ world, slabs }: WorldProps) {
+const ICON_TILES: [number, number] = [0, ENGINEER_ICONS.length];
+function EngineerWorld({ world, slabs, media }: WorldProps) {
   const icons = useMemo(() => makeIconAtlas(ENGINEER_ICONS), []);
   useEffect(() => () => icons.dispose(), [icons]);
+  const shots = useMemo(() => media.map((f) => `/hub/engineer/${f}`), [media]);
   return (
     <>
-      <Panes world={world} slabs={slabs} make={makeSlabAtlas} seed={101} />
-      <Slabs world={world} count={Math.round(slabs * 0.7)} atlas={icons} tiles={[0, ENGINEER_ICONS.length]} width={W_ICON} aspect={1} seed={151} />
-      <EngineerAssembly world={world} />
+      <Panes world={world} slabs={shots.length ? Math.round(slabs * 0.6) : slabs} make={makeSlabAtlas} seed={101} />
+      <Slabs world={world} count={Math.round(slabs * 0.7)} atlas={icons} tiles={ICON_TILES} width={W_ICON} aspect={1} seed={151} />
+      {shots.length ? <Pictures world={world} slabs={slabs} urls={shots} tileW={512} tileH={320} seed={171} /> : null}
+      <EngineerAssembly world={world} screenSrc={shots[0]} />
     </>
   );
 }
@@ -256,12 +288,17 @@ const TraderWorld = ({ world, slabs }: WorldProps) => (
     <TraderAssembly world={world} />
   </>
 );
-const PhotographerWorld = ({ world, slabs }: WorldProps) => (
-  <>
-    <Panes world={world} slabs={slabs} make={makePhotographerAtlas} seed={301} />
-    <PhotographerAssembly world={world} />
-  </>
-);
+function PhotographerWorld({ world, slabs, media }: WorldProps) {
+  const photos = useMemo(() => media.map((f) => `/hub/photographer/${f}`), [media]);
+  return (
+    <>
+      {/* With real photos the drawn frames step back; the pictures carry the stretch. */}
+      <Panes world={world} slabs={photos.length ? Math.round(slabs * 0.4) : slabs} make={makePhotographerAtlas} seed={301} />
+      {photos.length ? <Pictures world={world} slabs={slabs} urls={photos} tileW={512} tileH={341} seed={371} /> : null}
+      <PhotographerAssembly world={world} />
+    </>
+  );
+}
 const ArtistWorld = ({ world, slabs }: WorldProps) => (
   <>
     <Panes world={world} slabs={slabs} make={makeArtistAtlas} seed={401} />
@@ -292,11 +329,12 @@ const WORLDS: Record<PersonaSlug, (p: WorldProps) => React.JSX.Element> = {
 
 /** Every published persona's stretch; a persona appears here the moment it is published. */
 export function Worlds({ worlds, slabs }: { worlds: World[]; slabs: number }) {
+  const media = useHubMedia();
   return (
     <>
       {worlds.map((w) => {
         const C = WORLDS[w.slug as PersonaSlug];
-        return C ? <C key={w.slug} world={w} slabs={slabs} /> : null;
+        return C ? <C key={w.slug} world={w} slabs={slabs} media={media[w.slug as PersonaSlug] ?? NO_MEDIA} /> : null;
       })}
     </>
   );

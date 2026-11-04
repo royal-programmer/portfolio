@@ -3,15 +3,12 @@
  *
  * The code on the screens is real: excerpts of this site's own source (the
  * fluid under the cursor, the climb, the sound). Nothing is lorem ipsum.
- * When Ratul's own editor screenshots land in `public/hub/engineer/`, the
- * laptop takes those instead (`LAPTOP_SCREEN_SRC`); the drifting slabs keep
- * the drawn code, which reads better small.
+ * When Ratul's own editor screenshots land in `public/hub/engineer/`
+ * (listed by scripts/hub-media.mjs), the laptop shows the first and the rest
+ * drift as panes beside the drawn code.
  */
 import * as THREE from "three";
 import { spectrumHue } from "@/lib/site/spectrum";
-
-/** Optional real screenshot for the laptop (WebP/PNG under public/). `null` = drawn editor. */
-export const LAPTOP_SCREEN_SRC: string | null = null;
 
 // --- Real source, as it appears in this repo ---------------------------------
 const FILES: Array<{ name: string; lang: "ts" | "glsl"; code: string }> = [
@@ -460,6 +457,49 @@ export function makeIconAtlas(files: string[]): THREE.Texture {
     img.src = `/hub/icons/${file}`;
   });
   return tex;
+}
+
+/**
+ * Ratul's own pictures as atlas tiles (photos, screenshots). Served through
+ * Next's image optimizer at a scene-sized width, so files can be any size.
+ * The texture starts dark and fills in as each picture arrives.
+ */
+export function makeImageAtlas(urls: string[], tileW: number, tileH: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = tileW * ATLAS_N;
+  canvas.height = tileH * ATLAS_N;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#0b0b11";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  urls.slice(0, ATLAS_TILES).forEach((url, i) => {
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+      const x = (i % ATLAS_N) * tileW;
+      const y = Math.floor(i / ATLAS_N) * tileH;
+      // Cover the tile, centred.
+      const r = Math.max(tileW / img.width, tileH / img.height);
+      const w = img.width * r;
+      const h = img.height * r;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, tileW, tileH);
+      ctx.clip();
+      ctx.drawImage(img, x + (tileW - w) / 2, y + (tileH - h) / 2, w, h);
+      ctx.restore();
+      tex.needsUpdate = true;
+    };
+    img.src = optimized(url, 640);
+  });
+  return tex;
+}
+
+/** A public image through Next's optimizer at the given width. */
+export function optimized(url: string, w: 640 | 1080 | 1920) {
+  return `/_next/image?url=${encodeURIComponent(url)}&w=${w}&q=72`;
 }
 
 /** The engineer's tools, in the order they appear (max 16 per atlas). */

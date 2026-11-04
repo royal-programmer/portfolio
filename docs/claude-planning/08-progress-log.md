@@ -5,6 +5,47 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## Doorway sequences, dark world covers, media manifest (2026-11-04)
+
+Ratul's notes on the switch (slow, thin, wants typing / a chart playing out / a shutter):
+- **The slow part is dev.** First visit to a route compiles it (26–78 s seen in the dev log, 1–3 s
+  after; production < 1 s). Two fixes regardless: hovering a lit screen **warms** that world
+  (`fetch` no-cors via `onPortalHover` from the Director), and the page now leaves **the moment the
+  sequence ends** — no timer (`leaveForWorld` is the sequence's `onDone`).
+- **`hub/exit-sequence.tsx`** — one window per world, ≈70 % of the view, skippable by click/key,
+  skipped under reduced motion:
+  · engineer: a terminal (title bar, `ssh ratul@code.<root>`, resolve, authenticate, `cd && ls`
+    of the published engineer entry slugs from the content store, `open royal-programmer`), typed
+    character by character with synthesized key clicks (`ambient.key()`), ~2.5 s;
+  · trader: a trading screen assembles (header, plan list, grid), 34 candles draw, entry / stop −1 R /
+    target +3 R lines appear, six candles run into the target, tick + glow (`ambient.target()`), ~2.7 s;
+  · photographer: the display — thirds grid, focus bracket hunts and locks (`ambient.lock()`), ISO /
+    shutter / aperture tick to 400 · 1/250 · f/2.8, shutter (`ambient.shutter()`: three clicks and a
+    thump) with a black blink and a white frame, ~1.8 s;
+  · other worlds: the small light (their sequences come with their worlds).
+- **World pages open dark** (`components/world-boot.tsx`, server-rendered in `[persona]/page.tsx`):
+  a void cover with a light in the persona's accent, lifting at 160 ms — no white flash after the
+  sequence. The world redesign will own what comes after.
+- **Media manifest** (`scripts/hub-media.mjs`, runs on `predev` / `prebuild` and `npm run hub:media`):
+  lists `public/hub/<persona>/*.{jpg,png,webp,avif}` into `public/hub/media.json`. The scene reads
+  it; engineer screenshots become panes (16:10) and the first sits on the laptop; photographer
+  photos become panes (3:2) and the drawn frames step back. Up to 16 per persona per atlas, served
+  via `/_next/image` at 640 px (laptop 1080 px) — any file size is fine for the scene.
+- Lesson: `gsap.from` + React dev double-mount leaves targets parked at the from-value (`tl.kill()`
+  does not revert). Always `gsap.context(() => …, el)` and `ctx.revert()` in cleanup.
+- **All six personas are launched in code** (`LaunchedPersona` = every slug; fixtures publish artist,
+  ride, gamer): each has a world page on the shared template and a stretch on the climb. On the hub
+  they still follow `is_published` in Supabase, which stays false for the three until this branch
+  is on `main` (production runs old code where their pages 404). Dev-only `?preview=all` shows
+  them now; `proxy.ts` keeps the query across the hub rewrite. Verified at c = 5 / 6 / 7: easel
+  with strokes, bike with beam and route panel, gamer desk booting to the handle.
+- Verified: all three doorways → `code.` / `trade.` / `lens.ratulroy.localhost:3000`, arrival shows
+  the dark cover; no page errors. Pre-existing and not from this work: the lint error in
+  `persona-motion-slots.tsx` (setState in effect) and a hydration warning inside `RefractionPoster`
+  (the Normal-mode poster) with six bands.
+
+---
+
 ## Round C: every persona's assembly, on one pattern (2026-11-04)
 
 - **`vr/assembly.tsx` — the shared machinery.** `useAssembly({ world, root, screens, homes, offset,
