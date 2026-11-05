@@ -34,7 +34,24 @@ type Props = {
   delay?: number;
   /** Called once, when the sequence has ended or was skipped: the page leaves. */
   onDone: () => void;
+  /**
+   * A direct visit's loader: the window is server-rendered and this component may not run for a
+   * while (the page is still downloading). Until it does, the window keeps itself alive with CSS
+   * only — the screen "boots": the light on the bar wakes, a scan sweeps the body, the focus
+   * box hunts. The timeline ends the boot the moment it starts.
+   */
+  boot?: boolean;
 };
+
+/** The CSS-only life of a booting screen: grid lines that draw themselves and a scan that sweeps. */
+function BootScreen() {
+  return (
+    <div data-boot className="hub-exit-boot" aria-hidden>
+      <i /> <i /> <i /> <i /> <i />
+      <b />
+    </div>
+  );
+}
 
 const HOST = `${personaIdentity("engineer").subdomain}.${DISPLAY_ROOT}`;
 // From the résumé — true things, in a terminal's voice.
@@ -145,9 +162,10 @@ function TerminalLines({ lines, partial }: { lines: Line[]; partial: string | nu
   );
 }
 
-function TerminalExit({ items, onDone, delay = 0 }: Props) {
+function TerminalExit({ items, onDone, delay = 0, boot }: Props) {
   const done = useOnce(onDone);
   useSkip(done);
+  const [booting, setBooting] = useState(!!boot);
   const [lines, setLines] = useState<Line[]>([]);
   const [partial, setPartial] = useState<string | null>("");
   const script = useMemo<Line[]>(() => terminalScript(items), [items]);
@@ -158,6 +176,7 @@ function TerminalExit({ items, onDone, delay = 0 }: Props) {
     const wait = (ms: number) => new Promise<void>((r) => timers.push(window.setTimeout(r, ms)));
     const run = async () => {
       await wait(delay + 100);
+      setBooting(false);
       for (const line of script) {
         if (cancelled) return;
         if (line.typed) {
@@ -185,7 +204,7 @@ function TerminalExit({ items, onDone, delay = 0 }: Props) {
   }, [script, done, delay]);
 
   return (
-    <div className="hub-exit hub-exit-term" role="presentation">
+    <div className={`hub-exit hub-exit-term ${booting ? "is-boot" : ""}`} role="presentation">
       <div className="hub-exit-bar">
         <span /> <span /> <span />
         <b>ratul@{HOST} — zsh</b>
@@ -279,12 +298,13 @@ function TradeChart({ data, c, final, hidden }: { data: ReturnType<typeof useTra
   );
 }
 
-function TraderExit({ world, onDone, delay = 0 }: Props) {
+function TraderExit({ world, onDone, delay = 0, boot }: Props) {
   const done = useOnce(onDone);
   useSkip(done);
   const root = useRef<HTMLDivElement>(null);
   const c = spectrumColor(world.t);
   const data = useTradeData();
+  const [booting, setBooting] = useState(!!boot);
 
   useEffect(() => {
     const el = root.current;
@@ -292,7 +312,12 @@ function TraderExit({ world, onDone, delay = 0 }: Props) {
     // gsap.context + revert: the dev double-mount must not leave `from` tweens parked at 0.
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ onComplete: () => done(), delay: delay / 1000 });
-      tl.fromTo(el, { opacity: 0, scale: 0.97 }, { opacity: 1, scale: 1, duration: 0.25, ease: "power2.out" });
+      // Booting (a direct visit): the window is already up — the boot screen hands over to the chart.
+      const bootEl = el.querySelector("[data-boot]");
+      if (bootEl) {
+        tl.to(bootEl, { opacity: 0, duration: 0.3 }, 0);
+        tl.add(() => setBooting(false), 0.3);
+      } else tl.fromTo(el, { opacity: 0, scale: 0.97 }, { opacity: 1, scale: 1, duration: 0.25, ease: "power2.out" });
       tl.set(el.querySelector("[data-body]"), { opacity: 1 }, 0);
       tl.from(el.querySelectorAll("[data-hd]"), { opacity: 0, y: -6, duration: 0.25, stagger: 0.05 }, "<0.05");
       tl.from(el.querySelectorAll("[data-row]"), { opacity: 0, x: -8, duration: 0.25, stagger: 0.04 }, "<0.1");
@@ -309,7 +334,7 @@ function TraderExit({ world, onDone, delay = 0 }: Props) {
   }, [done, c, delay]);
 
   return (
-    <div ref={root} className="hub-exit hub-exit-trade" style={{ "--c": c } as CSSProperties} role="presentation">
+    <div ref={root} className={`hub-exit hub-exit-trade ${booting ? "is-boot" : ""}`} style={{ "--c": c } as CSSProperties} role="presentation">
       <div className="hub-exit-bar">
         <span /> <span /> <span />
         <b data-hd>setup · 4H</b>
@@ -317,6 +342,7 @@ function TraderExit({ world, onDone, delay = 0 }: Props) {
         <em data-hd>risk 0.5 %</em>
       </div>
       <TradeChart data={data} c={c} hidden />
+      {booting ? <BootScreen /> : null}
     </div>
   );
 }
@@ -357,11 +383,12 @@ function Viewfinder({ photo, look, locked, set, black, children }: { photo?: str
   );
 }
 
-function PhotoExit({ world, onDone, photo, delay = 0 }: Props) {
+function PhotoExit({ world, onDone, photo, delay = 0, boot }: Props) {
   const done = useOnce(onDone);
   useSkip(done);
   const root = useRef<HTMLDivElement>(null);
   const c = spectrumColor(world.t);
+  const [booting, setBooting] = useState(!!boot);
   const [set, setSet] = useState<Settings>({ iso: 100, f: 1.8, s: 60 });
   const [locked, setLocked] = useState(false);
   const [black, setBlack] = useState(false);
@@ -373,9 +400,15 @@ function PhotoExit({ world, onDone, photo, delay = 0 }: Props) {
     const box = el.querySelector("[data-focus]");
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ onComplete: () => done(), delay: delay / 1000 });
-      tl.fromTo(el, { opacity: 0, scale: 0.97 }, { opacity: 1, scale: 1, duration: 0.25, ease: "power2.out" });
+      if (boot) {
+        // Booting: the display is already up and hunting — the timeline takes the focus box over.
+        tl.add(() => setBooting(false), 0);
+        tl.to({}, { duration: 0.25 });
+      } else {
+        tl.fromTo(el, { opacity: 0, scale: 0.97 }, { opacity: 1, scale: 1, duration: 0.25, ease: "power2.out" });
+        tl.from(el.querySelectorAll("[data-grid]"), { opacity: 0, duration: 0.3, stagger: 0.03 }, "<0.05");
+      }
       tl.set(el.querySelector("[data-body]"), { opacity: 1 }, 0);
-      tl.from(el.querySelectorAll("[data-grid]"), { opacity: 0, duration: 0.3, stagger: 0.03 }, "<0.05");
       // The live view: soft and blown out, pulling sharp and settling as the camera meters.
       const v = { blur: 18, bright: 1.9 };
       tl.to(v, { blur: 0, bright: 1, duration: 1.25, ease: "power2.inOut", onUpdate: () => setLook({ blur: v.blur, bright: v.bright }) }, "<");
@@ -400,10 +433,10 @@ function PhotoExit({ world, onDone, photo, delay = 0 }: Props) {
       tl.fromTo(el.querySelector("[data-frame]"), { opacity: 0.9 }, { opacity: 0, duration: 0.35 });
     }, el);
     return () => ctx.revert();
-  }, [done, delay]);
+  }, [done, delay, boot]);
 
   return (
-    <div ref={root} className="hub-exit hub-exit-photo" style={{ "--c": c } as CSSProperties} role="presentation">
+    <div ref={root} className={`hub-exit hub-exit-photo ${booting ? "is-boot" : ""}`} style={{ "--c": c } as CSSProperties} role="presentation">
       <Viewfinder photo={photo} look={look} locked={locked} set={set} black={black}>
         <span data-frame className="vf-frame" />
       </Viewfinder>

@@ -1255,6 +1255,80 @@ em.font-display,
   from { opacity: 0; transform: scale(0.96) translateY(10px); }
 }
 
+/* A booting screen (direct visit, before the page's script runs): CSS-only life. */
+.hub-exit.is-boot .hub-exit-bar span:first-child {
+  animation: hub-boot-led 1.6s ease-in-out infinite;
+}
+@keyframes hub-boot-led {
+  0%, 100% { opacity: 0.35; box-shadow: 0 0 0 0 transparent; }
+  50% { opacity: 1; box-shadow: 0 0 10px color-mix(in srgb, var(--c) 70%, transparent); }
+}
+.hub-exit-boot {
+  position: absolute;
+  inset: 38px 0 0 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.hub-exit-boot i {
+  position: absolute;
+  left: 7%;
+  right: 2%;
+  height: 1px;
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  transform-origin: left;
+  animation: hub-boot-line 900ms var(--ease-out) both;
+}
+.hub-exit-boot i:nth-child(1) { top: 12%; animation-delay: 150ms; }
+.hub-exit-boot i:nth-child(2) { top: 31%; animation-delay: 260ms; }
+.hub-exit-boot i:nth-child(3) { top: 50%; animation-delay: 370ms; }
+.hub-exit-boot i:nth-child(4) { top: 69%; animation-delay: 480ms; }
+.hub-exit-boot i:nth-child(5) { top: 88%; animation-delay: 590ms; }
+@keyframes hub-boot-line {
+  from { transform: scaleX(0); }
+}
+.hub-exit-boot b {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 18%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c) 7%, transparent) 45%, color-mix(in srgb, var(--c) 16%, transparent) 50%, color-mix(in srgb, var(--c) 7%, transparent) 55%, transparent);
+  animation: hub-boot-scan 2.4s cubic-bezier(0.4, 0, 0.6, 1) 700ms infinite;
+}
+@keyframes hub-boot-scan {
+  0% { transform: translateX(-120%); opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { transform: translateX(560%); opacity: 0; }
+}
+/* The terminal's cursor waits, a little brighter, until the first key. */
+.hub-exit-term.is-boot .hub-enter-caret {
+  box-shadow: 0 0 10px color-mix(in srgb, var(--c) 70%, transparent);
+}
+/* The camera's display hunts for focus until the page's metering takes over. */
+.hub-exit-photo.is-boot .vf-focus {
+  animation: vf-boot-hunt 1.8s ease-in-out infinite;
+}
+@keyframes vf-boot-hunt {
+  0%, 100% { scale: 1.6; opacity: 0.5; }
+  50% { scale: 1.2; opacity: 0.9; }
+}
+.hub-exit-photo.is-boot .vf-photo {
+  animation: vf-boot-breathe 2.6s ease-in-out infinite alternate;
+}
+@keyframes vf-boot-breathe {
+  from { filter: blur(18px) brightness(1.9); }
+  to { filter: blur(13px) brightness(1.6); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hub-exit.is-boot .hub-exit-bar span:first-child,
+  .hub-exit-boot i,
+  .hub-exit-boot b,
+  .hub-exit-photo.is-boot .vf-focus,
+  .hub-exit-photo.is-boot .vf-photo {
+    animation: none;
+  }
+}
+
 /* A world page opens dark: the cover lifts once it has drawn. */
 .world-boot {
   position: fixed;

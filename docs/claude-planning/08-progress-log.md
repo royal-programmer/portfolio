@@ -5,6 +5,20 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-05 — Round D, third pass: loaders alive from the first paint, Normal mode drawings
+
+**Ratul's check:** the world loaders "from the first frame" were not working for him. Measured on a fresh direct visit in dev: the server-rendered window arrived, then sat *empty* for ~4–5 s until the page's script hydrated and GSAP began (the chart body was deliberately `opacity: 0` in markup so the finished chart would not flash). The earlier timing report had been measured from hydration, not from navigation — my mistake. A reload also replayed nothing (once-per-session flag), which is how he tested.
+
+**Fix (`exit-sequence.tsx`, `world-boot.tsx`, `globals.css`):**
+- `ExitSequence` gets `boot`: a direct visit's window is alive in CSS alone until the script arrives — the bar's light wakes, the trader's grid lines draw themselves and a soft scan sweeps the body (`BootScreen`), the camera's focus box hunts and the live view breathes, the terminal's cursor waits lit. Each timeline ends the boot the moment it starts (the trader fades the boot layer over the chart).
+- A **reload** replays the loader (`PerformanceNavigationTiming.type === "reload"`); moving around inside a world still does not.
+- Verified: trade — boot grid mid-draw at 0.4 s, boot until hydration (~4 s in dev), candles, target, page gone at ~7.6 s. code — cursor at 0.5 s, typing from 4 s, 13 lines, gone at 8.5 s. lens — hunting focus until 4 s, then the metering sequence.
+- Dev hydration is ~4 s on these pages (uncompressed dev bundles); production will be well under that, but the boot screen makes the wait a non-issue either way.
+
+**Normal mode (`normal-journey.tsx`):** per Ratul — the bicycle is now a super bike (low fairing over the front wheel, tank, kicked-up tail, screen, forks, exhaust), the gamer's screen shows a crosshair with a first-person rifle, health and ammo marks, the easel carries a landscape (hills, horizon, sun, a cloud) with a brush. `strokeIcon` now returns the pen position so a bright point with a halo rides the head of the stroke while a setup draws; once lit, a soft glow sits under it and motes of its colour rise. Short dashes of light stream outward along the fan while the view follows the light, so the climb has motion as well as a turn.
+
+**Jamendo:** Ratul registered a client id (`JAMENDO_CLIENT_ID` in `.env.local`); the search route returns real tracks. His ask: a premade playlist, and he is unsure whether music belongs at all → recommendation sent (see the reply): one **Sound** control with a few soundscapes + one curated CC playlist, retire the paste-a-link dock.
+
 ## Round D, second pass: Normal mode as a motion piece, the phone pass (2026-11-05)
 
 - **Normal mode** (`hub/normal-journey.tsx`): "the headset stays off" is now the same

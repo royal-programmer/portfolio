@@ -7,7 +7,9 @@
  * the window is the page's loader from its first frame: the terminal types,
  * the chart builds to its target, the viewfinder focuses and fires — then it
  * lifts. Once per world per session (moving around inside a world does not
- * replay it). Server-rendered, so the first paint is never white.
+ * replay it; a reload does). Server-rendered, so the first paint is never
+ * white — and the window is alive in CSS alone (`boot`) until the page's
+ * script arrives, however long that takes.
  */
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import type { PersonaSlug } from "@/lib/content/types";
@@ -31,7 +33,9 @@ export function WorldBoot({ slug, color, t, viaHub, items, photo }: Props) {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let seen = false;
     try {
-      seen = sessionStorage.getItem(SEEN_KEY) === slug;
+      // Once per world per session — but a reload of the page replays it (that is someone asking to see it again).
+      const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+      seen = nav?.type !== "reload" && sessionStorage.getItem(SEEN_KEY) === slug;
       sessionStorage.setItem(SEEN_KEY, slug);
     } catch {}
     if (viaHub || reduce || seen) {
@@ -53,7 +57,7 @@ export function WorldBoot({ slug, color, t, viaHub, items, photo }: Props) {
     <div aria-hidden className={`world-boot ${viaHub ? "is-via-hub" : "is-direct"} ${state === "lifting" ? "is-lifting" : ""}`} style={{ "--c": color } as CSSProperties}>
       <div className="world-boot-frame">
         {play ? (
-          <ExitSequence world={{ slug, t, c: 0 }} items={items} photo={photo} delay={350} onDone={lift} />
+          <ExitSequence world={{ slug, t, c: 0 }} items={items} photo={photo} delay={350} onDone={lift} boot />
         ) : (
           <ExitFrame slug={slug} t={t} items={items} photo={photo} />
         )}
