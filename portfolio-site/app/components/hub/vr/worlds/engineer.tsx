@@ -1,6 +1,4 @@
 "use client";
-/* eslint-disable react-hooks/immutability -- R3F idiom: transforms and instance matrices are
-   mutated every frame inside the assembly's frame callback. */
 
 /**
  * The engineer's laptop (D38 round B): base, lid, 70 keys and a trackpad fly

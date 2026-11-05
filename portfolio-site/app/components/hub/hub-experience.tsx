@@ -221,7 +221,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         });
       }
     }
-  }, [setPhase, sections, worlds]);
+  }, [setPhase, worlds]);
 
   const wear = useCallback(() => {
     if (status !== "ready") return;

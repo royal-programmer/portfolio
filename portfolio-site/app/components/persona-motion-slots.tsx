@@ -176,14 +176,15 @@ export function PersonaMotionSlot({
   const [afterFirstLayout, setAfterFirstLayout] = useState(startShown);
 
   useLayoutEffect(() => {
-    if (!ctx) {
-      setAfterFirstLayout(true);
-      return;
-    }
+    // Without a context the slot starts shown (see `startShown`), nothing to gate.
+    if (!ctx) return;
     if (ctx.peekOffscreenPending()) {
       const { x, y } = getDelta();
       controls.set({ x, y, opacity: 0, filter: "blur(8px)" });
     }
+    // Deliberate: this flips once, after the first layout, so the slot cannot flash before its
+    // offscreen start is set. The one-render cascade is the point.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAfterFirstLayout(true);
   }, [ctx, controls, getDelta]);
 
