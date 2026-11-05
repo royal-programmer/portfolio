@@ -278,7 +278,7 @@ export function DashExit({
             <i>km/h</i>
           </div>
           <div className="dash-gear">
-            <span data-gear>{final ? "4" : "N"}</span>
+            <span data-gear>{final ? "3" : "N"}</span>
             <em>gear</em>
           </div>
         </div>

@@ -20,7 +20,7 @@
  */
 import { useEffect, useRef, type MutableRefObject } from "react";
 import { spectrumColor } from "@/lib/site/spectrum";
-import { BIKE_LINES } from "./bike-lines";
+import { CONSTELLATIONS, strokesLength } from "./constellations";
 import type { VrState, World } from "./vr/state";
 
 type Props = { state: MutableRefObject<VrState>; worlds: World[]; sectionT: Array<number | null>; /** 0 → 1: the chapter's display is on, the drawing steps back behind it. */ recede?: MutableRefObject<number> };
@@ -43,73 +43,9 @@ const angleOf = (t: number) => rad(A0 + (A1 - A0) * t);
 
 type Pt = [number, number];
 type Icon = Pt[][];
-const circle = (cx: number, cy: number, r: number, n = 22): Pt[] => Array.from({ length: n + 1 }, (_, i) => [cx + Math.cos((i / n) * Math.PI * 2) * r, cy + Math.sin((i / n) * Math.PI * 2) * r]);
 
-/** Line icons in a unit box (y down): each world's setup, as strokes drawn in order. */
-const ICONS: Record<string, Icon> = {
-  engineer: [
-    [[0.12, 0.74], [0.88, 0.74], [0.8, 0.82], [0.2, 0.82], [0.12, 0.74]],
-    [[0.2, 0.72], [0.22, 0.22], [0.78, 0.22], [0.8, 0.72]],
-    [[0.3, 0.34], [0.5, 0.34]],
-    [[0.3, 0.42], [0.62, 0.42]],
-    [[0.34, 0.5], [0.56, 0.5]],
-    [[0.3, 0.58], [0.46, 0.58]],
-  ],
-  trader: [
-    [[0.08, 0.84], [0.92, 0.84]],
-    [[0.46, 0.84], [0.46, 0.7], [0.54, 0.7], [0.54, 0.84]],
-    [[0.14, 0.7], [0.14, 0.2], [0.86, 0.2], [0.86, 0.7], [0.14, 0.7]],
-    [[0.26, 0.6], [0.26, 0.44]],
-    [[0.38, 0.56], [0.38, 0.36]],
-    [[0.5, 0.52], [0.5, 0.3]],
-    [[0.62, 0.46], [0.62, 0.26]],
-    [[0.2, 0.62], [0.74, 0.3], [0.8, 0.3]],
-  ],
-  photographer: [
-    [[0.14, 0.72], [0.14, 0.34], [0.32, 0.34], [0.38, 0.24], [0.62, 0.24], [0.68, 0.34], [0.86, 0.34], [0.86, 0.72], [0.14, 0.72]],
-    circle(0.5, 0.53, 0.15),
-    circle(0.5, 0.53, 0.07),
-    [[0.72, 0.42], [0.78, 0.42]],
-    [[0.22, 0.34], [0.22, 0.28], [0.3, 0.28]],
-  ],
-  artist: [
-    // Easel, canvas, and on it a landscape: hills, a horizon, the sun, one cloud — and the brush.
-    [[0.28, 0.96], [0.5, 0.16], [0.72, 0.96]],
-    [[0.5, 0.74], [0.5, 0.96]],
-    [[0.3, 0.74], [0.7, 0.74]],
-    [[0.18, 0.26], [0.82, 0.26], [0.82, 0.7], [0.18, 0.7], [0.18, 0.26]],
-    [[0.18, 0.58], [0.82, 0.58]],
-    [[0.18, 0.58], [0.3, 0.44], [0.4, 0.52], [0.52, 0.36], [0.64, 0.5], [0.72, 0.44], [0.82, 0.54]],
-    circle(0.68, 0.37, 0.045, 14),
-    [[0.26, 0.34], [0.3, 0.31], [0.36, 0.32], [0.38, 0.35], [0.26, 0.35]],
-    [[0.22, 0.64], [0.3, 0.63], [0.4, 0.65], [0.5, 0.63]],
-    [[0.86, 0.82], [0.95, 0.48]],
-    [[0.95, 0.48], [0.98, 0.42]],
-  ],
-  // The bike: traced from the real model (bike-lines.ts), so both modes show the same machine.
-  ride: BIKE_LINES as unknown as Icon,
-  gamer: [
-    // A gamer's screen: the monitor, a crosshair, the rifle in first person, health and ammo.
-    [[0.08, 0.16], [0.92, 0.16], [0.92, 0.7], [0.08, 0.7], [0.08, 0.16]],
-    [[0.5, 0.7], [0.5, 0.82]],
-    [[0.34, 0.84], [0.66, 0.84]],
-    circle(0.5, 0.42, 0.085, 18),
-    [[0.5, 0.26], [0.5, 0.35]],
-    [[0.5, 0.49], [0.5, 0.58]],
-    [[0.34, 0.42], [0.43, 0.42]],
-    [[0.57, 0.42], [0.66, 0.42]],
-    circle(0.5, 0.42, 0.012, 8),
-    [[0.92, 0.7], [0.86, 0.7], [0.78, 0.62], [0.66, 0.54], [0.62, 0.5], [0.66, 0.47], [0.72, 0.52], [0.8, 0.58], [0.9, 0.6]],
-    [[0.62, 0.5], [0.6, 0.45]],
-    [[0.72, 0.52], [0.73, 0.47]],
-    [[0.14, 0.62], [0.34, 0.62]],
-    [[0.14, 0.6], [0.14, 0.64]],
-    [[0.74, 0.66], [0.84, 0.66]],
-  ],
-};
-
-const iconLength = (icon: Icon) => icon.reduce((n, poly) => n + poly.slice(1).reduce((m, p, i) => m + Math.hypot(p[0] - poly[i][0], p[1] - poly[i][1]), 0), 0);
-const ICON_LENGTH: Record<string, number> = Object.fromEntries(Object.entries(ICONS).map(([k, v]) => [k, iconLength(v)]));
+/** Strokes in a unit box (y down), drawn in order. */
+const CONSTELLATION_LENGTH: Record<string, number[]> = Object.fromEntries(Object.entries(CONSTELLATIONS).map(([k, objs]) => [k, objs.map((o) => strokesLength(o.strokes))]));
 
 /** Strokes an icon up to `progress` (0…1) of its total length; returns where the pen is (null when finished). */
 function strokeIcon(ctx: CanvasRenderingContext2D, icon: Icon, total: number, progress: number): Pt | null {
@@ -412,71 +348,84 @@ export function NormalJourney({ state, worlds, sectionT, recede }: Props) {
       ctx.restore();
       ctx.globalAlpha = 1;
 
-      // ---- The world's setup, drawn in light ----
+      // ---- The world's constellation: its things draw themselves around the display as the chapter
+      //      arrives (complete at its midpoint), and undraw in reverse as it goes. They drift in from the
+      //      light's direction and settle; depth gives parallax. The display's place is read off the
+      //      same CSS the DOM uses (normal-display), so the ring always fits around it.
       if (world && near > 0.02 && ending < 0.98) {
         const portrait = W / Math.max(1, H) < 1;
-        const cx = portrait ? 800 : 1180;
-        const cy = portrait ? 300 : 450;
-        const size = (portrait ? 340 : 440) * (0.7 + 0.3 * near);
-        const progress = easeInOut(clamp01((near - 0.15) / 0.65));
-        const litNow = smooth(near, 0.8, 1);
-        ctx.save();
-        ctx.translate(cx - size / 2, cy - size / 2 + (1 - near) * 60 * (c < world.c ? 1 : -1));
-        ctx.scale(size, size);
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.lineWidth = 2.2 / size;
-        ctx.strokeStyle = spectrumColor(world.t, 72);
-        // Under the display the drawing steps back: fainter, a touch smaller, no glow — a blueprint.
-        ctx.globalAlpha = (0.35 + 0.65 * near) * (1 - ending) * (1 - back * 0.82);
-        if (back > 0.01) {
-          ctx.translate(0.5, 0.5);
-          ctx.scale(1 - back * 0.08, 1 - back * 0.08);
-          ctx.translate(-0.5, -0.5);
+        const objs = CONSTELLATIONS[world.slug] ?? [];
+        // Display centre and width, in stage units.
+        let dcx: number, dcy: number, dw: number;
+        if (portrait) {
+          dw = (0.92 * W) / s;
+          dcx = (0.5 * W - ox) / s;
+          dcy = (0.09 * H + 0.92 * W * (680 / 1100) * 0.5 - oy) / s;
+        } else {
+          dw = (Math.min(0.44 * W, 720)) / s;
+          dcx = (W - 0.085 * W - dw * s * 0.5 - ox) / s;
+          dcy = (0.5 * H - oy) / s;
         }
-        if (litNow > 0 && back < 0.5) {
-          ctx.shadowColor = spectrumColor(world.t, 60);
-          ctx.shadowBlur = 18 * litNow * s;
-        }
-        const pen = strokeIcon(ctx, ICONS[world.slug] ?? ICONS.engineer, ICON_LENGTH[world.slug] ?? ICON_LENGTH.engineer, progress);
-        ctx.shadowBlur = 0;
-        // The light that draws: a bright point at the head of the stroke, with a soft halo.
-        if (pen && progress > 0.01) {
-          const halo = ctx.createRadialGradient(pen[0], pen[1], 0, pen[0], pen[1], 0.09);
-          halo.addColorStop(0, spectrumColor(world.t, 80));
-          halo.addColorStop(1, "rgba(255,255,255,0)");
-          ctx.globalAlpha = 0.55 * (1 - ending);
-          ctx.fillStyle = halo;
-          ctx.beginPath();
-          ctx.arc(pen[0], pen[1], 0.09, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.globalAlpha = 1 - ending;
-          ctx.fillStyle = "#fff";
-          ctx.beginPath();
-          ctx.arc(pen[0], pen[1], 0.009, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        // Lit: motes of its colour rise off the setup; a faint glow sits under it.
-        if (litNow > 0.01 && back < 0.6) {
-          const under = ctx.createRadialGradient(0.5, 0.62, 0, 0.5, 0.62, 0.7);
-          under.addColorStop(0, spectrumColor(world.t, 58));
-          under.addColorStop(1, "rgba(255,255,255,0)");
-          ctx.globalAlpha = 0.18 * litNow * (1 - ending);
-          ctx.fillStyle = under;
-          ctx.fillRect(-0.3, -0.3, 1.6, 1.6);
-          ctx.fillStyle = spectrumColor(world.t, 78);
-          for (let i = 0; i < 14; i++) {
-            const ph = (t * (0.08 + (i % 5) * 0.015) + i * 0.37) % 1;
-            const x = 0.1 + ((i * 0.618) % 1) * 0.8 + Math.sin(t * 0.7 + i) * 0.03;
-            const y = 0.95 - ph * 1.1;
-            ctx.globalAlpha = litNow * (1 - ending) * Math.sin(ph * Math.PI) * 0.8;
+        // Chapter progress 0 → 1 across the chapter; drawn fully at the midpoint.
+        const u = clamp01((c - (world.c - 0.5)) / 1);
+        const draw = easeInOut(u < 0.5 ? u / 0.5 : (1 - u) / 0.5);
+        const apexAngle = angleOf(0.5 + (world.t - 0.5) * spread);
+        const dirX = Math.cos(apexAngle);
+        const dirY = -Math.sin(apexAngle);
+        const lit = spectrumColor(world.t, 72);
+        const bright = spectrumColor(world.t, 84);
+        for (let i = 0; i < objs.length; i++) {
+          const o = objs[i];
+          if (portrait && o.place.y > 0.2) continue;
+          const px = portrait ? o.place.x * 0.62 : o.place.x;
+          const py = portrait ? o.place.y * 0.9 : o.place.y;
+          const size = o.place.size * dw * (0.82 + 0.18 * o.place.depth);
+          // Each object draws on its own slice of the chapter, staggered by its index, so the ring
+          // grows outward rather than all at once; the undraw mirrors it.
+          const lag = (i / Math.max(1, objs.length)) * 0.35;
+          const own = clamp01((draw - lag) / (1 - lag));
+          if (own <= 0.001) continue;
+          const settle = easeInOut(own);
+          // Home around the display; start displaced along the light (back toward the apex).
+          const hx = dcx + px * dw;
+          const hy = dcy + py * dw + (c - world.c) * 160 * (1 - o.place.depth);
+          const x0 = hx - dirX * 220 * (1 - settle);
+          const y0 = hy - dirY * 220 * (1 - settle) + 40 * (1 - settle);
+          ctx.save();
+          ctx.translate(x0 - size / 2, y0 - size / 2);
+          ctx.scale(size, size);
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          ctx.lineWidth = (1.2 + 0.9 * o.place.depth) / size;
+          ctx.strokeStyle = lit;
+          ctx.globalAlpha = (0.3 + 0.7 * o.place.depth) * (1 - ending) * Math.min(1, own * 3);
+          if (own > 0.98 && o.place.depth > 0.6) {
+            ctx.shadowColor = spectrumColor(world.t, 60);
+            ctx.shadowBlur = 10 * s;
+          }
+          const total = CONSTELLATION_LENGTH[world.slug]?.[i] ?? 1;
+          const pen = strokeIcon(ctx, o.strokes as Icon, total, own);
+          ctx.shadowBlur = 0;
+          if (pen) {
+            // The light that draws: a point at the head of the stroke.
+            ctx.globalAlpha = 1 - ending;
+            ctx.fillStyle = bright;
             ctx.beginPath();
-            ctx.arc(x, y, 0.006 + (i % 3) * 0.003, 0, Math.PI * 2);
+            ctx.arc(pen[0], pen[1], 0.012, 0, Math.PI * 2);
+            ctx.fill();
+            const halo = ctx.createRadialGradient(pen[0], pen[1], 0, pen[0], pen[1], 0.08);
+            halo.addColorStop(0, spectrumColor(world.t, 78));
+            halo.addColorStop(1, "rgba(255,255,255,0)");
+            ctx.globalAlpha = 0.5 * (1 - ending);
+            ctx.fillStyle = halo;
+            ctx.beginPath();
+            ctx.arc(pen[0], pen[1], 0.08, 0, Math.PI * 2);
             ctx.fill();
           }
+          ctx.restore();
         }
-        ctx.restore();
         ctx.globalAlpha = 1;
+        void back;
       }
 
       if (on && !reduce) raf = requestAnimationFrame(frame);
