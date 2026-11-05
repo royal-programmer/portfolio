@@ -27,7 +27,7 @@ mount, as a collapsed `credits` group.
 
 | Model | Source | Licence | Use |
 |-------|--------|---------|-----|
-| Rider's bike (`public/hub/models/bike.glb`) | ["Motorcycle" by Poly by Google](https://poly.pizza/m/dse64pqMKAR), via Poly Pizza | CC BY 3.0 | Re-coloured in the setup's finishes (palette split by colour), fitted to 2.7 units, lit by the persona's light. 6.4 k triangles, 110 KB. |
+| Rider's bike (`public/hub/models/bike.glb`) | ["Motorcycle" by Poly by Google](https://poly.pizza/m/dse64pqMKAR), via Poly Pizza | CC BY 3.0 (also traced into line art for Normal mode: `app/components/hub/bike-lines.ts`) | Re-coloured in the setup's finishes (palette split by colour), fitted to 2.7 units, lit by the persona's light. 6.4 k triangles, 110 KB. |
 
 Everything else — headset, planets, laptop, desks, camera, easel, kit — is built from
 primitives in code.

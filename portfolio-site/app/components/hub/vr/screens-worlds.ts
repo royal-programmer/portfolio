@@ -319,6 +319,37 @@ export function makeRouteScreen(t: number): THREE.Texture {
   return makeTexture(canvas, () => drawRoute(ctx, 0, 0, 1024, 640, t, 11, 5, true));
 }
 
+/** The bike's TFT dash: the speedo on the left, the trip's route on the right — the rider's doorway. */
+export function makeDashScreen(t: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 640;
+  const ctx = canvas.getContext("2d")!;
+  return makeTexture(canvas, () => {
+    ctx.fillStyle = "#08080c";
+    ctx.fillRect(0, 0, 1024, 640);
+    drawSpeedo(ctx, 0, 0, 500, 640, t, 0.42);
+    drawRoute(ctx, 512, 0, 512, 640, t, 11, 4, true);
+    ctx.fillStyle = "rgba(243,241,236,0.08)";
+    ctx.fillRect(504, 24, 1, 592);
+    // Speed and gear under the arc.
+    ctx.font = `92px ${mono()}`;
+    ctx.fillStyle = "#f3f1ec";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText("84", 250, 560);
+    ctx.font = `20px ${mono()}`;
+    ctx.fillStyle = "rgba(243,241,236,0.5)";
+    ctx.fillText("km/h", 250, 596);
+    ctx.font = `64px ${mono()}`;
+    ctx.fillStyle = hsl(t, 64);
+    ctx.shadowColor = hsl(t, 64);
+    ctx.shadowBlur = 18;
+    ctx.fillText("4", 440, 600);
+    ctx.shadowBlur = 0;
+  });
+}
+
 function drawSpeedo(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, t: number, frac: number) {
   ctx.save();
   ctx.beginPath();

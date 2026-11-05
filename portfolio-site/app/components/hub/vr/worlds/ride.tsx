@@ -8,15 +8,15 @@
  * around it: helmet, tank bag, panniers, gloves, intercom — or, when
  * public/hub/models/bike.glb exists, a real low-poly sport bike re-skinned in
  * the same finishes (CC-BY, credited in the console). Powered, the
- * headlight comes on with a beam and the route panel draws its glowing line
- * with light pins. The route panel is the doorway.
+ * headlight comes on with a beam and the TFT dash lights up: speedo, gear, the
+ * trip's route with light pins. The dash is the doorway.
  */
 import { useGLTF } from "@react-three/drei";
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { Halo, Tube, makeScreenMaterial, useAssembly } from "../assembly";
-import { makeRouteScreen } from "../screens-worlds";
+import { makeDashScreen } from "../screens-worlds";
 import type { World } from "../state";
 
 const PANEL_W = 1.3;
@@ -208,7 +208,7 @@ export function RideAssembly({ world, modelUrl }: { world: World; /** A CC0 .glb
   const lensMat = useMemo(() => new THREE.MeshBasicMaterial({ color: new THREE.Color("#000"), toneMapped: false }), []);
   const visorMat = useMemo(() => new THREE.MeshPhysicalMaterial({ color: new THREE.Color("#05060a"), roughness: 0.05, metalness: 0.2, clearcoat: 1, envMapIntensity: 2.2 }), []);
   const fabric = useMemo(() => new THREE.MeshStandardMaterial({ color: new THREE.Color("#101014"), roughness: 0.95, metalness: 0 }), []);
-  const tex = useMemo(() => makeRouteScreen(world.t), [world.t]);
+  const tex = useMemo(() => makeDashScreen(world.t), [world.t]);
   const mat = useMemo(() => makeScreenMaterial(tex, world.t, 1), [tex, world.t]);
   const screenMats = useMemo(() => [mat], [mat]);
   useEffect(() => () => tex.dispose(), [tex]);

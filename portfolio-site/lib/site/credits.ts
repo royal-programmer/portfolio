@@ -11,7 +11,7 @@ export function printCredits() {
   const p = "font: 12px/1.6 ui-monospace, monospace; color: #9a948a";
   console.groupCollapsed("%c credits %c third-party work in this hub", h, p);
   console.info("%c3D model", h);
-  console.info("%cRider's bike · \"Motorcycle\" by Poly by Google · CC BY 3.0 · https://poly.pizza/m/dse64pqMKAR · re-coloured and lit for this site", p);
+  console.info("%cRider's bike · \"Motorcycle\" by Poly by Google · CC BY 3.0 · https://poly.pizza/m/dse64pqMKAR · also traced as the line drawing in Normal mode · re-coloured and lit for this site", p);
   console.info("%cLogos", h);
   console.info("%cTool and language marks via simple-icons (CC0 1.0, https://simpleicons.org) and devicon (MIT, https://devicon.dev). Shown as tools I use; trademarks belong to their owners, no affiliation.", p);
   console.info("%cFonts", h);

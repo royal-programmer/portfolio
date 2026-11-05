@@ -20,6 +20,7 @@
  */
 import { useEffect, useRef, type MutableRefObject } from "react";
 import { spectrumColor } from "@/lib/site/spectrum";
+import { BIKE_LINES } from "./bike-lines";
 import type { VrState, World } from "./vr/state";
 
 type Props = { state: MutableRefObject<VrState>; worlds: World[]; sectionT: Array<number | null> };
@@ -85,24 +86,8 @@ const ICONS: Record<string, Icon> = {
     [[0.86, 0.82], [0.95, 0.48]],
     [[0.95, 0.48], [0.98, 0.42]],
   ],
-  ride: [
-    // A super bike, side on, facing the light: wheels, the fairing low over the front wheel, tank, a kicked-up tail, screen, forks, exhaust.
-    circle(0.22, 0.72, 0.15),
-    circle(0.22, 0.72, 0.05, 12),
-    circle(0.78, 0.72, 0.15),
-    circle(0.78, 0.72, 0.05, 12),
-    [[0.84, 0.44], [0.9, 0.54], [0.86, 0.64], [0.7, 0.7], [0.52, 0.7], [0.44, 0.62], [0.46, 0.5], [0.56, 0.42], [0.72, 0.4], [0.84, 0.44]],
-    [[0.72, 0.4], [0.76, 0.31], [0.86, 0.44]],
-    [[0.56, 0.42], [0.5, 0.36], [0.4, 0.36], [0.36, 0.44], [0.46, 0.5]],
-    [[0.4, 0.36], [0.28, 0.38], [0.16, 0.34], [0.14, 0.4], [0.26, 0.46], [0.36, 0.44]],
-    [[0.26, 0.46], [0.32, 0.54], [0.44, 0.62]],
-    [[0.22, 0.72], [0.44, 0.64]],
-    [[0.52, 0.7], [0.38, 0.7], [0.3, 0.66]],
-    [[0.68, 0.4], [0.76, 0.72]],
-    [[0.72, 0.42], [0.8, 0.72]],
-    [[0.68, 0.36], [0.62, 0.35]],
-    [[0.86, 0.47], [0.9, 0.52]],
-  ],
+  // The bike: traced from the real model (bike-lines.ts), so both modes show the same machine.
+  ride: BIKE_LINES as unknown as Icon,
   gamer: [
     // A gamer's screen: the monitor, a crosshair, the rifle in first person, health and ammo.
     [[0.08, 0.16], [0.92, 0.16], [0.92, 0.7], [0.08, 0.7], [0.08, 0.16]],

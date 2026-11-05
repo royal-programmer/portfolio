@@ -10,7 +10,9 @@
  *   engineer      a terminal: true lines typed character by character, with key clicks
  *   trader        a trading screen assembles, candles draw, price runs into the target
  *   photographer  the camera's display: a live view pulls into focus and settles, the shutter fires
- *   others        a small breathing light
+ *   ride          the bike's TFT dash boots (exit-sequence-worlds.tsx)
+ *   gamer         the monitor powers on, the HUD slides in
+ *   artist        a canvas paints itself
  *
  * `ExitFrame` is the same window, finished and still: the world page opens on
  * it, and it shrinks away when you come back to the hub.
@@ -21,6 +23,8 @@ import { ambient } from "@/lib/site/ambient-sound";
 import { DISPLAY_ROOT, personaIdentity } from "@/lib/site/brand";
 import { spectrumColor } from "@/lib/site/spectrum";
 import type { PersonaSlug } from "@/lib/content/types";
+import { CanvasExit, DashExit, MonitorExit } from "./exit-sequence-worlds";
+import { BootScreen, useOnce, useSkip } from "./exit-shared";
 import { optimized } from "./vr/screens";
 import type { World } from "./vr/state";
 
@@ -43,60 +47,20 @@ type Props = {
   boot?: boolean;
 };
 
-/** The CSS-only life of a booting screen: grid lines that draw themselves and a scan that sweeps. */
-function BootScreen() {
-  return (
-    <div data-boot className="hub-exit-boot" aria-hidden>
-      <i /> <i /> <i /> <i /> <i />
-      <b />
-    </div>
-  );
-}
-
 const HOST = `${personaIdentity("engineer").subdomain}.${DISPLAY_ROOT}`;
 // From the résumé — true things, in a terminal's voice.
 const WHO = "ratul · software engineer · bengaluru";
 const STACK = "c# · .net · react · typescript · python · fastapi · sql server · postgresql · rabbitmq";
 const UPTIME = "2 years in production · 200+ users on the last rebuild · 11 automations kept alive";
 
-function useOnce(onDone: () => void) {
-  const fired = useRef(false);
-  return useMemo(
-    () => () => {
-      if (fired.current) return;
-      fired.current = true;
-      onDone();
-    },
-    [onDone],
-  );
-}
-
-/** Skip on any click / key; honour reduced motion. */
-function useSkip(done: () => void) {
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      const id = window.setTimeout(done, 250);
-      return () => window.clearTimeout(id);
-    }
-    const skip = () => done();
-    // A beat later, so the click that opened the doorway does not also skip it.
-    const id = window.setTimeout(() => {
-      window.addEventListener("pointerdown", skip);
-      window.addEventListener("keydown", skip);
-    }, 400);
-    return () => {
-      window.clearTimeout(id);
-      window.removeEventListener("pointerdown", skip);
-      window.removeEventListener("keydown", skip);
-    };
-  }, [done]);
-}
-
 export function ExitSequence(props: Props) {
   const slug = props.world.slug as PersonaSlug;
   if (slug === "engineer") return <TerminalExit {...props} />;
   if (slug === "trader") return <TraderExit {...props} />;
   if (slug === "photographer") return <PhotoExit {...props} />;
+  if (slug === "ride") return <DashExit world={props.world} delay={props.delay} onDone={props.onDone} boot={props.boot} />;
+  if (slug === "gamer") return <MonitorExit world={props.world} delay={props.delay} onDone={props.onDone} boot={props.boot} />;
+  if (slug === "artist") return <CanvasExit world={props.world} delay={props.delay} onDone={props.onDone} boot={props.boot} />;
   return <LightExit {...props} />;
 }
 
@@ -492,6 +456,9 @@ export function BootFrame({ slug, t, items, photo }: { slug: PersonaSlug; t: num
       </div>
     );
   }
+  if (slug === "ride") return <DashExit world={{ slug, t, c: 0 }} still="boot" />;
+  if (slug === "gamer") return <MonitorExit world={{ slug, t, c: 0 }} still="boot" />;
+  if (slug === "artist") return <CanvasExit world={{ slug, t, c: 0 }} still="boot" />;
   return <span className="hub-enter-light" style={{ "--c": c } as CSSProperties} />;
 }
 
@@ -529,5 +496,8 @@ export function ExitFrame({ slug, t, items, photo }: { slug: PersonaSlug; t: num
       </div>
     );
   }
+  if (slug === "ride") return <DashExit world={{ slug, t, c: 0 }} still="final" />;
+  if (slug === "gamer") return <MonitorExit world={{ slug, t, c: 0 }} still="final" />;
+  if (slug === "artist") return <CanvasExit world={{ slug, t, c: 0 }} still="final" />;
   return <span className="hub-enter-light" style={{ "--c": c } as CSSProperties} />;
 }
