@@ -412,6 +412,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   useEffect(() => {
     if (!returning) return;
     const c = spectrumColor(returning.t);
+    const flashEl = flashRef.current;
     let tw: gsap.core.Tween | null = null;
     setBlink(true);
     // Two frames on: the lids have mounted (closed) and the animation clocks are fresh after the
@@ -433,10 +434,9 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       cancelAnimationFrame(raf);
       // Never leave the flare half-way (a stalled clock could): clear it outright.
       tw?.kill();
-      const f = flashRef.current;
-      if (f) {
-        f.style.opacity = "0";
-        f.style.background = "";
+      if (flashEl) {
+        flashEl.style.opacity = "0";
+        flashEl.style.background = "";
       }
     };
   }, [returning, runLids]);
@@ -865,7 +865,12 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
           <RefractionPoster bands={bands} />
         </div>
         {/* Normal mode: the same journey as a flat motion piece, over the still poster it started from. */}
-        {decided && !sceneWanted && experience === "normal" ? <NormalJourney state={vr} worlds={worlds} sectionT={sectionT} recede={normalRecede} /> : null}
+        {decided && !sceneWanted && experience === "normal" ? (
+          <>
+            <NormalJourney state={vr} worlds={worlds} sectionT={sectionT} recede={normalRecede} />
+            <div className="normal-grain absolute inset-0" />
+          </>
+        ) : null}
         {sceneWanted ? (
           <div className="absolute inset-0">
             <SceneBoundary onFail={onSceneFail}>
