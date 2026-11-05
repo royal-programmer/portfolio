@@ -1374,6 +1374,10 @@ em.font-display,
     width: auto;
     translate: 0 0;
   }
+  /* Phones: the display takes the upper part, so a chapter's words start below it. */
+  .hub-v3.is-normal section[aria-labelledby] > .relative {
+    padding-top: 30vh;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .normal-display,
