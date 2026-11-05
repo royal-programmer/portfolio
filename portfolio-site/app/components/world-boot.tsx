@@ -14,16 +14,18 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import type { PersonaSlug } from "@/lib/content/types";
 import { ExitFrame, ExitSequence } from "./hub/exit-sequence";
 
-type Props = { slug: PersonaSlug; color: string; t: number; viaHub: boolean; items: string[]; photo?: string };
+type Props = { slug: PersonaSlug; color: string; t: number; /** "hub": the camera flew into this window, play on from its first frame. "normal": the display already played on the hub — open on the finished window and lift. */ via: "hub" | "normal" | null; items: string[]; photo?: string };
 
 const SEEN_KEY = "xp-world-boot";
 
-export function WorldBoot({ slug, color, t, viaHub, items, photo }: Props) {
+export function WorldBoot({ slug, color, t, via, items, photo }: Props) {
   const [state, setState] = useState<"on" | "lifting" | "gone">("on");
+  const viaHub = via === "hub";
+  const finished = via === "normal";
   // The sequence's first frame is server-rendered (an empty terminal, a bare chart, a soft live view),
   // so nothing finished flashes before it starts. Through the hub that frame is the one the hub cut
   // from: the sequence simply carries on here.
-  const play = true;
+  const play = !finished;
 
   const lift = useCallback(() => {
     setState((s) => (s === "on" ? "lifting" : s));
@@ -39,12 +41,13 @@ export function WorldBoot({ slug, color, t, viaHub, items, photo }: Props) {
       seen = !viaHub && nav?.type !== "reload" && sessionStorage.getItem(SEEN_KEY) === slug;
       sessionStorage.setItem(SEEN_KEY, slug);
     } catch {}
-    if (reduce || seen) {
-      // Already seen (or no motion wanted): lift straight away. Otherwise the sequence calls `lift` when it ends or is skipped.
-      const id = window.setTimeout(lift, 0);
+    if (finished || reduce || seen) {
+      // Finished already (Normal mode's display played it), seen, or no motion wanted: lift straight
+      // away — after a short hold when arriving on the finished window, so the cut reads.
+      const id = window.setTimeout(lift, finished && !reduce ? 160 : 0);
       return () => window.clearTimeout(id);
     }
-  }, [viaHub, slug, lift]);
+  }, [viaHub, finished, slug, lift]);
 
   useEffect(() => {
     if (state !== "lifting") return;
@@ -55,7 +58,7 @@ export function WorldBoot({ slug, color, t, viaHub, items, photo }: Props) {
 
   if (state === "gone") return null;
   return (
-    <div aria-hidden className={`world-boot ${viaHub ? "is-via-hub" : "is-direct"} ${state === "lifting" ? "is-lifting" : ""}`} style={{ "--c": color } as CSSProperties}>
+    <div aria-hidden className={`world-boot ${viaHub ? "is-via-hub" : finished ? "is-finished" : "is-direct"} ${state === "lifting" ? "is-lifting" : ""}`} style={{ "--c": color } as CSSProperties}>
       <div className="world-boot-frame">
         {play ? <ExitSequence world={{ slug, t, c: 0 }} items={items} photo={photo} delay={viaHub ? 150 : 350} onDone={lift} boot /> : <ExitFrame slug={slug} t={t} items={items} photo={photo} />}
       </div>

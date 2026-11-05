@@ -35,6 +35,7 @@ import { BootFrame, ExitFrame } from "./exit-sequence";
 import { GateSkeleton, HeadsetGate, type LoadStatus } from "./headset-gate";
 import { printCredits } from "@/lib/site/credits";
 import { LightCursor } from "./light-cursor";
+import { NormalDisplays } from "./normal-displays";
 import { NormalJourney } from "./normal-journey";
 import { RefractionPoster } from "./refraction-poster";
 import { PORTAL_LENGTH, PORTAL_OUT_LENGTH, REWIND_LENGTH, atLeast, createVrState, type Band, type Phase, type World } from "./vr/state";
@@ -129,6 +130,10 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   const rootRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
   const enterRef = useRef<HTMLDivElement>(null);
+  // Normal mode: the displays tell the canvas how far the drawing should recede, and lend the
+  // chapter button their doorway.
+  const normalRecede = useRef(0);
+  const normalEnter = useRef<((slug: string) => void) | null>(null);
   // Read once, before the provider strips it from the URL.
   const xpForced = useRef<boolean>(false);
   if (typeof window !== "undefined" && !xpForced.current) {
@@ -832,7 +837,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
           <RefractionPoster bands={bands} />
         </div>
         {/* Normal mode: the same journey as a flat motion piece, over the still poster it started from. */}
-        {decided && !sceneWanted && experience === "normal" ? <NormalJourney state={vr} worlds={worlds} sectionT={sectionT} /> : null}
+        {decided && !sceneWanted && experience === "normal" ? <NormalJourney state={vr} worlds={worlds} sectionT={sectionT} recede={normalRecede} /> : null}
         {sceneWanted ? (
           <div className="absolute inset-0">
             <SceneBoundary onFail={onSceneFail}>
@@ -930,7 +935,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         </section>
 
         {chapters.map((c, i) => (
-          <PersonaChapter key={c.slug} chapter={c} index={i} total={chapters.length} onEnter={immersiveLive && introDone ? enterWorld : undefined} />
+          <PersonaChapter key={c.slug} chapter={c} index={i} total={chapters.length} onEnter={immersiveLive && introDone ? enterWorld : experience === "normal" && !sceneWanted && textLive ? (slug) => normalEnter.current?.(slug) : undefined} />
         ))}
 
         {upcoming.length ? (
@@ -1041,6 +1046,9 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       ) : null}
 
       {ready ? <LightCursor /> : null}
+      {decided && !sceneWanted && experience === "normal" && textLive ? (
+        <NormalDisplays worlds={worlds} activeSlug={activeSlug} items={terminalItems} photo={media.photographer?.[0] ? `/hub/photographer/${media.photographer[0]}` : undefined} recedeRef={normalRecede} enterRef={normalEnter} />
+      ) : null}
 
       {struggling ? (
         <div role="alertdialog" aria-label="Performance" className="fixed inset-x-4 bottom-6 z-40 mx-auto flex max-w-md flex-col gap-4 rounded-2xl border border-[var(--line)] bg-[rgba(10,10,14,0.9)] p-5 backdrop-blur-xl sm:flex-row sm:items-center">

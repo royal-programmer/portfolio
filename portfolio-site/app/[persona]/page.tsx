@@ -73,7 +73,7 @@ export default async function PersonaPage({ params, searchParams }: PersonaPageP
   return (
     <>
       {/* Opens dark, like the doorway that led here; lifts once the page has drawn. */}
-      <WorldBoot slug={launched} color={accent} t={t} viaHub={via === "hub"} items={items} photo={photo} />
+      <WorldBoot slug={launched} color={accent} t={t} via={via === "hub" ? "hub" : via === "normal" ? "normal" : null} items={items} photo={photo} />
       <HomePage
         routePersona={launched}
         personas={personas}

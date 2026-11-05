@@ -1319,6 +1319,70 @@ em.font-display,
   transform: none !important;
 }
 
+/* Normal mode's doorway: the chapter's display where the setup would stand. */
+.normal-display {
+  position: fixed;
+  right: 7vw;
+  top: 50%;
+  z-index: 20; /* above the page's text column (z-10), under the header and the rail */
+  width: min(40vw, 640px);
+  translate: 0 -50%;
+  animation: normal-display-in 720ms var(--ease-out) both;
+  transition: transform 560ms var(--ease-in-out), opacity 320ms var(--ease-out) 260ms;
+}
+.normal-display-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1100 / 680;
+  transition: transform 520ms var(--ease-out), filter 520ms var(--ease-out);
+}
+.normal-display .hub-exit {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  aspect-ratio: auto;
+}
+.normal-display-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.normal-display-hit:focus-visible {
+  outline: 1px solid var(--c);
+  outline-offset: 6px;
+}
+.normal-display:hover .normal-display-frame,
+.normal-display:has(.normal-display-hit:focus-visible) .normal-display-frame {
+  transform: scale(1.025);
+  filter: drop-shadow(0 0 34px color-mix(in srgb, var(--c) 45%, transparent));
+}
+.normal-display.is-zoom {
+  transform: scale(2.4);
+  opacity: 0;
+  transition: transform 560ms var(--ease-in), opacity 260ms var(--ease-in) 300ms;
+}
+@keyframes normal-display-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+}
+@media (max-width: 1023px) {
+  .normal-display {
+    right: 4vw;
+    left: 4vw;
+    top: 9vh;
+    width: auto;
+    translate: 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .normal-display,
+  .normal-display-frame {
+    animation: none;
+    transition: none;
+  }
+}
+
 /* A booting screen (direct visit, before the page's script runs): CSS-only life. */
 .hub-exit.is-boot .hub-exit-bar span:first-child {
   animation: hub-boot-led 1.6s ease-in-out infinite;

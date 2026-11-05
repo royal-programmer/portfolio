@@ -23,7 +23,7 @@ import { spectrumColor } from "@/lib/site/spectrum";
 import { BIKE_LINES } from "./bike-lines";
 import type { VrState, World } from "./vr/state";
 
-type Props = { state: MutableRefObject<VrState>; worlds: World[]; sectionT: Array<number | null> };
+type Props = { state: MutableRefObject<VrState>; worlds: World[]; sectionT: Array<number | null>; /** 0 → 1: the chapter's display is on, the drawing steps back behind it. */ recede?: MutableRefObject<number> };
 
 // The poster's composition (refraction-poster.tsx).
 const E = { x: 1034, y: 455 };
@@ -148,7 +148,7 @@ function seeded(seed: number) {
   };
 }
 
-export function NormalJourney({ state, worlds, sectionT }: Props) {
+export function NormalJourney({ state, worlds, sectionT, recede }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -166,6 +166,7 @@ export function NormalJourney({ state, worlds, sectionT }: Props) {
     let H = 0;
     let dpr = 1;
     let live = 0; // smoothed c
+    let back = 0; // smoothed recede
     let raf = 0;
     let last = performance.now();
     let on = true;
@@ -204,6 +205,7 @@ export function NormalJourney({ state, worlds, sectionT }: Props) {
       last = now;
       const target = state.current.c;
       live += (target - live) * (1 - Math.exp(-dt * 4));
+      back += ((recede?.current ?? 0) - back) * (1 - Math.exp(-dt * 3));
       const c = live;
       const t = reduce ? 0 : now / 1000;
 
@@ -385,8 +387,14 @@ export function NormalJourney({ state, worlds, sectionT }: Props) {
         ctx.lineJoin = "round";
         ctx.lineWidth = 2.2 / size;
         ctx.strokeStyle = spectrumColor(world.t, 72);
-        ctx.globalAlpha = (0.35 + 0.65 * near) * (1 - ending);
-        if (litNow > 0) {
+        // Under the display the drawing steps back: fainter, a touch smaller, no glow — a blueprint.
+        ctx.globalAlpha = (0.35 + 0.65 * near) * (1 - ending) * (1 - back * 0.82);
+        if (back > 0.01) {
+          ctx.translate(0.5, 0.5);
+          ctx.scale(1 - back * 0.08, 1 - back * 0.08);
+          ctx.translate(-0.5, -0.5);
+        }
+        if (litNow > 0 && back < 0.5) {
           ctx.shadowColor = spectrumColor(world.t, 60);
           ctx.shadowBlur = 18 * litNow * s;
         }
@@ -409,7 +417,7 @@ export function NormalJourney({ state, worlds, sectionT }: Props) {
           ctx.fill();
         }
         // Lit: motes of its colour rise off the setup; a faint glow sits under it.
-        if (litNow > 0.01) {
+        if (litNow > 0.01 && back < 0.6) {
           const under = ctx.createRadialGradient(0.5, 0.62, 0, 0.5, 0.62, 0.7);
           under.addColorStop(0, spectrumColor(world.t, 58));
           under.addColorStop(1, "rgba(255,255,255,0)");
@@ -446,7 +454,7 @@ export function NormalJourney({ state, worlds, sectionT }: Props) {
       document.removeEventListener("visibilitychange", vis);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [state, worlds, sectionT]);
+  }, [state, worlds, sectionT, recede]);
 
   return <canvas ref={canvas} aria-hidden className="normal-journey absolute inset-0 h-full w-full" />;
 }

@@ -776,7 +776,7 @@ export function CanvasExit({
                 data-stroke
                 d={s.d}
                 fill="none"
-                stroke={spectrumColor(world.t, s.l)}
+                stroke={spectrumColor(wrapT(world.t + s.dt), s.l)}
                 strokeWidth={s.w}
                 strokeLinecap="round"
                 strokeLinejoin="round"
