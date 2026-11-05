@@ -196,22 +196,20 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
     L.t = t;
     L.d = d;
 
-    // Portal: the pointer over a lit screen.
+    // Portal: the pointer anywhere over the lit setup (the whole object is the doorway, not just its screen).
     let hover: string | null = null;
     const first = screens[0]?.current;
     if (lv.power > 0.9 && !s.portal) {
       tmp.ndc.set(s.px, s.py);
       tmp.ray.setFromCamera(tmp.ndc, camera);
-      for (const r of screens) {
-        const m = r.current;
-        if (m && tmp.ray.intersectObject(m, false).length) {
-          hover = world.slug;
-          break;
-        }
-      }
+      if (tmp.ray.intersectObject(g, true).length) hover = world.slug;
     }
     lv.hover = THREE.MathUtils.damp(lv.hover, hover ? 1 : 0, 8, k.dt);
     L.hover = lv.hover;
+    // Under the pointer the whole setup pops: a rim of its own light along every edge, a touch larger.
+    mats.rim.value = lv.hover * lv.power * (1.1 + 0.3 * Math.sin(t * 2.4));
+    mats.rimColor.value.copy(tint);
+    g.scale.multiplyScalar(1 + 0.035 * lv.hover);
     if (hover !== lv.lastHover) {
       lv.lastHover = hover;
       s.portalHover = hover;
@@ -251,6 +249,10 @@ export function useLitMats() {
     const metal = new THREE.MeshStandardMaterial({ color: new THREE.Color("#2a2a33"), roughness: 0.35, metalness: 0.85 });
     /** Parts that take the persona's light when powered (keys, strips, rings). */
     const glow = new THREE.MeshStandardMaterial({ color: new THREE.Color("#0d0d13"), roughness: 0.6, metalness: 0.05, emissive: new THREE.Color("#000000"), emissiveIntensity: 1 });
+    // Rim light (hover): a fresnel term added to every lit surface, driven per frame — no post pass.
+    const rim = { value: 0 };
+    const rimColor = { value: new THREE.Color("#fff") };
+    for (const m of [shell, matte, glass, metal, glow]) withRim(m, rim, rimColor);
     const bezel = new THREE.MeshBasicMaterial({ color: new THREE.Color("#000"), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
     // A soft light behind the screen: a lit setup is a doorway, and it should look like one.
     const haloCanvas = document.createElement("canvas");
@@ -263,10 +265,30 @@ export function useLitMats() {
     hc.fillStyle = grad;
     hc.fillRect(0, 0, 128, 128);
     const halo = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(haloCanvas), color: new THREE.Color("#000"), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
-    return { shell, matte, glass, metal, glow, bezel, halo };
+    return { shell, matte, glass, metal, glow, bezel, halo, rim, rimColor };
   }, []);
-  useEffect(() => () => Object.values(mats).forEach((m) => m.dispose()), [mats]);
+  useEffect(
+    () => () => {
+      for (const m of Object.values(mats)) if (m instanceof THREE.Material) m.dispose();
+    },
+    [mats],
+  );
   return mats;
+}
+
+/** Adds a view-dependent rim (fresnel) emissive term to a standard/physical material. */
+export function withRim(m: THREE.Material, rim: { value: number }, rimColor: { value: THREE.Color }) {
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uRim = rim;
+    shader.uniforms.uRimColor = rimColor;
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", "#include <common>\nuniform float uRim;\nuniform vec3 uRimColor;")
+      .replace(
+        "#include <emissivemap_fragment>",
+        "#include <emissivemap_fragment>\n{ float f = 1.0 - saturate(abs(dot(normalize(vViewPosition), normal))); totalEmissiveRadiance += uRimColor * uRim * pow(f, 2.6); }",
+      );
+  };
+  m.customProgramCacheKey = () => "rim";
 }
 
 // ---------------------------------------------------------------------------

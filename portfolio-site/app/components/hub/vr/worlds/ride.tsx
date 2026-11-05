@@ -50,9 +50,10 @@ function Wheel({ mats }: { mats: ReturnType<typeof useAssembly>["mats"] }) {
 }
 
 type Mats = ReturnType<typeof useAssembly>["mats"];
+type Finish = "shell" | "matte" | "metal" | "glass";
 
 /** Which of the setup's finishes a baked colour becomes. */
-function finishOf(r: number, g: number, b: number): keyof Mats {
+function finishOf(r: number, g: number, b: number): Finish {
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   const sat = max === 0 ? 0 : (max - min) / max;
@@ -81,7 +82,7 @@ function splitByPalette(mesh: THREE.Mesh, map: THREE.Texture, mats: Mats): boole
   const uv = geo.getAttribute("uv") as THREE.BufferAttribute | undefined;
   if (!uv) return false;
   const index = geo.index ? Array.from(geo.index.array) : Array.from({ length: uv.count }, (_, i) => i);
-  const order: (keyof Mats)[] = ["shell", "matte", "metal", "glass"];
+  const order: Finish[] = ["shell", "matte", "metal", "glass"];
   const buckets: Record<string, number[]> = { shell: [], matte: [], metal: [], glass: [] };
   for (let i = 0; i < index.length; i += 3) {
     const a = index[i], b = index[i + 1], c = index[i + 2];

@@ -31,7 +31,7 @@ import { PersonaLink, personaHref } from "@/lib/site/persona-link";
 import { spectrumColor } from "@/lib/site/spectrum";
 import { useExperience } from "../../experience-provider";
 import { ModeSwitch, QualityMenu, QUALITY_LABEL, SoundToggle } from "../experience-controls";
-import { ExitFrame, ExitSequence } from "./exit-sequence";
+import { BootFrame, ExitFrame } from "./exit-sequence";
 import { GateSkeleton, HeadsetGate, type LoadStatus } from "./headset-gate";
 import { printCredits } from "@/lib/site/credits";
 import { LightCursor } from "./light-cursor";
@@ -130,6 +130,12 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   const rootRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
   const enterRef = useRef<HTMLDivElement>(null);
+  // Read once, before the provider strips it from the URL.
+  const xpForced = useRef<boolean>(false);
+  if (typeof window !== "undefined" && !xpForced.current) {
+    const q = new URLSearchParams(window.location.search).get("xp");
+    if (q === "normal" || q === "immersive") xpForced.current = true;
+  }
   const blinkRaf = useRef(0);
   const eyeRef = useRef<SVGEllipseElement>(null);
   const heldOnce = useRef(false);
@@ -171,7 +177,12 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   useEffect(() => {
     if (!ready) return;
     const report = analyseDevice();
-    const seen = sessionFlag();
+    let seen = sessionFlag();
+    // A link that names the mode is a decision already made: no gate.
+    if (xpForced.current) {
+      sessionFlag(true);
+      seen = true;
+    }
     queueMicrotask(() => {
       setDevice(report);
       setTouch(!window.matchMedia("(pointer: fine)").matches);
@@ -296,17 +307,17 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   const leaveForWorld = useCallback(() => {
     if (!entering) return;
     const target = personaHref(window.location.origin, entering.slug as PersonaSlug);
-    // `via=hub`: the world opens on the same finished window, so the two pages read as one motion.
+    // `via=hub`: the world page opens on this same booting window and plays its sequence from here.
     const href = target.href + (target.href.includes("?") ? "&" : "?") + "via=hub";
-    const go = () => {
-      if (target.crossOrigin) window.location.assign(href);
-      else router.push(href);
-    };
-    // The window pushes in toward you as we go; the world page picks the zoom up where it left off.
-    const win = enterRef.current?.querySelector<HTMLElement>(".hub-exit");
-    if (win) gsap.to(win, { scale: 1.3, duration: 0.32, ease: "power2.in", onComplete: go });
-    else go();
+    if (target.crossOrigin) window.location.assign(href);
+    else router.push(href);
   }, [entering, router]);
+  // The cut: the moment the screen has filled the view, the world page takes over.
+  useEffect(() => {
+    if (!entering) return;
+    const id = window.setTimeout(leaveForWorld, Math.round(PORTAL_LENGTH * 1000) + 90);
+    return () => window.clearTimeout(id);
+  }, [entering, leaveForWorld]);
 
   const goNormal = useCallback(() => {
     sessionFlag(true);
@@ -511,6 +522,47 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         s.zoom = e.key === "0" ? 0 : Math.max(-0.5, Math.min(1, s.zoom + (e.key === "-" || e.key === "_" ? 0.25 : -0.25)));
         return;
       }
+      if (p === "climb" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const s = vr.current;
+        const glide = (id: string) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          if (lenisRef.current) lenisRef.current.scrollTo(el, { duration: 1.6 });
+          else el.scrollIntoView({ behavior: "smooth" });
+        };
+        const personas = sections.map((sec, i) => ({ sec, i })).filter((x) => x.sec.kind === "persona") as Array<{ sec: { kind: "persona"; slug: string }; i: number }>;
+        // Space: the next world (Shift: the one before). Past the last, the ending.
+        if (e.key === " " && !s.portal && !s.rewind) {
+          e.preventDefault();
+          if (e.shiftKey) {
+            const prev = [...personas].reverse().find((x) => x.i < active);
+            glide(prev ? prev.sec.slug : "hero");
+          } else {
+            const next = personas.find((x) => x.i > active);
+            glide(next ? next.sec.slug : "end");
+          }
+          return;
+        }
+        // 1 … 6: straight to that world.
+        if (/^[1-9]$/.test(e.key)) {
+          const w = personas[Number(e.key) - 1];
+          if (w) {
+            e.preventDefault();
+            glide(w.sec.slug);
+          }
+          return;
+        }
+        // Enter: through the doorway of the setup under the pointer, or the one you are standing at.
+        if (e.key === "Enter" && !s.portal && !s.rewind) {
+          const here = sections[active];
+          const slug = s.portalHover ?? (here?.kind === "persona" ? here.slug : null);
+          if (slug) {
+            e.preventDefault();
+            enterWorld(slug);
+          }
+          return;
+        }
+      }
       if (e.key === " " || e.key === "Enter") {
         if (gate === "full" && p === "gate" && status === "ready") {
           e.preventDefault();
@@ -525,7 +577,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [gate, status, wear, startLight]);
+  }, [gate, status, wear, startLight, sections, active, enterWorld]);
 
   // ---- Smooth scroll + scroll → climb progress ---------------------------------
   useEffect(() => {
@@ -849,7 +901,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         </section>
 
         {chapters.map((c, i) => (
-          <PersonaChapter key={c.slug} chapter={c} index={i} total={chapters.length} />
+          <PersonaChapter key={c.slug} chapter={c} index={i} total={chapters.length} onEnter={immersiveLive && introDone ? enterWorld : undefined} />
         ))}
 
         {upcoming.length ? (
@@ -919,7 +971,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       <div ref={flashRef} aria-hidden className="vr-flash fixed inset-0 z-40 opacity-0" />
       {entering ? (
         <div ref={enterRef} aria-hidden className="hub-enter fixed inset-0 z-[46] flex items-center justify-center opacity-0" style={{ "--c": spectrumColor(entering.t) } as CSSProperties}>
-          <ExitSequence world={entering} items={terminalItems} photo={media.photographer?.[0] ? `/hub/photographer/${media.photographer[0]}` : undefined} delay={Math.round(PORTAL_LENGTH * 1000)} onDone={leaveForWorld} />
+          <BootFrame slug={entering.slug as PersonaSlug} t={entering.t} items={terminalItems} photo={media.photographer?.[0] ? `/hub/photographer/${media.photographer[0]}` : undefined} />
         </div>
       ) : null}
       {returning ? (
@@ -1005,7 +1057,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   );
 }
 
-function PersonaChapter({ chapter, index, total }: { chapter: HubChapter; index: number; total: number }) {
+function PersonaChapter({ chapter, index, total, onEnter }: { chapter: HubChapter; index: number; total: number; /** Immersive: the button goes through the same doorway as the setup (the camera flies into its screen). */ onEnter?: (slug: string) => void }) {
   const id = personaIdentity(chapter.slug);
   const color = spectrumColor(chapter.t);
   return (
@@ -1051,6 +1103,11 @@ function PersonaChapter({ chapter, index, total }: { chapter: HubChapter; index:
           <div>
             <PersonaLink
               persona={chapter.slug}
+              onClick={(e) => {
+                if (!onEnter) return;
+                e.preventDefault();
+                onEnter(chapter.slug);
+              }}
               data-cursor-color={color}
               className="hub-cta mt-10 inline-flex min-h-12 items-center gap-3 rounded-full border px-6 text-sm font-medium backdrop-blur-md"
               style={{ "--c": color } as CSSProperties}

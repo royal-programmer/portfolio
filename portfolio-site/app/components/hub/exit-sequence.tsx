@@ -449,6 +449,51 @@ function PhotoExit({ world, onDone, photo, delay = 0, boot }: Props) {
 // when you come back to the hub. Same window, no motion of its own.
 // ---------------------------------------------------------------------------
 const SETTLED: Settings = { iso: 400, f: 2.8, s: 250 };
+const UNSETTLED: Settings = { iso: 100, f: 1.8, s: 60 };
+
+/**
+ * The very first frame of a world's sequence, booting and still: what the hub shows the instant the
+ * camera has flown into a screen, and exactly what that world's page server-renders — so the cut
+ * from hub to page is invisible and the page carries the sequence on from here.
+ */
+export function BootFrame({ slug, t, items, photo }: { slug: PersonaSlug; t: number; items: string[]; photo?: string }) {
+  const c = spectrumColor(t);
+  const data = useTradeData();
+  void items;
+  if (slug === "engineer") {
+    return (
+      <div className="hub-exit hub-exit-term is-boot" style={{ "--c": c } as CSSProperties} role="presentation">
+        <div className="hub-exit-bar">
+          <span /> <span /> <span />
+          <b>ratul@{HOST} — zsh</b>
+        </div>
+        <TerminalLines lines={[]} partial="" />
+      </div>
+    );
+  }
+  if (slug === "trader") {
+    return (
+      <div className="hub-exit hub-exit-trade is-boot" style={{ "--c": c } as CSSProperties} role="presentation">
+        <div className="hub-exit-bar">
+          <span /> <span /> <span />
+          <b>setup · 4H</b>
+          <em>R : R 1 : 3</em>
+          <em>risk 0.5 %</em>
+        </div>
+        <TradeChart data={data} c={c} hidden />
+        <BootScreen />
+      </div>
+    );
+  }
+  if (slug === "photographer") {
+    return (
+      <div className="hub-exit hub-exit-photo is-boot" style={{ "--c": c } as CSSProperties} role="presentation">
+        <Viewfinder photo={photo} look={{ blur: 18, bright: 1.9 }} locked={false} set={UNSETTLED} />
+      </div>
+    );
+  }
+  return <span className="hub-enter-light" style={{ "--c": c } as CSSProperties} />;
+}
 
 export function ExitFrame({ slug, t, items, photo }: { slug: PersonaSlug; t: number; items: string[]; photo?: string }) {
   const c = spectrumColor(t);

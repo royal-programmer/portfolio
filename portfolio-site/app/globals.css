@@ -493,7 +493,42 @@ html.is-headset-hover .light-cursor-ring::before {
 html.is-headset-hover canvas {
   cursor: none;
 }
-/* A lit assembly under the pointer is a doorway: the ring opens in that world's colour. */
+/* The scene is something you can take hold of: an open hand at rest, closed while you look around,
+   and a pointer over a lit setup — the ring rides along in each case. */
+html.has-light-cursor .hub-v3 canvas {
+  cursor: grab;
+}
+html.is-dragging .hub-v3 canvas {
+  cursor: grabbing;
+}
+html.is-portal-hover .hub-v3 canvas {
+  cursor: pointer;
+}
+html.is-dragging .light-cursor-ring::before {
+  transform: scale(0.62);
+  border-color: rgba(255, 255, 255, 0.9);
+  transition-duration: 220ms;
+}
+/* A lit assembly under the pointer is a doorway: the ring opens in that world's colour, with a small
+   mark pointing in — "enter". */
+.light-cursor-ring::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin: -5px 0 0 -7px;
+  border-top: 1.5px solid var(--portal-c, var(--ink));
+  border-right: 1.5px solid var(--portal-c, var(--ink));
+  transform: rotate(45deg) scale(0.4);
+  opacity: 0;
+  transition: opacity 260ms var(--ease-out), transform 420ms var(--ease-out);
+}
+html.is-portal-hover .light-cursor-ring::after {
+  opacity: 0.95;
+  transform: rotate(45deg) scale(1);
+}
 html.is-portal-hover .light-cursor-ring::before {
   transform: scale(1.8);
   border-color: color-mix(in srgb, var(--portal-c, var(--ink)) 90%, transparent);
@@ -1233,23 +1268,18 @@ em.font-display,
   0% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(0.22); }
 }
-/* Arriving through the doorway: the same window, already pushed in, keeps zooming and dissolves into the page. */
+/* The world's window: the loader. It plays, then pushes in toward you and dissolves into the page. */
 .world-boot-frame {
-  transform: scale(1.3);
+  transform: scale(1);
   transition: transform 800ms var(--ease-in-out), opacity 650ms var(--ease-in-out);
 }
 .world-boot.is-lifting .world-boot-frame {
-  transform: scale(1.9);
-  opacity: 0;
-}
-/* A direct visit: the same window is the loader — it rises into place, holds, then lifts the same way. */
-.world-boot.is-direct .world-boot-frame {
-  transform: scale(1);
-  animation: world-boot-in 700ms var(--ease-out) both;
-}
-.world-boot.is-direct.is-lifting .world-boot-frame {
   transform: scale(1.6);
   opacity: 0;
+}
+/* A direct visit: it rises into place first. Through the hub it is already there (the hub cut on it). */
+.world-boot.is-direct .world-boot-frame {
+  animation: world-boot-in 700ms var(--ease-out) both;
 }
 @keyframes world-boot-in {
   from { opacity: 0; transform: scale(0.96) translateY(10px); }

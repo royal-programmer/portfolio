@@ -46,7 +46,20 @@ export function ExperienceProvider({ children }: { children: React.ReactNode }) 
   });
 
   useEffect(() => {
-    const saved = readExperienceCookie();
+    // `?xp=normal` / `?xp=immersive`: a shareable, testable override. It becomes the choice (cookie on
+    // the root domain, so every world follows), and the URL is left tidy.
+    let forced: Experience | null = null;
+    try {
+      const url = new URL(window.location.href);
+      const q = url.searchParams.get("xp");
+      if (q === "normal" || q === "immersive") {
+        forced = q;
+        writeCookie(EXPERIENCE_COOKIE, q, rootDomains());
+        url.searchParams.delete("xp");
+        window.history.replaceState(window.history.state, "", url.toString());
+      }
+    } catch {}
+    const saved = forced ?? readExperienceCookie();
     const experience = saved ?? defaultExperience();
     stampExperience(experience);
     const quality = readQualityCookie();
