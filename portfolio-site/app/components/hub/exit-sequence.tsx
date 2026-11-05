@@ -126,9 +126,11 @@ function TerminalLines({ lines, partial }: { lines: Line[]; partial: string | nu
   );
 }
 
-function TerminalExit({ items, onDone, delay = 0, boot }: Props) {
+function TerminalExit({ world, items, onDone, delay = 0, boot }: Props) {
   const done = useOnce(onDone);
   useSkip(done);
+  const root = useRef<HTMLDivElement>(null);
+  const c = spectrumColor(world.t);
   const [booting, setBooting] = useState(!!boot);
   const [lines, setLines] = useState<Line[]>([]);
   const [partial, setPartial] = useState<string | null>("");
@@ -157,7 +159,9 @@ function TerminalExit({ items, onDone, delay = 0, boot }: Props) {
         setPartial("");
         setLines((l) => [...l, line]);
       }
-      await wait(160);
+      // Connected: the window takes the world's light.
+      if (root.current) gsap.to(root.current, { boxShadow: `0 0 80px -10px ${c}`, duration: 0.4 });
+      await wait(260);
       if (!cancelled) done();
     };
     void run();
@@ -165,10 +169,10 @@ function TerminalExit({ items, onDone, delay = 0, boot }: Props) {
       cancelled = true;
       timers.forEach((t) => window.clearTimeout(t));
     };
-  }, [script, done, delay]);
+  }, [script, done, delay, c]);
 
   return (
-    <div className={`hub-exit hub-exit-term ${booting ? "is-boot" : ""}`} role="presentation">
+    <div ref={root} className={`hub-exit hub-exit-term ${booting ? "is-boot" : ""}`} style={{ "--c": c } as CSSProperties} role="presentation">
       <div className="hub-exit-bar">
         <span /> <span /> <span />
         <b>ratul@{HOST} — zsh</b>
@@ -387,6 +391,7 @@ function PhotoExit({ world, onDone, photo, delay = 0, boot }: Props) {
         setLocked(true);
         ambient.lock();
       });
+      tl.fromTo(el, { boxShadow: `0 0 0 0 ${c}` }, { boxShadow: `0 0 80px -10px ${c}`, duration: 0.35 }, "<");
       tl.to({}, { duration: 0.38 });
       tl.add(() => {
         ambient.shutter();
@@ -397,7 +402,7 @@ function PhotoExit({ world, onDone, photo, delay = 0, boot }: Props) {
       tl.fromTo(el.querySelector("[data-frame]"), { opacity: 0.9 }, { opacity: 0, duration: 0.35 });
     }, el);
     return () => ctx.revert();
-  }, [done, delay, boot]);
+  }, [done, delay, boot, c]);
 
   return (
     <div ref={root} className={`hub-exit hub-exit-photo ${booting ? "is-boot" : ""}`} style={{ "--c": c } as CSSProperties} role="presentation">
@@ -467,7 +472,7 @@ export function ExitFrame({ slug, t, items, photo }: { slug: PersonaSlug; t: num
   const data = useTradeData();
   if (slug === "engineer") {
     return (
-      <div className="hub-exit hub-exit-term" style={{ "--c": c } as CSSProperties} role="presentation">
+      <div className="hub-exit hub-exit-term" style={{ "--c": c, boxShadow: `0 0 80px -10px ${c}` } as CSSProperties} role="presentation">
         <div className="hub-exit-bar">
           <span /> <span /> <span />
           <b>ratul@{HOST} — zsh</b>
@@ -491,7 +496,7 @@ export function ExitFrame({ slug, t, items, photo }: { slug: PersonaSlug; t: num
   }
   if (slug === "photographer") {
     return (
-      <div className="hub-exit hub-exit-photo" style={{ "--c": c } as CSSProperties} role="presentation">
+      <div className="hub-exit hub-exit-photo" style={{ "--c": c, boxShadow: `0 0 80px -10px ${c}` } as CSSProperties} role="presentation">
         <Viewfinder photo={photo} locked set={SETTLED} />
       </div>
     );

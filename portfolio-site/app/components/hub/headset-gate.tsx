@@ -47,7 +47,9 @@ export function GateSkeleton() {
           One mind. <span className="italic text-[var(--ink-dim)]">Many perspectives.</span>
         </h1>
         <div className="flex-1" />
-        <p className="gate-skeleton-load mb-[9svh] font-mono text-[11px] tracking-[0.2em] text-[var(--ink-dim)] uppercase">Gathering light</p>
+        <p className="mb-[9svh] flex items-center gap-3 font-mono text-[11px] tracking-[0.2em] text-[var(--ink-dim)] uppercase" aria-label="Loading">
+          <span aria-hidden className="gate-ring is-spinning" />
+        </p>
         <p className="mb-6 min-h-4" />
       </div>
       <div className="h-[7.5rem] sm:h-[6.5rem]" />
@@ -118,7 +120,14 @@ export function HeadsetGate({ device, quality, onQuality, status, startedAt, lea
               onClick={onWear}
               className="gate-wear pointer-events-auto mb-[9svh] font-mono text-[11px] tracking-[0.2em] text-[var(--ink-dim)] uppercase transition-colors hover:text-[var(--ink)] disabled:cursor-progress"
             >
-              {ready ? "Put on the headset" : `Gathering light · ${pct}%`}
+              {ready ? (
+                "Put on the headset"
+              ) : (
+                <span className="flex items-center gap-3">
+                  <span aria-hidden className="gate-ring" style={{ "--p": pct / 100 } as React.CSSProperties} />
+                  <span className="tabular-nums">{pct}%</span>
+                </span>
+              )}
               {ready ? <span aria-hidden className="gate-wear-line" /> : null}
             </button>
             <p className="mb-6 min-h-4 text-xs text-[var(--ink-faint)]" aria-live="polite">

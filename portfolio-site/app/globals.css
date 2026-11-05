@@ -810,6 +810,24 @@ html.is-holding .light-cursor-time {
 .gate-skeleton-load {
   animation: gate-skeleton-load 2.2s var(--ease-in-out) infinite;
 }
+/* The loading mark: a thin ring that fills (no words). Before the page can count, it turns. */
+.gate-ring {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: conic-gradient(var(--ink) calc(var(--p, 0) * 1turn), rgba(243, 241, 236, 0.14) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent 60%, #000 62%);
+  mask: radial-gradient(farthest-side, transparent 60%, #000 62%);
+  transition: --p 300ms linear;
+}
+.gate-ring.is-spinning {
+  --p: 0.22;
+  animation: gate-ring-spin 1.1s linear infinite;
+}
+@keyframes gate-ring-spin {
+  to { transform: rotate(1turn); }
+}
 @keyframes gate-skeleton-load {
   0%, 100% { opacity: 0.45; }
   50% { opacity: 1; }

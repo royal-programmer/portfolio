@@ -431,7 +431,13 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     });
     return () => {
       cancelAnimationFrame(raf);
+      // Never leave the flare half-way (a stalled clock could): clear it outright.
       tw?.kill();
+      const f = flashRef.current;
+      if (f) {
+        f.style.opacity = "0";
+        f.style.background = "";
+      }
     };
   }, [returning, runLids]);
 
@@ -449,14 +455,31 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
 
   // Back from a world: the browser may restore this page from its cache mid-flight (colour up,
   // camera inside the screen). Put everything back where it was.
+  const enteringRef = useRef<World | null>(null);
+  useEffect(() => {
+    enteringRef.current = entering;
+  }, [entering]);
   useEffect(() => {
     const onShow = (e: PageTransitionEvent) => {
       if (!e.persisted) return;
-      vr.current.portal = null;
-      vr.current.portalHover = null;
+      const s = vr.current;
+      const w = enteringRef.current;
+      s.portal = null;
+      s.portalHover = null;
       setEntering(null);
+      setLeaving(false);
       document.documentElement.classList.remove("is-portal-hover");
       ambient.resume();
+      // The world's key is spent here (a fresh load would otherwise replay the return on reload).
+      try {
+        sessionStorage.removeItem(WORLD_SESSION_KEY);
+      } catch {}
+      // Come back out of the screen you went into: the same pull-out as a fresh landing.
+      if (w) {
+        s.portalOut = { slug: w.slug, at: performance.now() + 120 };
+        setReturning(w);
+        window.setTimeout(() => setReturning(null), PORTAL_OUT_LENGTH * 1000 + 300);
+      }
     };
     window.addEventListener("pageshow", onShow);
     return () => window.removeEventListener("pageshow", onShow);
@@ -559,22 +582,27 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       }
       if (p === "climb" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const s = vr.current;
+        // Glide so the chapter sits centred in the view (its words and its setup), not at the top.
+        const centreOf = (el: HTMLElement) => el.offsetTop + el.offsetHeight / 2 - window.innerHeight / 2;
         const glide = (id: string) => {
           const el = document.getElementById(id);
           if (!el) return;
-          if (lenisRef.current) lenisRef.current.scrollTo(el, { duration: 1.6 });
-          else el.scrollIntoView({ behavior: "smooth" });
+          const y = id === "hero" ? 0 : Math.max(0, centreOf(el));
+          if (lenisRef.current) lenisRef.current.scrollTo(y, { duration: 1.5 });
+          else window.scrollTo({ top: y, behavior: "smooth" });
         };
-        const personas = sections.map((sec, i) => ({ sec, i })).filter((x) => x.sec.kind === "persona") as Array<{ sec: { kind: "persona"; slug: string }; i: number }>;
-        // Space: the next world (Shift: the one before). Past the last, the ending.
+        const personas = sections.filter((sec) => sec.kind === "persona") as Array<{ kind: "persona"; slug: string }>;
+        const stops = personas.map((w) => ({ slug: w.slug, el: document.getElementById(w.slug) })).filter((x): x is { slug: string; el: HTMLElement } => !!x.el);
+        // Space: the next world from where you are now (Shift: the one before). Past the last, the ending.
         if (e.key === " " && !s.portal && !s.rewind) {
           e.preventDefault();
+          const here = window.scrollY;
           if (e.shiftKey) {
-            const prev = [...personas].reverse().find((x) => x.i < active);
-            glide(prev ? prev.sec.slug : "hero");
+            const prev = [...stops].reverse().find((x) => centreOf(x.el) < here - 40);
+            glide(prev ? prev.slug : "hero");
           } else {
-            const next = personas.find((x) => x.i > active);
-            glide(next ? next.sec.slug : "end");
+            const next = stops.find((x) => centreOf(x.el) > here + 40);
+            glide(next ? next.slug : "end");
           }
           return;
         }
@@ -583,7 +611,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
           const w = personas[Number(e.key) - 1];
           if (w) {
             e.preventDefault();
-            glide(w.sec.slug);
+            glide(w.slug);
           }
           return;
         }
