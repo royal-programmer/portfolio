@@ -35,7 +35,6 @@ import { BootFrame, ExitFrame } from "./exit-sequence";
 import { GateSkeleton, HeadsetGate, type LoadStatus } from "./headset-gate";
 import { printCredits } from "@/lib/site/credits";
 import { LightCursor } from "./light-cursor";
-import { MusicButton, MusicDock } from "./music-player";
 import { NormalJourney } from "./normal-journey";
 import { RefractionPoster } from "./refraction-poster";
 import { PORTAL_LENGTH, PORTAL_OUT_LENGTH, REWIND_LENGTH, atLeast, createVrState, type Band, type Phase, type World } from "./vr/state";
@@ -86,7 +85,7 @@ class SceneBoundary extends Component<{ onFail: () => void; children: ReactNode 
 
 export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props) {
   const xp = useExperience();
-  const { experience, ready, chosen, setExperience, setQuality, qualityChosen, sound } = xp;
+  const { experience, ready, chosen, setExperience, setQuality, qualityChosen, sound, soundChoice } = xp;
 
   const [device, setDevice] = useState<DeviceReport | null>(null);
   const [status, setStatus] = useState<LoadStatus>("loading");
@@ -403,6 +402,34 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     if (closing && blink) runLids("close", 400);
   }, [closing, blink, runLids]);
 
+  // Back from a world: you pull out of its screen — a flare in its colour, the eyes opening onto the
+  // climb, the camera's lens settling (the scene widens the view over the pull-out).
+  useEffect(() => {
+    if (!returning) return;
+    const c = spectrumColor(returning.t);
+    let tw: gsap.core.Tween | null = null;
+    setBlink(true);
+    // Two frames on: the lids have mounted (closed) and the animation clocks are fresh after the
+    // landing's long frame — so neither the flare nor the lids skip their start.
+    let raf = requestAnimationFrame(() => {
+      raf = requestAnimationFrame(() => {
+        const f = flashRef.current;
+        if (f) {
+          f.style.background = c;
+          tw = gsap.fromTo(f, { opacity: 0.55 }, { opacity: 0, duration: PORTAL_OUT_LENGTH * 0.9, ease: "power2.out", onComplete: () => {
+              f.style.background = "";
+            },
+          });
+        }
+        runLids("open", PORTAL_OUT_LENGTH * 1000 * 0.8, 0, () => setBlink(false));
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      tw?.kill();
+    };
+  }, [returning, runLids]);
+
   // The world's colour rises over the last part of the flight in.
   useEffect(() => {
     const el = enterRef.current;
@@ -501,7 +528,10 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     return () => window.clearTimeout(id);
   }, [toast]);
 
-  // ---- Sound follows the toggle (the toggle click is the user gesture) -----
+  // ---- Sound follows the menu (the click is the user gesture); the scene can change while it plays -----
+  useEffect(() => {
+    if (soundChoice !== "off") ambient.scene(soundChoice);
+  }, [soundChoice]);
   useEffect(() => {
     if (!immersiveLive) return;
     if (sound) ambient.start();
@@ -837,7 +867,6 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         </button>
         <div className="flex items-center gap-3 sm:gap-5">
           {ready && experience === "immersive" ? <QualityMenu value={quality} className="hidden md:block" /> : null}
-          <MusicButton />
           <span className="sm:hidden">
             <SoundToggle compact />
           </span>
@@ -1012,7 +1041,6 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       ) : null}
 
       {ready ? <LightCursor /> : null}
-      <MusicDock />
 
       {struggling ? (
         <div role="alertdialog" aria-label="Performance" className="fixed inset-x-4 bottom-6 z-40 mx-auto flex max-w-md flex-col gap-4 rounded-2xl border border-[var(--line)] bg-[rgba(10,10,14,0.9)] p-5 backdrop-blur-xl sm:flex-row sm:items-center">

@@ -10,14 +10,28 @@
  *              the scene's real time scale, so it glides rather than switches.
  *   chime      a glassy shimmer when the light strikes / you enter a world
  *   impact     the strike: a sub drop under the chime
+ *   scene      the soundscape under everything — Ambient (the drone), Night wind,
+ *              Rain, Deep hum — the visitor's pick, remembered
  */
+export type SoundScene = "ambient" | "wind" | "rain" | "hum";
+export const SOUND_SCENES: ReadonlyArray<{ id: SoundScene; label: string }> = [
+  { id: "ambient", label: "Ambient" },
+  { id: "wind", label: "Night wind" },
+  { id: "rain", label: "Rain" },
+  { id: "hum", label: "Deep hum" },
+];
 type Engine = {
   ctx: AudioContext;
   master: GainNode;
   filter: BiquadFilterNode;
   oscs: OscillatorNode[];
+  oscGains: GainNode[];
+  oscBase: number[];
   wind: GainNode;
   windBand: BiquadFilterNode;
+  windLfo: GainNode;
+  rain: GainNode;
+  rainFlutter: GainNode;
   sub: GainNode;
   subOsc: OscillatorNode;
   shimmer: GainNode;
@@ -25,11 +39,17 @@ type Engine = {
   scale: number;
   /** The drone is on (start was called, stop was not). */
   on: boolean;
-  /** 1 normally; lower while music plays over it. */
+  /** 1 normally (kept for a future layer that sits over the drone). */
   duck: number;
+  scene: SoundScene;
+  /** Per-scene shaping. */
+  windBase: number;
+  filterScale: number;
+  subBase: number;
 };
 
 let engine: Engine | null = null;
+let pendingScene: SoundScene = "ambient";
 
 function build(): Engine | null {
   const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -44,6 +64,7 @@ function build(): Engine | null {
   filter.connect(master);
   master.connect(ctx.destination);
 
+  const oscGains: GainNode[] = [];
   const tone = (freq: number, type: OscillatorType, gain: number) => {
     const o = ctx.createOscillator();
     o.type = type;
@@ -52,10 +73,12 @@ function build(): Engine | null {
     g.gain.value = gain;
     o.connect(g).connect(filter);
     o.start();
+    oscGains.push(g);
     return o;
   };
   // Sines only: the triangle's harmonics read as a buzz through the filter (Ratul, round B).
-  const oscs = [tone(55, "sine", 0.26), tone(82.4, "sine", 0.09), tone(110.3, "sine", 0.1), tone(164.8, "sine", 0.03)];
+  const oscBase = [0.26, 0.09, 0.1, 0.03];
+  const oscs = [tone(55, "sine", oscBase[0]), tone(82.4, "sine", oscBase[1]), tone(110.3, "sine", oscBase[2]), tone(164.8, "sine", oscBase[3])];
 
   // Slow breathing on the upper partial.
   const lfo = ctx.createOscillator();
@@ -80,6 +103,31 @@ function build(): Engine | null {
   const wind = ctx.createGain();
   wind.gain.value = 0.025;
   noise.connect(windBand).connect(wind).connect(filter);
+  // Night wind: the band wanders slowly (gusts) — the LFO's depth is 0 unless that scene is on.
+  const windLfoOsc = ctx.createOscillator();
+  windLfoOsc.frequency.value = 0.045;
+  const windLfo = ctx.createGain();
+  windLfo.gain.value = 0;
+  windLfoOsc.connect(windLfo).connect(windBand.frequency);
+  windLfoOsc.start();
+  // Rain: the same noise, high and thin, straight to the master (not through the drone's filter),
+  // with a slow flutter so it never reads as a flat hiss.
+  const rainBand = ctx.createBiquadFilter();
+  rainBand.type = "bandpass";
+  rainBand.frequency.value = 3800;
+  rainBand.Q.value = 0.35;
+  const rainHp = ctx.createBiquadFilter();
+  rainHp.type = "highpass";
+  rainHp.frequency.value = 1400;
+  const rain = ctx.createGain();
+  rain.gain.value = 0;
+  const rainFlutterOsc = ctx.createOscillator();
+  rainFlutterOsc.frequency.value = 0.23;
+  const rainFlutter = ctx.createGain();
+  rainFlutter.gain.value = 0;
+  rainFlutterOsc.connect(rainFlutter).connect(rain.gain);
+  rainFlutterOsc.start();
+  noise.connect(rainHp).connect(rainBand).connect(rain).connect(master);
   noise.start();
 
   // Sub: felt more than heard; swells when time slows and on impact.
@@ -105,20 +153,55 @@ function build(): Engine | null {
   }
   shimmer.connect(master);
 
-  return { ctx, master, filter, oscs, wind, windBand, sub, subOsc, shimmer, depth: 0, scale: 1, on: false, duck: 1 };
+  return { ctx, master, filter, oscs, oscGains, oscBase, wind, windBand, windLfo, rain, rainFlutter, sub, subOsc, shimmer, depth: 0, scale: 1, on: false, duck: 1, scene: "ambient", windBase: 0.025, filterScale: 1, subBase: 0 };
 }
 
 function applyFilter(e: Engine) {
   // Depth opens the filter; slowed time closes it again (muffled, underwater).
-  const open = 380 + Math.pow(e.depth, 1.3) * 2200;
+  const open = (380 + Math.pow(e.depth, 1.3) * 2200) * e.filterScale;
   const f = open * (0.18 + 0.82 * e.scale);
   e.filter.frequency.setTargetAtTime(f, e.ctx.currentTime, 0.25);
+}
+
+/** The soundscape: what sits under the journey. Glides between scenes over a couple of seconds. */
+function applyScene(e: Engine) {
+  const now = e.ctx.currentTime;
+  const T = 1.6;
+  const set = (p: AudioParam, v: number, t = T) => {
+    p.cancelScheduledValues(now);
+    p.setTargetAtTime(v, now, t / 3);
+  };
+  // drone level · wind level · wind band · gust depth · rain level · flutter · filter · sub
+  const S: Record<SoundScene, [number, number, number, number, number, number, number, number]> = {
+    ambient: [1, 0.025, 900, 0, 0, 0, 1, 0],
+    wind: [0.4, 0.11, 700, 420, 0, 0, 1.1, 0],
+    rain: [0.3, 0.012, 900, 0, 0.055, 0.012, 0.9, 0],
+    hum: [1.25, 0.008, 900, 0, 0, 0, 0.6, 0.11],
+  };
+  const [drone, windLv, band, gust, rainLv, flutter, filt, sub] = S[e.scene];
+  e.oscGains.forEach((g, i) => set(g.gain, e.oscBase[i] * drone));
+  e.windBase = windLv;
+  set(e.wind.gain, windLv);
+  set(e.windBand.frequency, band);
+  set(e.windLfo.gain, gust);
+  set(e.rain.gain, rainLv);
+  set(e.rainFlutter.gain, flutter);
+  e.filterScale = filt;
+  e.subBase = sub;
+  set(e.sub.gain, sub + (1 - e.scale) * 0.2);
+  applyFilter(e);
 }
 
 export const ambient = {
   /** Must be called from a user gesture (click / key). */
   start() {
-    if (!engine) engine = build();
+    if (!engine) {
+      engine = build();
+      if (engine && pendingScene !== "ambient") {
+        engine.scene = pendingScene;
+        applyScene(engine);
+      }
+    }
     if (!engine) return;
     const { ctx, master } = engine;
     void ctx.resume();
@@ -126,14 +209,13 @@ export const ambient = {
     master.gain.cancelScheduledValues(ctx.currentTime);
     master.gain.setTargetAtTime(0.55 * engine.duck, ctx.currentTime, 1.2);
   },
-  /** Music is playing over the drone: sit under it (the small sounds stay as they are). */
-  duck(on: boolean) {
+  /** The soundscape (Ambient / Night wind / Rain / Deep hum). Safe before start: applied when it builds. */
+  scene(scene: SoundScene) {
+    pendingScene = scene;
     if (!engine) return;
-    engine.duck = on ? 0.22 : 1;
-    if (!engine.on) return;
-    const { ctx, master } = engine;
-    master.gain.cancelScheduledValues(ctx.currentTime);
-    master.gain.setTargetAtTime(0.55 * engine.duck, ctx.currentTime, on ? 0.6 : 1.2);
+    if (engine.scene === scene) return;
+    engine.scene = scene;
+    applyScene(engine);
   },
   /** After a reload the context starts suspended: resume on the first gesture. */
   resume() {
@@ -158,8 +240,8 @@ export const ambient = {
     if (!engine) return;
     const s = Math.min(1, Math.max(0, speed));
     const now = engine.ctx.currentTime;
-    engine.wind.gain.setTargetAtTime(0.025 + s * s * 0.16, now, 0.2);
-    engine.windBand.frequency.setTargetAtTime(900 + s * 1900, now, 0.2);
+    engine.wind.gain.setTargetAtTime(engine.windBase + s * s * 0.16, now, 0.2);
+    if (engine.scene !== "wind") engine.windBand.frequency.setTargetAtTime(900 + s * 1900, now, 0.2);
   },
   /** Time scale: 1 = normal, 0.1 = fully slowed. Glides; call as often as it changes. */
   timeScale(s: number) {
@@ -169,7 +251,7 @@ export const ambient = {
     const now = engine.ctx.currentTime;
     const cents = (1 - k) * -700;
     for (const o of engine.oscs) o.detune.setTargetAtTime(cents, now, 0.3);
-    engine.sub.gain.setTargetAtTime((1 - k) * 0.2, now, 0.35);
+    engine.sub.gain.setTargetAtTime(engine.subBase + (1 - k) * 0.2, now, 0.35);
     engine.shimmer.gain.setTargetAtTime((1 - k) * 0.012, now, 0.5);
     applyFilter(engine);
   },
@@ -323,7 +405,7 @@ export const ambient = {
     sub.gain.cancelScheduledValues(now);
     sub.gain.setValueAtTime(0.5, now);
     sub.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
-    wind.gain.setTargetAtTime(0.025, now, 0.6);
+    wind.gain.setTargetAtTime(engine.windBase, now, 0.6);
     this.chime(1);
   },
 };

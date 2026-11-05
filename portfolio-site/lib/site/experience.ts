@@ -45,8 +45,18 @@ export function readQualityCookie(): Quality | null {
   const v = readCookie(QUALITY_COOKIE);
   return isQuality(v) ? v : null;
 }
+/** Sound: "off", or the soundscape's id. Legacy "on" → ambient. */
+export type SoundChoice = "off" | "ambient" | "wind" | "rain" | "hum";
+export function isSoundChoice(v: unknown): v is SoundChoice {
+  return v === "off" || v === "ambient" || v === "wind" || v === "rain" || v === "hum";
+}
 export function readSoundCookie(): boolean {
-  return readCookie(SOUND_COOKIE) === "on";
+  return readSoundChoice() !== "off";
+}
+export function readSoundChoice(): SoundChoice {
+  const v = readCookie(SOUND_COOKIE);
+  if (v === "on") return "ambient";
+  return isSoundChoice(v) ? v : "off";
 }
 
 /**

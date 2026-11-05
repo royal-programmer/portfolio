@@ -5,7 +5,7 @@
  * slider (Performance · Balanced · Best) and sound — no "Auto", no captions.
  */
 import { useEffect, useId, useRef, useState } from "react";
-import { QUALITIES, type Experience, type Quality } from "@/lib/site/experience";
+import { QUALITIES, type Experience, type Quality, type SoundChoice } from "@/lib/site/experience";
 import { useExperience } from "../experience-provider";
 
 export const QUALITY_LABEL: Record<Quality, string> = {
@@ -93,23 +93,77 @@ export function ModeSwitch({ className = "" }: { className?: string }) {
   );
 }
 
+const SCENES: ReadonlyArray<{ id: SoundChoice; label: string }> = [
+  { id: "off", label: "Off" },
+  { id: "ambient", label: "Ambient" },
+  { id: "wind", label: "Night wind" },
+  { id: "rain", label: "Rain" },
+  { id: "hum", label: "Deep hum" },
+];
+
+/**
+ * Sound: one control, a small menu. Off, or one of four synthesised soundscapes (no files, no
+ * third parties). The bars show the state; the label names the scene.
+ */
 export function SoundToggle({ className = "", compact = false }: { className?: string; /** Bars only (phones): the label stays for screen readers. */ compact?: boolean }) {
-  const { sound, setSound } = useExperience();
+  const { sound, soundChoice, setSoundChoice } = useExperience();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", esc);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  const current = SCENES.find((x) => x.id === soundChoice) ?? SCENES[0];
   return (
-    <button
-      type="button"
-      aria-pressed={sound}
-      onClick={() => setSound(!sound)}
-      className={`group inline-flex min-h-8 items-center gap-2 font-mono text-[10px] tracking-[0.16em] text-[var(--ink-dim)] uppercase transition-colors hover:text-[var(--ink)] ${className}`}
-    >
-      <span aria-hidden className={`sound-bars ${sound ? "is-on" : ""}`}>
-        <i />
-        <i />
-        <i />
-        <i />
-      </span>
-      <span className={compact ? "sr-only" : ""}>Sound {sound ? "on" : "off"}</span>
-    </button>
+    <div ref={ref} className={`relative ${className}`}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((v) => !v)}
+        className="group inline-flex min-h-8 items-center gap-2 font-mono text-[10px] tracking-[0.16em] text-[var(--ink-dim)] uppercase transition-colors hover:text-[var(--ink)]"
+      >
+        <span aria-hidden className={`sound-bars ${sound ? "is-on" : ""}`}>
+          <i />
+          <i />
+          <i />
+          <i />
+        </span>
+        <span className={compact ? "sr-only" : ""}>Sound · {sound ? current.label : "off"}</span>
+      </button>
+      {open ? (
+        <div role="menu" aria-label="Sound" className="sound-menu absolute top-full right-0 mt-3 w-44 rounded-2xl border border-[var(--line)] bg-[rgba(10,10,14,0.88)] p-2 backdrop-blur-xl">
+          {SCENES.map((sc) => {
+            const on = soundChoice === sc.id;
+            return (
+              <button
+                key={sc.id}
+                type="button"
+                role="menuitemradio"
+                aria-checked={on}
+                onClick={() => {
+                  setSoundChoice(sc.id);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-2 font-mono text-[10px] tracking-[0.14em] uppercase transition-colors ${on ? "bg-[rgba(255,255,255,0.08)] text-[var(--ink)]" : "text-[var(--ink-dim)] hover:text-[var(--ink)]"}`}
+              >
+                {sc.label}
+                <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${on ? "bg-current" : "border border-current opacity-40"}`} />
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

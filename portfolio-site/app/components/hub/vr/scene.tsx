@@ -211,10 +211,12 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
     // Through the doorway: the camera flies into the lit screen, straight on — and back out
     // of it when you return from that world.
     let into = 0;
+    let outKick = 0; // the pull-out's lens kick: wide at the start, settling as you land on the climb
     if (s.portal) into = easeIn(clamp01((now - s.portal.at) / 1000 / PORTAL_LENGTH));
     else if (s.portalOut) {
       const u = clamp01((now - s.portalOut.at) / 1000 / PORTAL_OUT_LENGTH);
       into = 1 - easeInOut(u);
+      outKick = Math.sin(Math.pow(u, 0.6) * Math.PI);
       if (u >= 1) s.portalOut = null;
     }
     if (into > 0 && s.portalAnchor) {
@@ -266,7 +268,7 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
     const cam = camera as THREE.PerspectiveCamera;
     // Lens: holding narrows the view; rushing widens it; the visitor's zoom opens it right up.
     const zoomed = fovBase * (1 + s.zoom * 0.95);
-    L.fov = THREE.MathUtils.damp(L.fov, zoomed - (1 - k.scale) * 6 + k.speed * 12 - into * 14, 3, dt);
+    L.fov = THREE.MathUtils.damp(L.fov, zoomed - (1 - k.scale) * 6 + k.speed * 12 - into * 14 + outKick * 18, outKick > 0 ? 8 : 3, dt);
     if (Math.abs(cam.fov - L.fov) > 0.01) {
       cam.fov = L.fov;
       cam.updateProjectionMatrix();
