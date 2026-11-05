@@ -328,7 +328,7 @@ export function makeDashScreen(t: number): THREE.Texture {
   return makeTexture(canvas, () => {
     ctx.fillStyle = "#08080c";
     ctx.fillRect(0, 0, 1024, 640);
-    drawSpeedo(ctx, 0, 0, 500, 640, t, 0.42);
+    drawSpeedo(ctx, 0, 0, 500, 640, t, 0.52);
     drawRoute(ctx, 512, 0, 512, 640, t, 11, 4, true);
     ctx.fillStyle = "rgba(243,241,236,0.08)";
     ctx.fillRect(504, 24, 1, 592);
@@ -345,7 +345,7 @@ export function makeDashScreen(t: number): THREE.Texture {
     ctx.fillStyle = hsl(t, 64);
     ctx.shadowColor = hsl(t, 64);
     ctx.shadowBlur = 18;
-    ctx.fillText("4", 440, 600);
+    ctx.fillText("3", 440, 600);
     ctx.shadowBlur = 0;
   });
 }

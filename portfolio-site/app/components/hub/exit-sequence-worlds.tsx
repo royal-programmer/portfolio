@@ -117,27 +117,39 @@ export function DashExit({
         });
       }
       tl.add(() => ambient.chime(0.5), "<-0.3");
-      // Pulling away: the speed climbs, the gear steps up, the revs ride along.
-      const s = { v: 0, g: 0, t: 0 };
-      const gears = ["N", "1", "2", "3", "4"];
-      tl.to(
-        s,
-        {
-          v: 84,
-          g: 4,
-          t: 2.3,
-          duration: 1.7,
-          ease: "power2.out",
-          onUpdate: () => {
-            if (speed) speed.textContent = String(Math.round(s.v));
-            if (gear) gear.textContent = gears[Math.min(4, Math.floor(s.g))];
-            if (trip) trip.textContent = `trip ${s.t.toFixed(1)} km`;
-            if (rev)
-              rev.style.strokeDashoffset = `${REV_LEN * (1 - (0.14 + 0.55 * Math.abs(Math.sin(s.g * Math.PI))))}`;
-          },
+      // Pulling away, honestly: the revs climb under throttle, each upshift drops them and the next
+      // gear picks the speed up from where it was. Speed = revs × the gear's ratio; the trip adds up.
+      const RATIO = [0, 0.0062, 0.0088, 0.0117, 0.0148]; // km/h per rpm, gears 1–4 (≈ 56 / 79 / 105 at the shift point)
+      const REDLINE = 12000;
+      const sim = { rpm: 1300, gear: 0, v: 0, trip: 0, last: 0 };
+      const drive = { t: 0 };
+      tl.to(drive, {
+        t: 2.1,
+        duration: 2.1,
+        ease: "none",
+        onUpdate: () => {
+          const dt = drive.t - sim.last;
+          sim.last = drive.t;
+          if (dt <= 0) return;
+          if (sim.gear === 0) {
+            // Into first: the revs dip as the clutch bites.
+            sim.gear = 1;
+            sim.rpm = 2400;
+          }
+          const throttle = 1 - sim.v / 140;
+          sim.rpm += 7800 * throttle * dt;
+          if (sim.rpm > 9000 && sim.gear < 4) {
+            sim.gear += 1;
+            sim.rpm = sim.v / RATIO[sim.gear];
+          }
+          sim.v = sim.rpm * RATIO[sim.gear];
+          sim.trip += (sim.v / 3600) * dt * 4; // the trip screen counts a little quicker than real time
+          if (speed) speed.textContent = String(Math.round(sim.v));
+          if (gear) gear.textContent = String(sim.gear);
+          if (trip) trip.textContent = `trip ${sim.trip.toFixed(1)} km`;
+          if (rev) rev.style.strokeDashoffset = `${REV_LEN * (1 - Math.min(1, sim.rpm / REDLINE))}`;
         },
-        ">-0.2",
-      );
+      }, ">");
       // The trip screen traces the route; the rider's dot runs it; the pins light as it passes.
       if (route) {
         route.style.strokeDasharray = `${routeLen}`;

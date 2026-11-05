@@ -19,11 +19,13 @@ import { Halo, Tube, makeScreenMaterial, useAssembly } from "../assembly";
 import { makeDashScreen } from "../screens-worlds";
 import type { World } from "../state";
 
-// The TFT dash on the bike (the doorway): where a real one sits — low behind the screen, between the
-// clip-ons, facing up to the rider — so it is hidden from the side and the fly-in comes down onto it.
-const PANEL_W = 0.4;
-const PANEL_H = 0.25;
-const DASH_TILT: [number, number, number] = [-Math.PI / 2 + 0.62, 0, 0];
+// The TFT dash on the bike (the doorway): where a real one sits — on the top yoke, just behind the
+// screen, between the bars, its face tilted up and back to the rider (about 40° off vertical). From
+// the side you see its edge; the fly-in comes over the tank and down onto it, the rider's view.
+// Measured off the model: the bars sit at x ≈ 0.55–0.65, the dip behind the screen tops out at y ≈ 0.65.
+const PANEL_W = 0.42;
+const PANEL_H = 0.21;
+const DASH_TILT = (40 * Math.PI) / 180;
 // Side view, xy plane, bike pointing +x. Wheel radius 0.46.
 const R_AXLE: [number, number, number] = [-0.86, 0, 0];
 const F_AXLE: [number, number, number] = [0.9, 0, 0];
@@ -173,7 +175,7 @@ export function RideAssembly({ world, modelUrl }: { world: World; /** A CC0 .glb
       new THREE.Vector3(...R_AXLE),
       new THREE.Vector3(0.62, 0.78, 0),
       new THREE.Vector3(1.02, 0.62, 0),
-      new THREE.Vector3(0.4, 0.66, 0),
+      new THREE.Vector3(0.56, 0.76, 0),
       new THREE.Vector3(-1.7, 0.25, 0.35),
       new THREE.Vector3(0.1, 0.86, 0),
       new THREE.Vector3(-0.72, 0.42, 0.34),
@@ -197,6 +199,7 @@ export function RideAssembly({ world, modelUrl }: { world: World; /** A CC0 .glb
       lens: new THREE.PlaneGeometry(0.1, 0.24),
       beam: new THREE.ConeGeometry(0.9, 2.8, 24, 1, true).rotateZ(Math.PI / 2),
       panel: new THREE.PlaneGeometry(PANEL_W, PANEL_H),
+      dashBody: new RoundedBoxGeometry(PANEL_W + 0.04, PANEL_H + 0.04, 0.05, 3, 0.012),
       light: new THREE.PlaneGeometry(PANEL_W + 0.03, PANEL_H + 0.03),
       helmet: new THREE.SphereGeometry(0.24, 32, 24),
       visor: new THREE.SphereGeometry(0.235, 32, 16, -0.2, 1.9, 0.9, 1.0),
@@ -253,10 +256,14 @@ export function RideAssembly({ world, modelUrl }: { world: World; /** A CC0 .glb
         </group>
         <group ref={(el) => void (refs[5].current = el)}>
           {/* The dash: lies on the bike, faces up and back — the fly-in comes down onto it (top view). */}
-          <group rotation={DASH_TILT}>
-            <mesh ref={panel} geometry={geo.panel} material={mat} />
-            <mesh geometry={geo.light} material={mats.bezel} position={[0, 0, -0.001]} />
-            <Halo width={PANEL_W * 1.2} height={PANEL_H * 1.2} material={mats.halo} position={[0, 0, -0.02]} />
+          {/* Faces back (−x) first, then tilts up: the plane's normal ends up pointing up and back at the rider. */}
+          <group rotation={[0, 0, -(Math.PI / 2 - DASH_TILT)]}>
+            <group rotation={[0, -Math.PI / 2, 0]}>
+              <mesh ref={panel} geometry={geo.panel} material={mat} />
+              <mesh geometry={geo.light} material={mats.bezel} position={[0, 0, -0.001]} />
+              <mesh geometry={geo.dashBody} material={mats.matte} position={[0, 0, -0.03]} />
+              <Halo width={PANEL_W * 1.2} height={PANEL_H * 1.2} material={mats.halo} position={[0, 0, -0.02]} />
+            </group>
           </group>
         </group>
         <group ref={(el) => void (refs[6].current = el)}>
@@ -319,10 +326,13 @@ export function RideAssembly({ world, modelUrl }: { world: World; /** A CC0 .glb
       </group>
       {/* The dash: the doorway. */}
       <group ref={(el) => void (refs[5].current = el)}>
-        <group rotation={DASH_TILT}>
-          <mesh ref={panel} geometry={geo.panel} material={mat} />
-          <mesh geometry={geo.light} material={mats.bezel} position={[0, 0, -0.001]} />
-          <Halo width={PANEL_W * 1.2} height={PANEL_H * 1.2} material={mats.halo} position={[0, 0, -0.02]} />
+        <group rotation={[0, 0, -(Math.PI / 2 - DASH_TILT)]}>
+          <group rotation={[0, -Math.PI / 2, 0]}>
+            <mesh ref={panel} geometry={geo.panel} material={mat} />
+            <mesh geometry={geo.light} material={mats.bezel} position={[0, 0, -0.001]} />
+            <mesh geometry={geo.dashBody} material={mats.matte} position={[0, 0, -0.03]} />
+            <Halo width={PANEL_W * 1.2} height={PANEL_H * 1.2} material={mats.halo} position={[0, 0, -0.02]} />
+          </group>
         </group>
       </group>
       {/* The kit. */}
