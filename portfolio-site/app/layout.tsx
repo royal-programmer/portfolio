@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import { EXPERIENCE_BOOT_SCRIPT } from "@/lib/site/experience";
 import { ExperienceProvider } from "./experience-provider";
 import { PersonaProvider } from "./persona-provider";
@@ -47,7 +48,8 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: EXPERIENCE_BOOT_SCRIPT }} />
+        {/* Runs before hydration (next/script keeps React from re-rendering a raw <script> on the client). */}
+        <Script id="xp-boot" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: EXPERIENCE_BOOT_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col">
         <ExperienceProvider>

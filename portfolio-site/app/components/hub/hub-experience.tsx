@@ -1116,7 +1116,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       ) : null}
       {gate === "returning" ? (
         <div role="status" className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-[var(--void)]">
-          <p className="font-mono text-[10px] tracking-[0.24em] text-[var(--ink-dim)] uppercase">{status === "failed" ? "3D couldn’t start" : "Gathering light"}</p>
+          {status === "failed" ? <p className="font-mono text-[10px] tracking-[0.24em] text-[var(--ink-dim)] uppercase">3D couldn’t start</p> : <span aria-label="Loading" className="gate-ring is-spinning" style={{ width: 20, height: 20 }} />}
           <button type="button" onClick={goNormal} className="font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase underline-offset-4 hover:text-[var(--ink)] hover:underline">
             {status === "failed" ? "Continue in Normal view" : "Skip — Normal view"}
           </button>

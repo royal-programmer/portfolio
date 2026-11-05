@@ -19,10 +19,11 @@ import { Halo, Tube, makeScreenMaterial, useAssembly } from "../assembly";
 import { makeDashScreen } from "../screens-worlds";
 import type { World } from "../state";
 
-// The TFT dash on the bike (the doorway): small, at the headstock, tilted up towards the rider.
-const PANEL_W = 0.62;
-const PANEL_H = 0.39;
-const DASH_TILT: [number, number, number] = [-Math.PI / 2 + 0.95, 0, 0];
+// The TFT dash on the bike (the doorway): where a real one sits — low behind the screen, between the
+// clip-ons, facing up to the rider — so it is hidden from the side and the fly-in comes down onto it.
+const PANEL_W = 0.4;
+const PANEL_H = 0.25;
+const DASH_TILT: [number, number, number] = [-Math.PI / 2 + 0.62, 0, 0];
 // Side view, xy plane, bike pointing +x. Wheel radius 0.46.
 const R_AXLE: [number, number, number] = [-0.86, 0, 0];
 const F_AXLE: [number, number, number] = [0.9, 0, 0];
@@ -172,7 +173,7 @@ export function RideAssembly({ world, modelUrl }: { world: World; /** A CC0 .glb
       new THREE.Vector3(...R_AXLE),
       new THREE.Vector3(0.62, 0.78, 0),
       new THREE.Vector3(1.02, 0.62, 0),
-      new THREE.Vector3(0.52, 0.86, 0),
+      new THREE.Vector3(0.4, 0.66, 0),
       new THREE.Vector3(-1.7, 0.25, 0.35),
       new THREE.Vector3(0.1, 0.86, 0),
       new THREE.Vector3(-0.72, 0.42, 0.34),
@@ -255,7 +256,7 @@ export function RideAssembly({ world, modelUrl }: { world: World; /** A CC0 .glb
           <group rotation={DASH_TILT}>
             <mesh ref={panel} geometry={geo.panel} material={mat} />
             <mesh geometry={geo.light} material={mats.bezel} position={[0, 0, -0.001]} />
-            <Halo width={PANEL_W * 1.6} height={PANEL_H * 1.6} material={mats.halo} position={[0, 0, -0.03]} />
+            <Halo width={PANEL_W * 1.2} height={PANEL_H * 1.2} material={mats.halo} position={[0, 0, -0.02]} />
           </group>
         </group>
         <group ref={(el) => void (refs[6].current = el)}>
@@ -321,7 +322,7 @@ export function RideAssembly({ world, modelUrl }: { world: World; /** A CC0 .glb
         <group rotation={DASH_TILT}>
           <mesh ref={panel} geometry={geo.panel} material={mat} />
           <mesh geometry={geo.light} material={mats.bezel} position={[0, 0, -0.001]} />
-          <Halo width={PANEL_W * 1.6} height={PANEL_H * 1.6} material={mats.halo} position={[0, 0, -0.03]} />
+          <Halo width={PANEL_W * 1.2} height={PANEL_H * 1.2} material={mats.halo} position={[0, 0, -0.02]} />
         </group>
       </group>
       {/* The kit. */}
