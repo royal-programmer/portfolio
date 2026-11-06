@@ -26,8 +26,14 @@ status() {
   curl -fsS --max-time 30 -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" "$api" | jq -r '.status'
 }
 
+token_ok() {
+  # Retry: the Management API occasionally fails transiently.
+  for _ in 1 2 3; do status >/dev/null 2>&1 && return 0; sleep 10; done
+  return 1
+}
+
 token_problem=""
-if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]] && ! status >/dev/null 2>&1; then
+if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]] && ! token_ok; then
   # Expired / revoked / under-scoped token: still ping (keeps the DB awake),
   # but fail the run at the end so GitHub emails the owner to rotate it.
   token_problem="Management API rejected SUPABASE_ACCESS_TOKEN (expired, revoked, or missing permissions) — auto-restore is OFF until it is replaced."

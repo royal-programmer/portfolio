@@ -6,27 +6,40 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "hub:media": "node scripts/hub-media.mjs",
+    "predev": "node scripts/hub-media.mjs",
+    "prebuild": "node scripts/hub-media.mjs"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
+    "@react-three/postprocessing": "^3.2.2",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.7",
     "exifr": "^7.1.3",
     "framer-motion": "^12.38.0",
+    "gsap": "^3.13.0",
+    "lenis": "^1.3.11",
     "lucide-react": "^1.0.1",
     "next": "16.2.1",
+    "postprocessing": "^6.39.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-type-animation": "^3.2.0",
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.3",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.187.0",
+    "devicon": "^2.18.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
+    "simple-icons": "^16.36.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

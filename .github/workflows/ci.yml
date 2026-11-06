@@ -1,0 +1,38 @@
+name: ci
+
+# Type-check and lint on every push and pull request, so a broken build never
+# reaches `main` (Vercel deploys `main` to production on push). No build step
+# here: `next build` needs the Supabase env, and Vercel runs it anyway.
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "portfolio-site/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths:
+      - "portfolio-site/**"
+      - ".github/workflows/ci.yml"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: portfolio-site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: portfolio-site/package-lock.json
+      - run: npm ci
+      - name: Type-check
+        run: npx tsc --noEmit -p tsconfig.json
+      - name: Lint
+        run: npm run lint

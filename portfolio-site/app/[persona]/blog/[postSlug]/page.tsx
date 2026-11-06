@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { PersonaLink } from "@/lib/site/persona-link";
 import { notFound } from "next/navigation";
 import { getBlogPost, isLaunchedPersona, listBlogPosts } from "@/lib/content";
 
@@ -52,12 +52,13 @@ export default async function PersonaBlogPostPage({ params }: BlogPostPageProps)
   return (
     <main className="min-h-screen bg-[var(--page-bg)] text-[var(--fg)]">
       <article className="mx-auto w-full max-w-3xl px-4 py-12 sm:px-6 md:px-8 md:py-16 lg:px-10">
-        <Link
-          href={`/${persona}/blog`}
+        <PersonaLink
+          persona={persona}
+          path="/blog"
           className="text-sm font-medium text-[var(--accent)] underline-offset-4 hover:underline"
         >
           ← All posts
-        </Link>
+        </PersonaLink>
 
         <header className="mt-8 space-y-3">
           {dateLabel ? (

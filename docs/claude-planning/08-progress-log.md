@@ -5,6 +5,575 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-06 — Round F: orbiting fly-in, key-on dash, 48 drawings, the world pages' stage, all six by default
+
+Ratul's review of the constellation pass: the camera reached the dash but the bike did not turn; the dash should boot the way a real TFT does when the key turns; the drawings should be detailed, drawn in place (no sliding), more of them but not cluttered, with his object lists per world; "pages go"; deploy; `preview=all` as default; rename the branch; is `via` needed.
+
+**What landed (commits `27fa69e` and the pages commit after it):**
+- scene.tsx: the fly-in is an orbit — the camera's direction from the setup's centre slerps round to the side the screen faces while the distance closes (over the tank and down onto the dash; round to the front of a monitor), the look held on the setup throughout; `PORTAL_LENGTH` 1.35 s, `PORTAL_OUT_LENGTH` 1.25 s so the swing reads. `portalAnchor` carries the setup's centre (`cx cy cz`).
+- exit-sequence-worlds.tsx `DashExit`: key on → logo screen (ring draws, "R", "system check") → cut to the dash → self-test (tell-tales ABS · TC · N · ! · OIL · HI light in turn, "888" flash, rev sweep to the red line and back) → lamps out except N and ABS → the drive; N goes out on first gear, ABS once rolling. Tell-tales live in the window's bar.
+- constellations.ts: 48 objects redrawn with detail (helpers `arc`, `rrect`, `bar`, `grid`, `keys`, `ticks`), eight per world at the same eight stations, from Ratul's lists: code laptop · terminal · monitors · earbuds · server · coffee · git branch · keyboard; trade candles · hourglass · clock · bitcoin · calculator · brain · dollars · journal; lens camera · thirds grid · golden ratio · lens · SD card · phone back (round camera island) · softbox · tripod; art easel · colour wheel · watercolours · tubes · pencil cup · palette · brush jar · tablet + stylus; ride bike (traced) · road sign · mountains · helmet · jerry can · gloves · boots · road; play monitor · trophy · PC tower · headset · mouse · gamepad · keyboard (WASD marked) · energy can. `strokeObject` lives here now (shared with the page stage). normal-journey.tsx draws each in place from its first point — the drift is gone.
+- Hydration: poster and dash-tick geometry rounded to two decimals (Node and the browser disagree on a sine's last digit).
+- whoami/page.tsx: every persona climbs by default (`?preview=published` restores the old gate); load-home-content.ts likewise lists all six for the pages; both fall back to the public list when the admin read is unavailable.
+- world-boot.tsx strips `via` from the address bar once it has done its job. `via` stays a URL parameter because the worlds live on their own hosts (sessionStorage does not cross origins).
+- **World pages' stage** (world-stage.tsx, world-stage-3d.tsx): a 46 svh band above every page's hero. Immersive: the hub's very assembly on its own R3F canvas — a local `VrContext` (clock at the chapter, state for the pointer), a camera standing in front of the setup where the climb's would (`PLACE` mirrors each world's hub offset), RoomEnvironment lighting, the pointer turns it, hover rims it. Normal: the world's hero drawing strokes itself in with a pen light, then breathes. persona-home-body.tsx mounts it for all six and gives artist / ride / gamer a page (hero + identity); home-hero.tsx types each persona's own points; identity-panel.tsx has an icon per persona.
+- home-page.tsx: on a persona's own host the path is `/`, so the provider could not read the persona from the route and the page waited forever — the page now hands `routePersona` over.
+
+**Verified (Playwright, dev):** fly-in frame at 200 ms is a top view over the tank, then the dash; the dash boots logo → self-test → first gear at 55 km/h; constellations on engineer and ride, ring clear of the header and rail; engineer page stage in both modes; ride page stage with the bike model and the traced drawing; ride page server HTML carries the real persona copy.
+
+**Not done:** publishing artist / ride / gamer in Supabase (the tool's permission classifier refused the UPDATE; one SQL for Ratul in the reply).
+
+## 2026-11-05 — Normal mode constellations; dash seated; content reads resilient
+
+Ratul's brief for Normal mode: keep the display as the centrepiece, draw the world's things *around* it (not under it), in one stroke language for every world; drawing in as you scroll into the chapter, complete at its midpoint, undrawing in reverse on the way out. Built: `constellations.ts` (32 hand-drawn objects + the traced bike, each placed in display-widths around the display with a depth), drawn by `normal-journey.tsx` with per-object stagger, a drift in along the light's direction, depth parallax, the pen light at each stroke head; the display's place is derived from the same CSS the DOM uses. Portrait keeps the objects above the display. The old single-icon table is gone. Also: the TFT dash seated on the top yoke from model measurements (facing up/back 40°), the dash loader as a small drivetrain, the boot script via next/script, public content listings resilient (deadline + last-good), the returning screen's ring. Commits `36eb170`, `d64765d`, and this one.
+
+## 2026-11-05 — Round E feedback pass: dash on the bike, Space centring, return robustness, Normal mode as light
+
+Ratul's second review of Round E. Changes: (1) no separate panel for the rider — the TFT dash is on the bike at the headstock, tilted to the rider; the fly-in comes down onto it (top view) and fills the screen. (2) Space / Shift+Space pick the next or previous chapter from the current scroll position and glide so the chapter is centred (it was aligning section tops and reading a lagging `active`, which skipped chapters). (3) Back to the hub was inconsistent: a page restored from the browser cache reset the portal without the pull-out, and left the world's session key behind so a reload replayed the return. The cache path now plays the pull-out and spends the key; the return flare is cleared outright on cleanup (a stalled clock had left the screen washed in the world's colour). (4) Every finished window glows in its world's colour, not only the trader's. (5) "Gathering light" → a thin ring that fills, with the number. (6) Normal mode: the fan is drawn as light — additive wedges fading along their length with soft edges, an apex glow where white becomes colour, a wide soft field along the lit band that the display stands on, 70 motes streaming outward (brighter near the lit band), fine additive persona bands; the hero sits closer (zoom 1.18 at rest); film grain over the backdrop; the display is larger (44 vw), slides in along the light, carries a floor reflection and a deep shadow. Commits `10f9c21` and (this).
+
+## 2026-11-05 — Round E (Ratul: "lets do it all"): doorways, keys, sound menu, six displays, Normal mode rebuilt
+
+Ratul's calls, all accepted: the hub's exit ends at the filled screen and the page carries the loader on; the whole object is the doorway and pops; the chapter button takes the same doorway; Space / Shift+Space / 1–6 / Enter on the climb; the cursor family (grab / grabbing / pointer + the ring's enter mark); the music dock goes, Sound becomes a menu of synthesised soundscapes; `?xp=` as a shareable mode override; the rider's doorway is a TFT dash; the bike is traced from its real model; Normal mode is rebuilt around the six displays; the re-entry from a world is a pull-out with a flare. Domain: `ratulroy.me` live on Vercel (apex production, `www` and `who` 308 to it, six persona subdomains), Cloudflare DNS-only. CI: type-check + lint on every push (`.github/workflows/ci.yml`); first run caught one real lint error and two warnings, fixed.
+
+**Commits:** `4b880fc` ci · `cdb8c4e` lint fixes · `ba6f35c` cut at the filled screen, whole-object doorway, keys, cursor, `?xp=` · `b980fde` chore(config) env · `76eae04` Sound menu + pull-out re-entry · `2d75075` dash / monitor / canvas sequences, traced bike · (this) Normal mode six displays.
+
+**What landed:**
+- `BootFrame` (exit-sequence.tsx): the very first frame of a world's sequence, still — the hub cuts to it the moment the camera has flown into the screen (`PORTAL_LENGTH + 90 ms`), and the page server-renders the same frame and plays on (`via=hub`). The old push-in and the hub-side sequence are gone.
+- assembly.tsx: hover raycasts the whole setup (`intersectObject(g, true)`); `withRim` adds a fresnel emissive term to every lit material (`rim`, `rimColor` uniforms, no post pass); the setup scales 3.5 % under the pointer. CSS: `canvas { cursor: grab | grabbing | pointer }`, the ring squeezes while dragging and grows an enter chevron over a doorway.
+- Keyboard on the climb: Space next world, Shift+Space previous (past the last → the ending), 1–9 → that world, Enter → the setup under the pointer or the chapter you stand at.
+- `?xp=normal|immersive` (experience-provider.tsx): writes the cookie on the root domain, strips itself from the URL; the hub skips the gate for it.
+- Sound (ambient-sound.ts `scene()`, experience.ts `SoundChoice`, experience-controls.tsx `SoundToggle` → a menu): Off / Ambient / Night wind (gusting band LFO) / Rain (thin high noise with a flutter, past the drone's filter) / Deep hum (drone up, filter down, a sub bed). Music files deleted: music-player.tsx, lib/site/music.ts, api/music/search; `JAMENDO_CLIENT_ID` dropped from the template (chore(config)).
+- Pull-out re-entry: `outKick` widens the lens over the pull-out (scene.tsx); a flare in the world's colour and the lids opening (two frames after landing, so neither skips its start — the first attempt did, the GSAP clock was stale after the landing's long frame and the lids were not mounted yet).
+- Three new sequences (exit-sequence-worlds.tsx, shared bits in exit-shared.tsx), each rendering `still="boot" | "final"` or playing: `DashExit` (rev sweep, speed 0→84, gear N→4, route trace with the rider's dot and pins), `MonitorExit` (power-on line, HUD from the corners, crosshair settles, ammo counts, radar sweeps, PRESS START blinks), `CanvasExit` (nine strokes in a palette around the hue — sky, hills, sun, water, a tree, the signature — with a brush light). The rider's 3D panel is `makeDashScreen` (speedo + route).
+- `bike-lines.ts` (generated): 111 strokes traced from bike.glb — silhouette + crease edges in a side view, sign-agnostic facing (the model's windings are inconsistent), chained through junctions along the straightest path, closed loops simplified as two halves (the wheels vanished until that fix). Normal mode draws it.
+- Normal mode (normal-displays.tsx): the chapter's display sits where the setup would stand (fixed, right, 40 vw; phones: top), comes on 700 ms after the chapter arrives, plays once, holds (`ExitFrame`); the canvas drawing recedes under it (`recedeRef`); hover pops it; click or the chapter button zooms (`is-zoom`) and opens the world with `via=normal`, where `WorldBoot` opens on the finished window and lifts (`is-finished`).
+
+**Verified (Playwright, dev):** hover region over the whole laptop, cursor `pointer`, click → boot cover at 0.7–0.95 s → `code.…/?via=hub` → typing → gone; button → same; keys land on the right chapters; `?xp=normal` → no gate, canvas on, URL clean, cookie set; Sound menu → `xps=rain`; return from a world: flare 0.55→0 over ~1 s, lids 0→260 over ~0.9 s; ride / play / art direct visits play their sequences; Normal mode: terminal types in the display, trader and dash shown, click → zoom → `trade.…/?via=normal` → finished window → lifts.
+
+**Open from Round E:** world pages' signature object hero (Immersive: the same 3D model; Normal: the line drawing) over identical content — next. Sound pass per world (ambience variants) still pending. Pre-launch list unchanged (publish flags, production build + Lighthouse, real phones).
+
+## 2026-11-05 — Round D, third pass: loaders alive from the first paint, Normal mode drawings
+
+**Ratul's check:** the world loaders "from the first frame" were not working for him. Measured on a fresh direct visit in dev: the server-rendered window arrived, then sat *empty* for ~4–5 s until the page's script hydrated and GSAP began (the chart body was deliberately `opacity: 0` in markup so the finished chart would not flash). The earlier timing report had been measured from hydration, not from navigation — my mistake. A reload also replayed nothing (once-per-session flag), which is how he tested.
+
+**Fix (`exit-sequence.tsx`, `world-boot.tsx`, `globals.css`):**
+- `ExitSequence` gets `boot`: a direct visit's window is alive in CSS alone until the script arrives — the bar's light wakes, the trader's grid lines draw themselves and a soft scan sweeps the body (`BootScreen`), the camera's focus box hunts and the live view breathes, the terminal's cursor waits lit. Each timeline ends the boot the moment it starts (the trader fades the boot layer over the chart).
+- A **reload** replays the loader (`PerformanceNavigationTiming.type === "reload"`); moving around inside a world still does not.
+- Verified: trade — boot grid mid-draw at 0.4 s, boot until hydration (~4 s in dev), candles, target, page gone at ~7.6 s. code — cursor at 0.5 s, typing from 4 s, 13 lines, gone at 8.5 s. lens — hunting focus until 4 s, then the metering sequence.
+- Dev hydration is ~4 s on these pages (uncompressed dev bundles); production will be well under that, but the boot screen makes the wait a non-issue either way.
+
+**Normal mode (`normal-journey.tsx`):** per Ratul — the bicycle is now a super bike (low fairing over the front wheel, tank, kicked-up tail, screen, forks, exhaust), the gamer's screen shows a crosshair with a first-person rifle, health and ammo marks, the easel carries a landscape (hills, horizon, sun, a cloud) with a brush. `strokeIcon` now returns the pen position so a bright point with a halo rides the head of the stroke while a setup draws; once lit, a soft glow sits under it and motes of its colour rise. Short dashes of light stream outward along the fan while the view follows the light, so the climb has motion as well as a turn.
+
+**Jamendo:** Ratul registered a client id (`JAMENDO_CLIENT_ID` in `.env.local`); the search route returns real tracks. His ask: a premade playlist, and he is unsure whether music belongs at all → recommendation sent (see the reply): one **Sound** control with a few soundscapes + one curated CC playlist, retire the paste-a-link dock.
+
+## Round D, second pass: Normal mode as a motion piece, the phone pass (2026-11-05)
+
+- **Normal mode** (`hub/normal-journey.tsx`): "the headset stays off" is now the same
+  story as a flat, scroll-driven 2D canvas, no WebGL — drawn in the still poster's own
+  1600×900 space so it takes over from the SSR poster without a seam. Hero → through:
+  the white ray falls onto the prism and the spectrum fans open. The climb: the view
+  follows the light (zooms about the prism exit and **turns through the spectrum**, so
+  each persona's colour comes round to point right in turn and washes the sky), panes
+  drift past, and that persona's setup draws itself as line-work in its own light —
+  one icon per world (laptop, desk, camera, easel, bike, tower), stroked in by
+  nearness, glowing on its chapter, letting go after. The ending drains the colour to
+  stars. Progress is the page's own `state.c`; reduced motion keeps the scroll-follow
+  and drops the breathing; redraws pause when the tab is hidden; DPR capped at 1.5.
+- **Phone pass.** Portrait screens: the setup now sits at the centre of the upper half
+  (`frame.right × (1 − portrait)`, `up + 0.5·portrait`) instead of off the right edge,
+  and the Director opens the lens (`FOV × (1 + 0.45·portrait)`) so the climb is not a
+  keyhole. Header fits at 390 px: Music is icon-only and Sound is bars-only under `sm`
+  (labels stay for screen readers), tighter gaps. Checked at 390×844: gate, engineer,
+  photographer, Normal mode.
+- Still open in round D: a sound-design pass (per-world ambience, lighter wind on the
+  climb) and the Jamendo id (Ratul).
+
+## Round D, first pass: the ending and the rewind, the music dock (2026-11-05)
+
+Ratul: "go round D". Scope from `14-vr-journey-concept.md`: ending (fade, empty sky,
+"Take off your headset", reverse rewind), Normal mode, phone tuning, sound design,
+console credits (done in the fifth pass). This pass: the ending and the music.
+
+- **Ending.** Past the last world (`lastWorld.c + 0.45` → the end section) `k.ending`
+  rises: the beams close (`k.cone = 1 − ending`), the sky tint and the slab field fade
+  with it, and the head tilts back up into the empty night sky (pitch → 1.22 rad).
+  Under the closing copy, one quiet mono line with a breathing ring: **Take off your
+  headset** (immersive only).
+- **Rewind.** Click it: `state.rewind = {at, from}`; the Director dives `L.c` from
+  `from` to 0 over `REWIND_LENGTH` 1.5 s (`1 − u²`), rushing (`k.speed`), looking back
+  down the climb; the lids close over the last 640 ms (the eye mounts open — `rx` is
+  render-time 260 while closing — then runs shut in 400 ms, blur returning), the phase
+  returns to `gate` with the headset screen while shut, then the eyes open onto it
+  over 900 ms: the start again. Sound: `ambient.rewind()` — the drone pitches down
+  like a tape stop, a whoosh falls through the rising wind, then silence. One lids
+  runner (`runLids(dir, len, delay, onEnd)`) now drives the intro's opening too.
+  Measured: lids mount 1.14 s, shut 1.57 s, gate 1.65 s, open again 2.03–2.84 s.
+- **Music dock.** Top bar: *Music* (next to Sound). A small glass dock bottom-right:
+  paste a YouTube or SoundCloud link (plays in that service's own visible player —
+  their terms — driven by postMessage for pause/play) or search Jamendo (CC, free,
+  no ads; each track links back to Jamendo as its API terms 4.1 require; our
+  `/api/music/search` route holds `JAMENDO_CLIENT_ID` server-side, caches 5 min).
+  One source at a time; the ambient drone **ducks** to 22 % under music
+  (`ambient.duck`). The last source is remembered in `localStorage` but never
+  auto-plays: a "Play the link you left" tile waits for a tap. Links verified
+  (iframe mounts, state persists). **Jamendo search is unverified:** Jamendo's public
+  test id is suspended on their side, so the route reports "not set up" until Ratul
+  registers a free client id (devportal.jamendo.com) and sets `JAMENDO_CLIENT_ID`.
+- Pending in round D: Normal mode as a real scroll-driven motion piece, the phone
+  pass, sound polish.
+
+## Round C feedback, fifth pass: real bike, loaders from frame one, console credits (2026-11-05)
+
+Ratul's answers to the fourth pass: pass-through "more or less resolved"; bring a
+real bike and credit it in the console (personal, non-commercial site — his call);
+the world loader must be the *sequence* from its first frame, not the finished frame.
+
+- **Real bike.** The Kawasaki he liked is Sketchfab "Free Standard" (not CC), 335 k
+  faces and login-gated — unusable. Poly Pizza downloads without login; its bikes
+  are CC-BY 3.0. Chose "Motorcycle" by Poly by Google (a proper sport bike, 6.4 k
+  triangles, 110 KB, `static.poly.pizza/<uuid>.glb`) → `public/hub/models/bike.glb`.
+  It is a single mesh with one palette texture and no material names or normals, so
+  `BikeModel` now **splits the geometry by the colour under each triangle** (paint →
+  shell, grey → metal, dark → matte; white paint → shell so the body reads as one),
+  unwelds and computes flat normals (without them our lit materials shaded it flat
+  grey), fits it to 2.7 units and turns it to face its headlight beam (−π/2: the
+  model's front is −z). Name heuristics remain for models with named materials.
+- **Credits in the console.** `lib/site/credits.ts` prints a collapsed `credits`
+  group once on the hub's first mount (bike · logos · fonts). Record of record:
+  `15-credits.md`; `public/hub/models/README.md` now says CC0 or CC-BY.
+- **Loaders from frame one.** `WorldBoot` on a direct visit renders `ExitSequence`
+  itself (server-rendered start state: empty terminal, bare chart) and lifts when it
+  ends or is skipped; through the hub and on repeat visits it is still the finished
+  `ExitFrame`. The trade chart's body starts `opacity: 0` in the markup (`data-body`,
+  released by the timeline) so the finished chart cannot flash before hydration.
+  Verified: trade direct visit shows the bare window at 0.3 s, candles by 3 s,
+  target hit at 4.5 s, page by 6.5 s.
+- Dev-only note: the hub returned one transient 500 during testing with a
+  Supabase-shaped error body — the pre-launch "fetch timeout / fallback" item stands.
+
+## Round C feedback, fourth pass: no two setups at once, panes out of the lane, world loaders (2026-11-05)
+
+- **Pass-through, root cause:** two setups shared the same volume — the one leaving (|d| up to 1.0)
+  and the next arriving both rode in front of the camera between chapters, and large flat parts
+  (desk, lid, base) crossed. Now a setup exists only over **|d| < 0.52** (presence 0.36 → 0.52,
+  gather 0.5 → 0.16, lock 0.22 → 0.08), so with chapters one section apart the leaving one is gone
+  before the next appears. Arriving setups come in low-right, leaving ones drift up-left. Loose
+  spread is wider (2.8 / 3.0, box ±3.2 × 2.0 × 1.8) and tumble is under half a turn (0.5), so big
+  parts keep clear while converging on radial paths. Not a collision solver: rare touches remain.
+- **Panes out of the lane:** while a setup gathers (c₀ − 0.6 … c₀ + 0.25) its panes keep to the left
+  (75 %) or far right (≥ 4.6 out); plus a 4.2-unit exclusion around the setup's spot.
+- **World loader on direct visits:** `WorldBoot` now opens every world page on its own window
+  (terminal / trade screen / viewfinder) — rising into place, holding 0.9 s, lifting with a zoom —
+  once per world per session; via the hub it is the continued zoom as before.
+- **Bike:** the Kawasaki ZX-6R on Sketchfab is "Free Standard" (not CC), 335 k faces, and needs a
+  Sketchfab/Epic login to download — not usable. Sketchfab downloads always need that login. Poly
+  Pizza downloads without login but its bikes are CC-BY 3.0, which needs attribution — a `/credits`
+  page linked from the footer would satisfy it (reasonable to the medium) if Ratul relaxes the
+  console-only rule. Decision pending.
+- Verified (window in front): key cloud → closed laptop → lit at c = 1.6 / 1.75 / 1.9; laptop base
+  leaving at 2.4 while the trader's first monitor arrives small and far at 2.6; desk lit at 2.85;
+  `code.` direct visit opens on the terminal frame (`world-boot is-direct`).
+
+---
+
+## Round C feedback, third pass: no pops, one-piece blink, radial paths, less spin, zoom in, bike model path (2026-11-04)
+
+Ratul's six notes:
+1. **Nothing pops.** A setup is present over |d| < 1.0 with `presence = 1 − smoothstep(|d|, 0.72, 1.0)`:
+   it scales from 5 % and hangs up to 6 units further ahead while far, coming up to arm's length as
+   it gathers, and shrinks away the same way past the chapter. Loose parts are 55 % size.
+2. **The blink is one motion.** The eyelid ellipse grows in a single ease (width leads, height follows:
+   `rx = 260·u^0.75`, `ry = 260·u^1.6`) with the blur released from the same `u`, driven by a plain
+   animation frame that outlives the phase change (the old version was two tweens + a timed
+   removal + a CSS blur transition = three visible steps, and its overlay could miss its mount when
+   the 1 s timer lost the race to the phase change under load — it mounts with the phase now).
+   Found while measuring: the Playwright window runs at 1 fps when occluded; bring it to front
+   before timing anything.
+3. **Bike:** no CC0 superbike found (Poly Pizza and Sketchfab sport bikes are CC-BY; the Sketchfab
+   search API's licence filter returned nothing). The scene now takes a model: drop a CC0 `bike.glb`
+   in `public/hub/models/` (README there), `scripts/hub-media.mjs` lists it under `models`, and
+   `RideAssembly` loads it with `useGLTF`, re-skins by material name (tyre → matte, glass/light →
+   glow, chrome/exhaust → metal, else shell), fits it to 2.7 long with wheels on y = −0.46, keeps
+   the kit and the route panel around it. The stylised bike stays as the fallback.
+4. **Parts no longer cross:** loose positions lie out along the ray from the setup's centre through
+   each part's home (plus jitter, clamped to the view), so every part converges radially.
+5. **Spin:** tumble under one turn (spin 0.9, drift 0.06/0.05 per second); camera revolve 0.18.
+6. **Zoom in:** the finished window pushes in to 1.3× over 0.32 s before the page leaves; the world
+   page's frame starts at 1.3× and keeps zooming to 1.9× while it dissolves.
+- Verified (window in front): eye opens continuously 0 → 260 across blink into sky; cloud → laptop
+  → lit at c = 1.3 / 1.55 / 1.8 in frame; trader converging at 2.6, lit at 2.8.
+
+---
+
+## Round C feedback, second pass: entropy in frame, doorway timing both ways, blink, bike (2026-11-04)
+
+Ratul's notes (seven points + drag + résumé for the terminal), all in:
+- **Entropy in frame** (`assembly.tsx`): while loose, the whole setup rides in front of the camera
+  wherever it is on the climb (`cEff` follows `k.climb`), the parts a cloud around it (±2.6 across,
+  ±1.6 up) inside the view; it locks onto its world spot only when the chapter is close
+  (`lock = 1 − smoothstep(|d|, 0.08, 0.2)`) and loosens again, still in view, past it. Locking by the
+  gather curve put the spot (sections further along the helix) out of frame — seen at c = 1.65.
+- **Doorway out:** the flight is 0.8 s (`PORTAL_LENGTH`), the cover rises in its last 0.3 s, and every
+  sequence waits `delay` = the flight before it starts, so nothing types before the screen fills.
+  The page leaves when the sequence ends. The world page opens on the **same finished window**
+  (`ExitFrame` inside `WorldBoot`, via `?via=hub`), which zooms in and dissolves — one motion
+  across two hosts. Without `via=hub` the cover is the small light.
+- **Doorway in** (back to the hub): `state.portalOut` — the camera starts inside the screen you left
+  and pulls out over 1.1 s (`PORTAL_OUT_LENGTH`); that setup is lit at once; the finished window
+  shrinks away over the scene (`.hub-return`). Landing already scrolled to that chapter.
+- **Blink:** feathered lids (radial-gradient ellipse in the mask, 45 % soft) and the scene starts
+  blurred and pulls into focus (`html.is-focusing` → canvas `filter: blur(14px)` → 0 over 1.4 s).
+- **Camera:** revolves slowly with the lens toward you while loose, turns to present the display
+  (three-quarter) as it opens.
+- **Photo exit:** a real live view when `public/hub/photographer/` has a photo — soft and blown out,
+  pulling sharp and settling (blur 18 → 0, brightness 1.9 → 1) while the bracket hunts and locks and
+  the settings tick to 400 · 1/250 · f/2.8; then the shutter. Without photos: the abstract light.
+- **Terminal:** `whoami`, `cat stack`, `uptime` from the résumé (2 years in production, 200+ users on
+  the last rebuild, 11 automations), `git log --oneline -1` = the real build commit
+  (`NEXT_PUBLIC_COMMIT` from `next.config.ts`: Vercel's env on deploys, git locally), `ls /engineer`
+  of published entries, `open royal-programmer`. Faster keys (13–31 ms). Dry, true, no fake output.
+- **Drag** is first-person now: drag right → look right.
+- **Bike:** no CC0 superbike exists (Poly Pizza's are CC-BY 3.0, Sketchfab's sport bikes CC-BY), so
+  it is a stylised sport bike in code — fairing, nose, tank, seat hump, belly pan, twin exhausts,
+  clip-ons, five-spoke wheels — with the kit: helmet with visor, tank bag, pannier, gloves, intercom.
+- **Artist:** a sheet lands on the canvas (late part) before the strokes paint in.
+- Verified: cloud → laptop → lit at c = 1.5 / 1.7 / 1.85, all in frame; exit cover rises after the
+  flight, terminal types, code page opens on the finished terminal; return lands on the chapter.
+- Media: no limit; 16 per persona per visit, random pick; keep files ≲ 2 MB.
+
+---
+
+## Doorway sequences, dark world covers, media manifest (2026-11-04)
+
+Ratul's notes on the switch (slow, thin, wants typing / a chart playing out / a shutter):
+- **The slow part is dev.** First visit to a route compiles it (26–78 s seen in the dev log, 1–3 s
+  after; production < 1 s). Two fixes regardless: hovering a lit screen **warms** that world
+  (`fetch` no-cors via `onPortalHover` from the Director), and the page now leaves **the moment the
+  sequence ends** — no timer (`leaveForWorld` is the sequence's `onDone`).
+- **`hub/exit-sequence.tsx`** — one window per world, ≈70 % of the view, skippable by click/key,
+  skipped under reduced motion:
+  · engineer: a terminal (title bar, `ssh ratul@code.<root>`, resolve, authenticate, `cd && ls`
+    of the published engineer entry slugs from the content store, `open royal-programmer`), typed
+    character by character with synthesized key clicks (`ambient.key()`), ~2.5 s;
+  · trader: a trading screen assembles (header, plan list, grid), 34 candles draw, entry / stop −1 R /
+    target +3 R lines appear, six candles run into the target, tick + glow (`ambient.target()`), ~2.7 s;
+  · photographer: the display — thirds grid, focus bracket hunts and locks (`ambient.lock()`), ISO /
+    shutter / aperture tick to 400 · 1/250 · f/2.8, shutter (`ambient.shutter()`: three clicks and a
+    thump) with a black blink and a white frame, ~1.8 s;
+  · other worlds: the small light (their sequences come with their worlds).
+- **World pages open dark** (`components/world-boot.tsx`, server-rendered in `[persona]/page.tsx`):
+  a void cover with a light in the persona's accent, lifting at 160 ms — no white flash after the
+  sequence. The world redesign will own what comes after.
+- **Media manifest** (`scripts/hub-media.mjs`, runs on `predev` / `prebuild` and `npm run hub:media`):
+  lists `public/hub/<persona>/*.{jpg,png,webp,avif}` into `public/hub/media.json`. The scene reads
+  it; engineer screenshots become panes (16:10) and the first sits on the laptop; photographer
+  photos become panes (3:2) and the drawn frames step back. Up to 16 per persona per atlas, served
+  via `/_next/image` at 640 px (laptop 1080 px) — any file size is fine for the scene.
+- Lesson: `gsap.from` + React dev double-mount leaves targets parked at the from-value (`tl.kill()`
+  does not revert). Always `gsap.context(() => …, el)` and `ctx.revert()` in cleanup.
+- **All six personas are launched in code** (`LaunchedPersona` = every slug; fixtures publish artist,
+  ride, gamer): each has a world page on the shared template and a stretch on the climb. On the hub
+  they still follow `is_published` in Supabase, which stays false for the three until this branch
+  is on `main` (production runs old code where their pages 404). Dev-only `?preview=all` shows
+  them now; `proxy.ts` keeps the query across the hub rewrite. Verified at c = 5 / 6 / 7: easel
+  with strokes, bike with beam and route panel, gamer desk booting to the handle.
+- Verified: all three doorways → `code.` / `trade.` / `lens.ratulroy.localhost:3000`, arrival shows
+  the dark cover; no page errors. Pre-existing and not from this work: the lint error in
+  `persona-motion-slots.tsx` (setState in effect) and a hydration warning inside `RefractionPoster`
+  (the Normal-mode poster) with six bands.
+
+---
+
+## Round C: every persona's assembly, on one pattern (2026-11-04)
+
+- **`vr/assembly.tsx` — the shared machinery.** `useAssembly({ world, root, screens, homes, offset,
+  screenMats, onFrame })` owns the anchor (ahead of the camera's pose at the section, aspect-aware),
+  the loose parts' scatter positions (half a section before / after), the gather curve, the power
+  ramp, the hover raycast against the screen meshes, the portal anchor for the Director's fly-in,
+  and the halo / bezel light. Each world builds its own meshes and places them in `onFrame` through
+  `place(obj, i, late)`. Parts shrink to 30 % while loose and the whole setup is hidden beyond
+  |c − c₀| ≥ 0.92, so nothing lingers into the next chapter. `makeScreenMaterial(tex, t, mode)`:
+  mode 0 boot line · 1 drawn left→right · 2 painted in stroke order (order in alpha).
+- **Worlds (`vr/worlds/`):** engineer (laptop, moved), trader (desk, two monitors on stands,
+  keyboard, mouse; charts draw themselves in), photographer (body, grip, prism housing, shutter
+  button; the lens arrives in front of the mount and screws on; the back display wakes with the
+  viewfinder readout; the page blinks the shutter on entry), artist (three legs, tray, canvas;
+  strokes paint in one by one), ride (frame of tubes, two wheels that turn, bars, seat, headlight
+  that comes on with a beam; a route panel beside it draws a glowing line with light pins — the
+  doorway), gamer (desk, tower with RGB strips, ultrawide + side monitor, keyboard with underglow,
+  mouse; the monitor boots to the handle, RGB cycles the spectrum).
+- **Panes per persona** (`screens-worlds.ts`): trader charts; photographer viewfinder frames and
+  readouts; artist stroke clusters and dabs; ride route snippets, speedo dials and compass / unit
+  glyphs; gamer HUD pieces (crosshair, minimap, bars, ammo) and the words of the game (GG, ACE,
+  1v3…). No invented records: percentages, settings, lines, terms.
+- **Registry:** `field.tsx` maps slug → world; a persona's stretch appears the moment it is
+  published (artist, ride, gamer are built and unexercised in the browser until then — they share
+  the hook and type-check, but have not been seen).
+- **Also:** the code world's exit is a three-line terminal boot with a block cursor (other worlds
+  keep the small light); coming back from a world lands on that world's section (`xp-world` in
+  sessionStorage); `public/hub/engineer/README.md` says what to drop there.
+- Verified (Intel UHD, Performance): engineer, trader and photographer stretches at c = 2 / 3 / 4,
+  hover on the camera's display → `portalHover: photographer`; no page errors. The dev console's
+  "Router action dispatched before initialization" is Next's Fast Refresh, not ours.
+- Open: Ratul's screenshots/photos for the screens; music player source decision; round D.
+
+---
+
+## Round B feedback, first pass (2026-11-04)
+
+Ratul's notes on f402f2b, addressed:
+1. **Field per persona.** Panes carry their place on the climb (`aC`) and fade by it as well as by
+   distance, so the engineer's code is gone before the trader's chapter. The trader's stretch has
+   its own panes: eight drawn charts (candles / glowing line, random walk, "+0.8%" the way a journal
+   notes it — never currency) and eight numbers ("58% win", "1 : 3 R", "DD 4%"). `makeTraderAtlas`.
+2. **Tool and language logos** on the engineer's panes: square icon atlas from
+   `public/hub/icons/*.svg`, copied by `scripts/hub-icons.mjs` from simple-icons (CC0) and devicon
+   (MIT): TypeScript, Next.js, React, Node, Python, C#, .NET, Java, VS Code, Cursor, Claude, Git,
+   Docker, PostgreSQL, Supabase, Three.js. Licences in `15-credits.md`; console credits in round D.
+3. **The lit laptop invites the click:** a soft halo behind the lid and a breathing bezel light in
+   the engineer's blue, both stronger under the pointer; the screen brightens too.
+4. **Hold and move = look while time is slow.** Dragging no longer cancels the hold: the 260 ms
+   hold starts slow time, moving after that turns the view (`dragging` and `holding` together).
+   Moving before the hold lands is still a plain drag.
+5. **Back from a world** came back to a blue page (the browser restores the page from its cache
+   mid-flight). `pageshow` with `persisted` resets portal / entering state and resumes the audio
+   context. After a reload the context starts suspended: `ambient.resume()` on the first
+   pointer-down or key.
+6. **The drone buzzed:** the 82 Hz triangle is a sine now, levels trimmed.
+7. **Exit is dark, not blue:** the camera still dives into the screen; the cover is the void with
+   one small breathing light in the world's colour (from 0.8 s before the leave). The engineer
+   world's own dark opening comes with its redesign.
+8. **Lens keys on the climb:** `-` pulls the view wide (watch the assembly whole), `+` tightens,
+   `0` resets. Ctrl +/− stays the browser's zoom on purpose.
+- Open: a music player (needs Ratul's pick of source: YouTube IFrame + Data API key, or paste-a-link);
+  returning from a world should land on that world's section; the parts fly in at the frame's edge
+  on the approach (the laptop enters the view at c ≈ 1.85) — zoom out to watch them meet.
+
+---
+
+## Round B: the climb, the object field, the engineer's laptop (2026-11-04)
+
+D38 round B shipped on `phase-0-content-engine`. The doorway pattern is proven end to end.
+- **One helix for everything** (`vr/util.ts` `climbPose(c)`): the camera's position, heading and
+  pitch at scroll progress `c` (page sections). The Director and the field read the same curve, so
+  what the camera meets is always in front of it. Turn per section eased from 162° to 90° — at 162°
+  "ahead" swung out of view before the parts could arrive.
+- **Object field** (`vr/field.tsx` `Slabs`): one instanced draw of glass panes with real content from a
+  2048 × 1024 canvas atlas (`vr/screens.ts`): eight editor tiles showing this site's own source
+  (fluid shader, `climbPose`, the sound engine, the Director) and eight code glyphs. Rounded-rect SDF,
+  colour fringe, rim in the persona's colour, fog by camera distance (4 → 15 units). Each pane sits
+  ahead of the camera's own pose at its point on the climb, so panes drift in and out of the dark.
+- **Engineer assembly** (`EngineerAssembly`): a laptop built in code (base, lid, 70 instanced keys,
+  trackpad, screen) whose parts hang loose half a section before the peak, fly together as the camera
+  reaches the section (`gather` = 1 − smoothstep(|c − c₀|, 0.22, 0.95)), unfold (lid 104°), power on
+  (boot line opens into the editor, key backlight), hold while |c − c₀| < 0.22, then drift apart ahead
+  again. The laptop's screen is a drawn editor of `fluid.ts` with tabs and a status bar;
+  `LAPTOP_SCREEN_SRC` swaps in Ratul's own screenshot once `public/hub/engineer/` has one.
+- **The doorway:** the lit screen is raycast against the pointer each frame (`state.portalHover`);
+  the Director toggles `html.is-portal-hover` + `--portal-c` so the cursor ring opens in the world's
+  colour. A tap (page `up` handler) → `enterWorld`: `state.portal = {slug, at}`; the Director flies the
+  camera into the screen over `PORTAL_LENGTH` 1.6 s (position lerps to 0.18 in front of the glass,
+  heading turns to face it, FOV −14°, parallax/drag fade out), the HTML fades (`is-entering`), the
+  world's colour rises over the last 0.6 s, then `personaHref` → full navigation to
+  `code.<root>` (or `router.push` on unrouted hosts). Scroll is locked while leaving.
+- Pointer-down now records the point too, so a finger tap (no move) can hit the doorway.
+- Narrow screens: the laptop moves toward the centre and further away (`anchor` depends on aspect).
+- Numeral "01" hidden in immersive mode (the objects carry the chapter now).
+- Screens use the site's mono face: `--font-geist-mono` read off the root; textures redraw on
+  `document.fonts.ready`.
+- Measured (Intel UHD, dev, Performance, 1440×860): 59–60 fps on the climb with the field, the laptop
+  and the fluid composer on. Verified by script: hover → `is-portal-hover`; click → flight → lands on
+  `http://code.ratulroy.localhost:3000/`.
+- Lessons: the camera's yaw is a left-handed turn (`dir = (sin yaw, ·, −cos yaw)`), so an object that
+  must face back along the path takes `rotation.y = −yaw` — the first build had every pane and the
+  laptop edge-on. Canvas rows count from the top; texture `v` from the bottom (atlas tile rows flipped).
+  Playwright screenshots take ~1.2 s on this machine: to inspect a 1.6 s flight, freeze it by giving
+  `state.portal.at` a getter.
+- Open for round C/D: the other five assemblies; returning from a world should land on that world's
+  section (today: hero); the drifting field is engineer-only, the gaps between personas are still rays.
+
+---
+
+## Round A feedback, second pass (2026-11-04)
+
+Ratul's notes on 4451890, all addressed:
+1. **Page opens on the loader.** The gate's still parts (wordmark, headline, "Gathering light") are
+   server-rendered inside the boot cover (`GateSkeleton`), so the first paint IS the loader; the live gate
+   fades in over it in the same places (gate-rise no longer blurs/translates). Hidden when the saved mode is Normal.
+2. **Slow time readout:** the ring tightens to a small circle, the dot stays, and `time ×0.27` sits beside
+   it — no arc, no percentage, no caption. Director writes `--tscale`.
+3. **Fluid cursor** (`vr/fluid.ts`): a 160 px GPU sim (velocity + dye + hue, vorticity confinement, no
+   pressure solve) stirred by the pointer, applied as a `postprocessing` Effect that bends the frame along
+   the flow and adds the dye as light. Runs in light-time (holding freezes the swirls). The composer now
+   runs at every quality level so Performance has it too (bloom/CA/noise still off there; MSAA 2).
+4. **Descenders** no longer clipped: SplitText masks get `linesClass: "split-line"` → GSAP names the mask
+   `split-mask-line-mask`, padded 0.12em/0.2em with negative margins; words enter from 125 %.
+5. **Sound:** `timeScale` now follows the scene's real time scale (glides): pitch −700 cents, filter
+   closes, a 36 Hz sub swells, a thin beating shimmer surfaces. `rush(speed)` raises the wind during the
+   approach; `impact()` = sub drop 90→36 Hz under the chime.
+6. **Copy:** "Put on the headset" · "Or proceed without the headset →" · "Every perspective begins with
+   the same sight." Eyebrow "You are the prism" and the explaining body line removed (no spoon-feeding).
+7. **Graphics setting is sticky:** a level the visitor set by hand (cookie present) is never changed by
+   the governor — it toasts once ("Running below 40 fps — Balanced would be smoother") instead. The
+   governor's own step-down is session-only (`setQuality(q, false)`), so it never masquerades as a choice.
+8. **The split is continuous:** impact raises a *white pillar* (beams bundled on the axis, `spread 0`,
+   `chroma 0`), the approach glare thins out over 2.2 s, then over the 5.2 s split the beams fan out
+   (`spread`) and the colour separates inside them (`chroma`, later for beams near the axis) while the
+   camera rides the J. Flash shortened to a 1.1 s bloom at 0.95 so the pillar is seen through it.
+- Measured (Intel UHD, dev, Performance, 1440×860): 60 fps gate/sky/approach, 56–60 fps climb, with the
+  composer + fluid on. Fluid sim 160×96 texels.
+- Lessons: fresh render targets are not cleared — clear them once or the sim starts from driver garbage
+  (fog everywhere). Vorticity strength 38 blows up a sim with no pressure projection; 7 with a velocity
+  clamp of 0.3 holds. `blendMode.opacity = 0` on a postprocessing Effect is not a clean A/B (frame went black).
+- Known: the dev server stalls for minutes when Supabase DNS fails (content fetch has no timeout/fallback) —
+  still on the pre-launch list.
+
+---
+
+## Round A feedback fixes (2026-11-03)
+
+Ratul: "looks awesome now" + five notes. Done:
+1. **No glimpse of the old view before the gate** — a void cover (`.hub-boot`) is in the server HTML and
+   only fades once the page has decided how to open; the Normal poster stays hidden until then.
+2. **Graphics setting labels:** Performance · Balanced · **Quality** (was "Best"); top bar says "Graphics · …".
+3. **Type:** display face is now **Fraunces** (variable: opsz 144, SOFT 60, WONK 1, weight 330) via
+   `next/font/google`; hero headline no longer `nowrap`, max size 7 rem, so nothing clips.
+4. **Slow-time ring:** while holding, the cursor grows an arc that fills with the real time scale and shows
+   the percentage (Director writes `--slow` 0–100 on `<html>`; the cursor reads it each frame).
+5. **Company in the sky** (`vr/space.tsx`, all in code): shooting stars, two planets (one ringed, lit from
+   the light's side), a satellite with a blinking lamp on a slow arc, a tiny rocket crossing far away with
+   an exhaust glow. Scaled by sky visibility so they never compete with the light.
+- Lesson: `active` is a reserved word in GLSL (shader failed → gate said 3D couldn't start). Caught by
+  `ContextWatch`, which is exactly what it is for.
+
+---
+
+## VR journey round A: headset → sky → the light → the split (2026-11-03) — D38
+
+- **Scene rewritten** as `app/components/hub/vr/*` (replaces `hub/journey/*` and `entry-gate.tsx`):
+  `state.ts` (phases: gate · wear · blink · sky · approach · impact · split · climb), `clock.ts`,
+  `headset.tsx` (own design in code: rounded dark-glass visor, one light strip, two lens rings, head band;
+  RoomEnvironment reflections, nothing downloaded), `sky.tsx` (dome + twinkling stars, spectrum tint while
+  climbing), `light.tsx` (approaching light with rays and a colour-splitting rim; cone of colour; **Rays** —
+  instanced beams fanning up from the apex so the inside of the cone is made of light; photons),
+  `scene.tsx` (Director: time, phase timeline, J-path camera, spiral climb; Effects; Governor; Warmup).
+- **Gate** is now `headset-gate.tsx`: the headset floats in the scene behind a quiet overlay (device line,
+  quality slider, "Best with sound", Normal link). Click the headset / Enter / Space → `wear` (turns to face
+  you, rises, lenses fill the view, lids close) → `blink` (eyes open onto the sky) → `sky` ("Press Space" /
+  "Tap") → `approach` (≈7.3 s, slow then rushing; hint "Click and hold to slow it down" at 28–90 %; hold
+  → time scale 0.1) → `impact` (white flash, chime) → `split` (3.4 s J: forward then up to 78°, cone and
+  rays open) → `climb` (scroll unlocked, hero text rises). "Skip intro" visible from the first second of
+  wear. Returning visitors in the same session land on the climb (`returning` loader, Skip → Normal).
+- **Climb (placeholder until round B):** helix inside the cone, camera tilting back to level over the first
+  section, sky tinted by the nearest persona's spectrum position. Page sections are unchanged HTML.
+- **Measured (Intel UHD laptop, dev build, 1440×860, Performance):** 60 fps at the gate, during the approach
+  and on the climb; 53 fps while the test harness polled every 50 ms. Gate ready ≈1.5 s. No horizontal
+  overflow at 500 px (the tool's narrowest window).
+- **Lessons:** `ConeGeometry` uv.y is 1 at the apex — my glow was 140 units away until flipped. Looking up
+  inside a cone shows only a ring at the edge; the split needs volume (rays), not just a wall. The
+  screenshot tool lags ≈3 s, so sub-2 s phases were captured by freezing `phaseAt` from inside the page
+  (`window.__vr`, dev only). A Supabase DNS blip (`ENOTFOUND`) 500s the whole hub — content fallback to
+  stubs when the provider is unreachable is worth doing before launch.
+- **Next:** round B — the drifting object field + the engineer laptop assembly with click-into-screen; the
+  climb camera and cone-wall brightness will be retuned around the objects.
+
+---
+
+## Hub concept reset: the VR journey (2026-11-03) — D38
+
+- Ratul reviewed round 1: good, "not out of the world". Over several messages we agreed a new hub concept;
+  the complete spec is `14-vr-journey-concept.md` (flow, persona order and assemblies, rights, perf, Normal
+  mode, rounds A–D). Round-1's prism/river scene will be replaced; the gate, quality slider, governor, light
+  cursor, sound and Lenis/GSAP stack carry over.
+- Decisions inside D38: no on-screen HUD text; Ratul's own screenshots of VS Code / TradingView / Valorant /
+  CS2 etc. allowed; hub trading numbers illustrative (percentages only); ride routes as light lines (no map
+  tiles); CC0-only 3D models restyled in our material; all credits in the browser console.
+- Ratul is collecting screenshots in `Desktop/portfolio-shots` for round B.
+- **Next:** round A (headset gate + wear, night sky, Space/Tap, accelerating light + hold-to-slow, head-on
+  impact, J-split into the cone). Ratul may switch the builder model to Fable for it; everything needed is
+  in D38 + doc 14.
+
+---
+
+## Hub round 1: the light journey (2026-11-03) — D36, D37
+
+- Deps (`chore(config)`): gsap 3.13 (ScrollTrigger + SplitText), lenis 1.3.
+- **Entry gate** (`app/components/hub/entry-gate.tsx`): device analysis (`lib/site/device.ts`: WebGL
+  renderer → tier → suggested quality), quality slider, Enter (progress while the scene compiles behind
+  the gate) / Normal (instant); "taking longer than usual" after 9 s; WebGL missing/failed said plainly.
+  Returning visitors in the same session get the compact loader (auto-enters, Skip always visible).
+- **Modes:** `lib/site/experience.ts` rewritten — `immersive | normal` + quality + sound cookies on the root
+  domain; no Auto. `experience-toggle.tsx` → `experience-controls.tsx` (ModeSwitch, QualityMenu, SoundToggle).
+- **Scene** (`app/components/hub/journey/*`, replaces `refraction-scene.tsx`): beam with haze + pulses,
+  impact flash + sparks, custom glass shader (analytic per-channel refraction, AA edges, internal light
+  path; no transmission buffer → no grain), camera path through the prism onto a river of colour,
+  photons along each stream, cursor-reactive dust, a world teaser per persona (lattice / candles /
+  aperture), closing fold to white. Drag = look around (springs home), hold = slow time.
+  Shader compile errors / context loss → graceful "3D couldn't start" + Normal.
+- **Page:** Lenis smooth scroll, GSAP word-mask reveals, light cursor, synthesised ambient sound.
+- **Measured (Intel UHD 620-class laptop, dev build):** ready behind the gate in ~1.6 s; Performance 60 fps
+  at 1440×860; Balanced ~40 fps (bloom), so the device analysis correctly suggests Performance here.
+  Mobile (390 px emulated): no horizontal overflow, gate fits one screen.
+- **Lessons:** `THREE.Color` can't parse CSS `hsl(h s% l%)` (silently white) — use `setHSL`.
+  `modelMatrix` isn't available in fragment shaders. Background tabs throttle rAF (check focus before
+  trusting fps).
+- **Next:** round 2 = Normal mode with full motion (replace the static poster) + ending polish;
+  round 3 = portal into each world (D37), richer world scenes, phone tuning, sound design.
+
+---
+
+## Design pass 2: 3D "Refraction" hub (2026-11-02) — D32–D35
+
+- Deps (`chore(config)`): three, @react-three/fiber 9, drei 10, @react-three/postprocessing 3.
+- `app/components/hub/refraction-scene.tsx` (lazy, Immersive only): falling beam → glass prism
+  (MeshTransmissionMaterial, procedural Lightformer env, no network assets) → shader-drawn
+  continuous spectrum fan with persona bands (any count, MAX_BANDS 16); dust; cursor parallax;
+  camera follows the chapter in view; closing chapter folds the spectrum back to white.
+- `refraction-poster.tsx`: static SVG of the same composition = Lite backdrop + first paint.
+- `hub-experience.tsx`: scroll chapters, spectrum rail, cycling phrase (screen readers get one
+  sentence), per-world CTAs; `lib/site/spectrum.ts` (t → colour, auto-spread + pins, GLSL mirror).
+- **Perf (Intel UHD laptop, 1080p):** bloom was the cost (32 → 60 fps without). Now half-res
+  bloom + `QualityGovernor`: 4s warm-up, drop bloom if < 45 fps sustained, Lite if < 28 fps
+  without bloom; windows with frame gaps > 250 ms (hidden/throttled tab) are ignored — drei's
+  PerformanceMonitor degraded on warm-up jank and on background tabs. Measured 56–58 fps.
+- Dev on a TLS-intercepting network: run `NODE_OPTIONS=--use-system-ca npx next dev --webpack`
+  (Node trusts the Windows store; never NODE_TLS_REJECT_UNAUTHORIZED=0).
+- Tooling note: background Chrome windows are rAF-throttled to exactly ~1016 ms/frame — check
+  frame gaps before trusting any fps number.
+- Next: portal transition on CTA (fly along the band + colour flood), persona content fields
+  in the DB (phrase/CTA/pin/links), per-world 3D motifs, Engineer world redesign.
+
+## Design pass 1: hub + experience modes (2026-11-02)
+
+- **Design system v2** tokens in `globals.css`: void/ink base, one wavelength per persona
+  (`--wl-*`), fluid type scale `--step-*`, motion `--ease-*`/`--dur-*`; display face
+  Instrument Serif (`font-display`). Legacy tokens stay until each world is rebuilt.
+- **Experience modes (D26):** `lib/site/experience.ts` + `app/experience-provider.tsx` +
+  `ExperienceToggle`. Pre-paint boot script; Auto → Lite on reduced motion / data saver /
+  2g-3g / <4GB / <4 cores; cookie on the root domain (verified shared hub ↔ `code.`).
+  CSS hooks: `.xp-motion`, `.xp-immersive-only`, `.xp-lite-only`.
+- **Hub** (`app/components/hub/prism-hub.tsx`, served at the root / `/whoami`): beam → prism →
+  rays in spectral order onto doors; unlaunched personas = unlit rays; stacked layout < lg.
+- Perf: glow moved from SVG `feGaussianBlur` to a CSS-blurred composited layer; 59 fps in
+  Immersive (DevTools Chrome). Note: the Playwright window gets rAF-throttled to ~1 fps when
+  in the background — don't trust its fps numbers.
+
+## Persona subdomains (2026-11-02) — D31
+
+- `proxy.ts` (Next 16 "proxy" = middleware) + `lib/site/hosts.ts` (subdomain ↔ persona map,
+  `NEXT_PUBLIC_ROOT_DOMAIN`, dev root `ratulroy.localhost`) + `lib/site/persona-link.tsx`
+  (`PersonaLink`/`HubLink`: same-host → client nav with clean paths, other host → full nav).
+  All persona links in `app/**` migrated.
+- Verified in dev (curl + Playwright): hub `/` → whoami; `/engineer/x` on hub → `code.` host;
+  `code.` `/roster` client-nav works; cross-persona → other subdomain; `www.`/`who.` → root;
+  `trader.` → `trade.`; unknown label → "persona not found"; `/capture` → root host;
+  plain `localhost:3000/engineer` unchanged. 0 console errors.
+- Gotcha: Next relativises redirect `Location` when the target equals its own origin
+  (`localhost`) → hub on plain localhost would loop; hence the `ratulroy.localhost` dev root.
+- Not yet: domain purchase + Vercel domain/DNS; persona switcher in `home-page.tsx` still
+  swaps in place (no host change) — replaced in the redesign; shared experience-mode pref
+  needs a parent-domain cookie.
+
 ## Ownership change (2026-11-01)
 
 - Ratul: **Claude takes over the frontend** — owns all of `portfolio-site/`; Cursor

@@ -1,125 +1,46 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ALL_PERSONAS, listPersonas, type Persona, type PersonaSlug } from "@/lib/content";
+import { ALL_PERSONAS, listEntries, listPersonas } from "@/lib/content";
+import { HUB_COPY } from "@/lib/site/brand";
+import { placeOnSpectrum } from "@/lib/site/spectrum";
+import { HubExperience, type HubChapter, type HubUpcoming } from "../components/hub/hub-experience";
 
 export const metadata: Metadata = {
-  title: "Who am I | Ratul Roy",
-  description: "Pick a door — Engineer, Trader, Photographer, and more personas on the way.",
-};
-
-type HubCard =
-  | { kind: "live"; persona: Persona }
-  | { kind: "soon"; slug: PersonaSlug };
-
-function buildHubCards(published: Persona[]): HubCard[] {
-  const bySlug = new Map(published.map((p) => [p.slug, p]));
-  return ALL_PERSONAS.map((slug) => {
-    const persona = bySlug.get(slug);
-    if (persona?.isPublished) return { kind: "live" as const, persona };
-    return { kind: "soon" as const, slug };
-  });
-}
-
-const SOON_LABELS: Record<PersonaSlug, string> = {
-  engineer: "Engineer",
-  trader: "Trader",
-  photographer: "Photographer",
-  artist: "Artist",
-  ride: "Rider",
-  gamer: "Gamer",
+  title: `Ratul Roy — ${HUB_COPY.headline}`,
+  description:
+    "Engineer, trader, photographer — and more perspectives on the way. Follow the light into each world.",
 };
 
 /**
- * Explicit route (takes precedence over `/[persona]`).
- * Persona card hub — published doors link out; unpublished stay "coming soon".
+ * The hub (served at the bare root domain by proxy.ts, and at /whoami on hosts
+ * without subdomain routing). Live personas, in rank order, become chapters;
+ * unpublished ones are "more colours on the way". Every persona gets its
+ * place on the continuous spectrum (pinned or auto-spread).
  */
-export default async function WhoAmIPage() {
-  const published = await listPersonas();
-  const cards = buildHubCards(published);
+export default async function WhoAmIPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  // Every persona climbs by default — all six worlds are built. `?preview=published` shows only
+  // the ones whose content is published (what the hub used to do), the rest as colours on the way.
+  const { preview } = await searchParams;
+  const previewAll = preview !== "published";
+  const [adminPersonas, engineerEntries] = await Promise.all([previewAll ? listPersonas({ includeNonPublic: true }) : Promise.resolve([]), listEntries("engineer")]);
+  // The admin read needs the server-only key; without it (or on a blip) the public list stands in.
+  const allPersonas = adminPersonas.length ? adminPersonas : await listPersonas();
+  const published = allPersonas.filter((p) => p.isPublished || previewAll).sort((a, b) => a.order - b.order);
+  // The code world's terminal lists what is really published there.
+  const terminalItems = engineerEntries.filter((e) => e.visibility === "public").map((e) => e.slug);
+  const liveSlugs = new Set(published.map((p) => p.slug));
+  const upcomingSlugs = ALL_PERSONAS.filter((s) => !liveSlugs.has(s));
 
-  return (
-    <main className="relative min-h-screen overflow-hidden text-stone-900">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(ellipse 70% 50% at 50% 0%, #efe6d8 0%, transparent 55%), linear-gradient(165deg, #f7f1e8 0%, #e7eef6 45%, #f1e9e1 100%)",
-        }}
-      />
-
-      <div className="relative z-10 mx-auto w-full max-w-[90rem] px-4 py-14 sm:px-6 md:px-8 md:py-20 lg:px-10">
-        <header className="mb-10 max-w-2xl space-y-4 md:mb-12">
-          <p className="font-mono text-xs tracking-[0.22em] text-stone-500 uppercase">Who am I</p>
-          <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">Know me more</h1>
-          <p className="text-lg leading-relaxed text-stone-600">
-            Each door is a different audience entry. Pick one that fits — or wait for the rooms still
-            under construction.
-          </p>
-        </header>
-
-        <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {cards.map((card, idx) => {
-            if (card.kind === "live") {
-              const { persona } = card;
-              return (
-                <Link
-                  key={persona.slug}
-                  href={`/${persona.slug}`}
-                  className="group rounded-3xl border border-stone-300/80 bg-white/55 p-6 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:border-stone-400 hover:bg-white/80"
-                  style={{ animationDelay: `${idx * 40}ms` }}
-                >
-                  <span
-                    className="mb-4 inline-block h-2 w-10 rounded-full"
-                    style={{ backgroundColor: persona.accent }}
-                    aria-hidden
-                  />
-                  <h2 className="text-xl font-semibold tracking-tight">{persona.label}</h2>
-                  <p className="mt-1 text-xs uppercase tracking-[0.16em] text-stone-500">
-                    {persona.eyebrow}
-                  </p>
-                  <p className="mt-4 text-sm leading-relaxed text-stone-600">{persona.body}</p>
-                  <p
-                    className="mt-6 text-sm font-medium underline-offset-4 group-hover:underline"
-                    style={{ color: persona.accent }}
-                  >
-                    Enter →
-                  </p>
-                </Link>
-              );
-            }
-
-            return (
-              <div
-                key={card.slug}
-                className="rounded-3xl border border-dashed border-stone-300 bg-white/35 p-6 backdrop-blur"
-                aria-disabled="true"
-              >
-                <span className="mb-4 inline-block h-2 w-10 rounded-full bg-stone-300" aria-hidden />
-                <h2 className="text-xl font-semibold tracking-tight text-stone-500">
-                  {SOON_LABELS[card.slug]} Mode
-                </h2>
-                <p className="mt-1 text-xs uppercase tracking-[0.16em] text-stone-400">
-                  Not on stage yet
-                </p>
-                <p className="mt-4 text-sm leading-relaxed text-stone-500">
-                  This persona is planned. The door stays closed until there is real content behind
-                  it.
-                </p>
-                <p className="mt-6 text-sm font-medium text-stone-400">Coming soon</p>
-              </div>
-            );
-          })}
-        </section>
-
-        <p className="mt-12 text-sm text-stone-500">
-          Prefer a direct link? Try{" "}
-          <Link href="/engineer" className="font-medium text-stone-800 underline-offset-4 hover:underline">
-            /engineer
-          </Link>
-          .
-        </p>
-      </div>
-    </main>
+  const placed = new Map(
+    placeOnSpectrum([...published.map((p) => p.slug), ...upcomingSlugs]).map((pt) => [pt.slug, pt.t]),
   );
+
+  const chapters: HubChapter[] = published.map((p) => ({
+    slug: p.slug,
+    t: placed.get(p.slug) ?? 0.5,
+    body: p.body,
+    points: p.points,
+  }));
+  const upcoming: HubUpcoming[] = upcomingSlugs.map((slug) => ({ slug, t: placed.get(slug) ?? 0.5 }));
+
+  return <HubExperience chapters={chapters} upcoming={upcoming} terminalItems={terminalItems} />;
 }

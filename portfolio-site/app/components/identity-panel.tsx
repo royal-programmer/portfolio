@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Briefcase, Camera, CandlestickChart } from "lucide-react";
+import { Bike, Briefcase, Camera, CandlestickChart, Gamepad2, Palette } from "lucide-react";
 import type { Persona } from "../persona-provider";
 import type { PersonaContent } from "./site-content";
 
@@ -24,8 +24,14 @@ export function IdentityPanel({ persona, content }: { persona: Persona; content:
           <Briefcase className="h-4 w-4" />
         ) : persona === "trader" ? (
           <CandlestickChart className="h-4 w-4" />
-        ) : (
+        ) : persona === "photographer" ? (
           <Camera className="h-4 w-4" />
+        ) : persona === "artist" ? (
+          <Palette className="h-4 w-4" />
+        ) : persona === "ride" ? (
+          <Bike className="h-4 w-4" />
+        ) : (
+          <Gamepad2 className="h-4 w-4" />
         )}
         Identity Shift Panel
       </div>

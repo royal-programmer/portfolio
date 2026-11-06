@@ -30,6 +30,67 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-fraunces);
+}
+
+/* ==========================================================================
+   Design system v2 — "one light, many colours"
+   Neutral "void + ink" base; every persona is a wavelength of one spectrum.
+   New/redesigned surfaces use ONLY these tokens. Legacy tokens below stay
+   until each persona world is rebuilt.
+   ========================================================================== */
+:root {
+  /* Base */
+  --void: #07070a;          /* page background */
+  --void-2: #0d0d12;        /* raised background */
+  --ink: #f3f1ec;           /* primary text — warm white, not blue-white */
+  --ink-dim: #a9a7a1;       /* secondary text */
+  --ink-faint: #6d6b67;     /* captions, meta */
+  --line: rgba(243, 241, 236, 0.12);
+  --line-strong: rgba(243, 241, 236, 0.24);
+  --glass: rgba(243, 241, 236, 0.04);
+
+  /* The spectrum — one wavelength per persona */
+  --wl-engineer: #4d8dff;
+  --wl-trader: #2fd47a;
+  --wl-photographer: #ff4fa3;
+  --wl-artist: #ffb02e;
+  --wl-ride: #22d3c5;
+  --wl-gamer: #9d6bff;
+  --wl-unlit: #3a3936;
+
+  /* Type scale (fluid) */
+  --step--1: clamp(0.78rem, 0.76rem + 0.1vw, 0.84rem);
+  --step-0: clamp(1rem, 0.96rem + 0.2vw, 1.125rem);
+  --step-1: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem);
+  --step-2: clamp(1.6rem, 1.4rem + 1vw, 2.2rem);
+  --step-3: clamp(2.2rem, 1.7rem + 2.4vw, 3.6rem);
+  --step-4: clamp(3rem, 2rem + 5vw, 6.5rem);
+  --step-5: clamp(3.6rem, 2rem + 8vw, 9.5rem);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);       /* expo-ish settle */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-1: 160ms;   /* hover, press */
+  --dur-2: 320ms;   /* small reveals */
+  --dur-3: 700ms;   /* section reveals */
+  --dur-4: 1400ms;  /* scene beats */
+}
+
+/* Experience modes (D36): Immersive / Normal. Normal is still animated -
+   only visitors who ask their OS for reduced motion get it calmed down. */
+:root[data-experience="normal"] .xp-immersive-only {
+  display: none !important;
+}
+:root[data-experience="immersive"] .xp-normal-only {
+  display: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .xp-motion,
+  .xp-motion * {
+    animation: none !important;
+  }
 }
 
 :root[data-ui-theme="dark"] {
@@ -242,4 +303,1283 @@ body {
     animation: none;
     opacity: 0.65;
   }
+}
+
+/* ==========================================================================
+   Hub — "Refraction" scroll story (app/components/hub/hub-experience.tsx)
+   Animations only describe the "from" state, so with animations off (Lite /
+   reduced motion, via .xp-motion) everything renders in its final state.
+   ========================================================================== */
+@keyframes hub-fade-in {
+  from { opacity: 0; transform: translateY(18px); filter: blur(8px); }
+}
+.hub-fade {
+  animation: hub-fade-in var(--dur-3) var(--ease-out) both;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Chapters fade up as they scroll in — CSS scroll-driven (no JS). */
+@supports (animation-timeline: view()) {
+  .hub-reveal {
+    animation: hub-fade-in linear both;
+    animation-timeline: view();
+    animation-range: entry 5% cover 30%;
+  }
+}
+
+@keyframes hub-phrase-in {
+  from { opacity: 0; transform: translateY(0.4em); filter: blur(4px); }
+}
+.hub-phrase {
+  animation: hub-phrase-in 500ms var(--ease-out) both;
+}
+
+@keyframes hub-flicker {
+  0%, 100% { opacity: 0.55; }
+  45% { opacity: 0.95; }
+  50% { opacity: 0.4; }
+  55% { opacity: 0.9; }
+}
+.hub-flicker {
+  animation: hub-flicker 3.2s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * -1.1s);
+}
+
+.hub-cta {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--c) 55%, transparent);
+  background: color-mix(in srgb, var(--c) 10%, transparent);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--c) 0%, transparent);
+  transition:
+    transform var(--dur-2) var(--ease-out),
+    box-shadow var(--dur-2) var(--ease-out),
+    background-color var(--dur-2) var(--ease-out);
+}
+.hub-cta:hover,
+.hub-cta:focus-visible {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--c) 20%, transparent);
+  box-shadow: 0 0 36px -4px color-mix(in srgb, var(--c) 70%, transparent);
+  outline: none;
+}
+.hub-cta-arrow {
+  transition: transform var(--dur-2) var(--ease-out);
+}
+.hub-cta:hover .hub-cta-arrow,
+.hub-cta:focus-visible .hub-cta-arrow {
+  transform: translateX(4px);
+}
+
+/* ==========================================================================
+   Hub v3 — the light journey (D36)
+   ========================================================================== */
+html.scroll-locked,
+html.scroll-locked body {
+  overflow: hidden;
+}
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+html.is-dragging,
+html.is-dragging * {
+  user-select: none;
+  cursor: grabbing;
+}
+
+/* Readability: text column on the left (desktop), bottom (mobile). */
+.hub-scrim {
+  background: linear-gradient(90deg, rgba(5, 5, 7, 0.78) 0%, rgba(5, 5, 7, 0.42) 34%, rgba(5, 5, 7, 0) 58%);
+  pointer-events: none;
+}
+@media (max-width: 1023px) {
+  .hub-scrim {
+    background: linear-gradient(180deg, rgba(5, 5, 7, 0) 0%, rgba(5, 5, 7, 0.25) 45%, rgba(5, 5, 7, 0.88) 100%);
+  }
+}
+
+.hub-numeral {
+  font-size: clamp(10rem, 22vw, 24rem);
+  color: transparent;
+  -webkit-text-stroke: 1px color-mix(in srgb, var(--c) 38%, transparent);
+  opacity: 0.55;
+}
+
+.hub-scroll-cue {
+  display: inline-block;
+  width: 1px;
+  height: 22px;
+  margin-left: 10px;
+  vertical-align: middle;
+  background: linear-gradient(var(--ink-faint), transparent);
+  animation: hub-cue 2.2s var(--ease-in-out) infinite;
+  transform-origin: top;
+}
+@keyframes hub-cue {
+  0% { transform: scaleY(0); opacity: 1; }
+  60% { transform: scaleY(1); opacity: 1; }
+  100% { transform: scaleY(1); opacity: 0; }
+}
+
+/* Normal mode: the canvas journey fades in over the still poster. */
+.normal-journey {
+  animation: normal-journey-in 1200ms var(--ease-out) both;
+}
+/* Film grain over the flat journey: the light reads as light, not as flat fills. */
+.normal-grain {
+  pointer-events: none;
+  opacity: 0.085;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  background-size: 240px 240px;
+}
+@keyframes normal-journey-in {
+  from { opacity: 0; }
+}
+/* The still poster: the instant first paint, breathing until the journey takes over. */
+.poster-alive svg {
+  animation: poster-breathe 9s ease-in-out infinite;
+  transform-origin: 65% 50%;
+}
+@keyframes poster-breathe {
+  0%, 100% { transform: scale(1); filter: brightness(1) saturate(1); }
+  50% { transform: scale(1.035); filter: brightness(1.15) saturate(1.15); }
+}
+
+/* Before the intro is done, the page's text waits unseen (the scene is the page). */
+.hub-v3.is-quiet main,
+.hub-v3.is-quiet nav {
+  visibility: hidden;
+}
+
+/* ---------- Headset gate ---------- */
+.gate {
+  animation: gate-in 900ms var(--ease-out) both;
+}
+@keyframes gate-in {
+  from { opacity: 0; }
+}
+/* No rise or blur: the server-rendered skeleton already stands in these places. */
+.gate-panel {
+  animation: gate-rise 900ms var(--ease-out) both;
+}
+@keyframes gate-rise {
+  from { opacity: 0; }
+}
+.gate.is-leaving {
+  pointer-events: none !important;
+  animation: gate-out 700ms var(--ease-in-out) forwards;
+}
+.gate.is-leaving * {
+  pointer-events: none !important;
+}
+@keyframes gate-out {
+  to { opacity: 0; visibility: hidden; }
+}
+.gate-wear-line {
+  display: block;
+  width: 1px;
+  height: 26px;
+  margin: 12px auto 0;
+  background: linear-gradient(transparent, var(--ink-faint));
+  animation: gate-wear-line 2.4s var(--ease-in-out) infinite;
+  transform-origin: bottom;
+}
+@keyframes gate-wear-line {
+  0% { transform: scaleY(0); opacity: 1; }
+  60% { transform: scaleY(1); opacity: 1; }
+  100% { transform: scaleY(1); opacity: 0; }
+}
+html.is-headset-hover .light-cursor-ring::before {
+  transform: scale(1.8);
+  border-color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+}
+html.is-headset-hover canvas {
+  cursor: none;
+}
+/* The scene is something you can take hold of: an open hand at rest, closed while you look around,
+   and a pointer over a lit setup — the ring rides along in each case. */
+html.has-light-cursor .hub-v3 canvas {
+  cursor: grab;
+}
+html.is-dragging .hub-v3 canvas {
+  cursor: grabbing;
+}
+html.is-portal-hover .hub-v3 canvas {
+  cursor: pointer;
+}
+html.is-dragging .light-cursor-ring::before {
+  transform: scale(0.62);
+  border-color: rgba(255, 255, 255, 0.9);
+  transition-duration: 220ms;
+}
+/* A lit assembly under the pointer is a doorway: the ring opens in that world's colour, with a small
+   mark pointing in — "enter". */
+.light-cursor-ring::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin: -5px 0 0 -7px;
+  border-top: 1.5px solid var(--portal-c, var(--ink));
+  border-right: 1.5px solid var(--portal-c, var(--ink));
+  transform: rotate(45deg) scale(0.4);
+  opacity: 0;
+  transition: opacity 260ms var(--ease-out), transform 420ms var(--ease-out);
+}
+html.is-portal-hover .light-cursor-ring::after {
+  opacity: 0.95;
+  transform: rotate(45deg) scale(1);
+}
+html.is-portal-hover .light-cursor-ring::before {
+  transform: scale(1.8);
+  border-color: color-mix(in srgb, var(--portal-c, var(--ink)) 90%, transparent);
+  background: color-mix(in srgb, var(--portal-c, var(--ink)) 14%, transparent);
+  box-shadow: 0 0 24px -2px color-mix(in srgb, var(--portal-c, var(--ink)) 60%, transparent);
+}
+/* On the climb the objects carry the chapter; the outlined numeral would fight them. */
+.hub-v3.is-immersive .hub-numeral {
+  display: none;
+}
+/* Through the doorway: the view darkens into the screen; one small light in the world's colour
+   holds the eye while the world loads. */
+.hub-enter {
+  background: var(--void);
+}
+.hub-enter-light {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--c);
+  box-shadow: 0 0 18px 4px color-mix(in srgb, var(--c) 70%, transparent);
+  animation: hub-enter-light 1.4s var(--ease-in-out) infinite;
+}
+@keyframes hub-enter-light {
+  0%, 100% { transform: scale(0.8); opacity: 0.6; }
+  50% { transform: scale(1.3); opacity: 1; }
+}
+/* The code world's boot: a small terminal, lines typed in turn, a block cursor that waits. */
+.hub-enter-term {
+  margin: 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  line-height: 1.9;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+}
+.hub-enter-term span {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  width: 0;
+  animation: hub-enter-type 420ms steps(28, end) forwards;
+  animation-delay: calc(var(--i) * 360ms);
+}
+.hub-enter-term span:first-child {
+  color: var(--c);
+}
+@keyframes hub-enter-type {
+  to { width: 100%; }
+}
+.hub-enter-caret {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  margin-left: 2px;
+  vertical-align: -2px;
+  background: var(--c);
+  animation: hub-enter-caret 900ms steps(1, end) infinite;
+}
+@keyframes hub-enter-caret {
+  50% { opacity: 0; }
+}
+/* Leaving through a doorway: the words go first, the colour follows. */
+.hub-v3.is-entering main,
+.hub-v3.is-entering nav,
+.hub-v3.is-entering header {
+  opacity: 0;
+  transition: opacity 700ms var(--ease-in-out);
+  pointer-events: none;
+}
+
+/* ---------- Intro overlays ---------- */
+.vr-flash {
+  pointer-events: none;
+  background: #fff;
+}
+.vr-blink {
+  pointer-events: none;
+  animation: vr-blink-in 420ms var(--ease-out) both;
+}
+@keyframes vr-blink-in {
+  from { opacity: 0; }
+}
+/* The ending's one line: quiet mono, a small ring that breathes like the light did. */
+.vr-takeoff {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 56px;
+  min-height: 44px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  transition: color 500ms var(--ease-out);
+}
+.vr-takeoff:hover,
+.vr-takeoff:focus-visible {
+  color: var(--ink);
+}
+.vr-takeoff-ring {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  box-shadow: 0 0 14px 0 rgba(255, 255, 255, 0.35);
+  animation: vr-takeoff-breathe 3.2s ease-in-out infinite;
+}
+@keyframes vr-takeoff-breathe {
+  0%, 100% { transform: scale(0.85); opacity: 0.6; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+
+.vr-hint {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out);
+}
+.vr-hint.is-on {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- Quality slider ---------- */
+.xp-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 20px;
+  background: transparent;
+}
+.xp-range::-webkit-slider-runnable-track {
+  height: 1px;
+  background: linear-gradient(90deg, var(--ink) var(--p), var(--line-strong) var(--p));
+}
+.xp-range::-moz-range-track {
+  height: 1px;
+  background: linear-gradient(90deg, var(--ink) var(--p), var(--line-strong) var(--p));
+}
+.xp-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -6.5px;
+  border-radius: 999px;
+  background: var(--ink);
+  box-shadow: 0 0 0 4px rgba(243, 241, 236, 0.12), 0 0 14px rgba(255, 255, 255, 0.6);
+}
+.xp-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  box-shadow: 0 0 0 4px rgba(243, 241, 236, 0.12), 0 0 14px rgba(255, 255, 255, 0.6);
+}
+.xp-range:focus-visible {
+  outline: 1px solid var(--ink-dim);
+  outline-offset: 6px;
+}
+
+/* ---------- Sound bars + menu ---------- */
+.sound-menu {
+  animation: music-in 260ms var(--ease-out) both;
+  z-index: 50;
+}
+@keyframes music-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+.sound-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 10px;
+}
+.sound-bars i {
+  width: 2px;
+  height: 2px;
+  background: currentColor;
+}
+.sound-bars.is-on i {
+  animation: sound-bar 1.1s ease-in-out infinite;
+}
+.sound-bars.is-on i:nth-child(2) { animation-delay: -0.3s; }
+.sound-bars.is-on i:nth-child(3) { animation-delay: -0.6s; }
+.sound-bars.is-on i:nth-child(4) { animation-delay: -0.15s; }
+@keyframes sound-bar {
+  0%, 100% { height: 3px; }
+  50% { height: 10px; }
+}
+
+/* ---------- Light cursor ---------- */
+.light-cursor-dot,
+.light-cursor-ring {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms var(--ease-out);
+}
+html.light-cursor-visible .light-cursor-dot,
+html.light-cursor-visible .light-cursor-ring {
+  opacity: 1;
+}
+html.has-light-cursor .hub-v3,
+html.has-light-cursor .hub-v3 a,
+html.has-light-cursor .hub-v3 button,
+html.has-light-cursor .hub-v3 input[type="range"] {
+  cursor: none;
+}
+.light-cursor-dot {
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.55);
+}
+.light-cursor-ring {
+  width: 38px;
+  height: 38px;
+  margin: -19px 0 0 -19px;
+  --cc: var(--ink);
+}
+.light-cursor-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--cc) 45%, transparent);
+  transition: transform 420ms var(--ease-out), border-color 300ms var(--ease-out), background-color 300ms var(--ease-out);
+}
+.light-cursor-ring.is-link::before {
+  transform: scale(1.6);
+  border-color: color-mix(in srgb, var(--cc) 85%, transparent);
+  background: color-mix(in srgb, var(--cc) 10%, transparent);
+}
+.light-cursor-ring.is-down::before {
+  transform: scale(0.7);
+}
+/* Slow time: the ring tightens to a clean circle and a small readout sits beside it. */
+html.is-holding .light-cursor-ring::before {
+  transform: scale(1.35);
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+  transition-duration: 700ms;
+}
+.light-cursor-time {
+  position: absolute;
+  left: calc(100% + 16px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  white-space: nowrap;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
+  opacity: 0;
+  transition: opacity 350ms var(--ease-out), transform 500ms var(--ease-out);
+}
+html.is-holding .light-cursor-time {
+  opacity: 1;
+  transform: translateY(-50%);
+}
+
+/* Boot: the page opens on the loader (server-rendered), then this fades under the live gate. */
+.hub-boot {
+  pointer-events: none;
+  transition: opacity 800ms var(--ease-out);
+}
+.hub-boot.is-done {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 800ms var(--ease-out), visibility 0s 800ms;
+}
+.gate-skeleton-load {
+  animation: gate-skeleton-load 2.2s var(--ease-in-out) infinite;
+}
+/* The loading mark: a thin ring that fills (no words). Before the page can count, it turns. */
+.gate-ring {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: conic-gradient(var(--ink) calc(var(--p, 0) * 1turn), rgba(243, 241, 236, 0.14) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent 60%, #000 62%);
+  mask: radial-gradient(farthest-side, transparent 60%, #000 62%);
+  transition: --p 300ms linear;
+}
+.gate-ring.is-spinning {
+  --p: 0.22;
+  animation: gate-ring-spin 1.1s linear infinite;
+}
+@keyframes gate-ring-spin {
+  to { transform: rotate(1turn); }
+}
+@keyframes gate-skeleton-load {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+/* Returning in Normal mode there is no gate to open onto: plain void. */
+html[data-experience="normal"] .gate-skeleton {
+  visibility: hidden;
+}
+
+/* SplitText line masks clip at the line box; give descenders and ascenders room.
+   (GSAP derives the mask class from `linesClass: "split-line"` word by word → this name.) */
+.split-mask-line-mask {
+  padding: 0.12em 0.06em 0.2em;
+  margin: -0.12em -0.06em -0.2em;
+}
+
+/* ---------- Display type: Fraunces (D38 round A feedback) ----------
+   Light weight, soft high-contrast cut at display sizes, wonky italics. */
+.font-display {
+  font-weight: 330;
+  font-variation-settings: "opsz" 144, "SOFT" 60, "WONK" 1;
+  font-feature-settings: "ss01", "liga";
+}
+.font-display .italic,
+.font-display em,
+em.font-display,
+.font-display i {
+  font-weight: 320;
+}
+
+/* ---------- Through the doorway: the window each world opens (≈70 % of the view) ---------- */
+.hub-exit {
+  position: relative;
+  width: min(70vw, 1100px);
+  height: min(62vh, 640px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: 12px;
+  background: #0a0a0f;
+  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.9);
+}
+@media (max-width: 640px) {
+  .hub-exit {
+    width: calc(100vw - 32px);
+    height: 70vh;
+  }
+}
+.hub-exit-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+.hub-exit-bar span {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+}
+.hub-exit-bar span:first-child {
+  background: color-mix(in srgb, var(--c) 70%, transparent);
+}
+.hub-exit-bar b {
+  margin-left: 10px;
+  font-weight: 400;
+  color: var(--ink-dim);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hub-exit-bar em {
+  margin-left: 18px;
+  font-style: normal;
+}
+.hub-exit-body {
+  flex: 1;
+  margin: 0;
+  padding: 18px 20px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 13px;
+  line-height: 2;
+  letter-spacing: 0.03em;
+  color: var(--ink-dim);
+  white-space: pre-wrap;
+}
+.hub-exit-body span {
+  display: block;
+}
+.hub-exit-body .is-cmd {
+  color: var(--ink);
+}
+.hub-exit-body .is-out {
+  color: var(--ink-faint);
+}
+.hub-exit-term .hub-enter-caret {
+  background: var(--c);
+}
+
+/* Trader */
+.hub-exit-trade-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  min-height: 0;
+}
+.hub-exit-list {
+  margin: 0;
+  padding: 14px 0;
+  list-style: none;
+  border-right: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.hub-exit-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+}
+.hub-exit-list li i {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 70%, transparent);
+}
+.hub-exit-trade-grid svg {
+  width: 100%;
+  height: 100%;
+}
+@media (max-width: 640px) {
+  .hub-exit-trade-grid {
+    grid-template-columns: 1fr;
+  }
+  .hub-exit-list {
+    display: none;
+  }
+}
+
+/* Photographer */
+.hub-exit-photo {
+  aspect-ratio: 3 / 2;
+  height: auto;
+  max-height: 62vh;
+  background: #07070a;
+}
+.hub-exit-vf {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 50% at 62% 42%, color-mix(in srgb, var(--c) 22%, transparent), transparent 70%);
+}
+.hub-exit-vf .vf-v,
+.hub-exit-vf .vf-h {
+  position: absolute;
+  background: rgba(243, 241, 236, 0.1);
+}
+.hub-exit-vf .vf-v {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+.hub-exit-vf .vf-h {
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+.vf-corner {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border: 2px solid rgba(243, 241, 236, 0.85);
+}
+.vf-corner.tl { top: 5%; left: 4%; border-right: 0; border-bottom: 0; }
+.vf-corner.tr { top: 5%; right: 4%; border-left: 0; border-bottom: 0; }
+.vf-corner.bl { bottom: 5%; left: 4%; border-right: 0; border-top: 0; }
+.vf-corner.br { bottom: 5%; right: 4%; border-left: 0; border-top: 0; }
+.vf-focus {
+  position: absolute;
+  left: 62%;
+  top: 42%;
+  width: 9%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border: 2px solid rgba(243, 241, 236, 0.9);
+  transition: border-color 120ms;
+}
+.vf-focus.is-locked {
+  border-color: var(--c);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--c) 60%, transparent);
+}
+.vf-top,
+.vf-read {
+  position: absolute;
+  margin: 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: rgba(243, 241, 236, 0.85);
+}
+.vf-top {
+  top: 6%;
+  right: 4%;
+  color: rgba(243, 241, 236, 0.5);
+}
+.vf-read {
+  left: 4%;
+  bottom: 6%;
+  display: flex;
+  gap: 2.4em;
+  font-variant-numeric: tabular-nums;
+}
+.vf-black {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+}
+.vf-black.is-on {
+  opacity: 1;
+}
+.vf-frame {
+  position: absolute;
+  inset: 0;
+  border: 3px solid #f3f1ec;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The photographer's live view behind the grid. */
+.vf-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+/* Back on the hub: the finished window shrinks away as the camera pulls out of the screen. */
+.hub-return {
+  pointer-events: none;
+  animation: hub-return var(--dur, 1.1s) var(--ease-in-out) forwards;
+}
+@keyframes hub-return {
+  0% { opacity: 1; transform: scale(1); filter: brightness(1.8); }
+  35% { filter: brightness(1); }
+  100% { opacity: 0; transform: scale(0.22); }
+}
+/* The world's window: the loader. It plays, then pushes in toward you and dissolves into the page. */
+.world-boot-frame {
+  transform: scale(1);
+  transition: transform 800ms var(--ease-in-out), opacity 650ms var(--ease-in-out);
+}
+.world-boot.is-lifting .world-boot-frame {
+  transform: scale(1.6);
+  opacity: 0;
+}
+/* A direct visit: it rises into place first. Through the hub it is already there (the hub cut on it). */
+.world-boot.is-direct .world-boot-frame {
+  animation: world-boot-in 700ms var(--ease-out) both;
+}
+@keyframes world-boot-in {
+  from { opacity: 0; transform: scale(0.96) translateY(10px); }
+}
+
+/* Ride: the TFT dash */
+.hub-exit-dash {
+  background: #07070a;
+}
+.dash-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  min-height: 0;
+}
+.dash-left,
+.dash-right {
+  position: relative;
+  min-height: 0;
+  padding: 14px 18px;
+}
+.dash-left {
+  border-right: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.dash-rev {
+  width: 100%;
+  height: 52%;
+  display: block;
+}
+.dash-speed {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: -6%;
+  padding-left: 6%;
+  font-family: var(--font-geist-mono), monospace;
+}
+.dash-speed b {
+  font-weight: 500;
+  font-size: clamp(44px, 9vh, 84px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.dash-speed i {
+  font-style: normal;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+.dash-gear {
+  position: absolute;
+  right: 18px;
+  bottom: 16px;
+  text-align: center;
+  font-family: var(--font-geist-mono), monospace;
+}
+.dash-gear span {
+  display: block;
+  font-size: clamp(30px, 6vh, 54px);
+  line-height: 1;
+  color: var(--c);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--c) 60%, transparent);
+}
+.dash-gear em {
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+.dash-route {
+  width: 100%;
+  height: calc(100% - 34px);
+  display: block;
+}
+.dash-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+/* Key on: the logo screen before the dash — the ring, the mark, "system check". */
+.dash-ignition {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  background: radial-gradient(ellipse at 50% 60%, color-mix(in srgb, var(--c) 10%, #07070a), #07070a 70%);
+  pointer-events: none;
+}
+.dash-ign-ring {
+  position: absolute;
+  width: clamp(120px, 26vh, 190px);
+  height: clamp(120px, 26vh, 190px);
+  left: 50%;
+  top: 50%;
+  translate: -50% -60%;
+}
+.dash-ignition b {
+  font-family: var(--font-geist-mono), monospace;
+  font-weight: 500;
+  font-size: clamp(44px, 10vh, 74px);
+  line-height: 1;
+  color: var(--ink);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--c) 60%, transparent);
+  margin-top: -0.6em;
+}
+.dash-ignition small {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-top: clamp(60px, 13vh, 96px);
+}
+/* Tell-tales in the bar: lamps that light for the self-test and go out as the ride begins. */
+.dash-tells {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  margin-left: auto;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+.dash-tells i {
+  font-style: normal;
+  padding: 1px 5px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  color: var(--c);
+  transition: opacity 120ms linear;
+}
+.dash-tells i.is-warn {
+  color: #f0b24a;
+}
+@media (max-width: 640px) {
+  .dash-tells {
+    display: none;
+  }
+  .dash-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+  .dash-left {
+    border-right: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  }
+}
+
+/* Gamer: the monitor */
+.hub-exit-game {
+  background: #07070a;
+}
+.game-body {
+  flex: 1;
+  min-height: 0;
+  padding: 14px;
+}
+.game-pic {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 6px;
+  background:
+    radial-gradient(60% 55% at 50% 48%, color-mix(in srgb, var(--c) 26%, transparent), transparent 70%),
+    linear-gradient(180deg, #0b0b12, #05050a);
+  transform-origin: center;
+}
+.game-scan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.28) 0 1.5px, transparent 1.5px 4px);
+  mix-blend-mode: multiply;
+}
+.game-hud {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+}
+.game-hud-tl {
+  left: 5%;
+  top: 7%;
+}
+.game-hud-br {
+  right: 5%;
+  bottom: 8%;
+  align-items: flex-end;
+}
+.game-hud-br b {
+  font-weight: 500;
+  font-size: clamp(22px, 4.6vh, 38px);
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.game-hp {
+  display: block;
+  width: clamp(120px, 22vw, 220px);
+  height: 6px;
+  border: 1px solid rgba(243, 241, 236, 0.35);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.game-hp b {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--c);
+  transform-origin: left;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--c) 70%, transparent);
+}
+.game-map {
+  position: absolute;
+  right: 5%;
+  top: 7%;
+  width: clamp(64px, 12vh, 110px);
+  height: auto;
+}
+.game-cross {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  width: clamp(70px, 14vh, 120px);
+  height: auto;
+  translate: -50% -50%;
+  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.8));
+}
+.game-start {
+  position: absolute;
+  left: 50%;
+  bottom: 9%;
+  translate: -50% 0;
+  margin: 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--c);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--c) 60%, transparent);
+  white-space: nowrap;
+}
+
+/* Artist: the canvas */
+.hub-exit-art {
+  background: #0d0c0a;
+}
+.art-body {
+  flex: 1;
+  min-height: 0;
+  padding: 18px;
+  display: flex;
+}
+.art-canvas {
+  position: relative;
+  flex: 1;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.02) 0 1px, transparent 1px 3px),
+    #17150f;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.5), 0 10px 30px -14px rgba(0, 0, 0, 0.9);
+  border: 1px solid rgba(243, 241, 236, 0.08);
+  overflow: hidden;
+}
+.art-canvas svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  mix-blend-mode: screen;
+}
+.art-brush {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 999px;
+  background: #f3f1ec;
+  box-shadow: 0 0 14px 3px color-mix(in srgb, var(--c) 70%, transparent);
+  pointer-events: none;
+  left: var(--bx, 0%);
+  top: var(--by, 0%);
+  transform: none !important;
+}
+
+/* Normal mode's doorway: the chapter's display where the setup would stand. */
+.normal-display {
+  position: fixed;
+  right: 8.5vw;
+  top: 50%;
+  z-index: 20; /* above the page's text column (z-10), under the header and the rail */
+  width: min(44vw, 720px);
+  translate: 0 -50%;
+  animation: normal-display-in 820ms var(--ease-out) both;
+  transition: transform 560ms var(--ease-in-out), opacity 320ms var(--ease-out) 260ms;
+  perspective: 1400px;
+}
+.normal-display-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1100 / 680;
+  transition: transform 520ms var(--ease-out), filter 520ms var(--ease-out);
+  filter: drop-shadow(0 40px 60px rgba(0, 0, 0, 0.6));
+}
+/* The floor: a faint reflection of the window under it. */
+.normal-display-frame::after {
+  content: "";
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: 100%;
+  height: 34%;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 22%, transparent), transparent 80%);
+  transform: scaleY(-1);
+  transform-origin: top;
+  opacity: 0.35;
+  filter: blur(14px);
+  pointer-events: none;
+}
+.normal-display .hub-exit {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  aspect-ratio: auto;
+}
+.normal-display-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.normal-display-hit:focus-visible {
+  outline: 1px solid var(--c);
+  outline-offset: 6px;
+}
+.normal-display:hover .normal-display-frame,
+.normal-display:has(.normal-display-hit:focus-visible) .normal-display-frame {
+  transform: scale(1.025);
+  filter: drop-shadow(0 0 34px color-mix(in srgb, var(--c) 45%, transparent));
+}
+.normal-display.is-zoom {
+  transform: scale(2.4);
+  opacity: 0;
+  transition: transform 560ms var(--ease-in), opacity 260ms var(--ease-in) 300ms;
+}
+@keyframes normal-display-in {
+  from { opacity: 0; transform: translate(-60px, 36px) rotate(-5deg) scale(0.9); }
+}
+@media (max-width: 1023px) {
+  .normal-display {
+    right: 4vw;
+    left: 4vw;
+    top: 9vh;
+    width: auto;
+    translate: 0 0;
+  }
+  /* Phones: the display takes the upper part, so a chapter's words start below it. */
+  .hub-v3.is-normal section[aria-labelledby] > .relative {
+    padding-top: 30vh;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .normal-display,
+  .normal-display-frame {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* A booting screen (direct visit, before the page's script runs): CSS-only life. */
+.hub-exit.is-boot .hub-exit-bar span:first-child {
+  animation: hub-boot-led 1.6s ease-in-out infinite;
+}
+@keyframes hub-boot-led {
+  0%, 100% { opacity: 0.35; box-shadow: 0 0 0 0 transparent; }
+  50% { opacity: 1; box-shadow: 0 0 10px color-mix(in srgb, var(--c) 70%, transparent); }
+}
+.hub-exit-boot {
+  position: absolute;
+  inset: 38px 0 0 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.hub-exit-boot i {
+  position: absolute;
+  left: 7%;
+  right: 2%;
+  height: 1px;
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  transform-origin: left;
+  animation: hub-boot-line 900ms var(--ease-out) both;
+}
+.hub-exit-boot i:nth-child(1) { top: 12%; animation-delay: 150ms; }
+.hub-exit-boot i:nth-child(2) { top: 31%; animation-delay: 260ms; }
+.hub-exit-boot i:nth-child(3) { top: 50%; animation-delay: 370ms; }
+.hub-exit-boot i:nth-child(4) { top: 69%; animation-delay: 480ms; }
+.hub-exit-boot i:nth-child(5) { top: 88%; animation-delay: 590ms; }
+@keyframes hub-boot-line {
+  from { transform: scaleX(0); }
+}
+.hub-exit-boot b {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 18%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c) 7%, transparent) 45%, color-mix(in srgb, var(--c) 16%, transparent) 50%, color-mix(in srgb, var(--c) 7%, transparent) 55%, transparent);
+  animation: hub-boot-scan 2.4s cubic-bezier(0.4, 0, 0.6, 1) 700ms infinite;
+}
+@keyframes hub-boot-scan {
+  0% { transform: translateX(-120%); opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { transform: translateX(560%); opacity: 0; }
+}
+/* The terminal's cursor waits, a little brighter, until the first key. */
+.hub-exit-term.is-boot .hub-enter-caret {
+  box-shadow: 0 0 10px color-mix(in srgb, var(--c) 70%, transparent);
+}
+/* The camera's display hunts for focus until the page's metering takes over. */
+.hub-exit-photo.is-boot .vf-focus {
+  animation: vf-boot-hunt 1.8s ease-in-out infinite;
+}
+@keyframes vf-boot-hunt {
+  0%, 100% { scale: 1.6; opacity: 0.5; }
+  50% { scale: 1.2; opacity: 0.9; }
+}
+.hub-exit-photo.is-boot .vf-photo {
+  animation: vf-boot-breathe 2.6s ease-in-out infinite alternate;
+}
+@keyframes vf-boot-breathe {
+  from { filter: blur(18px) brightness(1.9); }
+  to { filter: blur(13px) brightness(1.6); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hub-exit.is-boot .hub-exit-bar span:first-child,
+  .hub-exit-boot i,
+  .hub-exit-boot b,
+  .hub-exit-photo.is-boot .vf-focus,
+  .hub-exit-photo.is-boot .vf-photo {
+    animation: none;
+  }
+}
+
+/* A world page opens dark: the cover lifts once it has drawn. */
+.world-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--void, #050507);
+  transition: opacity 600ms var(--ease-in-out, ease);
+}
+.world-boot.is-lifting {
+  opacity: 0;
+  pointer-events: none;
 }

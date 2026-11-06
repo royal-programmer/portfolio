@@ -5,10 +5,12 @@ import { TypeAnimation } from "react-type-animation";
 import { ArrowRight } from "lucide-react";
 import type { Persona } from "../persona-provider";
 import type { PersonaContent } from "./site-content";
+import { useMemo } from "react";
 import {
   ENGINEER_SEQUENCE,
   PHOTOGRAPHER_SEQUENCE,
   TRADER_SEQUENCE,
+  makeTypeSequence,
 } from "./site-content";
 
 export function HomeHero({
@@ -18,6 +20,17 @@ export function HomeHero({
   persona: Persona;
   content: PersonaContent;
 }) {
+  const sequence = useMemo(
+    () =>
+      persona === "engineer"
+        ? ENGINEER_SEQUENCE
+        : persona === "trader"
+          ? TRADER_SEQUENCE
+          : persona === "photographer"
+            ? PHOTOGRAPHER_SEQUENCE
+            : makeTypeSequence(content.points.length ? content.points : [content.label], 1400),
+    [persona, content.points, content.label],
+  );
   return (
     <motion.div
       initial={{ opacity: 0, y: 28 }}
@@ -37,13 +50,7 @@ export function HomeHero({
         <span className="font-semibold text-[var(--accent)]">
           <TypeAnimation
             key={persona}
-            sequence={
-              persona === "engineer"
-                ? ENGINEER_SEQUENCE
-                : persona === "trader"
-                  ? TRADER_SEQUENCE
-                  : PHOTOGRAPHER_SEQUENCE
-            }
+            sequence={sequence}
             speed={55}
             deletionSpeed={38}
             repeat={Infinity}
