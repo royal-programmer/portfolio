@@ -62,8 +62,8 @@ const WORLD_SESSION_KEY = "xp-world";
 const NEXT_PHASE: Partial<Record<Phase, Phase>> = { wear: "blink", blink: "sky", approach: "impact", impact: "split", split: "climb" };
 const NEXT_LOWER: Record<Quality, Quality> = { best: "balanced", balanced: "performance", performance: "performance" };
 
-/** How long a tapped doorway waits for its setup to form before it goes as a plain fade. */
-const WAIT_FOR_SETUP_MS = 2200;
+/** How long a tapped doorway waits for its setup to fully form before it gives up on the dive and goes as a plain fade (a model that never arrived). */
+const WAIT_FOR_SETUP_MS = 15000;
 
 function sessionFlag(set?: boolean): boolean {
   try {
@@ -326,7 +326,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       // The dive needs this world's screen. Before the setup has formed (its model still
       // arriving) there is nothing to fly into: wait for it, the button showing that it heard.
       const a = vr.current.portalAnchor;
-      if (!a || a.slug !== slug) {
+      if (!a || a.slug !== slug || !a.formed) {
         setWaiting(slug);
         return;
       }
@@ -343,16 +343,22 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     }
     const t0 = performance.now();
     const id = window.setInterval(() => {
+      // Scrolled away from the chapter: the setup is coming apart; the tap is forgotten.
+      if (Math.abs(vr.current.c - world.c) > 0.45) {
+        window.clearInterval(id);
+        setWaiting(null);
+        return;
+      }
       const a = vr.current.portalAnchor;
-      const formed = !!a && a.slug === waiting;
+      const formed = !!a && a.slug === waiting && a.formed;
       if (!formed && performance.now() - t0 < WAIT_FOR_SETUP_MS) return;
-      // Formed: the dive. Still nothing after the wait: no anchor, so the camera stays and the
-      // doorway is the plain fade into the world's window instead of a dive at nothing.
+      // Formed: the dive, from the perfect moment. Still nothing after a long wait (the model
+      // never arrived): no anchor, so the doorway is the plain fade into the world's window.
       if (!formed) vr.current.portalAnchor = null;
       window.clearInterval(id);
       setWaiting(null);
       startPortal(world);
-    }, 80);
+    }, 60);
     return () => window.clearInterval(id);
   }, [waiting, worlds, startPortal]);
   const leaveForWorld = useCallback(() => {
@@ -958,9 +964,6 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         </button>
         <div className="flex items-center gap-3 sm:gap-5">
           {ready && experience === "immersive" ? <QualityMenu value={quality} className="hidden md:block" /> : null}
-          <span className="sm:hidden">
-            <SoundToggle compact />
-          </span>
           <span className="hidden sm:block">
             <SoundToggle />
           </span>
@@ -968,8 +971,8 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         </div>
       </header>
 
-      {/* ---------- Spectrum rail (lg+) ---------- */}
-      <nav aria-label="Chapters" className={`fixed top-1/2 right-5 z-30 hidden -translate-y-1/2 flex-col gap-3 transition-opacity duration-700 lg:flex ${textLive ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+      {/* ---------- Spectrum rail (every size; phones get the marks alone) ---------- */}
+      <nav aria-label="Chapters" className={`fixed top-1/2 right-3 z-30 flex -translate-y-1/2 flex-col gap-3 transition-opacity duration-700 lg:right-5 ${textLive ? "opacity-100" : "pointer-events-none opacity-0"}`}>
         {chapters.map((c) => {
           const id = personaIdentity(c.slug);
           const on = activeSlug === c.slug;
@@ -984,7 +987,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
               data-cursor-color={color}
               className="group flex items-center justify-end gap-3"
             >
-              <span className={`font-mono text-[10px] tracking-[0.14em] text-[var(--ink-dim)] uppercase transition-opacity duration-[var(--dur-2)] ${on ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+              <span className={`font-mono text-[10px] tracking-[0.14em] text-[var(--ink-dim)] uppercase transition-opacity duration-[var(--dur-2)] max-lg:hidden ${on ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                 {id.role}
               </span>
               <span
@@ -1072,9 +1075,6 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
           </div>
           <footer className="hub-footer mt-16 flex items-center justify-between font-mono text-[10px] tracking-[0.16em] text-[var(--ink-faint)] uppercase">
             <span>© {new Date().getFullYear()} Ratul Roy</span>
-            <span className="sm:hidden">
-              <SoundToggle />
-            </span>
           </footer>
         </section>
       </main>

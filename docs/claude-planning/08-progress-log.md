@@ -5,6 +5,35 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-07 — Round H (part 1d): phone HUD carries the sound, no drag row, no text selection, the rail on phones, the doorway waits for the fully formed setup
+
+Ratul's phone notes (Vivo X200 Pro, Chrome):
+
+- **Sound on phones lives in the HUD only.** The header's compact toggle and the footer toggle are
+  gone below `sm`; the touch HUD has a `Sound · On/Off` row (`.hub-hud-sound`, off ↔ ambient).
+  Desktop keeps the header menu.
+- **No "Drag · Look around" on touch.** A finger moving was already a scroll (the pointer code
+  drops the drag on touch); the HUD no longer promises it.
+- **Holding to slow time no longer selects the words.** `@media (pointer: coarse) .hub-v3 { user-select: none }`.
+- **The spectrum rail shows on every size.** Marks only below `lg` (the role label is `max-lg:hidden`),
+  `right-3` on phones, `right-5` from `lg`.
+- **The doorway waits for the perfect moment.** `portalAnchor.formed` (gather ≥ 0.985 and the
+  screen's power > 0.95) is now the condition: a tap before that puts the button in `is-waiting`
+  and the dive starts the moment the setup is whole. Measured on a touch viewport: tap 150 ms after
+  jumping to Art → waiting 3.1 s → dive with `formed=true`. The wait is forgotten if you scroll away
+  (|c − chapter| > 0.45); the plain-fade fallback only fires after 15 s (a model that never came).
+
+**Dev domain (Ratul):** no custom `dev.` host. Previews stay on Vercel's own branch URL with Vercel
+Authentication; the noindex header and robots rule from part 1c still apply there. The Preview
+`NEXT_PUBLIC_ROOT_DOMAIN` advice from part 1c is withdrawn (path URLs on the preview host).
+
+**Dev note:** Playwright's `run_code` hung twice for its full 30-minute idle window around a page
+that navigated mid-script; the Chrome DevTools MCP (`emulate 412x915x2,mobile,touch`) did the same
+checks in seconds. Prefer it for touch runs that cross a navigation.
+
+**Admin knobs (16-admin-console):** the HUD's sound row on/off, the formed thresholds, the
+scroll-away tolerance.
+
 ## 2026-11-07 — Round H (part 1c): the phone's return and loader fixed, the early tap, bands for every world, the setup below the words, previews closed
 
 From Ratul's screen recording (Vivo X200 Pro, Chrome) and a Playwright reproduction on a 412×915 touch viewport:

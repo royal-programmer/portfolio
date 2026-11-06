@@ -239,7 +239,7 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
       // The owner's eye: where you sit to use this thing, which is where the fly-in pauses.
       tmp.e.copy(tmp.w).addScaledVector(tmp.n, viewBack).addScaledVector(tmp.u, viewUp);
       g.getWorldPosition(tmp.c);
-      s.portalAnchor = { slug: world.slug, x: tmp.w.x, y: tmp.w.y, z: tmp.w.z, nx: tmp.n.x, ny: tmp.n.y, nz: tmp.n.z, cx: tmp.c.x, cy: tmp.c.y, cz: tmp.c.z, ex: tmp.e.x, ey: tmp.e.y, ez: tmp.e.z };
+      s.portalAnchor = { slug: world.slug, formed: gather >= 0.985 && lv.power > 0.95, x: tmp.w.x, y: tmp.w.y, z: tmp.w.z, nx: tmp.n.x, ny: tmp.n.y, nz: tmp.n.z, cx: tmp.c.x, cy: tmp.c.y, cz: tmp.c.z, ex: tmp.e.x, ey: tmp.e.y, ez: tmp.e.z };
     }
 
     // Screens, bezel light and the halo: lit = enterable, so it breathes and brightens under the pointer.

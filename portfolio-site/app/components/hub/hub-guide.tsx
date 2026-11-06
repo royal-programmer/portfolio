@@ -8,6 +8,7 @@
  * (the gate, the intro, a doorway in motion).
  */
 import { useSyncExternalStore } from "react";
+import { useExperience } from "../../experience-provider";
 
 type Props = {
   /** The guide is allowed on screen (the gate is gone, no intro, no doorway in motion). */
@@ -36,12 +37,14 @@ function subscribeFullscreen(cb: () => void) {
 export function HubGuide({ on, touch, immersive, chapters }: Props) {
   const fs = useSyncExternalStore(subscribeFullscreen, () => !!document.fullscreenElement, () => false);
   const canFs = useSyncExternalStore(subscribeFullscreen, () => !!document.fullscreenEnabled, () => false);
+  // Phones (Ratul's call): the sound switch lives in the HUD and nowhere else.
+  const { sound, setSoundChoice } = useExperience();
 
   // Two groups: moving through the place, and jumping across it. Touch gets the gestures only.
   const move: Row[] = touch
     ? [
         ["Scroll", immersive ? "Climb" : "Follow the light"],
-        ...(immersive ? ([["Hold", "Slow time"], ["Drag", "Look around"]] as Row[]) : []),
+        ...(immersive ? ([["Hold", "Slow time"]] as Row[]) : []),
         ["Tap display", "Step in"],
       ]
     : [
@@ -80,6 +83,12 @@ export function HubGuide({ on, touch, immersive, chapters }: Props) {
           </dl>
         ) : null}
       </div>
+      {touch ? (
+        <button type="button" className="hub-hud-sound" aria-pressed={sound} onClick={() => setSoundChoice(sound ? "off" : "ambient")}>
+          <span>Sound</span>
+          <span>{sound ? "On" : "Off"}</span>
+        </button>
+      ) : null}
       {!touch && chapters.length ? (
         <p className="hub-hud-worlds">
           {chapters.map((c, i) => (
