@@ -48,7 +48,7 @@ export type VrState = {
   portalHover: string | null;
   /** Where that assembly's screen is (world) and which way it faces — set by the scene. */
   /** The lit screen's world position and facing, plus the setup's centre the fly-in orbits around. */
-  portalAnchor: { x: number; y: number; z: number; nx: number; ny: number; nz: number; cx: number; cy: number; cz: number } | null;
+  portalAnchor: { x: number; y: number; z: number; nx: number; ny: number; nz: number; cx: number; cy: number; cz: number; ex: number; ey: number; ez: number } | null;
   /** The visitor clicked a lit assembly: the camera flies into its screen, then the page leaves. */
   portal: { slug: string; at: number } | null;
   /** Back from a world: the camera starts inside that screen and pulls out to the chapter. */
@@ -63,9 +63,9 @@ export type VrState = {
 export const REWIND_LENGTH = 1.5;
 
 /** Seconds the camera takes to fly into a lit screen (the world's own sequence follows). */
-export const PORTAL_LENGTH = 1.35;
+export const PORTAL_LENGTH = 2.1;
 /** Seconds the camera takes to pull back out of a screen when you return from its world. */
-export const PORTAL_OUT_LENGTH = 1.25;
+export const PORTAL_OUT_LENGTH = 1.5;
 
 /** A persona world on the climb: where on the scroll it peaks, and its colour. */
 export type World = { slug: string; t: number; c: number };

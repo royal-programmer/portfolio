@@ -55,10 +55,18 @@ type Options = {
   yaw?: number;
   /** Screen material(s) whose uPower / uTime / uHover the hook drives. */
   screenMats?: THREE.ShaderMaterial[];
+  /**
+   * Where the owner's eye is, in the first screen's frame: `back` along its normal, `up` along
+   * its up — the rider's seat behind the dash, the chair in front of the monitor, an arm's
+   * length from the laptop. The fly-in swings round to this point before it dives in.
+   */
+  view?: { back: number; up: number };
   onFrame: (L: AssemblyLive, place: (obj: THREE.Object3D, i: number, late?: number) => void, parts: Part[]) => void;
 };
 
-export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffset = 0, screenMats, onFrame }: Options) {
+export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffset = 0, screenMats, view, onFrame }: Options) {
+  const viewBack = view?.back ?? 1;
+  const viewUp = view?.up ?? 0.15;
   const { clock, state } = useVr();
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
@@ -107,7 +115,7 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
   const tint = useMemo(() => new THREE.Color().setHSL(((world.t * 285 - 15) / 360 + 1) % 1, 0.9, 0.62), [world.t]);
   const mats = useLitMats();
   const tmp = useMemo(
-    () => ({ p: new THREE.Vector3(), q: new THREE.Quaternion(), ray: new THREE.Raycaster(), ndc: new THREE.Vector2(), n: new THREE.Vector3(), w: new THREE.Vector3(), c: new THREE.Vector3(), pose: makePose(), at: new THREE.Vector3() }),
+    () => ({ p: new THREE.Vector3(), q: new THREE.Quaternion(), ray: new THREE.Raycaster(), ndc: new THREE.Vector2(), n: new THREE.Vector3(), u: new THREE.Vector3(), e: new THREE.Vector3(), w: new THREE.Vector3(), c: new THREE.Vector3(), pose: makePose(), at: new THREE.Vector3() }),
     [],
   );
   // The frame offsets, resolved once (aspect-aware), reused to follow the camera while loose.
@@ -217,9 +225,13 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
     // Tell the Director where the screen is, for the fly-in.
     if (first && lv.power > 0.5 && (!s.portal || s.portal.slug === world.slug) && (!s.portalOut || s.portalOut.slug === world.slug)) {
       first.getWorldPosition(tmp.w);
-      tmp.n.set(0, 0, 1).applyQuaternion(first.getWorldQuaternion(tmp.q));
+      first.getWorldQuaternion(tmp.q);
+      tmp.n.set(0, 0, 1).applyQuaternion(tmp.q);
+      tmp.u.set(0, 1, 0).applyQuaternion(tmp.q);
+      // The owner's eye: where you sit to use this thing, which is where the fly-in pauses.
+      tmp.e.copy(tmp.w).addScaledVector(tmp.n, viewBack).addScaledVector(tmp.u, viewUp);
       g.getWorldPosition(tmp.c);
-      s.portalAnchor = { x: tmp.w.x, y: tmp.w.y, z: tmp.w.z, nx: tmp.n.x, ny: tmp.n.y, nz: tmp.n.z, cx: tmp.c.x, cy: tmp.c.y, cz: tmp.c.z };
+      s.portalAnchor = { x: tmp.w.x, y: tmp.w.y, z: tmp.w.z, nx: tmp.n.x, ny: tmp.n.y, nz: tmp.n.z, cx: tmp.c.x, cy: tmp.c.y, cz: tmp.c.z, ex: tmp.e.x, ey: tmp.e.y, ez: tmp.e.z };
     }
 
     // Screens, bezel light and the halo: lit = enterable, so it breathes and brightens under the pointer.

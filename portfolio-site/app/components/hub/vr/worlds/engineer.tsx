@@ -80,6 +80,7 @@ export function EngineerAssembly({ world, screenSrc }: { world: World; /** Ratul
     screens,
     homes,
     screenMats,
+    view: { back: 1.0, up: 0.25 },
     onFrame: (L, place) => {
       if (baseRef.current) place(baseRef.current, 0);
       if (padRef.current) place(padRef.current, 2);

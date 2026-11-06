@@ -377,6 +377,16 @@ html.scroll-locked,
 html.scroll-locked body {
   overflow: hidden;
 }
+/* No scrollbar anywhere: the page still scrolls (wheel, keys, touch, the rail); the chrome stays clean. */
+html {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+html::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
 html.lenis,
 html.lenis body {
   height: auto;
@@ -1194,41 +1204,50 @@ em.font-display,
   color: var(--ink-faint);
   text-transform: uppercase;
 }
-/* Key on: the logo screen before the dash — the ring, the mark, "system check". */
+/* Key on: the boot screen before the dash — READY · TO · RACE, then the gauge sweep. */
 .dash-ignition {
   position: absolute;
   inset: 0;
   z-index: 3;
-  display: grid;
-  place-content: center;
-  justify-items: center;
   background: radial-gradient(ellipse at 50% 60%, color-mix(in srgb, var(--c) 10%, #07070a), #07070a 70%);
   pointer-events: none;
 }
-.dash-ign-ring {
+.dash-ign-word {
   position: absolute;
-  width: clamp(120px, 26vh, 190px);
-  height: clamp(120px, 26vh, 190px);
   left: 50%;
   top: 50%;
-  translate: -50% -60%;
+  translate: -50% -50%;
+  font-family: var(--font-geist-mono), monospace;
+  font-weight: 600;
+  font-size: clamp(30px, 7vh, 56px);
+  line-height: 1;
+  letter-spacing: 0.22em;
+  text-indent: 0.22em;
+  white-space: nowrap;
+  color: var(--c);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--c) 70%, transparent);
 }
-.dash-ignition b {
+.dash-ign-gauge {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(150px, 36vh, 250px);
+  height: clamp(150px, 36vh, 250px);
+  translate: -50% -52%;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--c) 60%, transparent));
+}
+.dash-ign-num {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -52%;
   font-family: var(--font-geist-mono), monospace;
   font-weight: 500;
-  font-size: clamp(44px, 10vh, 74px);
+  font-size: clamp(46px, 11vh, 84px);
   line-height: 1;
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
-  text-shadow: 0 0 24px color-mix(in srgb, var(--c) 60%, transparent);
-  margin-top: -0.6em;
-}
-.dash-ignition small {
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 10px;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  margin-top: clamp(60px, 13vh, 96px);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--c) 50%, transparent);
 }
 /* Tell-tales in the bar: lamps that light for the self-test and go out as the ride begins. */
 .dash-tells {

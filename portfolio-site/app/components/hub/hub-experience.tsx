@@ -573,6 +573,8 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       const typing = document.activeElement && document.activeElement !== document.body && document.activeElement.tagName !== "BUTTON";
       if (typing) return;
       const p = vr.current.phase;
+      // The chapters answer the keys on the climb, and in Normal mode once the gate is gone.
+      const nav = p === "climb" || (experience === "normal" && gate === null);
       ambient.resume();
       if (p === "climb" && !e.ctrlKey && !e.metaKey && (e.key === "-" || e.key === "_" || e.key === "=" || e.key === "+" || e.key === "0")) {
         // Lens: − pulls the view wide (watch an assembly whole), + tightens, 0 resets.
@@ -580,7 +582,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         s.zoom = e.key === "0" ? 0 : Math.max(-0.5, Math.min(1, s.zoom + (e.key === "-" || e.key === "_" ? 0.25 : -0.25)));
         return;
       }
-      if (p === "climb" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (nav && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const s = vr.current;
         // Glide so the chapter sits centred in the view (its words and its setup), not at the top.
         const centreOf = (el: HTMLElement) => el.offsetTop + el.offsetHeight / 2 - window.innerHeight / 2;
@@ -621,7 +623,8 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
           const slug = s.portalHover ?? (here?.kind === "persona" ? here.slug : null);
           if (slug) {
             e.preventDefault();
-            enterWorld(slug);
+            if (experience === "normal") normalEnter.current?.(slug);
+            else enterWorld(slug);
           }
           return;
         }
@@ -640,7 +643,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [gate, status, wear, startLight, sections, active, enterWorld]);
+  }, [gate, status, wear, startLight, sections, active, enterWorld, experience]);
 
   // ---- Smooth scroll + scroll → climb progress ---------------------------------
   useEffect(() => {

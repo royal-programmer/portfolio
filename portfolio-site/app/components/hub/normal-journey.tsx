@@ -343,7 +343,7 @@ export function NormalJourney({ state, worlds, sectionT, recede }: Props) {
         const bright = spectrumColor(world.t, 84);
         for (let i = 0; i < objs.length; i++) {
           const o = objs[i];
-          if (portrait && o.place.y > 0.2) continue;
+          if (portrait && (o.place.y > 0.2 || o.place.y < -0.4)) continue; // phones: no room above the display (the header) or below it (the words)
           const px = portrait ? o.place.x * 0.62 : o.place.x;
           const py = portrait ? o.place.y * 0.9 : o.place.y;
           const size = o.place.size * dw * (0.82 + 0.18 * o.place.depth);

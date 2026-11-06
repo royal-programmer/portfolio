@@ -76,6 +76,7 @@ export function TraderAssembly({ world }: { world: World }) {
     homes,
     screenMats,
     offset: { fwd: 5.4, right: 1.5, up: -0.55 },
+    view: { back: 1.25, up: 0.05 },
     onFrame: (_L, place) => {
       refs.forEach((r, i) => r.current && place(r.current, i, i >= 3 ? 0.15 : 0));
     },
