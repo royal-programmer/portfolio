@@ -249,6 +249,12 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+/* The hub is the void from the first paint: nothing light shows behind it while it loads or
+   past its edges on an ultrawide / overscroll. */
+html:has(.hub-v3),
+body:has(.hub-v3) {
+  background: var(--void);
+}
 
 /* Messenger-style typing indicator: staggered vertical bounce, two waves (123 × 2) */
 @keyframes chat-dot-jump {
@@ -432,6 +438,154 @@ html.is-dragging * {
   0% { transform: scaleY(0); opacity: 1; }
   60% { transform: scaleY(1); opacity: 1; }
   100% { transform: scaleY(1); opacity: 0; }
+}
+
+/* The closing's footer: pinned to the bottom edge, clear of a phone's home bar. */
+.hub-footer {
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* The guide: one line in the corner; the shortcuts card above it on ?. */
+.hub-guide {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right, 0px));
+  bottom: max(1.1rem, env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out);
+}
+@media (min-width: 640px) {
+  .hub-guide { right: 2rem; bottom: 1.5rem; }
+}
+@media (min-width: 1024px) {
+  .hub-guide { right: 3rem; bottom: 1.75rem; }
+}
+.hub-guide.is-on {
+  opacity: 1;
+  transform: none;
+}
+.hub-guide.is-on .hub-guide-line,
+.hub-guide .hub-help {
+  pointer-events: auto;
+}
+.hub-guide-line {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-align: right;
+}
+.hub-guide-line > span {
+  max-width: 60vw;
+}
+.hub-guide-line button {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  color: var(--ink-dim);
+  font-size: 11px;
+  letter-spacing: 0;
+  transition: color 300ms var(--ease-out), border-color 300ms var(--ease-out), transform 300ms var(--ease-out);
+}
+.hub-guide-line button:hover,
+.hub-guide-line button[aria-expanded="true"] {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--ink) 60%, transparent);
+  transform: translateY(-1px);
+}
+.hub-help-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 29;
+  background: transparent;
+  cursor: default;
+}
+.hub-help {
+  width: min(22rem, calc(100vw - 2rem));
+  padding: 1.1rem 1.25rem 1.2rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  background: color-mix(in srgb, var(--void) 78%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+  text-align: left;
+  animation: hub-help-in 420ms var(--ease-out) both;
+}
+@keyframes hub-help-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+}
+.hub-help-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.hub-help dl {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.45rem;
+}
+.hub-help dl > div {
+  display: grid;
+  grid-template-columns: 9.5rem 1fr;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+.hub-help dt {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+.hub-help dd {
+  font-size: 12.5px;
+  color: var(--ink-dim);
+}
+.hub-help-worlds {
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.hub-help-worlds b {
+  font-weight: 600;
+}
+.hub-help-fs {
+  margin-top: 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  transition: color 300ms var(--ease-out);
+}
+.hub-help-fs:hover {
+  color: var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hub-guide, .hub-help { transition: none; animation: none; }
 }
 
 /* Normal mode: the canvas journey fades in over the still poster. */
@@ -1492,17 +1646,58 @@ em.font-display,
 @keyframes normal-display-in {
   from { opacity: 0; transform: translate(-60px, 36px) rotate(-5deg) scale(0.9); }
 }
+/* Phones and tablets: the display lives in the chapter's flow, above its words (normal-displays
+   portals it into this slot), so it never covers the drawing or the text. */
+.normal-display-slot {
+  display: none;
+}
 @media (max-width: 1023px) {
-  .normal-display {
-    right: 4vw;
-    left: 4vw;
-    top: 9vh;
-    width: auto;
-    translate: 0 0;
+  .hub-v3.is-normal .normal-display-slot {
+    display: block;
+    position: relative;
+    width: 100%;
+    /* Never taller than about half the screen (a phone on its side). */
+    max-width: calc(52svh * 1100 / 680);
+    aspect-ratio: 1100 / 680;
+    margin-bottom: 2.25rem;
   }
-  /* Phones: the display takes the upper part, so a chapter's words start below it. */
-  .hub-v3.is-normal section[aria-labelledby] > .relative {
-    padding-top: 30vh;
+  .normal-display.is-inflow {
+    position: absolute;
+    inset: 0;
+    right: auto;
+    top: auto;
+    width: 100%;
+    translate: none;
+    z-index: 1;
+  }
+  .normal-display.is-inflow .normal-display-frame::after {
+    height: 22%;
+  }
+  /* A phone on its side: no room above the words, so the display stands beside them. */
+  @media (max-height: 540px) {
+    .hub-v3.is-normal section[aria-labelledby] > .relative {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 42%);
+      column-gap: 1.5rem;
+      align-items: center;
+      max-width: none;
+      width: 100%;
+    }
+    .hub-v3.is-normal .normal-display-slot {
+      grid-column: 2;
+      grid-row: 1 / span 3;
+      align-self: center;
+      max-width: none;
+      margin-bottom: 0;
+    }
+    .hub-v3.is-normal section[aria-labelledby] > .relative > :not(.normal-display-slot) {
+      grid-column: 1;
+    }
+  }
+  /* Portrait, Immersive: the words sit low, the setup stands in the clear band above them. */
+  .hub-v3.is-immersive section[aria-labelledby] {
+    align-items: flex-end;
+    padding-bottom: 14svh;
   }
 }
 @media (prefers-reduced-motion: reduce) {

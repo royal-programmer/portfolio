@@ -125,10 +125,16 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
     // Portrait (phones): the copy sits in the lower half, so the setup goes to the centre of the
     // upper half instead of beside the text.
     const portrait = clamp01((1.2 - aspect) / 0.6);
+    const fwd = (offset?.fwd ?? 5) + (narrow - 1) * 2.2;
+    // Portrait: the chapter's words sit in the lower half (hub CSS), so the setup is placed where
+    // the lens puts it in the clear band above them — a fixed point on the screen (about 27% from
+    // the top), not a fixed height in the world. Same vertical field as the scene's camera.
+    const fovV = THREE.MathUtils.degToRad(40 * (1 + portrait * 0.45));
+    const lift = portrait * fwd * Math.tan(fovV / 2) * 0.46;
     return {
-      fwd: (offset?.fwd ?? 5) + (narrow - 1) * 2.2,
+      fwd,
       right: ((offset?.right ?? 1.4) / narrow) * (1 - portrait),
-      up: (offset?.up ?? -0.3) + (narrow - 1) * 1.1 + portrait * 0.5,
+      up: ((offset?.up ?? -0.3) + (narrow - 1) * 1.1) * (1 - portrait) + lift,
     };
   }, [size.width, size.height, offset?.fwd, offset?.right, offset?.up]);
   const L = useMemo<AssemblyLive>(() => ({ gather: 0, g3: 0, open: 0, power: 0, hover: 0, t: 0, d: -9 }), []);

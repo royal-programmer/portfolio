@@ -10,6 +10,7 @@
  */
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type CSSProperties, type MutableRefObject } from "react";
+import { createPortal } from "react-dom";
 import type { PersonaSlug } from "@/lib/content/types";
 import { personaIdentity } from "@/lib/site/brand";
 import { personaHref } from "@/lib/site/persona-link";
@@ -34,6 +35,16 @@ export function NormalDisplays({ worlds, activeSlug, items, photo, recedeRef, en
   const [shown, setShown] = useState<string | null>(null);
   const [played, setPlayed] = useState<Record<string, boolean>>({});
   const [zoom, setZoom] = useState<string | null>(null);
+  // Phones and tablets (Round H): the display is not a fixed window over the words — it sits in
+  // the chapter's own flow, above its title, in the slot the chapter renders (`<slug>-display`).
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const sync = () => setSlot(mq.matches && shown ? document.getElementById(`${shown}-display`) : null);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, [shown]);
 
   // The display comes on a beat after the chapter arrives — the drawing is still finishing.
   useEffect(() => {
@@ -72,12 +83,13 @@ export function NormalDisplays({ worlds, activeSlug, items, photo, recedeRef, en
   const slug = world.slug as PersonaSlug;
   const color = spectrumColor(world.t);
   const done = !!played[slug];
-  return (
-    <div key={slug} className={`normal-display ${zoom === slug ? "is-zoom" : ""}`} style={{ "--c": color } as CSSProperties}>
+  const node = (
+    <div key={slug} className={`normal-display ${slot ? "is-inflow" : ""} ${zoom === slug ? "is-zoom" : ""}`} style={{ "--c": color } as CSSProperties}>
       <div className="normal-display-frame">
         {done ? <ExitFrame slug={slug} t={world.t} items={items} photo={photo} /> : <ExitSequence world={world} items={items} photo={photo} delay={250} onDone={() => setPlayed((p) => ({ ...p, [slug]: true }))} />}
       </div>
       <button type="button" className="normal-display-hit" aria-label={`${personaIdentity(slug).cta} — ${personaIdentity(slug).role}`} data-cursor-color={color} onClick={() => enter(slug)} />
     </div>
   );
+  return slot ? createPortal(node, slot) : node;
 }

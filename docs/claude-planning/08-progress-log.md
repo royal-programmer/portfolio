@@ -5,6 +5,24 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-06 — Round H (part 1): footer pinned, the guide in the corner, ? card, F fullscreen, phone layouts, responsive sweep
+
+Ratul's review of Round G (all good design-wise): the copyright should sit at the bottom (desktop and phone); the site must be responsive to any screen; the navigation guide should live in a corner, not under the title; F for fullscreen; on phones the Normal-mode display should not cover the drawings — put it in the flow — and the Immersive setup should be framed against the content. Agreed list for later parts: PWA + offline game + error pages, admin Phase A, sound, live data, gyro, the art screen.
+
+**What landed:**
+- hub-experience.tsx: the closing section is `min-h-[100svh]` with the content on `my-auto` and the footer (`.hub-footer`) last, so the copyright line sits on the bottom edge plus the safe-area inset at every size (verified 0 px gap at 9 viewports). The hero's hint line is gone.
+- hub-guide.tsx (new): one line bottom-right ("Scroll to climb · drag to look · hold to slow time" / "Scroll to follow the light") with a `?` button. It fades after the first scroll, drag or key, or after 9 s, and returns after 14 s idle. `?` toggles the shortcuts card (scroll, hold, drag, lens, Space / Shift+Space, 1–6, Enter, F, ?) with the six worlds numbered in their colours; Escape or a click outside closes it. `F` toggles the fullscreen API where it exists (desktop, Android — iPhones have none, so the row and button hide). Touch devices get the gesture list instead.
+- Phones and tablets (< 1024 px), Normal mode: `PersonaChapter` renders a `normal-display-slot` above its kicker; `NormalDisplays` portals the active display into it (`is-inflow`), so the window scrolls with the words and never covers the drawing or the text. The journey measures the slot's rect each frame for the constellation's home instead of re-deriving the CSS; on portrait, objects under the display (y > 0.45) or far above it (y < −0.5, the header) are skipped and x is spread ×0.8. The old `padding-top: 30vh` hack is gone. A phone on its side (height ≤ 540) lays the chapter out as two columns, display beside the words.
+- Portrait, Immersive: the chapter's words sit low (`align-items: flex-end; padding-bottom: 14svh`) and `useAssembly` places the setup where the lens puts it ~27 % from the top (`lift = fwd · tan(fov/2) · 0.46`), so every world stands in the clear band above its words on any phone (verified: engineer centre at y = 228 of 844, title at 479).
+- globals.css: `html:has(.hub-v3), body:has(.hub-v3) { background: var(--void) }` — no light flash behind the hub while it loads (the body's default is the light theme token).
+- Responsive sweep (Playwright, 360×740, 430×932, 844×390, 768×1024, 1024×768, 1366×768, 1920×1080, 2560×1440, 3440×1440 — hero, chapter, Normal chapter, ending): no horizontal overflow anywhere, footer on the edge everywhere. Open item from the sweep: the display's inner type is cramped below ~400 px (the gamer window's title truncates) — the exit sequences need container-relative type; part 2.
+
+**Admin knobs this adds** (16-admin-console.md → Hub): guide text per mode, auto-hide / idle-return timings, the card on/off, F on/off.
+
+**Dev notes:** this Turbopack dev server does not pick up `globals.css` edits until restart (TSX hot-reloads fine); `rm -rf .next/dev` while a server runs corrupts the cache (every route 404s) — stop the server, delete `.next`, start again. Supabase reads from this network time out now and then ("content read past 9000 ms"); the hub then renders without chapters — reload.
+
+---
+
 ## 2026-11-06 — Round G: seated fly-in, READY · TO · RACE, keys in Normal mode, no scrollbar, admin plan
 
 Ratul's review of Round F from production (PR #2 merged, ratulroy.me live): the rider fly-in went to a top view, not the rider's seat; the other worlds' flights ended behind the laptop or above the desk; the boot logo was a mess (reference video of his TFT supplied); number/Space keys dead in Normal mode; no scrollbar wanted; the real bike should stand alone (no boxes, no ball); everything must become admin-configurable.

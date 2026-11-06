@@ -55,6 +55,7 @@ today, to move.
 - Per world: the constellation — pick 8 of the drawn objects, their stations, or hide one 🔜
 - Portal timings (fly-in, pull-out), climb length per chapter, ending copy, rewind on/off 🔜
 - Keys on/off (Space, 1–6, Enter), the drag-to-look, the hold-to-slow 🔜
+- The guide line (text per mode, auto-hide and idle-return timings), the `?` shortcuts card on/off, `F` fullscreen on/off 🔜
 
 ### Normal mode
 - Display size, ring radius, grain on/off, the light fan's intensity 🔜

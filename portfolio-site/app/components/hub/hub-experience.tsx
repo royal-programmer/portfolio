@@ -17,6 +17,7 @@
  */
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import { HubGuide, toggleFullscreen } from "./hub-guide";
 import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -99,6 +100,8 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   const [active, setActive] = useState(0);
   const [touch, setTouch] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
+  /** The shortcuts card (the ? key, or the guide's button). */
+  const [help, setHelp] = useState(false);
   const [blink, setBlink] = useState(false);
   /** "Take off your headset": the dive back down the climb, lids closing, back to the gate. */
   const [rewinding, setRewinding] = useState(false);
@@ -576,6 +579,20 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       // The chapters answer the keys on the climb, and in Normal mode once the gate is gone.
       const nav = p === "climb" || (experience === "normal" && gate === null);
       ambient.resume();
+      if (e.key === "Escape" && help) {
+        setHelp(false);
+        return;
+      }
+      if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setHelp((h) => !h);
+        return;
+      }
+      if ((e.key === "f" || e.key === "F") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        toggleFullscreen();
+        return;
+      }
       if (p === "climb" && !e.ctrlKey && !e.metaKey && (e.key === "-" || e.key === "_" || e.key === "=" || e.key === "+" || e.key === "0")) {
         // Lens: − pulls the view wide (watch an assembly whole), + tightens, 0 resets.
         const s = vr.current;
@@ -643,7 +660,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [gate, status, wear, startLight, sections, active, enterWorld, experience]);
+  }, [gate, status, wear, startLight, sections, active, enterWorld, experience, help]);
 
   // ---- Smooth scroll + scroll → climb progress ---------------------------------
   useEffect(() => {
@@ -957,9 +974,6 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
             <p data-hero-item className="mt-7 text-[length:var(--step-1)] text-[var(--ink-dim)]">
               {HUB_COPY.intro} <CyclingPhrase chapters={chapters} />
             </p>
-            <p data-hero-item className="mt-14 font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase">
-              {scrollHint} <span aria-hidden className="hub-scroll-cue" />
-            </p>
           </div>
         </section>
 
@@ -994,8 +1008,8 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         ) : null}
 
         {/* ---------- Closing ---------- */}
-        <section id="end" data-section className="flex min-h-[110svh] flex-col justify-center px-4 sm:px-8 lg:px-12">
-          <div className="max-w-2xl lg:max-w-3xl">
+        <section id="end" data-section className="flex min-h-[100svh] flex-col px-4 sm:px-8 lg:px-12">
+          <div className="my-auto max-w-2xl pt-28 lg:max-w-3xl">
             <h2 data-split className="font-display text-[length:var(--step-4)] leading-[0.95]">
               {HUB_COPY.closingTitle.split(/(?<=\.)\s+/).map((line, i) => (
                 <span key={i} className={`block ${i > 0 ? "italic text-[var(--ink-dim)]" : ""}`}>
@@ -1023,7 +1037,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
               </div>
             </div>
           </div>
-          <footer className="mt-24 flex items-center justify-between pb-8 font-mono text-[10px] tracking-[0.16em] text-[var(--ink-faint)] uppercase">
+          <footer className="hub-footer mt-16 flex items-center justify-between font-mono text-[10px] tracking-[0.16em] text-[var(--ink-faint)] uppercase">
             <span>© {new Date().getFullYear()} Ratul Roy</span>
             <span className="sm:hidden">
               <SoundToggle />
@@ -1031,6 +1045,17 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
           </footer>
         </section>
       </main>
+
+      {/* ---------- The guide: one line in the corner, the shortcuts card on ? ---------- */}
+      <HubGuide
+        text={scrollHint}
+        on={ready && gate === null && !inIntro && !entering && !returning && !rewinding}
+        touch={touch}
+        immersive={experience === "immersive"}
+        help={help}
+        onHelp={setHelp}
+        chapters={chapters.map((c) => ({ slug: c.slug, role: personaIdentity(c.slug).role, color: spectrumColor(c.t) }))}
+      />
 
       {/* ---------- Intro overlays ---------- */}
       {/* Before any script runs the page IS the loader: the gate's still parts, server-rendered.
@@ -1148,6 +1173,8 @@ function PersonaChapter({ chapter, index, total, onEnter }: { chapter: HubChapte
         {String(index + 1).padStart(2, "0")}
       </span>
       <div className="relative max-w-2xl">
+        {/* Phones, Normal mode: the chapter's display sits here, in the flow above its words (normal-displays). */}
+        <div id={`${chapter.slug}-display`} className="normal-display-slot" aria-hidden />
         <p className="flex items-center gap-3 font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase">
           <span aria-hidden className="h-px w-8" style={{ backgroundColor: color, boxShadow: `0 0 10px ${color}` }} />
           {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")} · {id.role}

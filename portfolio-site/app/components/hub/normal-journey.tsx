@@ -327,7 +327,15 @@ export function NormalJourney({ state, worlds, sectionT, recede }: Props) {
         const objs = CONSTELLATIONS[world.slug] ?? [];
         // Display centre and width, in stage units.
         let dcx: number, dcy: number, dw: number;
-        if (portrait) {
+        // Measured where it can be: on phones and tablets the display sits in the chapter's flow
+        // (its slot scrolls with the words), on desktop the fixed window itself once it is on.
+        const slotEl = (W < 1024 ? document.getElementById(`${world.slug}-display`) : document.querySelector(".normal-display-frame")) as HTMLElement | null;
+        const rect = slotEl?.getBoundingClientRect();
+        if (rect && rect.width > 0) {
+          dw = rect.width / s;
+          dcx = (rect.left + rect.width / 2 - ox) / s;
+          dcy = (rect.top + rect.height / 2 - oy) / s;
+        } else if (portrait) {
           dw = (0.92 * W) / s;
           dcx = (0.5 * W - ox) / s;
           dcy = (0.09 * H + 0.92 * W * (680 / 1100) * 0.5 - oy) / s;
@@ -343,8 +351,8 @@ export function NormalJourney({ state, worlds, sectionT, recede }: Props) {
         const bright = spectrumColor(world.t, 84);
         for (let i = 0; i < objs.length; i++) {
           const o = objs[i];
-          if (portrait && (o.place.y > 0.2 || o.place.y < -0.4)) continue; // phones: no room above the display (the header) or below it (the words)
-          const px = portrait ? o.place.x * 0.62 : o.place.x;
+          if (portrait && (o.place.y > 0.45 || o.place.y < -0.5)) continue; // phones: nothing under the display (the words) or far above it (the header)
+          const px = portrait ? o.place.x * 0.8 : o.place.x;
           const py = portrait ? o.place.y * 0.9 : o.place.y;
           const size = o.place.size * dw * (0.82 + 0.18 * o.place.depth);
           // Each object draws on its own slice of the chapter, staggered by its index, so the ring
