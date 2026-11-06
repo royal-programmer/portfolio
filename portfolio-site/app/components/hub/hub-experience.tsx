@@ -101,7 +101,6 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   const [touch, setTouch] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   /** The shortcuts card (the ? key, or the guide's button). */
-  const [help, setHelp] = useState(false);
   const [blink, setBlink] = useState(false);
   /** "Take off your headset": the dive back down the climb, lids closing, back to the gate. */
   const [rewinding, setRewinding] = useState(false);
@@ -579,15 +578,6 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       // The chapters answer the keys on the climb, and in Normal mode once the gate is gone.
       const nav = p === "climb" || (experience === "normal" && gate === null);
       ambient.resume();
-      if (e.key === "Escape" && help) {
-        setHelp(false);
-        return;
-      }
-      if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        e.preventDefault();
-        setHelp((h) => !h);
-        return;
-      }
       if ((e.key === "f" || e.key === "F") && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         toggleFullscreen();
@@ -660,7 +650,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [gate, status, wear, startLight, sections, active, enterWorld, experience, help]);
+  }, [gate, status, wear, startLight, sections, active, enterWorld, experience]);
 
   // ---- Smooth scroll + scroll → climb progress ---------------------------------
   useEffect(() => {
@@ -866,13 +856,6 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   const activeKind = sections[active];
   const activeSlug = activeKind?.kind === "persona" ? activeKind.slug : null;
   const inIntro = immersiveLive && !introDone;
-  const scrollHint = !ready
-    ? ""
-    : experience === "immersive"
-      ? touch
-        ? "Scroll to climb · touch & hold to slow time"
-        : "Scroll to climb · drag to look · hold to slow time"
-      : "Scroll to follow the light";
 
   return (
     <div
@@ -1046,14 +1029,11 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         </section>
       </main>
 
-      {/* ---------- The guide: one line in the corner, the shortcuts card on ? ---------- */}
+      {/* ---------- The guide: the HUD in the corner, every way around listed, always on ---------- */}
       <HubGuide
-        text={scrollHint}
         on={ready && gate === null && !inIntro && !entering && !returning && !rewinding}
         touch={touch}
         immersive={experience === "immersive"}
-        help={help}
-        onHelp={setHelp}
         chapters={chapters.map((c) => ({ slug: c.slug, role: personaIdentity(c.slug).role, color: spectrumColor(c.t) }))}
       />
 
@@ -1173,8 +1153,8 @@ function PersonaChapter({ chapter, index, total, onEnter }: { chapter: HubChapte
         {String(index + 1).padStart(2, "0")}
       </span>
       <div className="relative max-w-2xl">
-        {/* Phones, Normal mode: the chapter's display sits here, in the flow above its words (normal-displays). */}
-        <div id={`${chapter.slug}-display`} className="normal-display-slot" aria-hidden />
+        {/* Phones, Normal mode: the chapter's drawings gather here, above its words (normal-journey measures it). */}
+        <div id={`${chapter.slug}-art`} className="normal-art-slot" aria-hidden />
         <p className="flex items-center gap-3 font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase">
           <span aria-hidden className="h-px w-8" style={{ backgroundColor: color, boxShadow: `0 0 10px ${color}` }} />
           {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")} · {id.role}
@@ -1222,6 +1202,8 @@ function PersonaChapter({ chapter, index, total, onEnter }: { chapter: HubChapte
             </p>
           </div>
         </div>
+        {/* Phones, Normal mode: the chapter's display sits here, in the flow below its words (normal-displays). */}
+        <div id={`${chapter.slug}-display`} className="normal-display-slot" aria-hidden />
       </div>
     </section>
   );

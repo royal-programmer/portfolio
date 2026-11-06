@@ -5,6 +5,35 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-07 — Round H (part 1b): the HUD guide, phones read drawings → words → display
+
+Ratul's corrections on part 1, same day:
+
+- **The guide is a HUD, not a line + `?` card.** `hub-guide.tsx` now renders a fixed readout in the
+  bottom-right corner with corner ticks: two columns of key → action (move: Scroll / Hold / Drag /
+  Lens; jump: Space, ⇧Space, 1–6, Enter, F) and the six worlds numbered in their colours beneath.
+  It never fades; it only leaves with the rest of the chrome (gate, intro, doorway). The `?` key,
+  the card, the scrim and the auto-hide / idle timers are gone. Touch devices get the gestures only
+  (Scroll, Hold, Drag, Tap display), tucked small.
+- **Phones, Normal mode: drawings on top, words, display below.** Each chapter has a drawing band
+  (`#<slug>-art`, `.normal-art-slot`, 1 : 0.92, max 44svh, centred) above the kicker, and the
+  display slot moved below the CTA. `normal-journey` composes the eight drawn things in the band
+  with a phone layout of their own (`PHONE_PLACES`: hero in the middle, the rest balanced left and
+  right) instead of the desktop ring, which was left-heavy because its hero sits left of the display.
+  The drawing follows the band: it draws as the band rises into view, undraws as it leaves at the
+  top, no chapter-midpoint timing and no scroll parallax in the band. A phone on its side keeps the
+  two-column layout; its band is hidden and the ring goes around the display as before.
+- Verified with Playwright at 390×844 (touch context), 844×390, 1440×900 in both modes; no overflow.
+
+**Admin knobs this exposes (16-admin-console):** the HUD rows' labels per mode, HUD on/off, the
+phone composition's places and band ratio.
+
+**Dev note:** Turbopack's persistent cache served the old `globals.css` across a restart this time;
+stop the server, delete `.next`, start again.
+
+**Open:** display inner type cramped below ~400 px (part 2); Vercel preview deploy for
+`development` (Ratul asked; answer in chat: Hobby previews are free, path URLs on `*.vercel.app`).
+
 ## 2026-11-06 — Round H (part 1): footer pinned, the guide in the corner, ? card, F fullscreen, phone layouts, responsive sweep
 
 Ratul's review of Round G (all good design-wise): the copyright should sit at the bottom (desktop and phone); the site must be responsive to any screen; the navigation guide should live in a corner, not under the title; F for fullscreen; on phones the Normal-mode display should not cover the drawings — put it in the flow — and the Immersive setup should be framed against the content. Agreed list for later parts: PWA + offline game + error pages, admin Phase A, sound, live data, gyro, the art screen.
