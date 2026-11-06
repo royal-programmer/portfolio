@@ -53,12 +53,51 @@ function StudioEnvironment() {
   return null;
 }
 
+type Scratch = { centre: THREE.Vector3; dir: THREE.Vector3; pos: THREE.Vector3; look: THREE.Vector3; px: number; py: number; handle: boolean };
+type Pose = ReturnType<typeof climbPose>;
+
+/** One frame of the stage: advance the clock, keep the state at the chapter, stand the camera. */
+function driveStage(k: VrClock, s: VrState, tmp: Scratch, pose: Pose, place: { fwd: number; right: number; up: number }, size: { width: number; height: number }, camera: THREE.Camera, rawDt: number) {
+  const dt = Math.min(rawDt, 0.1);
+  k.dt = dt;
+  k.t += dt;
+  k.scale = 1;
+  // The setup stands assembled on its spot; its screens come on over the first two seconds
+  // (the assembly's own power ramp), which is the opening.
+  k.climb = C;
+  s.c = C;
+  s.phase = "climb";
+  // The setup's centre, as the assembly computes it (aspect-aware).
+  const aspect = size.width / Math.max(1, size.height);
+  const narrow = THREE.MathUtils.clamp(1.67 / aspect, 1, 2.2);
+  const portrait = THREE.MathUtils.clamp((1.2 - aspect) / 0.6, 0, 1);
+  const fwd = place.fwd + (narrow - 1) * 2.2;
+  const right = (place.right / narrow) * (1 - portrait);
+  const up = place.up + (narrow - 1) * 1.1 + portrait * 0.5;
+  tmp.centre.copy(pose.pos).addScaledVector(pose.fwd, fwd).addScaledVector(pose.right, right).add(tmp.look.set(0, up, 0));
+  // The camera stands the same distance off, swung a little by the pointer and a slow drift.
+  tmp.px += (s.px - tmp.px) * Math.min(1, dt * 5);
+  tmp.py += (s.py - tmp.py) * Math.min(1, dt * 5);
+  const yaw = Math.sin(k.t * 0.22) * 0.12 + tmp.px * 0.28;
+  const pitch = 0.1 + tmp.py * 0.12;
+  tmp.dir.copy(pose.fwd).applyAxisAngle(tmp.look.set(0, 1, 0), yaw);
+  // Closer than the climb's camera (this is a stage, not a passing view), the setup's body a
+  // little above the centre line.
+  const dist = fwd * (0.58 - 0.015 * Math.sin(k.t * 0.3)) * (1 + portrait * 0.35);
+  tmp.pos.copy(tmp.centre).addScaledVector(tmp.dir, -dist);
+  tmp.pos.y += dist * Math.sin(pitch);
+  camera.position.copy(tmp.pos);
+  tmp.look.copy(tmp.centre);
+  tmp.look.y += 0.3;
+  camera.lookAt(tmp.look);
+}
+
 /** Drives the clock and stands the camera in front of the setup; the pointer turns it a little. */
 function Rig({ slug }: { slug: PersonaSlug }) {
   const { clock, state } = useVr();
   const size = useThree((s) => s.size);
   // Per-frame scratch (a ref: it is written every frame).
-  const scratch = useRef({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0, handle: false });
+  const scratch = useRef<Scratch>({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0, handle: false });
   const pose = useMemo(() => climbPose(C), []);
   useFrame(({ camera, scene }, rawDt) => {
     const tmp = scratch.current;
@@ -67,41 +106,7 @@ function Rig({ slug }: { slug: PersonaSlug }) {
       // Dev-only handle for tests.
       if (process.env.NODE_ENV !== "production") (window as unknown as { __stage?: unknown }).__stage = { scene, camera, clock, state };
     }
-    const dt = Math.min(rawDt, 0.1);
-    const k = clock.current;
-    const s = state.current;
-    k.dt = dt;
-    k.t += dt;
-    k.scale = 1;
-    // The setup stands assembled on its spot; its screens come on over the first two seconds
-    // (the assembly's own power ramp), which is the opening.
-    k.climb = C;
-    s.c = C;
-    s.phase = "climb";
-    // The setup's centre, as the assembly computes it (aspect-aware).
-    const place = PLACE[slug];
-    const aspect = size.width / Math.max(1, size.height);
-    const narrow = THREE.MathUtils.clamp(1.67 / aspect, 1, 2.2);
-    const portrait = THREE.MathUtils.clamp((1.2 - aspect) / 0.6, 0, 1);
-    const fwd = place.fwd + (narrow - 1) * 2.2;
-    const right = (place.right / narrow) * (1 - portrait);
-    const up = place.up + (narrow - 1) * 1.1 + portrait * 0.5;
-    tmp.centre.copy(pose.pos).addScaledVector(pose.fwd, fwd).addScaledVector(pose.right, right).add(tmp.look.set(0, up, 0));
-    // The camera stands the same distance off, swung a little by the pointer and a slow drift.
-    tmp.px += (s.px - tmp.px) * Math.min(1, dt * 5);
-    tmp.py += (s.py - tmp.py) * Math.min(1, dt * 5);
-    const yaw = Math.sin(k.t * 0.22) * 0.12 + tmp.px * 0.28;
-    const pitch = 0.1 + tmp.py * 0.12;
-    tmp.dir.copy(pose.fwd).applyAxisAngle(tmp.look.set(0, 1, 0), yaw);
-    // Closer than the climb's camera (this is a stage, not a passing view), the setup's body a
-    // little above the centre line.
-    const dist = fwd * (0.58 - 0.015 * Math.sin(k.t * 0.3)) * (1 + portrait * 0.35);
-    tmp.pos.copy(tmp.centre).addScaledVector(tmp.dir, -dist);
-    tmp.pos.y += dist * Math.sin(pitch);
-    camera.position.copy(tmp.pos);
-    tmp.look.copy(tmp.centre);
-    tmp.look.y += 0.3;
-    camera.lookAt(tmp.look);
+    driveStage(clock.current, state.current, tmp, pose, PLACE[slug], size, camera, rawDt);
   });
   return null;
 }

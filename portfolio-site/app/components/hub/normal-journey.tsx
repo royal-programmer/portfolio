@@ -41,7 +41,6 @@ const easeInOut = (x: number) => (x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2,
 const rad = (deg: number) => (deg * Math.PI) / 180;
 const angleOf = (t: number) => rad(A0 + (A1 - A0) * t);
 
-type Pt = [number, number];
 
 
 /** Strokes in a unit box (y down), drawn in order. */
