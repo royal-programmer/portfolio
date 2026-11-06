@@ -5,6 +5,24 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-06 — Round G: seated fly-in, READY · TO · RACE, keys in Normal mode, no scrollbar, admin plan
+
+Ratul's review of Round F from production (PR #2 merged, ratulroy.me live): the rider fly-in went to a top view, not the rider's seat; the other worlds' flights ended behind the laptop or above the desk; the boot logo was a mess (reference video of his TFT supplied); number/Space keys dead in Normal mode; no scrollbar wanted; the real bike should stand alone (no boxes, no ball); everything must become admin-configurable.
+
+**What landed (commits `da67081` and this one):**
+- assembly.tsx: each world declares `view: { back, up }` — where its owner sits, in the first screen's frame; the eye goes into `portalAnchor` (`ex ey ez`). Distances scale with each screen: laptop 2.8, monitors 1.9 / 2.7, camera LCD 1.4, canvas 2.1, dash 1.6 with the eye 0.3 below the dash's normal (the rider's head over the tank).
+- scene.tsx: the fly-in is three beats — swing round the setup's centre to the eye (0–52 %), hold seated with the screen in view, dive into the glass (66–100 %); the head turns onto the setup ahead of the body so nothing slides out of frame; the lens tightens only on the dive. `PORTAL_LENGTH` 2.1 s, `PORTAL_OUT_LENGTH` 1.5 s (reverse). Verified seated frames for all six worlds (laptop front at the desk, monitor front, LCD in hand, easel, rider's seat with bars and dash, gaming desk).
+- exit-sequence-worlds.tsx `DashExit`: the boot is Ratul's TFT — READY · TO · RACE a word at a time in the world colour, then the gauge arc sweeps as the digits run 253 → 0, cut to the dash, self-test (888, every tell-tale, rev sweep), the drive. Verified on a screen recording of the hub → ride page flow.
+- hub-experience.tsx: Space / Shift+Space / 1–6 / Enter work in Normal mode too (the handler was gated on the climb phase; Normal mode never leaves "gate"). Enter takes Normal mode's own doorway. Verified: 3 → chapter 3, Space → next, Shift+Space → back.
+- globals.css: no scrollbar anywhere (`scrollbar-width: none` + the WebKit rule); the page still scrolls. Verified: client width = inner width.
+- ride.tsx: with the real model, nothing but the bike, its light and its dash (helmet, tank bag, pannier, gloves, intercom were the box, side box and ball Ratul saw).
+- normal-journey.tsx: on phones nothing draws above the display (the header) — objects with y < −0.4 skipped in portrait.
+- docs/claude-planning/16-admin-console.md: the standing contract that every value is admin-editable, the recommended configuration surface (identity, personas, hub, Normal mode, sound uploads, pages, media library, switches, theme), the build (settings store + history + Storage buckets + Zod-typed reads + `/admin` growing out of `/capture/admin`) and phases A–E.
+
+**Supabase:** all six personas `is_published = true` (Ratul ran the UPDATE).
+
+**Dev note:** a hung `next dev` on :3000 (two days old) blocked testing until the session restart freed the port; the dev server needs `NODE_OPTIONS=--use-system-ca` in this shell or every Supabase read fails TLS and the hub has no chapters.
+
 ## 2026-11-06 — Round F: orbiting fly-in, key-on dash, 48 drawings, the world pages' stage, all six by default
 
 Ratul's review of the constellation pass: the camera reached the dash but the bike did not turn; the dash should boot the way a real TFT does when the key turns; the drawings should be detailed, drawn in place (no sliding), more of them but not cluttered, with his object lists per world; "pages go"; deploy; `preview=all` as default; rename the branch; is `via` needed.

@@ -49,7 +49,7 @@ export function ArtistAssembly({ world }: { world: World }) {
     screenMats,
     yaw: -0.12,
     offset: { fwd: 5.2, right: 1.4, up: -0.2 },
-    view: { back: 1.5, up: 0.1 },
+    view: { back: 2.1, up: 0.1 },
     onFrame: (_L, place) => {
       // The easel first; the sheet lands on it a beat later (late = 0.3), then the painting starts.
       refs.forEach((r, i) => r.current && place(r.current, i, i === 5 ? 0.3 : 0));

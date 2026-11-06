@@ -63,7 +63,7 @@ export function GamerAssembly({ world, handle }: { world: World; handle: string 
     homes,
     screenMats,
     offset: { fwd: 5.8, right: 1.5, up: -0.55 },
-    view: { back: 1.25, up: 0.05 },
+    view: { back: 2.7, up: 0.1 },
     onFrame: (L, place) => {
       refs.forEach((r, i) => r.current && place(r.current, i, i >= 4 ? 0.15 : 0));
       // RGB: the strip and the keyboard underglow cycle slowly through the spectrum once lit.

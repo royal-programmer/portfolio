@@ -268,8 +268,10 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
         const wantPitch = Math.asin(THREE.MathUtils.clamp(toward.y, -1, 1));
         let dy = wantYaw - yaw; // shortest turn
         dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-        yaw += dy * into;
-        pitch += (wantPitch - pitch) * into;
+        // The head turns onto the setup ahead of the body's swing, so it never slides out of frame.
+        const hold = Math.max(dive, easeInOut(clamp01(swing * 2.4)));
+        yaw += dy * hold;
+        pitch += (wantPitch - pitch) * hold;
       }
     }
 
@@ -303,7 +305,7 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
     const cam = camera as THREE.PerspectiveCamera;
     // Lens: holding narrows the view; rushing widens it; the visitor's zoom opens it right up.
     const zoomed = fovBase * (1 + s.zoom * 0.95);
-    L.fov = THREE.MathUtils.damp(L.fov, zoomed - (1 - k.scale) * 6 + k.speed * 12 - into * 14 + outKick * 18, outKick > 0 ? 8 : 3, dt);
+    L.fov = THREE.MathUtils.damp(L.fov, zoomed - (1 - k.scale) * 6 + k.speed * 12 - dive * 14 + outKick * 18, outKick > 0 ? 8 : 3, dt);
     if (Math.abs(cam.fov - L.fov) > 0.01) {
       cam.fov = L.fov;
       cam.updateProjectionMatrix();
@@ -413,7 +415,7 @@ function Warmup({ onReady }: { onReady: () => void }) {
   const { clock, state } = useVr();
   useEffect(() => {
     // Dev-only handle for profiling and tests.
-    if (process.env.NODE_ENV !== "production") (window as unknown as { __vr?: unknown }).__vr = { gl, scene, clock, state };
+    if (process.env.NODE_ENV !== "production") (window as unknown as { __vr?: unknown }).__vr = { gl, scene, camera, clock, state };
     let cancelled = false;
     const run = async () => {
       try {

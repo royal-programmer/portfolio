@@ -60,7 +60,7 @@ export function PhotographerAssembly({ world }: { world: World }) {
     homes,
     screenMats,
     offset: { fwd: 4.6, right: 1.3, up: -0.1 },
-    view: { back: 0.8, up: 0.15 },
+    view: { back: 1.4, up: 0.15 },
     onFrame: (L, place) => {
       refs.forEach((r, i) => r.current && place(r.current, i));
       // Loose: it revolves slowly with the lens toward you. Assembled: it turns to present the

@@ -228,7 +228,7 @@ export function RideAssembly({ world, modelUrl }: { world: World; /** A CC0 .glb
     yaw: -0.35,
     offset: { fwd: 5.8, right: 1.3, up: -0.7 },
     // The rider's seat: behind and above the dash, looking down onto it over the top yoke.
-    view: { back: 1.2, up: -0.25 },
+    view: { back: 1.6, up: -0.3 },
     onFrame: (L, place) => {
       refs.forEach((r, i) => r.current && place(r.current, i, i >= 6 ? 0.12 : 0));
       // Wheels keep turning slowly, faster once lit.
