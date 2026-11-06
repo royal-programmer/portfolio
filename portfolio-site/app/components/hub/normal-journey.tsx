@@ -42,7 +42,7 @@ const rad = (deg: number) => (deg * Math.PI) / 180;
 const angleOf = (t: number) => rad(A0 + (A1 - A0) * t);
 
 type Pt = [number, number];
-type Icon = Pt[][];
+
 
 /** Strokes in a unit box (y down), drawn in order. */
 const CONSTELLATION_LENGTH: Record<string, number[]> = Object.fromEntries(Object.entries(CONSTELLATIONS).map(([k, objs]) => [k, objs.map((o) => strokesLength(o.strokes))]));

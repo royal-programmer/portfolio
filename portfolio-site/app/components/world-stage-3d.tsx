@@ -13,7 +13,7 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { PersonaSlug } from "@/lib/content/types";
 import { personaIdentity } from "@/lib/site/brand";
-import { VrContext, createClock, type VrClock } from "./hub/vr/clock";
+import { VrContext, createClock, useVr, type VrClock } from "./hub/vr/clock";
 import { createVrState, type VrState, type World } from "./hub/vr/state";
 import { climbPose } from "./hub/vr/util";
 import { ArtistAssembly } from "./hub/vr/worlds/artist";
@@ -38,9 +38,9 @@ const PLACE: Record<PersonaSlug, { fwd: number; right: number; up: number }> = {
 type HubMedia = Partial<Record<string, string[]>>;
 
 function StudioEnvironment() {
-  const gl = useThree((s) => s.gl);
-  const scene = useThree((s) => s.scene);
+  const get = useThree((s) => s.get);
   useEffect(() => {
+    const { gl, scene } = get();
     const pmrem = new THREE.PMREMGenerator(gl);
     const tex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = tex;
@@ -49,22 +49,24 @@ function StudioEnvironment() {
       scene.environment = null;
       tex.dispose();
     };
-  }, [gl, scene]);
+  }, [get]);
   return null;
 }
 
 /** Drives the clock and stands the camera in front of the setup; the pointer turns it a little. */
-function Rig({ slug, clock, state }: { slug: PersonaSlug; clock: React.MutableRefObject<VrClock>; state: React.MutableRefObject<VrState> }) {
+function Rig({ slug }: { slug: PersonaSlug }) {
+  const { clock, state } = useVr();
   const size = useThree((s) => s.size);
-  const scene = useThree((s) => s.scene);
-  const camera = useThree((s) => s.camera);
-  useEffect(() => {
-    // Dev-only handle for tests.
-    if (process.env.NODE_ENV !== "production") (window as unknown as { __stage?: unknown }).__stage = { scene, camera, clock, state };
-  }, [scene, camera, clock, state]);
-  const tmp = useMemo(() => ({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0 }), []);
+  // Per-frame scratch (a ref: it is written every frame).
+  const scratch = useRef({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0, handle: false });
   const pose = useMemo(() => climbPose(C), []);
-  useFrame(({ camera }, rawDt) => {
+  useFrame(({ camera, scene }, rawDt) => {
+    const tmp = scratch.current;
+    if (!tmp.handle) {
+      tmp.handle = true;
+      // Dev-only handle for tests.
+      if (process.env.NODE_ENV !== "production") (window as unknown as { __stage?: unknown }).__stage = { scene, camera, clock, state };
+    }
     const dt = Math.min(rawDt, 0.1);
     const k = clock.current;
     const s = state.current;
@@ -156,7 +158,7 @@ export default function WorldStage3D({ slug, t }: { slug: PersonaSlug; t: number
     >
       <VrContext.Provider value={ctx}>
         <StudioEnvironment />
-        <Rig slug={slug} clock={clock} state={state} />
+        <Rig slug={slug} />
         <Setup slug={slug} world={world} media={media} />
       </VrContext.Provider>
     </Canvas>
