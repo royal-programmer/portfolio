@@ -26,7 +26,17 @@ function hostUrl(request: NextRequest, root: string, label: string | null, pathn
   return new URL(`${protocol}//${host}${pathname}${search}`);
 }
 
+/** Preview deployments (the `development` branch on Vercel) are never for search engines. */
+function noindex<T extends NextResponse>(res: T): T {
+  if (process.env.VERCEL_ENV === "preview") res.headers.set("X-Robots-Tag", "noindex, nofollow");
+  return res;
+}
+
 export function proxy(request: NextRequest) {
+  return noindex(route(request));
+}
+
+function route(request: NextRequest) {
   const parsed = parseHost(request.headers.get("host"));
   if (parsed.kind === "unrouted") return NextResponse.next();
 

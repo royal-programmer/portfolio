@@ -55,6 +55,7 @@ today, to move.
 - Per world: the constellation — pick 8 of the drawn objects, their stations, or hide one 🔜
 - Portal timings (fly-in, pull-out), climb length per chapter, ending copy, rewind on/off 🔜
 - Keys on/off (Space, 1–6, Enter), the drag-to-look, the hold-to-slow 🔜
+- The doorway's wait for a setup to form (`WAIT_FOR_SETUP_MS`), the phone setup lift and the chapter's phone paddings 🔜
 - The HUD guide: on/off, its rows' labels per mode (desktop / touch), `F` fullscreen on/off; the phone drawing band's composition (places, band ratio) 🔜
 
 ### Normal mode

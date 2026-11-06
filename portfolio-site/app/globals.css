@@ -371,6 +371,18 @@ body:has(.hub-v3) {
 .hub-cta-arrow {
   transition: transform var(--dur-2) var(--ease-out);
 }
+/* Tapped before the setup formed: the arrow breathes while the doorway waits for its screen. */
+.hub-cta.is-waiting {
+  pointer-events: none;
+  background: color-mix(in srgb, var(--c) 16%, transparent);
+}
+.hub-cta.is-waiting .hub-cta-arrow {
+  animation: hub-cta-wait 900ms var(--ease-in-out) infinite;
+}
+@keyframes hub-cta-wait {
+  0%, 100% { opacity: 0.35; transform: translateX(0); }
+  50% { opacity: 1; transform: translateX(4px); }
+}
 .hub-cta:hover .hub-cta-arrow,
 .hub-cta:focus-visible .hub-cta-arrow {
   transform: translateX(4px);
@@ -443,6 +455,20 @@ html.is-dragging * {
 /* The closing's footer: pinned to the bottom edge, clear of a phone's home bar. */
 .hub-footer {
   padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Full-screen covers (the loaders, the gate, the doorway's frames) are sized to the large viewport:
+   Chrome on Android sizes a fixed `inset: 0` box to the viewport with the address bar showing, and
+   you arrive with the bar hidden after scrolling, so a bar-high strip of page showed under them. */
+.world-boot,
+.hub-boot,
+.hub-enter,
+.hub-return,
+.hub-wait,
+.vr-flash,
+.vr-blink,
+.gate {
+  min-height: 100lvh;
 }
 
 /* The guide: a HUD in the bottom-right corner, the way a readout sits at the edge of a canopy.
@@ -1673,10 +1699,13 @@ em.font-display,
       grid-column: 1;
     }
   }
-  /* Portrait, Immersive: the words sit low, the setup stands in the clear band above them. */
+  /* Portrait, Immersive: the words read first, high in the chapter; the setup stands in the band
+     under them (vr/assembly lifts it down to match). The chapter is 125svh and the camera stands
+     at its middle, so the top padding puts the words just under the header when it is centred. */
   .hub-v3.is-immersive section[aria-labelledby] {
-    align-items: flex-end;
-    padding-bottom: 14svh;
+    align-items: flex-start;
+    padding-top: calc(12.5svh + 4.5rem);
+    padding-bottom: 6rem;
   }
 }
 @media (prefers-reduced-motion: reduce) {

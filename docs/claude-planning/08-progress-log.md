@@ -5,6 +5,54 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-07 — Round H (part 1c): the phone's return and loader fixed, the early tap, bands for every world, the setup below the words, previews closed
+
+From Ratul's screen recording (Vivo X200 Pro, Chrome) and a Playwright reproduction on a 412×915 touch viewport:
+
+- **The strip under the world's loader.** Chrome on Android sizes a fixed `inset: 0` box to the
+  viewport with the address bar showing; you arrive with the bar hidden after scrolling the hub,
+  so a bar-high strip of the page showed under the loader. Every full-screen cover (`.world-boot`,
+  `.hub-boot`, `.hub-enter`, `.hub-return`, the returning gate `.hub-wait`, `.vr-flash`,
+  `.vr-blink`, `.gate`) is now `min-height: 100lvh`.
+- **The broken return.** The landing, not the transition: the browser restored its own scroll
+  while the hub scrolled to the chapter's middle before the chapter had its final height, so the
+  camera stood past the setup's station and the setup appeared up and over the words. The hub now
+  sets `history.scrollRestoration = "manual"` while it is up, and `land` re-aligns the scroll to
+  the chapter's centre at 0 / 120 / 300 / 600 / 1000 / 1600 ms, snapping `c` to the chapter each
+  time. Reproduced before (h2 at 102 → 497 px after the return) and after (102 → 102).
+- **Tapping before the setup has formed.** `portalAnchor` now carries its world's slug.
+  `enterWorld` starts the dive only when the anchor is this world's; otherwise the button goes
+  into `is-waiting` (arrow breathing, `aria-busy`) and polls every 80 ms; when the anchor arrives
+  the dive runs, and after `WAIT_FOR_SETUP_MS` (2.2 s) with nothing it clears the anchor and goes
+  as the plain fade into the world's window instead of diving at a stale or missing screen.
+- **Drawings popping / Art and Play looking small.** The journey drew only the nearest-by-scroll
+  world; on phones the band sits at the top of a chapter almost two screens tall, so it stayed
+  blank until the scroll crossed the chapter midpoint and then appeared half-formed. Now every
+  world whose band is on screen draws, each from its own band; the ring (desktop, sideways phone)
+  is unchanged. Artist and Gamer verified whole.
+- **Immersive on phones: words first, setup below.** Ratul's call, mirroring Normal mode. The
+  chapter is `align-items: flex-start; padding-top: calc(12.5svh + 4.5rem)`; `vr/assembly` lifts
+  the setup down (`-0.58` of the half view height) so it stands in the lower band under the CTA.
+- **Previews closed to crawlers.** `proxy.ts` sets `X-Robots-Tag: noindex, nofollow` and
+  `app/robots.ts` disallows everything when `VERCEL_ENV === "preview"`; production allows all but
+  `/capture/` and `/api/`.
+
+**Dev domain decision (Ratul, DNS at Cloudflare):** `dev.ratulroy.me` + the six persona labels
+under it, assigned to the `development` branch on Vercel, with Vercel Authentication on previews.
+No code change needed beyond the above: set `NEXT_PUBLIC_ROOT_DOMAIN=dev.ratulroy.me` in the
+Preview environment only (env vars are scoped per environment), so the host parser treats it as
+the root there.
+
+**Dev notes:** the second-return check stalled once on this machine because Supabase connect
+timed out and the dev server's HMR socket dropped; not a code path. Deleting `.next` can leave a
+transient `UNKNOWN open … routes.d.ts` on the first start; start again.
+
+**Admin knobs this exposes (16-admin-console):** the doorway wait length, the phone setup lift,
+the chapter's phone paddings.
+
+**Open:** display inner type cramped below ~400 px (gamer "30 / 90" overlaps); art book and lens
+gallery intros after admin Phase A; the offline arcade (several games) later.
+
 ## 2026-11-07 — Round H (part 1b): the HUD guide, phones read drawings → words → display
 
 Ratul's corrections on part 1, same day:

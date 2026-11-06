@@ -48,7 +48,7 @@ export type VrState = {
   portalHover: string | null;
   /** Where that assembly's screen is (world) and which way it faces — set by the scene. */
   /** The lit screen's world position and facing, plus the setup's centre the fly-in orbits around. */
-  portalAnchor: { x: number; y: number; z: number; nx: number; ny: number; nz: number; cx: number; cy: number; cz: number; ex: number; ey: number; ez: number } | null;
+  portalAnchor: { slug: string; x: number; y: number; z: number; nx: number; ny: number; nz: number; cx: number; cy: number; cz: number; ex: number; ey: number; ez: number } | null;
   /** The visitor clicked a lit assembly: the camera flies into its screen, then the page leaves. */
   portal: { slug: string; at: number } | null;
   /** Back from a world: the camera starts inside that screen and pulls out to the chapter. */

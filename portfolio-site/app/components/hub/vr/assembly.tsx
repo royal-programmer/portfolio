@@ -130,7 +130,9 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
     // the lens puts it in the clear band above them — a fixed point on the screen (about 27% from
     // the top), not a fixed height in the world. Same vertical field as the scene's camera.
     const fovV = THREE.MathUtils.degToRad(40 * (1 + portrait * 0.45));
-    const lift = portrait * fwd * Math.tan(fovV / 2) * 0.46;
+    // Phones (Round H, Ratul's call): the words read first, at the top; the setup stands in the
+    // lower band under them, where the thumb is. Negative = down in the view.
+    const lift = -portrait * fwd * Math.tan(fovV / 2) * 0.58;
     return {
       fwd,
       right: ((offset?.right ?? 1.4) / narrow) * (1 - portrait),
@@ -237,7 +239,7 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
       // The owner's eye: where you sit to use this thing, which is where the fly-in pauses.
       tmp.e.copy(tmp.w).addScaledVector(tmp.n, viewBack).addScaledVector(tmp.u, viewUp);
       g.getWorldPosition(tmp.c);
-      s.portalAnchor = { x: tmp.w.x, y: tmp.w.y, z: tmp.w.z, nx: tmp.n.x, ny: tmp.n.y, nz: tmp.n.z, cx: tmp.c.x, cy: tmp.c.y, cz: tmp.c.z, ex: tmp.e.x, ey: tmp.e.y, ez: tmp.e.z };
+      s.portalAnchor = { slug: world.slug, x: tmp.w.x, y: tmp.w.y, z: tmp.w.z, nx: tmp.n.x, ny: tmp.n.y, nz: tmp.n.z, cx: tmp.c.x, cy: tmp.c.y, cz: tmp.c.z, ex: tmp.e.x, ey: tmp.e.y, ez: tmp.e.z };
     }
 
     // Screens, bezel light and the halo: lit = enterable, so it breathes and brightens under the pointer.

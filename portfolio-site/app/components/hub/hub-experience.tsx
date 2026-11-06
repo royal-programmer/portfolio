@@ -62,6 +62,9 @@ const WORLD_SESSION_KEY = "xp-world";
 const NEXT_PHASE: Partial<Record<Phase, Phase>> = { wear: "blink", blink: "sky", approach: "impact", impact: "split", split: "climb" };
 const NEXT_LOWER: Record<Quality, Quality> = { best: "balanced", balanced: "performance", performance: "performance" };
 
+/** How long a tapped doorway waits for its setup to form before it goes as a plain fade. */
+const WAIT_FOR_SETUP_MS = 2200;
+
 function sessionFlag(set?: boolean): boolean {
   try {
     if (set) sessionStorage.setItem(GATE_SESSION_KEY, "1");
@@ -111,6 +114,8 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   const [entering, setEntering] = useState<World | null>(null);
   /** The world just returned from: its finished window shrinks away as the camera pulls out. */
   const [returning, setReturning] = useState<World | null>(null);
+  /** A doorway asked for before its setup has formed: the button waits for the screen, then goes. */
+  const [waiting, setWaiting] = useState<string | null>(null);
   /** public/hub/media.json: Ratul's own pictures per persona (the photographer's sequence uses one). */
   const [media, setMedia] = useState<Partial<Record<string, string[]>>>({});
   const router = useRouter();
@@ -226,16 +231,25 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       const el = document.getElementById(from);
       const world = worlds.find((w) => w.slug === from);
       if (el && world) {
-        const y = el.offsetTop + el.offsetHeight / 2 - window.innerHeight / 2;
-        requestAnimationFrame(() => {
-          window.scrollTo(0, y);
-          lenisRef.current?.scrollTo(y, { immediate: true, force: true });
+        // The chapter's middle, re-aligned a few times while the page settles (fonts, the
+        // chapters' heights, a phone's address bar): the browser's own restore is off, so this
+        // is the only hand on the scroll, and the camera stands exactly at the chapter's station.
+        const align = () => {
+          const y = el.getBoundingClientRect().top + window.scrollY + el.offsetHeight / 2 - window.innerHeight / 2;
+          if (Math.abs(window.scrollY - y) > 1) {
+            window.scrollTo(0, y);
+            lenisRef.current?.scrollTo(y, { immediate: true, force: true });
+          }
           vr.current.c = world.c;
+        };
+        requestAnimationFrame(() => {
+          align();
           // Start inside the screen you left and pull back out to the chapter.
           vr.current.portalOut = { slug: from!, at: performance.now() + 200 };
           setReturning(world);
           window.setTimeout(() => setReturning(null), PORTAL_OUT_LENGTH * 1000 + 300);
         });
+        for (const ms of [120, 300, 600, 1000, 1600]) window.setTimeout(align, ms);
       }
     }
   }, [setPhase, worlds]);
@@ -295,21 +309,52 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   }, []);
 
   /** Through the doorway: the camera flies into the screen; the world's own sequence runs; we leave when it ends. */
+  const startPortal = useCallback((world: World) => {
+    vr.current.portal = { slug: world.slug, at: performance.now() };
+    vr.current.portalHover = null;
+    sessionFlag(true);
+    try {
+      sessionStorage.setItem(WORLD_SESSION_KEY, world.slug);
+    } catch {}
+    setEntering(world);
+    ambient.chime(1.5);
+  }, []);
   const enterWorld = useCallback(
     (slug: string) => {
       const world = worlds.find((w) => w.slug === slug);
-      if (!world || vr.current.portal) return;
-      vr.current.portal = { slug, at: performance.now() };
-      vr.current.portalHover = null;
-      sessionFlag(true);
-      try {
-        sessionStorage.setItem(WORLD_SESSION_KEY, slug);
-      } catch {}
-      setEntering(world);
-      ambient.chime(1.5);
+      if (!world || vr.current.portal || waiting) return;
+      // The dive needs this world's screen. Before the setup has formed (its model still
+      // arriving) there is nothing to fly into: wait for it, the button showing that it heard.
+      const a = vr.current.portalAnchor;
+      if (!a || a.slug !== slug) {
+        setWaiting(slug);
+        return;
+      }
+      startPortal(world);
     },
-    [worlds],
+    [worlds, waiting, startPortal],
   );
+  useEffect(() => {
+    if (!waiting) return;
+    const world = worlds.find((w) => w.slug === waiting);
+    if (!world) {
+      setWaiting(null);
+      return;
+    }
+    const t0 = performance.now();
+    const id = window.setInterval(() => {
+      const a = vr.current.portalAnchor;
+      const formed = !!a && a.slug === waiting;
+      if (!formed && performance.now() - t0 < WAIT_FOR_SETUP_MS) return;
+      // Formed: the dive. Still nothing after the wait: no anchor, so the camera stays and the
+      // doorway is the plain fade into the world's window instead of a dive at nothing.
+      if (!formed) vr.current.portalAnchor = null;
+      window.clearInterval(id);
+      setWaiting(null);
+      startPortal(world);
+    }, 80);
+    return () => window.clearInterval(id);
+  }, [waiting, worlds, startPortal]);
   const leaveForWorld = useCallback(() => {
     if (!entering) return;
     const target = personaHref(window.location.origin, entering.slug as PersonaSlug);
@@ -657,6 +702,10 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const lenis = reduce ? null : new Lenis({ lerp: 0.14, wheelMultiplier: 0.9 });
     lenisRef.current = lenis;
+    // The hub places its own scroll (a return lands on the chapter you left); the browser's restore
+    // would fight it while the page is still finding its height.
+    const prevRestore = history.scrollRestoration;
+    history.scrollRestoration = "manual";
 
     const measure = () => {
       const els = Array.from(document.querySelectorAll<HTMLElement>("[data-section]"));
@@ -709,6 +758,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       window.addEventListener("scroll", onScroll, { passive: true });
     }
     return () => {
+      history.scrollRestoration = prevRestore;
       ro.disconnect();
       window.removeEventListener("scroll", onScroll);
       if (tick) gsap.ticker.remove(tick);
@@ -968,7 +1018,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         </section>
 
         {chapters.map((c, i) => (
-          <PersonaChapter key={c.slug} chapter={c} index={i} total={chapters.length} onEnter={immersiveLive && introDone ? enterWorld : experience === "normal" && !sceneWanted && textLive ? (slug) => normalEnter.current?.(slug) : undefined} />
+          <PersonaChapter key={c.slug} chapter={c} index={i} total={chapters.length} waiting={waiting === c.slug} onEnter={immersiveLive && introDone ? enterWorld : experience === "normal" && !sceneWanted && textLive ? (slug) => normalEnter.current?.(slug) : undefined} />
         ))}
 
         {upcoming.length ? (
@@ -1123,7 +1173,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         />
       ) : null}
       {gate === "returning" ? (
-        <div role="status" className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-[var(--void)]">
+        <div role="status" className="hub-wait fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-[var(--void)]">
           {status === "failed" ? <p className="font-mono text-[10px] tracking-[0.24em] text-[var(--ink-dim)] uppercase">3D couldn’t start</p> : <span aria-label="Loading" className="gate-ring is-spinning" style={{ width: 20, height: 20 }} />}
           <button type="button" onClick={goNormal} className="font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase underline-offset-4 hover:text-[var(--ink)] hover:underline">
             {status === "failed" ? "Continue in Normal view" : "Skip — Normal view"}
@@ -1134,7 +1184,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   );
 }
 
-function PersonaChapter({ chapter, index, total, onEnter }: { chapter: HubChapter; index: number; total: number; /** Immersive: the button goes through the same doorway as the setup (the camera flies into its screen). */ onEnter?: (slug: string) => void }) {
+function PersonaChapter({ chapter, index, total, onEnter, waiting }: { chapter: HubChapter; index: number; total: number; /** The doorway heard the tap and waits for its setup to form. */ waiting?: boolean; /** Immersive: the button goes through the same doorway as the setup (the camera flies into its screen). */ onEnter?: (slug: string) => void }) {
   const id = personaIdentity(chapter.slug);
   const color = spectrumColor(chapter.t);
   return (
@@ -1188,7 +1238,8 @@ function PersonaChapter({ chapter, index, total, onEnter }: { chapter: HubChapte
                 onEnter(chapter.slug);
               }}
               data-cursor-color={color}
-              className="hub-cta mt-10 inline-flex min-h-12 items-center gap-3 rounded-full border px-6 text-sm font-medium backdrop-blur-md"
+              aria-busy={waiting || undefined}
+              className={`hub-cta mt-10 inline-flex min-h-12 items-center gap-3 rounded-full border px-6 text-sm font-medium backdrop-blur-md ${waiting ? "is-waiting" : ""}`}
               style={{ "--c": color } as CSSProperties}
             >
               {id.cta}

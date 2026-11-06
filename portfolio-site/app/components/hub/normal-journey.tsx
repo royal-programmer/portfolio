@@ -341,8 +341,23 @@ export function NormalJourney({ state, worlds, sectionT, recede }: Props) {
       //      arrives (complete at its midpoint), and undraw in reverse as it goes. They drift in from the
       //      light's direction and settle; depth gives parallax. The display's place is read off the
       //      same CSS the DOM uses (normal-display), so the ring always fits around it.
-      if (world && near > 0.02 && ending < 0.98) {
-        const portrait = W / Math.max(1, H) < 1;
+      // Which worlds draw: on phones, every world whose drawing band is on screen (the band sits
+      // at the top of a tall chapter, so the nearest-by-scroll world is often the one before it);
+      // elsewhere the nearest world, its ring around the display. A phone on its side has no bands
+      // (hidden), so it rings too.
+      const portrait = W / Math.max(1, H) < 1;
+      const targets: Array<{ w: World; band: DOMRect | null }> = [];
+      let bands = 0;
+      if (W < 1024) {
+        for (const w of worlds) {
+          const b = document.getElementById(`${w.slug}-art`)?.getBoundingClientRect();
+          if (!b || b.width <= 0 || b.height <= 0) continue;
+          bands++;
+          if (b.bottom > -0.3 * H && b.top < 1.3 * H) targets.push({ w, band: b });
+        }
+      }
+      if (!bands && world && near > 0.02) targets.push({ w: world, band: null });
+      for (const { w: world, band: bandRect } of ending < 0.98 ? targets : []) {
         const objs = CONSTELLATIONS[world.slug] ?? [];
         // Display centre and width, in stage units.
         let dcx: number, dcy: number, dw: number;
@@ -350,10 +365,8 @@ export function NormalJourney({ state, worlds, sectionT, recede }: Props) {
         // in a composition of their own (PHONE_PLACES) instead of ringing the display. Where there
         // is no band (desktop, a phone on its side) the ring goes around the display, measured
         // off the DOM: the in-flow slot on tablets and sideways phones, the fixed window on desktop.
-        const band = W < 1024 ? (document.getElementById(`${world.slug}-art`) as HTMLElement | null) : null;
-        const bandRect = band?.getBoundingClientRect();
-        const inBand = !!bandRect && bandRect.width > 0 && bandRect.height > 0;
-        if (inBand) {
+        const inBand = !!bandRect;
+        if (bandRect) {
           dw = Math.min(bandRect.width, bandRect.height / PHONE_BAND_RATIO) / s;
           dcx = (bandRect.left + bandRect.width / 2 - ox) / s;
           dcy = (bandRect.top + bandRect.height / 2 - oy) / s;
@@ -378,7 +391,7 @@ export function NormalJourney({ state, worlds, sectionT, recede }: Props) {
         // the drawing follows the band itself: it draws as the band rises into view and undraws as
         // the band leaves at the top, so it is whole while it is on screen.
         let draw: number;
-        if (inBand) {
+        if (bandRect) {
           const arrive = clamp01((H - bandRect.top) / (0.55 * H));
           const leave = clamp01((bandRect.bottom + 0.1 * H) / (0.45 * H));
           draw = easeInOut(Math.min(arrive, leave));
@@ -439,8 +452,8 @@ export function NormalJourney({ state, worlds, sectionT, recede }: Props) {
           ctx.restore();
         }
         ctx.globalAlpha = 1;
-        void back;
       }
+      void back;
 
       if (on && !reduce) raf = requestAnimationFrame(frame);
       else if (on) {
