@@ -806,4 +806,36 @@ export const CONSTELLATIONS: Record<string, Placed[]> = {
   ],
 };
 
+/**
+ * Strokes an object up to `progress` (0…1) of its total length, in whatever transform the context
+ * is in; returns where the pen is (null when finished).
+ */
+export function strokeObject(ctx: CanvasRenderingContext2D, strokes: Strokes, total: number, progress: number): Pt | null {
+  let budget = total * progress;
+  let pen: Pt | null = null;
+  for (const poly of strokes) {
+    if (budget <= 0) break;
+    ctx.beginPath();
+    ctx.moveTo(poly[0][0], poly[0][1]);
+    for (let i = 1; i < poly.length; i++) {
+      const [ax, ay] = poly[i - 1];
+      const [bx, by] = poly[i];
+      const len = Math.hypot(bx - ax, by - ay);
+      if (budget >= len) {
+        ctx.lineTo(bx, by);
+        budget -= len;
+        pen = [bx, by];
+      } else {
+        const u = budget / len;
+        pen = [ax + (bx - ax) * u, ay + (by - ay) * u];
+        ctx.lineTo(pen[0], pen[1]);
+        budget = 0;
+        break;
+      }
+    }
+    ctx.stroke();
+  }
+  return progress < 0.999 ? pen : null;
+}
+
 export const strokesLength = (s: Strokes) => s.reduce((n, poly) => n + poly.slice(1).reduce((m, p, i) => m + Math.hypot(p[0] - poly[i][0], p[1] - poly[i][1]), 0), 0);

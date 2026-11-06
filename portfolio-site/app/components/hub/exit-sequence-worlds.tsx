@@ -34,6 +34,8 @@ export type WorldSeqProps = {
 };
 
 const noop = () => {};
+/** Two decimals: Node and the browser can disagree on a sine's last digit, which is a hydration error. */
+const r2 = (v: number) => Math.round(v * 100) / 100;
 
 // ---------------------------------------------------------------------------
 // Ride: the TFT dash
@@ -289,10 +291,10 @@ export function DashExit({
               return (
                 <line
                   key={i}
-                  x1={150 + Math.cos(a) * r0}
-                  y1={150 + Math.sin(a) * r0}
-                  x2={150 + Math.cos(a) * r1}
-                  y2={150 + Math.sin(a) * r1}
+                  x1={r2(150 + Math.cos(a) * r0)}
+                  y1={r2(150 + Math.sin(a) * r0)}
+                  x2={r2(150 + Math.cos(a) * r1)}
+                  y2={r2(150 + Math.sin(a) * r1)}
                   stroke={i >= 10 ? c : "rgba(243,241,236,0.45)"}
                   strokeWidth={i % 3 ? 1.5 : 2.5}
                 />

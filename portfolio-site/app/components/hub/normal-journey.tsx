@@ -20,7 +20,7 @@
  */
 import { useEffect, useRef, type MutableRefObject } from "react";
 import { spectrumColor } from "@/lib/site/spectrum";
-import { CONSTELLATIONS, strokesLength } from "./constellations";
+import { CONSTELLATIONS, strokeObject, strokesLength } from "./constellations";
 import type { VrState, World } from "./vr/state";
 
 type Props = { state: MutableRefObject<VrState>; worlds: World[]; sectionT: Array<number | null>; /** 0 → 1: the chapter's display is on, the drawing steps back behind it. */ recede?: MutableRefObject<number> };
@@ -46,35 +46,6 @@ type Icon = Pt[][];
 
 /** Strokes in a unit box (y down), drawn in order. */
 const CONSTELLATION_LENGTH: Record<string, number[]> = Object.fromEntries(Object.entries(CONSTELLATIONS).map(([k, objs]) => [k, objs.map((o) => strokesLength(o.strokes))]));
-
-/** Strokes an icon up to `progress` (0…1) of its total length; returns where the pen is (null when finished). */
-function strokeIcon(ctx: CanvasRenderingContext2D, icon: Icon, total: number, progress: number): Pt | null {
-  let budget = total * progress;
-  let pen: Pt | null = null;
-  for (const poly of icon) {
-    if (budget <= 0) break;
-    ctx.beginPath();
-    ctx.moveTo(poly[0][0], poly[0][1]);
-    for (let i = 1; i < poly.length; i++) {
-      const [ax, ay] = poly[i - 1];
-      const [bx, by] = poly[i];
-      const len = Math.hypot(bx - ax, by - ay);
-      if (budget >= len) {
-        ctx.lineTo(bx, by);
-        budget -= len;
-        pen = [bx, by];
-      } else {
-        const u = budget / len;
-        pen = [ax + (bx - ax) * u, ay + (by - ay) * u];
-        ctx.lineTo(pen[0], pen[1]);
-        budget = 0;
-        break;
-      }
-    }
-    ctx.stroke();
-  }
-  return progress < 0.999 ? pen : null;
-}
 
 function seeded(seed: number) {
   let s = seed >>> 0;
@@ -399,7 +370,7 @@ export function NormalJourney({ state, worlds, sectionT, recede }: Props) {
             ctx.shadowBlur = 10 * s;
           }
           const total = CONSTELLATION_LENGTH[world.slug]?.[i] ?? 1;
-          const pen = strokeIcon(ctx, o.strokes as Icon, total, own);
+          const pen = strokeObject(ctx, o.strokes, total, own);
           ctx.shadowBlur = 0;
           if (pen) {
             // The light that draws: a point at the head of the stroke.

@@ -15,6 +15,7 @@ import {
   type PersonaMotionOrchestratorHandle,
 } from "./persona-motion-slots";
 import { ProjectsGrid } from "./projects-grid";
+import { WorldStage } from "./world-stage";
 
 export type { PersonaMotionOrchestratorHandle };
 
@@ -105,15 +106,23 @@ function PhotographerGalleryStrip() {
 
 type PersonaHomeBodyProps = {
   persona: Persona;
+  /** The persona's place on the hub's spectrum (0…1): the stage takes its colour from it. */
+  spectrumT: number;
   content: PersonaContent;
   engineerEntries: Entry[];
   engineerBlogPosts: BlogPost[];
 };
 
 export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, PersonaHomeBodyProps>(
-  function PersonaHomeBody({ persona, content, engineerEntries, engineerBlogPosts }, ref) {
+  function PersonaHomeBody({ persona, spectrumT, content, engineerEntries, engineerBlogPosts }, ref) {
     return (
       <PersonaMotionOrchestrator ref={ref}>
+        {/* The world's hero: the hub's setup (Immersive) or its line drawing (Normal), the same page under it. */}
+        <section className={`${SITE_SHELL} pb-6 pt-2 md:pb-8`}>
+          <PersonaMotionSlot id={`${persona}-stage`} dir="down" exitOrder={0} enterOrder={0}>
+            <WorldStage slug={persona} t={spectrumT} />
+          </PersonaMotionSlot>
+        </section>
         {persona === "engineer" && (
           <>
             <section className={`${SITE_SHELL} grid gap-6 pb-8 pt-2 sm:gap-8 md:grid-cols-2 md:gap-10 md:pt-3`}>
@@ -170,6 +179,16 @@ export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, Perso
               </PersonaMotionSlot>
             </section>
           </>
+        )}
+        {(persona === "artist" || persona === "ride" || persona === "gamer") && (
+          <section className={`${SITE_SHELL} grid gap-6 pb-16 pt-2 sm:gap-8 md:grid-cols-2 md:gap-10 md:pb-24 md:pt-3`}>
+            <PersonaMotionSlot id={`${persona}-hero`} dir="left" exitOrder={1} enterOrder={1}>
+              <HomeHero persona={persona} content={content} />
+            </PersonaMotionSlot>
+            <PersonaMotionSlot id={`${persona}-identity`} dir="right" exitOrder={2} enterOrder={2}>
+              <IdentityPanel persona={persona} content={content} />
+            </PersonaMotionSlot>
+          </section>
         )}
       </PersonaMotionOrchestrator>
     );

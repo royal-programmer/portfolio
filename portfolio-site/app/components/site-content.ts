@@ -45,7 +45,7 @@ export const THEME_OPTIONS: Array<{ value: UiTheme; label: string; icon: typeof 
   { value: "dark", label: "Dark", icon: Moon },
 ];
 
-const makeTypeSequence = (words: string[], pauseMs: number): Array<string | number> => {
+export const makeTypeSequence = (words: string[], pauseMs: number): Array<string | number> => {
   const seq: Array<string | number> = [];
   for (const word of words) seq.push(word, pauseMs);
   return seq;

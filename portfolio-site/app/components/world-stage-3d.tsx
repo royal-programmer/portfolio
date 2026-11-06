@@ -1,0 +1,164 @@
+"use client";
+
+/**
+ * The world page's hero in Immersive mode: the very setup you flew into on the hub, standing in
+ * its own small stage — the laptop, the desk, the camera, the easel, the bike, the rig — lit by
+ * the same materials and screens, gathering itself from loose parts as the page opens, turning a
+ * little with the pointer, glowing under it. The hub's assemblies are reused as they are: this
+ * canvas only provides the clock, the state and a camera standing where the climb's would.
+ */
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
+import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import type { PersonaSlug } from "@/lib/content/types";
+import { personaIdentity } from "@/lib/site/brand";
+import { VrContext, createClock, type VrClock } from "./hub/vr/clock";
+import { createVrState, type VrState, type World } from "./hub/vr/state";
+import { climbPose } from "./hub/vr/util";
+import { ArtistAssembly } from "./hub/vr/worlds/artist";
+import { EngineerAssembly } from "./hub/vr/worlds/engineer";
+import { GamerAssembly } from "./hub/vr/worlds/gamer";
+import { PhotographerAssembly } from "./hub/vr/worlds/photographer";
+import { RideAssembly } from "./hub/vr/worlds/ride";
+import { TraderAssembly } from "./hub/vr/worlds/trader";
+
+/** Any climb progress: the pose is only the frame the assembly places itself in. */
+const C = 1;
+/** Where each setup stands relative to the pose (the same offsets the worlds use on the hub). */
+const PLACE: Record<PersonaSlug, { fwd: number; right: number; up: number }> = {
+  engineer: { fwd: 5, right: 1.4, up: -0.3 },
+  trader: { fwd: 5.4, right: 1.5, up: -0.55 },
+  photographer: { fwd: 4.6, right: 1.3, up: -0.1 },
+  artist: { fwd: 5.2, right: 1.4, up: -0.2 },
+  ride: { fwd: 5.8, right: 1.3, up: -0.7 },
+  gamer: { fwd: 5.8, right: 1.5, up: -0.55 },
+};
+
+type HubMedia = Partial<Record<string, string[]>>;
+
+function StudioEnvironment() {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  useEffect(() => {
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const tex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = tex;
+    pmrem.dispose();
+    return () => {
+      scene.environment = null;
+      tex.dispose();
+    };
+  }, [gl, scene]);
+  return null;
+}
+
+/** Drives the clock and stands the camera in front of the setup; the pointer turns it a little. */
+function Rig({ slug, clock, state }: { slug: PersonaSlug; clock: React.MutableRefObject<VrClock>; state: React.MutableRefObject<VrState> }) {
+  const size = useThree((s) => s.size);
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
+  useEffect(() => {
+    // Dev-only handle for tests.
+    if (process.env.NODE_ENV !== "production") (window as unknown as { __stage?: unknown }).__stage = { scene, camera, clock, state };
+  }, [scene, camera, clock, state]);
+  const tmp = useMemo(() => ({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0 }), []);
+  const pose = useMemo(() => climbPose(C), []);
+  useFrame(({ camera }, rawDt) => {
+    const dt = Math.min(rawDt, 0.1);
+    const k = clock.current;
+    const s = state.current;
+    k.dt = dt;
+    k.t += dt;
+    k.scale = 1;
+    // The setup stands assembled on its spot; its screens come on over the first two seconds
+    // (the assembly's own power ramp), which is the opening.
+    k.climb = C;
+    s.c = C;
+    s.phase = "climb";
+    // The setup's centre, as the assembly computes it (aspect-aware).
+    const place = PLACE[slug];
+    const aspect = size.width / Math.max(1, size.height);
+    const narrow = THREE.MathUtils.clamp(1.67 / aspect, 1, 2.2);
+    const portrait = THREE.MathUtils.clamp((1.2 - aspect) / 0.6, 0, 1);
+    const fwd = place.fwd + (narrow - 1) * 2.2;
+    const right = (place.right / narrow) * (1 - portrait);
+    const up = place.up + (narrow - 1) * 1.1 + portrait * 0.5;
+    tmp.centre.copy(pose.pos).addScaledVector(pose.fwd, fwd).addScaledVector(pose.right, right).add(tmp.look.set(0, up, 0));
+    // The camera stands the same distance off, swung a little by the pointer and a slow drift.
+    tmp.px += (s.px - tmp.px) * Math.min(1, dt * 5);
+    tmp.py += (s.py - tmp.py) * Math.min(1, dt * 5);
+    const yaw = Math.sin(k.t * 0.22) * 0.12 + tmp.px * 0.28;
+    const pitch = 0.1 + tmp.py * 0.12;
+    tmp.dir.copy(pose.fwd).applyAxisAngle(tmp.look.set(0, 1, 0), yaw);
+    // Closer than the climb's camera (this is a stage, not a passing view), the setup's body a
+    // little above the centre line.
+    const dist = fwd * (0.58 - 0.015 * Math.sin(k.t * 0.3)) * (1 + portrait * 0.35);
+    tmp.pos.copy(tmp.centre).addScaledVector(tmp.dir, -dist);
+    tmp.pos.y += dist * Math.sin(pitch);
+    camera.position.copy(tmp.pos);
+    tmp.look.copy(tmp.centre);
+    tmp.look.y += 0.3;
+    camera.lookAt(tmp.look);
+  });
+  return null;
+}
+
+function Setup({ slug, world, media }: { slug: PersonaSlug; world: World; media: HubMedia }) {
+  switch (slug) {
+    case "engineer":
+      return <EngineerAssembly world={world} screenSrc={media.engineer?.[0] ? `/hub/engineer/${media.engineer[0]}` : undefined} />;
+    case "trader":
+      return <TraderAssembly world={world} />;
+    case "photographer":
+      return <PhotographerAssembly world={world} />;
+    case "artist":
+      return <ArtistAssembly world={world} />;
+    case "ride":
+      return <RideAssembly world={world} modelUrl={media.models?.includes("bike.glb") ? "/hub/models/bike.glb" : undefined} />;
+    case "gamer":
+      return <GamerAssembly world={world} handle={personaIdentity("gamer").handle ?? "gamer"} />;
+  }
+}
+
+export default function WorldStage3D({ slug, t }: { slug: PersonaSlug; t: number }) {
+  const clock = useRef<VrClock>(createClock());
+  const state = useRef<VrState>(createVrState());
+  const ctx = useMemo(() => ({ clock, state }), []);
+  const world = useMemo<World>(() => ({ slug, t, c: C }), [slug, t]);
+  const [media, setMedia] = useState<HubMedia>({});
+  useEffect(() => {
+    let live = true;
+    fetch("/hub/media.json", { cache: "no-cache" })
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((m: HubMedia) => live && setMedia(m))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  return (
+    <Canvas
+      dpr={[1, 1.75]}
+      camera={{ position: [0, 0, 0], fov: 36, near: 0.05, far: 200 }}
+      gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+      onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
+      onPointerMove={(e) => {
+        const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        state.current.px = ((e.clientX - r.left) / r.width) * 2 - 1;
+        state.current.py = -(((e.clientY - r.top) / r.height) * 2 - 1);
+      }}
+      onPointerLeave={() => {
+        state.current.px = 0;
+        state.current.py = 0;
+      }}
+      style={{ background: "transparent" }}
+    >
+      <VrContext.Provider value={ctx}>
+        <StudioEnvironment />
+        <Rig slug={slug} clock={clock} state={state} />
+        <Setup slug={slug} world={world} media={media} />
+      </VrContext.Provider>
+    </Canvas>
+  );
+}

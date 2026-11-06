@@ -6,6 +6,7 @@ import { isLaunchedPersona } from "@/lib/content/types";
 import { PERSONA_ORDER, usePersona, type Persona } from "../persona-provider";
 import type { AssistantQueueItem, ChatMessage, LeadDraft } from "./chat-types";
 import { BubbleDock } from "./bubble-dock";
+import { placeOnSpectrum } from "@/lib/site/spectrum";
 import { HomeHeader } from "./home-header";
 import { PersonaBackdrop } from "./persona-backdrop";
 import {
@@ -96,6 +97,18 @@ export function HomePage({
       points: match.points,
     };
   }, [persona, personas]);
+  // On a persona's own host (ride.ratulroy.me) the browser's path is "/", so the provider cannot
+  // read the persona off the route: the page knows it, and hands it over. Without this the page
+  // would wait forever for a persona that never arrives.
+  useEffect(() => {
+    if (routePersona && personaHydrated && persona !== routePersona) setPersona(routePersona);
+  }, [routePersona, personaHydrated, persona, setPersona]);
+
+  // The persona's place on the hub's spectrum, so the page's stage glows the colour its door did.
+  const spectrumT = useMemo(() => {
+    const ranked = [...personas].sort((a, b) => a.order - b.order).map((p) => p.slug);
+    return placeOnSpectrum(ranked).find((p) => p.slug === persona)?.t ?? 0.5;
+  }, [personas, persona]);
   const effectiveTransitionsRef = useRef(effectiveTransitions);
   effectiveTransitionsRef.current = effectiveTransitions;
 
@@ -585,6 +598,7 @@ export function HomePage({
         <PersonaHomeBody
           ref={personaOrchestratorRef}
           persona={persona}
+          spectrumT={spectrumT}
           content={content}
           engineerEntries={engineerEntries}
           engineerBlogPosts={engineerBlogPosts}
