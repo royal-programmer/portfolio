@@ -369,9 +369,6 @@ export function NormalJourney({ state, worlds, sectionT, recede }: Props) {
         // Chapter progress 0 → 1 across the chapter; drawn fully at the midpoint.
         const u = clamp01((c - (world.c - 0.5)) / 1);
         const draw = easeInOut(u < 0.5 ? u / 0.5 : (1 - u) / 0.5);
-        const apexAngle = angleOf(0.5 + (world.t - 0.5) * spread);
-        const dirX = Math.cos(apexAngle);
-        const dirY = -Math.sin(apexAngle);
         const lit = spectrumColor(world.t, 72);
         const bright = spectrumColor(world.t, 84);
         for (let i = 0; i < objs.length; i++) {
@@ -385,14 +382,12 @@ export function NormalJourney({ state, worlds, sectionT, recede }: Props) {
           const lag = (i / Math.max(1, objs.length)) * 0.35;
           const own = clamp01((draw - lag) / (1 - lag));
           if (own <= 0.001) continue;
-          const settle = easeInOut(own);
-          // Home around the display; start displaced along the light (back toward the apex).
+          // Home around the display: each object is drawn in place, from its own first point,
+          // with nothing sliding in; depth gives a little parallax against the scroll.
           const hx = dcx + px * dw;
-          const hy = dcy + py * dw + (c - world.c) * 160 * (1 - o.place.depth);
-          const x0 = hx - dirX * 220 * (1 - settle);
-          const y0 = hy - dirY * 220 * (1 - settle) + 40 * (1 - settle);
+          const hy = dcy + py * dw + (c - world.c) * 120 * (1 - o.place.depth);
           ctx.save();
-          ctx.translate(x0 - size / 2, y0 - size / 2);
+          ctx.translate(hx - size / 2, hy - size / 2);
           ctx.scale(size, size);
           ctx.lineCap = "round";
           ctx.lineJoin = "round";

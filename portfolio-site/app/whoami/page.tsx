@@ -17,11 +17,13 @@ export const metadata: Metadata = {
  * place on the continuous spectrum (pinned or auto-spread).
  */
 export default async function WhoAmIPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  // Dev only: `?preview=all` shows unpublished personas on the climb (their worlds are built
-  // before their content is published). Production ignores it.
+  // Every persona climbs by default — all six worlds are built. `?preview=published` shows only
+  // the ones whose content is published (what the hub used to do), the rest as colours on the way.
   const { preview } = await searchParams;
-  const previewAll = process.env.NODE_ENV !== "production" && preview === "all";
-  const [allPersonas, engineerEntries] = await Promise.all([listPersonas({ includeNonPublic: previewAll }), listEntries("engineer")]);
+  const previewAll = preview !== "published";
+  const [adminPersonas, engineerEntries] = await Promise.all([previewAll ? listPersonas({ includeNonPublic: true }) : Promise.resolve([]), listEntries("engineer")]);
+  // The admin read needs the server-only key; without it (or on a blip) the public list stands in.
+  const allPersonas = adminPersonas.length ? adminPersonas : await listPersonas();
   const published = allPersonas.filter((p) => p.isPublished || previewAll).sort((a, b) => a.order - b.order);
   // The code world's terminal lists what is really published there.
   const terminalItems = engineerEntries.filter((e) => e.visibility === "public").map((e) => e.slug);

@@ -910,6 +910,10 @@ em.font-display,
   margin-left: 10px;
   font-weight: 400;
   color: var(--ink-dim);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .hub-exit-bar em {
   margin-left: 18px;
@@ -1190,7 +1194,67 @@ em.font-display,
   color: var(--ink-faint);
   text-transform: uppercase;
 }
+/* Key on: the logo screen before the dash — the ring, the mark, "system check". */
+.dash-ignition {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  background: radial-gradient(ellipse at 50% 60%, color-mix(in srgb, var(--c) 10%, #07070a), #07070a 70%);
+  pointer-events: none;
+}
+.dash-ign-ring {
+  position: absolute;
+  width: clamp(120px, 26vh, 190px);
+  height: clamp(120px, 26vh, 190px);
+  left: 50%;
+  top: 50%;
+  translate: -50% -60%;
+}
+.dash-ignition b {
+  font-family: var(--font-geist-mono), monospace;
+  font-weight: 500;
+  font-size: clamp(44px, 10vh, 74px);
+  line-height: 1;
+  color: var(--ink);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--c) 60%, transparent);
+  margin-top: -0.6em;
+}
+.dash-ignition small {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-top: clamp(60px, 13vh, 96px);
+}
+/* Tell-tales in the bar: lamps that light for the self-test and go out as the ride begins. */
+.dash-tells {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  margin-left: auto;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+.dash-tells i {
+  font-style: normal;
+  padding: 1px 5px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  color: var(--c);
+  transition: opacity 120ms linear;
+}
+.dash-tells i.is-warn {
+  color: #f0b24a;
+}
 @media (max-width: 640px) {
+  .dash-tells {
+    display: none;
+  }
   .dash-body {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr 1fr;

@@ -86,6 +86,9 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
       pose: makePose(),
       anchor: new THREE.Vector3(),
       normal: new THREE.Vector3(),
+      centre: new THREE.Vector3(),
+      v0: new THREE.Vector3(),
+      v1: new THREE.Vector3(),
     }),
     [],
   );
@@ -211,11 +214,16 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
     // Through the doorway: the camera flies into the lit screen, straight on — and back out
     // of it when you return from that world.
     let into = 0;
+    let swing = 0; // the orbit's share of the way round the setup (ahead of the dive)
     let outKick = 0; // the pull-out's lens kick: wide at the start, settling as you land on the climb
-    if (s.portal) into = easeIn(clamp01((now - s.portal.at) / 1000 / PORTAL_LENGTH));
-    else if (s.portalOut) {
+    if (s.portal) {
+      const u = clamp01((now - s.portal.at) / 1000 / PORTAL_LENGTH);
+      into = easeIn(u);
+      swing = easeInOut(clamp01(u / 0.8));
+    } else if (s.portalOut) {
       const u = clamp01((now - s.portalOut.at) / 1000 / PORTAL_OUT_LENGTH);
       into = 1 - easeInOut(u);
+      swing = 1 - easeInOut(clamp01((u - 0.2) / 0.8));
       outKick = Math.sin(Math.pow(u, 0.6) * Math.PI);
       if (u >= 1) s.portalOut = null;
     }
@@ -223,18 +231,44 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
       const a = s.portalAnchor;
       tmp.anchor.set(a.x, a.y, a.z);
       tmp.normal.set(a.nx, a.ny, a.nz);
+      tmp.centre.set(a.cx, a.cy, a.cz);
       // End just in front of the glass, looking through it.
       tmp.look.copy(tmp.anchor).addScaledVector(tmp.normal, 0.18);
-      tmp.pos.lerp(tmp.look, into);
-      const toward = tmp.dir.copy(tmp.anchor).sub(tmp.pos);
+      // The way there is an orbit, not a straight line: the camera swings round the setup to the side
+      // its screen faces (over the tank and down onto the dash, round to the front of a monitor),
+      // so the object turns beneath you, then it dives in. Direction slerps round the centre while
+      // the distance closes.
+      tmp.v0.copy(tmp.pos).sub(tmp.centre);
+      tmp.v1.copy(tmp.look).sub(tmp.centre);
+      const r0 = tmp.v0.length();
+      const r1 = tmp.v1.length();
+      if (r0 > 1e-4 && r1 > 1e-4) {
+        tmp.v0.divideScalar(r0);
+        tmp.v1.divideScalar(r1);
+        const cos = THREE.MathUtils.clamp(tmp.v0.dot(tmp.v1), -1, 1);
+        const ang = Math.acos(cos);
+        if (ang > 1e-3 && ang < Math.PI - 1e-3) {
+          const sn = Math.sin(ang);
+          const w0 = Math.sin((1 - swing) * ang) / sn;
+          const w1 = Math.sin(swing * ang) / sn;
+          tmp.dir.copy(tmp.v0).multiplyScalar(w0).addScaledVector(tmp.v1, w1);
+        } else tmp.dir.copy(tmp.v0).lerp(tmp.v1, swing).normalize();
+        // Keep height from the orbit a little above the chord so the swing reads as going over, not through.
+        const r = r0 + (r1 - r0) * into;
+        tmp.pos.copy(tmp.centre).addScaledVector(tmp.dir, r);
+        tmp.pos.y += Math.sin(swing * Math.PI) * 0.35 * (1 - into);
+      } else tmp.pos.lerp(tmp.look, into);
+      // Look: at the setup while swinging round it, settling onto the screen as you arrive.
+      const toward = tmp.dir.copy(tmp.centre).lerp(tmp.anchor, Math.max(into, swing * 0.7)).sub(tmp.pos);
       if (toward.lengthSq() > 1e-6) {
         toward.normalize();
         const wantYaw = Math.atan2(toward.x, -toward.z);
         const wantPitch = Math.asin(THREE.MathUtils.clamp(toward.y, -1, 1));
         let dy = wantYaw - yaw; // shortest turn
         dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-        yaw += dy * into;
-        pitch += (wantPitch - pitch) * into;
+        const hold = Math.max(into, swing);
+        yaw += dy * hold;
+        pitch += (wantPitch - pitch) * hold;
       }
     }
 
@@ -257,7 +291,7 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
     L.yaw = THREE.MathUtils.damp(L.yaw, s.yaw, 6, dt);
     L.pitch = THREE.MathUtils.damp(L.pitch, s.pitch, 6, dt);
 
-    const free = 1 - into;
+    const free = 1 - Math.max(into, swing);
     const totalYaw = yaw + (L.yaw + L.px * 0.06) * free;
     const totalPitch = Math.min(1.5, pitch + (L.pitch + L.py * 0.05) * free);
     tmp.dir.set(Math.sin(totalYaw) * Math.cos(totalPitch), Math.sin(totalPitch), -Math.cos(totalYaw) * Math.cos(totalPitch));

@@ -32,6 +32,20 @@ export function WorldBoot({ slug, color, t, via, items, photo }: Props) {
   }, []);
 
   useEffect(() => {
+    // `via` has done its job once the page has drawn: take it off the address bar so the URL is
+    // clean to copy, reload and share (a reload then plays the direct arrival, as it should).
+    if (via) {
+      try {
+        const u = new URL(window.location.href);
+        if (u.searchParams.has("via")) {
+          u.searchParams.delete("via");
+          window.history.replaceState(window.history.state, "", u);
+        }
+      } catch {}
+    }
+  }, [via]);
+
+  useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let seen = false;
     try {

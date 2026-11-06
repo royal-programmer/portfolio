@@ -3,8 +3,10 @@
 /**
  * Three more displays, three more doorways (Round E — "six displays"):
  *
- *   ride    the bike's TFT dash boots: the rev arc sweeps and settles, the speed climbs, the gear
- *           steps up, the trip screen traces the route and the rider's dot runs it
+ *   ride    the key turns: the TFT's backlight comes up on its logo screen, it cuts to the dash
+ *           and runs its self-test (every tell-tale lights, the rev arc sweeps to the red line and
+ *           back, the digits flash), then the ride pulls away — revs, gears, speed and the trip
+ *           screen tracing the route
  *   gamer   the monitor powers on: scanlines, the HUD slides in, the crosshair settles, ammo
  *           counts up, the radar sweeps — PRESS START
  *   artist  a canvas on linen: a landscape paints itself stroke by stroke in the world's palette,
@@ -37,6 +39,8 @@ const noop = () => {};
 // Ride: the TFT dash
 // ---------------------------------------------------------------------------
 const REV_LEN = 420; // the rev arc's path length (viewBox units), measured once below
+const RING_LEN = 2 * Math.PI * 44;
+const TELLS = ["ABS", "TC", "N", "!", "OIL", "HI"];
 const ROUTE =
   "M 30 230 C 80 200, 110 120, 160 130 S 230 220, 280 170 S 330 60, 370 70";
 
@@ -63,6 +67,9 @@ export function DashExit({
     const speed = el.querySelector<HTMLElement>("[data-speed]");
     const gear = el.querySelector<HTMLElement>("[data-gear]");
     const trip = el.querySelector<HTMLElement>("[data-trip]");
+    const ign = el.querySelector<HTMLElement>("[data-ign]");
+    const ring = el.querySelector<SVGCircleElement>("[data-ign-ring]");
+    const tells = Array.from(el.querySelectorAll<HTMLElement>("[data-tell]"));
     const routeLen = route?.getTotalLength() ?? 600;
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
@@ -79,18 +86,39 @@ export function DashExit({
           { opacity: 0, scale: 0.97 },
           { opacity: 1, scale: 1, duration: 0.25, ease: "power2.out" },
         );
-      tl.set(el.querySelector("[data-body]"), { opacity: 1 }, 0);
-      tl.from(
-        el.querySelectorAll("[data-hd]"),
-        { opacity: 0, y: -6, duration: 0.25, stagger: 0.05 },
-        "<0.05",
-      );
-      tl.from(
-        el.querySelectorAll("[data-cell]"),
-        { opacity: 0, y: 8, duration: 0.3, stagger: 0.05 },
-        "<0.05",
-      );
-      // Ignition: the rev arc sweeps to the red line and falls back to idle.
+      // Key on: the backlight comes up on the logo screen — the ring draws, the mark settles in.
+      tl.add(() => ambient.chime(0.25), 0.1);
+      if (ign) {
+        tl.fromTo(ign, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power1.out" }, 0.1);
+        if (ring) {
+          ring.style.strokeDasharray = `${RING_LEN}`;
+          ring.style.strokeDashoffset = `${RING_LEN}`;
+          tl.to(ring, { strokeDashoffset: 0, duration: 0.6, ease: "power2.inOut" }, 0.25);
+        }
+        tl.fromTo(ign.querySelector("[data-ign-mark]"), { opacity: 0, scale: 1.12 }, { opacity: 1, scale: 1, duration: 0.45, ease: "power2.out" }, 0.4);
+        tl.fromTo(ign.querySelector("[data-ign-sub]"), { opacity: 0, letterSpacing: "0.5em" }, { opacity: 1, letterSpacing: "0.28em", duration: 0.5, ease: "power2.out" }, 0.6);
+        // …and cuts to the dash screen.
+        tl.to(ign, { opacity: 0, duration: 0.16, ease: "power1.in" }, 1.3);
+      }
+      tl.set(el.querySelector("[data-body]"), { opacity: 1 }, 1.34);
+      tl.from(el.querySelectorAll("[data-hd]"), { opacity: 0, duration: 0.2 }, 1.36);
+      tl.from(el.querySelectorAll("[data-cell]"), { opacity: 0, duration: 0.22 }, 1.36);
+      // Self-test: every tell-tale lights in turn, the digits flash, the rev arc sweeps to the red
+      // line and falls back to idle; then the lamps go out — all but neutral and ABS.
+      if (tells.length) {
+        tl.to(tells, { opacity: 1, duration: 0.08, stagger: 0.05 }, 1.42);
+        tl.to(tells.filter((_, i) => i !== 2 && i !== 0), { opacity: 0.18, duration: 0.2, stagger: 0.04 }, 2.4);
+      }
+      if (speed) {
+        tl.add(() => {
+          speed.textContent = "888";
+          speed.style.opacity = "0.45";
+        }, 1.42);
+        tl.add(() => {
+          speed.textContent = "0";
+          speed.style.opacity = "";
+        }, 2.45);
+      }
       const r = { v: 0 };
       if (rev) {
         rev.style.strokeDasharray = `${REV_LEN}`;
@@ -105,7 +133,7 @@ export function DashExit({
               rev.style.strokeDashoffset = `${REV_LEN * (1 - r.v)}`;
             },
           },
-          "<0.1",
+          1.5,
         );
         tl.to(r, {
           v: 0.14,
@@ -127,15 +155,18 @@ export function DashExit({
         t: 2.1,
         duration: 2.1,
         ease: "none",
+        delay: 0.1,
         onUpdate: () => {
           const dt = drive.t - sim.last;
           sim.last = drive.t;
           if (dt <= 0) return;
           if (sim.gear === 0) {
-            // Into first: the revs dip as the clutch bites.
+            // Into first: the revs dip as the clutch bites; the neutral lamp goes out.
             sim.gear = 1;
             sim.rpm = 2400;
+            if (tells[2]) tells[2].style.opacity = "0.18";
           }
+          if (tells[0] && sim.v > 6) tells[0].style.opacity = "0.18"; // ABS: its self-test ends once rolling
           const throttle = 1 - sim.v / 140;
           sim.rpm += 7800 * throttle * dt;
           if (sim.rpm > 9000 && sim.gear < 4) {
@@ -213,8 +244,13 @@ export function DashExit({
       <div className="hub-exit-bar">
         <span /> <span /> <span />
         <b data-hd>trip · dawn run</b>
-        <em data-hd>N ↑</em>
-        <em data-hd>14 °C</em>
+        <span className="dash-tells" data-hd aria-hidden>
+          {TELLS.map((t, i) => (
+            <i key={t} data-tell className={i === 3 ? "is-warn" : undefined} style={{ opacity: 0.18 }}>
+              {t}
+            </i>
+          ))}
+        </span>
       </div>
       <div
         className="dash-body"
@@ -364,6 +400,16 @@ export function DashExit({
           </div>
         </div>
       </div>
+      {!still ? (
+        <div className="dash-ignition" data-ign style={{ opacity: 0 }} aria-hidden>
+          <svg viewBox="0 0 100 100" className="dash-ign-ring">
+            <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(243,241,236,0.1)" strokeWidth="1" />
+            <circle data-ign-ring cx="50" cy="50" r="44" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" transform="rotate(-90 50 50)" />
+          </svg>
+          <b data-ign-mark>R</b>
+          <small data-ign-sub>system check</small>
+        </div>
+      ) : null}
       {bodyHidden ? <BootScreen /> : null}
     </div>
   );

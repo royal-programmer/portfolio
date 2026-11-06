@@ -107,7 +107,7 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
   const tint = useMemo(() => new THREE.Color().setHSL(((world.t * 285 - 15) / 360 + 1) % 1, 0.9, 0.62), [world.t]);
   const mats = useLitMats();
   const tmp = useMemo(
-    () => ({ p: new THREE.Vector3(), q: new THREE.Quaternion(), ray: new THREE.Raycaster(), ndc: new THREE.Vector2(), n: new THREE.Vector3(), w: new THREE.Vector3(), pose: makePose(), at: new THREE.Vector3() }),
+    () => ({ p: new THREE.Vector3(), q: new THREE.Quaternion(), ray: new THREE.Raycaster(), ndc: new THREE.Vector2(), n: new THREE.Vector3(), w: new THREE.Vector3(), c: new THREE.Vector3(), pose: makePose(), at: new THREE.Vector3() }),
     [],
   );
   // The frame offsets, resolved once (aspect-aware), reused to follow the camera while loose.
@@ -218,7 +218,8 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
     if (first && lv.power > 0.5 && (!s.portal || s.portal.slug === world.slug) && (!s.portalOut || s.portalOut.slug === world.slug)) {
       first.getWorldPosition(tmp.w);
       tmp.n.set(0, 0, 1).applyQuaternion(first.getWorldQuaternion(tmp.q));
-      s.portalAnchor = { x: tmp.w.x, y: tmp.w.y, z: tmp.w.z, nx: tmp.n.x, ny: tmp.n.y, nz: tmp.n.z };
+      g.getWorldPosition(tmp.c);
+      s.portalAnchor = { x: tmp.w.x, y: tmp.w.y, z: tmp.w.z, nx: tmp.n.x, ny: tmp.n.y, nz: tmp.n.z, cx: tmp.c.x, cy: tmp.c.y, cz: tmp.c.z };
     }
 
     // Screens, bezel light and the halo: lit = enterable, so it breathes and brightens under the pointer.

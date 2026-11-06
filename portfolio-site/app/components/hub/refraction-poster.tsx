@@ -13,9 +13,11 @@ const A0 = 16;
 const A1 = -40;
 const R = 1100;
 
+// Rounded to a hundredth: Node and the browser can disagree on the last digit of a sine, and a
+// server/client mismatch in `points` is a hydration error.
 const at = (t: number, r: number) => {
   const a = ((A0 + (A1 - A0) * t) * Math.PI) / 180;
-  return { x: E.x + Math.cos(a) * r, y: E.y - Math.sin(a) * r };
+  return { x: Math.round((E.x + Math.cos(a) * r) * 100) / 100, y: Math.round((E.y - Math.sin(a) * r) * 100) / 100 };
 };
 
 export function RefractionPoster({ bands }: { bands: Band[] }) {
