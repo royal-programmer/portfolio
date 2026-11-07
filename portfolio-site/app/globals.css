@@ -559,51 +559,141 @@ html.is-dragging * {
   color: var(--ink-faint);
   white-space: nowrap;
 }
-.hub-hud-worlds {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.25rem 0.75rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
-  font-size: 9.5px;
-  letter-spacing: 0.12em;
+/* Column heads: Move / Jump / Worlds. */
+.hub-hud dt.hub-hud-head {
+  font-size: 8.5px;
+  letter-spacing: 0.22em;
   color: var(--ink-faint);
+  padding-bottom: 0.15rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  margin-bottom: 0.15rem;
 }
-.hub-hud-worlds b {
+.hub-hud-worlds dt {
   font-weight: 600;
-  margin-right: 0.3rem;
 }
-/* Phones: the sound switch is a row of the HUD. */
-.hub-hud-sound {
-  pointer-events: auto;
-  display: grid;
-  grid-template-columns: auto auto;
-  justify-content: end;
-  gap: 0.7rem;
-  align-items: baseline;
+/* Folded (after a scroll): the columns leave, the action strip stays. */
+.hub-hud.is-folded .hub-hud-cols {
+  display: none;
+}
+.hub-hud-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
   padding-top: 0.45rem;
   border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+}
+.hub-hud.is-folded .hub-hud-actions {
+  padding-top: 0;
+  border-top: 0;
+}
+.hub-hud-actions button {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-height: 1.6rem;
   font-family: inherit;
   text-transform: inherit;
-  text-align: right;
-}
-.hub-hud-sound > span:first-child {
-  font-size: 9px;
+  font-size: 9.5px;
   letter-spacing: 0.14em;
+  color: var(--ink-dim);
+  transition: color var(--dur-2) var(--ease-out);
+}
+.hub-hud-actions button:hover,
+.hub-hud-actions button:focus-visible {
   color: var(--ink);
 }
-.hub-hud-sound > span:last-child {
-  font-size: 8.5px;
-  letter-spacing: 0.12em;
+.hub-hud-actions button > span:first-child {
+  font-size: 8px;
   color: var(--ink-faint);
 }
-.hub-hud-sound[aria-pressed="true"] > span:last-child {
+.hub-hud-sound[aria-pressed="true"] {
+  color: var(--ink);
+}
+.hub-hud-sound[aria-pressed="true"] > span:first-child {
   color: var(--ink);
 }
 /* Phones: the gestures only, tucked tight into the corner. */
 .hub-hud.is-touch {
   padding: 0.55rem 0.65rem 0.5rem;
+}
+.hub-hud.is-touch .hub-hud-actions {
+  gap: 0.8rem;
+}
+.hub-hud.is-touch .hub-hud-actions button {
+  font-size: 9px;
+}
+
+/* The spectrum rail: Top, the worlds' marks, End; open with the page, folded to a strip on scroll. */
+.hub-rail {
+  position: fixed;
+  top: 50%;
+  right: 0.75rem;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 700ms var(--ease-out);
+}
+@media (min-width: 1024px) {
+  .hub-rail { right: 1.25rem; }
+}
+.hub-rail.is-on {
+  opacity: 1;
+  pointer-events: auto;
+}
+.hub-rail-marks {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+.hub-rail.is-folded .hub-rail-marks {
+  gap: 0.45rem;
+  padding: 0.35rem 0.4rem;
+  margin-right: -0.4rem;
+}
+.hub-rail-mark {
+  display: block;
+  width: 3px;
+  border-radius: 999px;
+  transition: height var(--dur-2) var(--ease-out), opacity var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+}
+.hub-rail.is-folded .hub-rail-mark {
+  width: 2px;
+}
+.hub-rail-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  transition: color var(--dur-2) var(--ease-out);
+}
+.hub-rail-end:hover,
+.hub-rail-end:focus-visible {
+  color: var(--ink);
+}
+.hub-rail-end > span:first-child {
+  font-size: 7px;
+  color: var(--ink-faint);
+}
+.hub-rail.is-folded .hub-rail-word {
+  display: none;
+}
+@media (max-width: 1023px) {
+  .hub-rail-word { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hub-rail, .hub-rail-mark { transition: none; }
 }
 .hub-hud.is-touch dt {
   font-size: 9px;

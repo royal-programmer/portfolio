@@ -5,6 +5,40 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-07 — Round H (part 2a): the hub drives the early tap, Top/End marks, the HUD in three columns, both fold on scroll, the sound cycles, `/` is the hub, the stage fits its model, Art and Play whole on phones
+
+Ratul's list, discussed and agreed:
+
+- **Art and Play smaller on phones: root cause.** The chapter's text box (`relative max-w-2xl`) is a
+  flex item with no width, so it shrank to its content: measured at 393 px the six boxes were
+  `361, 361, 361, 284, 361, 260` (Artist and Gamer carry the shortest words). The drawing band and
+  the in-flow display slot inherit that width. Fix: `w-full` on the box. Now `361 × 6`.
+- **An early tap scrolls itself.** `enterWorld` before `portalAnchor.formed` sets `waiting` *and*
+  calls `jump(slug)`; the waiting poll waits for the auto-scroll to arrive (|c − chapter| < 0.15)
+  before "scrolled away" can cancel it. Measured on a touch viewport: tap at the hero → scroll
+  lands at Art 1.4 s later → anchor forms → dive at 5.5 s.
+- **Navigation.** The rail carries `▲ Top` and `▼ End` on every size (words from `lg`, arrows
+  below). The HUD is three columns on desktop — Move, Jump, Worlds — with column heads. Both open
+  with the page and **fold to a strip on the first scroll** (and again after any reopen, Ratul's
+  call): the rail folds to its dots + Top/End (tap the dots to open), the HUD to its action strip
+  `Top · End · ♪ scene · Guide` (tap Guide to open). The action strip never leaves.
+- **Sound on phones cycles.** The HUD's `♪` row steps Off → Ambient → Night wind → Rain → Deep hum
+  and shows the scene's name. Desktop keeps the header menu.
+- **`/` is the hub.** `app/page.tsx` redirects to `/whoami` (path-style hosts: previews, localhost);
+  the real domain already rewrote `/` to the hub.
+- **The page stage fits its model.** `world-stage-3d` measures the setup's world-space bounds every
+  250 ms (every mesh but the screens' `halo` sheet, now named), projects the eight corners and eases
+  the camera distance so the furthest corner sits at 0.82 of the frame; the camera looks at the
+  measured centre. Measured on the Engineer stage at 393 × 852 (aspect 0.92): before, the laptop's
+  NDC y ran `−1.34 … −0.23` (the base below the frame); after, `−0.57 … 0.43`, whole and centred.
+
+**Dev note:** the Chrome DevTools MCP did every check here (phone + desktop) in seconds; no Playwright.
+
+**Admin knobs (16-admin-console):** fold-on-scroll on/off and threshold (40 px), the sound cycle
+order, the stage fit margin (0.82), the Top/End marks.
+
+**Next in this round:** every drawn object redrawn in detail (48 objects, world by world).
+
 ## 2026-11-07 — Round H (part 1d): phone HUD carries the sound, no drag row, no text selection, the rail on phones, the doorway waits for the fully formed setup
 
 Ratul's phone notes (Vivo X200 Pro, Chrome):

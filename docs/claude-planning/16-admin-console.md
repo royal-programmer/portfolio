@@ -56,6 +56,7 @@ today, to move.
 - Portal timings (fly-in, pull-out), climb length per chapter, ending copy, rewind on/off 🔜
 - Keys on/off (Space, 1–6, Enter), the drag-to-look, the hold-to-slow 🔜
 - The doorway's wait for a setup to form (`WAIT_FOR_SETUP_MS`), the phone setup lift and the chapter's phone paddings 🔜
+- The rail/HUD fold-on-scroll (on/off, 40 px threshold), the HUD sound cycle order, the Top/End marks, the page stage's fit margin (0.82) 🔜
 - The HUD guide: on/off, its rows' labels per mode (desktop / touch), `F` fullscreen on/off; the phone drawing band's composition (places, band ratio) 🔜
 
 ### Normal mode

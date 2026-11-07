@@ -286,6 +286,8 @@ export function useLitMats() {
     hc.fillStyle = grad;
     hc.fillRect(0, 0, 128, 128);
     const halo = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(haloCanvas), color: new THREE.Color("#000"), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
+    // Named so a stage framing the setup can leave the glow out of the measure (it is a soft sheet twice the screen).
+    halo.name = "halo";
     return { shell, matte, glass, metal, glow, bezel, halo, rim, rimColor };
   }, []);
   useEffect(
