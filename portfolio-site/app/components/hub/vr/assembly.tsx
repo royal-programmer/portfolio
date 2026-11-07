@@ -55,10 +55,18 @@ type Options = {
   yaw?: number;
   /** Screen material(s) whose uPower / uTime / uHover the hook drives. */
   screenMats?: THREE.ShaderMaterial[];
+  /**
+   * Where the owner's eye is, in the first screen's frame: `back` along its normal, `up` along
+   * its up — the rider's seat behind the dash, the chair in front of the monitor, an arm's
+   * length from the laptop. The fly-in swings round to this point before it dives in.
+   */
+  view?: { back: number; up: number };
   onFrame: (L: AssemblyLive, place: (obj: THREE.Object3D, i: number, late?: number) => void, parts: Part[]) => void;
 };
 
-export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffset = 0, screenMats, onFrame }: Options) {
+export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffset = 0, screenMats, view, onFrame }: Options) {
+  const viewBack = view?.back ?? 1;
+  const viewUp = view?.up ?? 0.15;
   const { clock, state } = useVr();
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
@@ -107,7 +115,7 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
   const tint = useMemo(() => new THREE.Color().setHSL(((world.t * 285 - 15) / 360 + 1) % 1, 0.9, 0.62), [world.t]);
   const mats = useLitMats();
   const tmp = useMemo(
-    () => ({ p: new THREE.Vector3(), q: new THREE.Quaternion(), ray: new THREE.Raycaster(), ndc: new THREE.Vector2(), n: new THREE.Vector3(), w: new THREE.Vector3(), c: new THREE.Vector3(), pose: makePose(), at: new THREE.Vector3() }),
+    () => ({ p: new THREE.Vector3(), q: new THREE.Quaternion(), ray: new THREE.Raycaster(), ndc: new THREE.Vector2(), n: new THREE.Vector3(), u: new THREE.Vector3(), e: new THREE.Vector3(), w: new THREE.Vector3(), c: new THREE.Vector3(), pose: makePose(), at: new THREE.Vector3() }),
     [],
   );
   // The frame offsets, resolved once (aspect-aware), reused to follow the camera while loose.
@@ -117,10 +125,18 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
     // Portrait (phones): the copy sits in the lower half, so the setup goes to the centre of the
     // upper half instead of beside the text.
     const portrait = clamp01((1.2 - aspect) / 0.6);
+    const fwd = (offset?.fwd ?? 5) + (narrow - 1) * 2.2;
+    // Portrait: the chapter's words sit in the lower half (hub CSS), so the setup is placed where
+    // the lens puts it in the clear band above them — a fixed point on the screen (about 27% from
+    // the top), not a fixed height in the world. Same vertical field as the scene's camera.
+    const fovV = THREE.MathUtils.degToRad(40 * (1 + portrait * 0.45));
+    // Phones (Round H, Ratul's call): the words read first, at the top; the setup stands in the
+    // lower band under them, where the thumb is. Negative = down in the view.
+    const lift = -portrait * fwd * Math.tan(fovV / 2) * 0.58;
     return {
-      fwd: (offset?.fwd ?? 5) + (narrow - 1) * 2.2,
+      fwd,
       right: ((offset?.right ?? 1.4) / narrow) * (1 - portrait),
-      up: (offset?.up ?? -0.3) + (narrow - 1) * 1.1 + portrait * 0.5,
+      up: ((offset?.up ?? -0.3) + (narrow - 1) * 1.1) * (1 - portrait) + lift,
     };
   }, [size.width, size.height, offset?.fwd, offset?.right, offset?.up]);
   const L = useMemo<AssemblyLive>(() => ({ gather: 0, g3: 0, open: 0, power: 0, hover: 0, t: 0, d: -9 }), []);
@@ -217,9 +233,13 @@ export function useAssembly({ world, root, screens, homes, offset, yaw: yawOffse
     // Tell the Director where the screen is, for the fly-in.
     if (first && lv.power > 0.5 && (!s.portal || s.portal.slug === world.slug) && (!s.portalOut || s.portalOut.slug === world.slug)) {
       first.getWorldPosition(tmp.w);
-      tmp.n.set(0, 0, 1).applyQuaternion(first.getWorldQuaternion(tmp.q));
+      first.getWorldQuaternion(tmp.q);
+      tmp.n.set(0, 0, 1).applyQuaternion(tmp.q);
+      tmp.u.set(0, 1, 0).applyQuaternion(tmp.q);
+      // The owner's eye: where you sit to use this thing, which is where the fly-in pauses.
+      tmp.e.copy(tmp.w).addScaledVector(tmp.n, viewBack).addScaledVector(tmp.u, viewUp);
       g.getWorldPosition(tmp.c);
-      s.portalAnchor = { x: tmp.w.x, y: tmp.w.y, z: tmp.w.z, nx: tmp.n.x, ny: tmp.n.y, nz: tmp.n.z, cx: tmp.c.x, cy: tmp.c.y, cz: tmp.c.z };
+      s.portalAnchor = { slug: world.slug, formed: gather >= 0.985 && lv.power > 0.95, x: tmp.w.x, y: tmp.w.y, z: tmp.w.z, nx: tmp.n.x, ny: tmp.n.y, nz: tmp.n.z, cx: tmp.c.x, cy: tmp.c.y, cz: tmp.c.z, ex: tmp.e.x, ey: tmp.e.y, ez: tmp.e.z };
     }
 
     // Screens, bezel light and the halo: lit = enterable, so it breathes and brightens under the pointer.
@@ -266,6 +286,8 @@ export function useLitMats() {
     hc.fillStyle = grad;
     hc.fillRect(0, 0, 128, 128);
     const halo = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(haloCanvas), color: new THREE.Color("#000"), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
+    // Named so a stage framing the setup can leave the glow out of the measure (it is a soft sheet twice the screen).
+    halo.name = "halo";
     return { shell, matte, glass, metal, glow, bezel, halo, rim, rimColor };
   }, []);
   useEffect(

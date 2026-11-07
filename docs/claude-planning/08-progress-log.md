@@ -5,6 +5,235 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-07 — Round H (part 2b): every drawn object redrawn in detail, one stroke per object
+
+Ratul's call: "make all graffiti detailed to look like real but in 2D, no matter the strokes."
+All 47 hand-drawn objects in `hub/constellations.ts` (the bike stays traced from its model) were
+redrawn at roughly three to five times the detail, each still a set of polylines in a unit box so
+the draw-on, the pen light and the placements are untouched:
+
+- **Code:** the laptop in three-quarter view with a lit screen of code, a cursor, a status bar,
+  hinge caps, a perspective keyboard, trackpad, speaker grilles, ports; the terminal with a title,
+  a progress bar and a scrollbar; two monitors showing an editor (file tree, tabs, minimap) and a
+  dashboard (chart, bars, gauge); earbuds with mesh and stems; a rack of five servers with rails,
+  handles, drive bays, vents and LEDs; a mug with latte swirl and beans; a git graph with two
+  branches, a tag and HEAD; a keyboard with a function row, W A S D legends, arrows and a wrist rest.
+- **Trade:** the chart is a chart (Ratul: "not a desk"): fourteen candles with wicks and bearish
+  fills, a moving average, volume bars, price and time ticks, a crosshair with its price tag, a
+  legend; a coin with reeded edge and lettering; a stack of notes with a portrait, seals and a coin
+  stack; a brain with gyri and a circuit overlay; a clock with sixty ticks, a sub-dial, a date
+  window and a crown; an hourglass with turned posts, grains and a stream; a spiral journal with a
+  checklist and a tiny P&L sketch, and a pen; a calculator with digits, a solar strip and glyphs.
+- **Lens:** a camera with grip, pentaprism, hot shoe, mode dial, seven aperture blades and strap
+  lugs; thirds with a scene (sun, hills, a tree on a crossing, an AF box); the golden spiral with
+  diagonals and a ratio bar; a phone back with a three-lens island, LiDAR, flash and speaker holes;
+  a tripod with a ball head, pan handle, centre column, hook, three two-section legs and a
+  spreader; a lens front with thread, blades and reflections; a softbox with its grid, speedring,
+  stand and rays; an SD card with pins, label and lock.
+- **Art:** an easel whose legs hide behind the canvas, a half-painted landscape, a clip and a rag;
+  a kidney palette with eight dabs and two brushes; a watercolour tin with wells and worn pans; a
+  jar of four brush shapes with a palette knife; a pencil cup with hex pencils, a brush and a
+  ruler; a pen tablet with a profile sketch, layers and a stylus; paint tubes, one squeezed; a
+  twelve-segment colour wheel with both triangles and a pointer.
+- **Ride:** a helmet with visor, pivots, vents, spoiler, chin grille and D-ring; gloves with
+  knuckle guards and stitching; boots with buckles, shin plate, ankle disc and tread; a road to a
+  vanishing point with posts, a sign, mountains and a rider; mountains with two ridges, couloirs,
+  pines and a winding road; a diamond road sign with a plate; a jerry can with three handles,
+  spout chain and level marks.
+- **Play:** a curved ultrawide with a first-person view and HUD (crosshair, health, ammo, minimap,
+  kill feed); a mouse with a ridged wheel, side buttons and RGB ring; a headset with sliders,
+  cushions, a boom mic; a gamepad with gated sticks, D-pad arrows, glyph buttons, a touchpad and
+  triggers; a keyboard with lit W A S D, an underglow strip and a knob; a trophy with laurels and
+  a plaque; a glass-side tower with three fans, cooler, RAM, GPU and PSU shroud; an energy can
+  with a bolt, bands, drops and a straw.
+
+**Performance.** Point counts went from ~1 000 to ~2 500–3 500 per world. The first measure on a
+393 × 852 touch viewport dropped a band's draw from 61 to 17–20 fps: `strokeObject` stroked every
+polyline on its own under the shadow blur. It now builds one path and strokes once per object;
+the same bands measure 51 / 59 / 57 fps (engineer / trader / gamer) against 61 at the hero.
+
+**Dev note:** a preview sheet in the scratchpad (plain-script build of the file, one canvas per
+object with its stroke and point counts) made each world a two-second visual check.
+
+**Admin knobs (16-admin-console):** the drawings themselves are code (SVG-like polylines); an
+admin upload of a world's drawing set as JSON is the later Phase C item already listed.
+
+## 2026-11-07 — Round H (part 2a): the hub drives the early tap, Top/End marks, the HUD in three columns, both fold on scroll, the sound cycles, `/` is the hub, the stage fits its model, Art and Play whole on phones
+
+Ratul's list, discussed and agreed:
+
+- **Art and Play smaller on phones: root cause.** The chapter's text box (`relative max-w-2xl`) is a
+  flex item with no width, so it shrank to its content: measured at 393 px the six boxes were
+  `361, 361, 361, 284, 361, 260` (Artist and Gamer carry the shortest words). The drawing band and
+  the in-flow display slot inherit that width. Fix: `w-full` on the box. Now `361 × 6`.
+- **An early tap scrolls itself.** `enterWorld` before `portalAnchor.formed` sets `waiting` *and*
+  calls `jump(slug)`; the waiting poll waits for the auto-scroll to arrive (|c − chapter| < 0.15)
+  before "scrolled away" can cancel it. Measured on a touch viewport: tap at the hero → scroll
+  lands at Art 1.4 s later → anchor forms → dive at 5.5 s.
+- **Navigation.** The rail carries `▲ Top` and `▼ End` on every size (words from `lg`, arrows
+  below). The HUD is three columns on desktop — Move, Jump, Worlds — with column heads. Both open
+  with the page and **fold to a strip on the first scroll** (and again after any reopen, Ratul's
+  call): the rail folds to its dots + Top/End (tap the dots to open), the HUD to its action strip
+  `Top · End · ♪ scene · Guide` (tap Guide to open). The action strip never leaves.
+- **Sound on phones cycles.** The HUD's `♪` row steps Off → Ambient → Night wind → Rain → Deep hum
+  and shows the scene's name. Desktop keeps the header menu.
+- **`/` is the hub.** `app/page.tsx` redirects to `/whoami` (path-style hosts: previews, localhost);
+  the real domain already rewrote `/` to the hub.
+- **The page stage fits its model.** `world-stage-3d` measures the setup's world-space bounds every
+  250 ms (every mesh but the screens' `halo` sheet, now named), projects the eight corners and eases
+  the camera distance so the furthest corner sits at 0.82 of the frame; the camera looks at the
+  measured centre. Measured on the Engineer stage at 393 × 852 (aspect 0.92): before, the laptop's
+  NDC y ran `−1.34 … −0.23` (the base below the frame); after, `−0.57 … 0.43`, whole and centred.
+
+**Dev note:** the Chrome DevTools MCP did every check here (phone + desktop) in seconds; no Playwright.
+
+**Admin knobs (16-admin-console):** fold-on-scroll on/off and threshold (40 px), the sound cycle
+order, the stage fit margin (0.82), the Top/End marks.
+
+**Next in this round:** every drawn object redrawn in detail (48 objects, world by world).
+
+## 2026-11-07 — Round H (part 1d): phone HUD carries the sound, no drag row, no text selection, the rail on phones, the doorway waits for the fully formed setup
+
+Ratul's phone notes (Vivo X200 Pro, Chrome):
+
+- **Sound on phones lives in the HUD only.** The header's compact toggle and the footer toggle are
+  gone below `sm`; the touch HUD has a `Sound · On/Off` row (`.hub-hud-sound`, off ↔ ambient).
+  Desktop keeps the header menu.
+- **No "Drag · Look around" on touch.** A finger moving was already a scroll (the pointer code
+  drops the drag on touch); the HUD no longer promises it.
+- **Holding to slow time no longer selects the words.** `@media (pointer: coarse) .hub-v3 { user-select: none }`.
+- **The spectrum rail shows on every size.** Marks only below `lg` (the role label is `max-lg:hidden`),
+  `right-3` on phones, `right-5` from `lg`.
+- **The doorway waits for the perfect moment.** `portalAnchor.formed` (gather ≥ 0.985 and the
+  screen's power > 0.95) is now the condition: a tap before that puts the button in `is-waiting`
+  and the dive starts the moment the setup is whole. Measured on a touch viewport: tap 150 ms after
+  jumping to Art → waiting 3.1 s → dive with `formed=true`. The wait is forgotten if you scroll away
+  (|c − chapter| > 0.45); the plain-fade fallback only fires after 15 s (a model that never came).
+
+**Dev domain (Ratul):** no custom `dev.` host. Previews stay on Vercel's own branch URL with Vercel
+Authentication; the noindex header and robots rule from part 1c still apply there. The Preview
+`NEXT_PUBLIC_ROOT_DOMAIN` advice from part 1c is withdrawn (path URLs on the preview host).
+
+**Dev note:** Playwright's `run_code` hung twice for its full 30-minute idle window around a page
+that navigated mid-script; the Chrome DevTools MCP (`emulate 412x915x2,mobile,touch`) did the same
+checks in seconds. Prefer it for touch runs that cross a navigation.
+
+**Admin knobs (16-admin-console):** the HUD's sound row on/off, the formed thresholds, the
+scroll-away tolerance.
+
+## 2026-11-07 — Round H (part 1c): the phone's return and loader fixed, the early tap, bands for every world, the setup below the words, previews closed
+
+From Ratul's screen recording (Vivo X200 Pro, Chrome) and a Playwright reproduction on a 412×915 touch viewport:
+
+- **The strip under the world's loader.** Chrome on Android sizes a fixed `inset: 0` box to the
+  viewport with the address bar showing; you arrive with the bar hidden after scrolling the hub,
+  so a bar-high strip of the page showed under the loader. Every full-screen cover (`.world-boot`,
+  `.hub-boot`, `.hub-enter`, `.hub-return`, the returning gate `.hub-wait`, `.vr-flash`,
+  `.vr-blink`, `.gate`) is now `min-height: 100lvh`.
+- **The broken return.** The landing, not the transition: the browser restored its own scroll
+  while the hub scrolled to the chapter's middle before the chapter had its final height, so the
+  camera stood past the setup's station and the setup appeared up and over the words. The hub now
+  sets `history.scrollRestoration = "manual"` while it is up, and `land` re-aligns the scroll to
+  the chapter's centre at 0 / 120 / 300 / 600 / 1000 / 1600 ms, snapping `c` to the chapter each
+  time. Reproduced before (h2 at 102 → 497 px after the return) and after (102 → 102).
+- **Tapping before the setup has formed.** `portalAnchor` now carries its world's slug.
+  `enterWorld` starts the dive only when the anchor is this world's; otherwise the button goes
+  into `is-waiting` (arrow breathing, `aria-busy`) and polls every 80 ms; when the anchor arrives
+  the dive runs, and after `WAIT_FOR_SETUP_MS` (2.2 s) with nothing it clears the anchor and goes
+  as the plain fade into the world's window instead of diving at a stale or missing screen.
+- **Drawings popping / Art and Play looking small.** The journey drew only the nearest-by-scroll
+  world; on phones the band sits at the top of a chapter almost two screens tall, so it stayed
+  blank until the scroll crossed the chapter midpoint and then appeared half-formed. Now every
+  world whose band is on screen draws, each from its own band; the ring (desktop, sideways phone)
+  is unchanged. Artist and Gamer verified whole.
+- **Immersive on phones: words first, setup below.** Ratul's call, mirroring Normal mode. The
+  chapter is `align-items: flex-start; padding-top: calc(12.5svh + 4.5rem)`; `vr/assembly` lifts
+  the setup down (`-0.58` of the half view height) so it stands in the lower band under the CTA.
+- **Previews closed to crawlers.** `proxy.ts` sets `X-Robots-Tag: noindex, nofollow` and
+  `app/robots.ts` disallows everything when `VERCEL_ENV === "preview"`; production allows all but
+  `/capture/` and `/api/`.
+
+**Dev domain decision (Ratul, DNS at Cloudflare):** `dev.ratulroy.me` + the six persona labels
+under it, assigned to the `development` branch on Vercel, with Vercel Authentication on previews.
+No code change needed beyond the above: set `NEXT_PUBLIC_ROOT_DOMAIN=dev.ratulroy.me` in the
+Preview environment only (env vars are scoped per environment), so the host parser treats it as
+the root there.
+
+**Dev notes:** the second-return check stalled once on this machine because Supabase connect
+timed out and the dev server's HMR socket dropped; not a code path. Deleting `.next` can leave a
+transient `UNKNOWN open … routes.d.ts` on the first start; start again.
+
+**Admin knobs this exposes (16-admin-console):** the doorway wait length, the phone setup lift,
+the chapter's phone paddings.
+
+**Open:** display inner type cramped below ~400 px (gamer "30 / 90" overlaps); art book and lens
+gallery intros after admin Phase A; the offline arcade (several games) later.
+
+## 2026-11-07 — Round H (part 1b): the HUD guide, phones read drawings → words → display
+
+Ratul's corrections on part 1, same day:
+
+- **The guide is a HUD, not a line + `?` card.** `hub-guide.tsx` now renders a fixed readout in the
+  bottom-right corner with corner ticks: two columns of key → action (move: Scroll / Hold / Drag /
+  Lens; jump: Space, ⇧Space, 1–6, Enter, F) and the six worlds numbered in their colours beneath.
+  It never fades; it only leaves with the rest of the chrome (gate, intro, doorway). The `?` key,
+  the card, the scrim and the auto-hide / idle timers are gone. Touch devices get the gestures only
+  (Scroll, Hold, Drag, Tap display), tucked small.
+- **Phones, Normal mode: drawings on top, words, display below.** Each chapter has a drawing band
+  (`#<slug>-art`, `.normal-art-slot`, 1 : 0.92, max 44svh, centred) above the kicker, and the
+  display slot moved below the CTA. `normal-journey` composes the eight drawn things in the band
+  with a phone layout of their own (`PHONE_PLACES`: hero in the middle, the rest balanced left and
+  right) instead of the desktop ring, which was left-heavy because its hero sits left of the display.
+  The drawing follows the band: it draws as the band rises into view, undraws as it leaves at the
+  top, no chapter-midpoint timing and no scroll parallax in the band. A phone on its side keeps the
+  two-column layout; its band is hidden and the ring goes around the display as before.
+- Verified with Playwright at 390×844 (touch context), 844×390, 1440×900 in both modes; no overflow.
+
+**Admin knobs this exposes (16-admin-console):** the HUD rows' labels per mode, HUD on/off, the
+phone composition's places and band ratio.
+
+**Dev note:** Turbopack's persistent cache served the old `globals.css` across a restart this time;
+stop the server, delete `.next`, start again.
+
+**Open:** display inner type cramped below ~400 px (part 2); Vercel preview deploy for
+`development` (Ratul asked; answer in chat: Hobby previews are free, path URLs on `*.vercel.app`).
+
+## 2026-11-06 — Round H (part 1): footer pinned, the guide in the corner, ? card, F fullscreen, phone layouts, responsive sweep
+
+Ratul's review of Round G (all good design-wise): the copyright should sit at the bottom (desktop and phone); the site must be responsive to any screen; the navigation guide should live in a corner, not under the title; F for fullscreen; on phones the Normal-mode display should not cover the drawings — put it in the flow — and the Immersive setup should be framed against the content. Agreed list for later parts: PWA + offline game + error pages, admin Phase A, sound, live data, gyro, the art screen.
+
+**What landed:**
+- hub-experience.tsx: the closing section is `min-h-[100svh]` with the content on `my-auto` and the footer (`.hub-footer`) last, so the copyright line sits on the bottom edge plus the safe-area inset at every size (verified 0 px gap at 9 viewports). The hero's hint line is gone.
+- hub-guide.tsx (new): one line bottom-right ("Scroll to climb · drag to look · hold to slow time" / "Scroll to follow the light") with a `?` button. It fades after the first scroll, drag or key, or after 9 s, and returns after 14 s idle. `?` toggles the shortcuts card (scroll, hold, drag, lens, Space / Shift+Space, 1–6, Enter, F, ?) with the six worlds numbered in their colours; Escape or a click outside closes it. `F` toggles the fullscreen API where it exists (desktop, Android — iPhones have none, so the row and button hide). Touch devices get the gesture list instead.
+- Phones and tablets (< 1024 px), Normal mode: `PersonaChapter` renders a `normal-display-slot` above its kicker; `NormalDisplays` portals the active display into it (`is-inflow`), so the window scrolls with the words and never covers the drawing or the text. The journey measures the slot's rect each frame for the constellation's home instead of re-deriving the CSS; on portrait, objects under the display (y > 0.45) or far above it (y < −0.5, the header) are skipped and x is spread ×0.8. The old `padding-top: 30vh` hack is gone. A phone on its side (height ≤ 540) lays the chapter out as two columns, display beside the words.
+- Portrait, Immersive: the chapter's words sit low (`align-items: flex-end; padding-bottom: 14svh`) and `useAssembly` places the setup where the lens puts it ~27 % from the top (`lift = fwd · tan(fov/2) · 0.46`), so every world stands in the clear band above its words on any phone (verified: engineer centre at y = 228 of 844, title at 479).
+- globals.css: `html:has(.hub-v3), body:has(.hub-v3) { background: var(--void) }` — no light flash behind the hub while it loads (the body's default is the light theme token).
+- Responsive sweep (Playwright, 360×740, 430×932, 844×390, 768×1024, 1024×768, 1366×768, 1920×1080, 2560×1440, 3440×1440 — hero, chapter, Normal chapter, ending): no horizontal overflow anywhere, footer on the edge everywhere. Open item from the sweep: the display's inner type is cramped below ~400 px (the gamer window's title truncates) — the exit sequences need container-relative type; part 2.
+
+**Admin knobs this adds** (16-admin-console.md → Hub): guide text per mode, auto-hide / idle-return timings, the card on/off, F on/off.
+
+**Dev notes:** this Turbopack dev server does not pick up `globals.css` edits until restart (TSX hot-reloads fine); `rm -rf .next/dev` while a server runs corrupts the cache (every route 404s) — stop the server, delete `.next`, start again. Supabase reads from this network time out now and then ("content read past 9000 ms"); the hub then renders without chapters — reload.
+
+---
+
+## 2026-11-06 — Round G: seated fly-in, READY · TO · RACE, keys in Normal mode, no scrollbar, admin plan
+
+Ratul's review of Round F from production (PR #2 merged, ratulroy.me live): the rider fly-in went to a top view, not the rider's seat; the other worlds' flights ended behind the laptop or above the desk; the boot logo was a mess (reference video of his TFT supplied); number/Space keys dead in Normal mode; no scrollbar wanted; the real bike should stand alone (no boxes, no ball); everything must become admin-configurable.
+
+**What landed (commits `da67081` and this one):**
+- assembly.tsx: each world declares `view: { back, up }` — where its owner sits, in the first screen's frame; the eye goes into `portalAnchor` (`ex ey ez`). Distances scale with each screen: laptop 2.8, monitors 1.9 / 2.7, camera LCD 1.4, canvas 2.1, dash 1.6 with the eye 0.3 below the dash's normal (the rider's head over the tank).
+- scene.tsx: the fly-in is three beats — swing round the setup's centre to the eye (0–52 %), hold seated with the screen in view, dive into the glass (66–100 %); the head turns onto the setup ahead of the body so nothing slides out of frame; the lens tightens only on the dive. `PORTAL_LENGTH` 2.1 s, `PORTAL_OUT_LENGTH` 1.5 s (reverse). Verified seated frames for all six worlds (laptop front at the desk, monitor front, LCD in hand, easel, rider's seat with bars and dash, gaming desk).
+- exit-sequence-worlds.tsx `DashExit`: the boot is Ratul's TFT — READY · TO · RACE a word at a time in the world colour, then the gauge arc sweeps as the digits run 253 → 0, cut to the dash, self-test (888, every tell-tale, rev sweep), the drive. Verified on a screen recording of the hub → ride page flow.
+- hub-experience.tsx: Space / Shift+Space / 1–6 / Enter work in Normal mode too (the handler was gated on the climb phase; Normal mode never leaves "gate"). Enter takes Normal mode's own doorway. Verified: 3 → chapter 3, Space → next, Shift+Space → back.
+- globals.css: no scrollbar anywhere (`scrollbar-width: none` + the WebKit rule); the page still scrolls. Verified: client width = inner width.
+- ride.tsx: with the real model, nothing but the bike, its light and its dash (helmet, tank bag, pannier, gloves, intercom were the box, side box and ball Ratul saw).
+- normal-journey.tsx: on phones nothing draws above the display (the header) — objects with y < −0.4 skipped in portrait.
+- docs/claude-planning/16-admin-console.md: the standing contract that every value is admin-editable, the recommended configuration surface (identity, personas, hub, Normal mode, sound uploads, pages, media library, switches, theme), the build (settings store + history + Storage buckets + Zod-typed reads + `/admin` growing out of `/capture/admin`) and phases A–E.
+
+**Supabase:** all six personas `is_published = true` (Ratul ran the UPDATE).
+
+**Dev note:** a hung `next dev` on :3000 (two days old) blocked testing until the session restart freed the port; the dev server needs `NODE_OPTIONS=--use-system-ca` in this shell or every Supabase read fails TLS and the hub has no chapters.
+
 ## 2026-11-06 — Round F: orbiting fly-in, key-on dash, 48 drawings, the world pages' stage, all six by default
 
 Ratul's review of the constellation pass: the camera reached the dash but the bike did not turn; the dash should boot the way a real TFT does when the key turns; the drawings should be detailed, drawn in place (no sliding), more of them but not cluttered, with his object lists per world; "pages go"; deploy; `preview=all` as default; rename the branch; is `via` needed.

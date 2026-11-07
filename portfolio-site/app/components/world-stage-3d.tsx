@@ -53,11 +53,47 @@ function StudioEnvironment() {
   return null;
 }
 
-type Scratch = { centre: THREE.Vector3; dir: THREE.Vector3; pos: THREE.Vector3; look: THREE.Vector3; px: number; py: number; handle: boolean };
+type Scratch = {
+  centre: THREE.Vector3;
+  dir: THREE.Vector3;
+  pos: THREE.Vector3;
+  look: THREE.Vector3;
+  px: number;
+  py: number;
+  handle: boolean;
+  /** The setup's measured bounds (world space, the halo left out) and the frame they were taken on. */
+  box: THREE.Box3;
+  boxAt: number;
+  corner: THREE.Vector3;
+  /** The camera's distance multiplier that fits the bounds in view; eased, so the frame never jumps. */
+  fit: number;
+};
+
+/** How much of the frame the setup may fill (NDC half-extent); the rest is air. */
+const FIT_MARGIN = 0.82;
+
+/** Measure the setup: every mesh in the scene except the screens' halo sheets. */
+function measureSetup(scene: THREE.Scene, box: THREE.Box3, tmp: THREE.Vector3) {
+  box.makeEmpty();
+  scene.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || !m.visible) return;
+    const mat = m.material as THREE.Material | THREE.Material[];
+    if (!Array.isArray(mat) && mat?.name === "halo") return;
+    const g = m.geometry;
+    if (!g.boundingBox) g.computeBoundingBox();
+    const b = g.boundingBox;
+    if (!b || !Number.isFinite(b.min.x)) return;
+    for (let i = 0; i < 8; i++) {
+      tmp.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(m.matrixWorld);
+      box.expandByPoint(tmp);
+    }
+  });
+}
 type Pose = ReturnType<typeof climbPose>;
 
 /** One frame of the stage: advance the clock, keep the state at the chapter, stand the camera. */
-function driveStage(k: VrClock, s: VrState, tmp: Scratch, pose: Pose, place: { fwd: number; right: number; up: number }, size: { width: number; height: number }, camera: THREE.Camera, rawDt: number) {
+function driveStage(k: VrClock, s: VrState, tmp: Scratch, pose: Pose, place: { fwd: number; right: number; up: number }, size: { width: number; height: number }, camera: THREE.Camera, scene: THREE.Scene, rawDt: number) {
   const dt = Math.min(rawDt, 0.1);
   k.dt = dt;
   k.t += dt;
@@ -83,13 +119,39 @@ function driveStage(k: VrClock, s: VrState, tmp: Scratch, pose: Pose, place: { f
   tmp.dir.copy(pose.fwd).applyAxisAngle(tmp.look.set(0, 1, 0), yaw);
   // Closer than the climb's camera (this is a stage, not a passing view), the setup's body a
   // little above the centre line.
-  const dist = fwd * (0.58 - 0.015 * Math.sin(k.t * 0.3)) * (1 + portrait * 0.35);
+  const dist = fwd * (0.58 - 0.015 * Math.sin(k.t * 0.3)) * (1 + portrait * 0.35) * tmp.fit;
   tmp.pos.copy(tmp.centre).addScaledVector(tmp.dir, -dist);
   tmp.pos.y += dist * Math.sin(pitch);
   camera.position.copy(tmp.pos);
-  tmp.look.copy(tmp.centre);
-  tmp.look.y += 0.3;
+  // Look at the measured middle of the setup (the hand-placed centre until the first measure).
+  if (tmp.box.isEmpty()) {
+    tmp.look.copy(tmp.centre);
+    tmp.look.y += 0.3;
+  } else {
+    tmp.box.getCenter(tmp.look);
+  }
   camera.lookAt(tmp.look);
+  // Fit (Ratul's call: the model always fits its stage). Every few frames, measure the setup
+  // and project its corners; if any falls outside the margin the distance grows towards the
+  // multiple that brings it in, if all sit well inside it shrinks. Eased, so the frame breathes
+  // rather than jumps; the stage's own slow drift sits on top.
+  if (!tmp.box.isEmpty() || k.t - tmp.boxAt > 0.25) {
+    if (k.t - tmp.boxAt > 0.25) {
+      tmp.boxAt = k.t;
+      measureSetup(scene, tmp.box, tmp.corner);
+    }
+    if (!tmp.box.isEmpty()) {
+      camera.updateMatrixWorld();
+      let ext = 0;
+      const b = tmp.box;
+      for (let i = 0; i < 8; i++) {
+        tmp.corner.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).project(camera);
+        ext = Math.max(ext, Math.abs(tmp.corner.x), Math.abs(tmp.corner.y));
+      }
+      const want = THREE.MathUtils.clamp(tmp.fit * (ext / FIT_MARGIN), 0.6, 3);
+      tmp.fit += (want - tmp.fit) * Math.min(1, dt * 6);
+    }
+  }
 }
 
 /** Drives the clock and stands the camera in front of the setup; the pointer turns it a little. */
@@ -97,7 +159,7 @@ function Rig({ slug }: { slug: PersonaSlug }) {
   const { clock, state } = useVr();
   const size = useThree((s) => s.size);
   // Per-frame scratch (a ref: it is written every frame).
-  const scratch = useRef<Scratch>({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0, handle: false });
+  const scratch = useRef<Scratch>({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0, handle: false, box: new THREE.Box3(), boxAt: -1, corner: new THREE.Vector3(), fit: 1 });
   const pose = useMemo(() => climbPose(C), []);
   useFrame(({ camera, scene }, rawDt) => {
     const tmp = scratch.current;
@@ -106,7 +168,7 @@ function Rig({ slug }: { slug: PersonaSlug }) {
       // Dev-only handle for tests.
       if (process.env.NODE_ENV !== "production") (window as unknown as { __stage?: unknown }).__stage = { scene, camera, clock, state };
     }
-    driveStage(clock.current, state.current, tmp, pose, PLACE[slug], size, camera, rawDt);
+    driveStage(clock.current, state.current, tmp, pose, PLACE[slug], size, camera, scene, rawDt);
   });
   return null;
 }

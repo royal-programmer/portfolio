@@ -3,10 +3,11 @@
 /**
  * Three more displays, three more doorways (Round E — "six displays"):
  *
- *   ride    the key turns: the TFT's backlight comes up on its logo screen, it cuts to the dash
- *           and runs its self-test (every tell-tale lights, the rev arc sweeps to the red line and
- *           back, the digits flash), then the ride pulls away — revs, gears, speed and the trip
- *           screen tracing the route
+ *   ride    the key turns: the TFT's backlight comes up and it boots the way Ratul's does —
+ *           READY · TO · RACE a word at a time, the gauge sweeps as the digits run down to 0 —
+ *           cuts to the dash and runs its self-test (every tell-tale lights, the rev arc sweeps to
+ *           the red line and back, the digits flash), then the ride pulls away — revs, gears,
+ *           speed and the trip screen tracing the route
  *   gamer   the monitor powers on: scanlines, the HUD slides in, the crosshair settles, ammo
  *           counts up, the radar sweeps — PRESS START
  *   artist  a canvas on linen: a landscape paints itself stroke by stroke in the world's palette,
@@ -41,7 +42,10 @@ const r2 = (v: number) => Math.round(v * 100) / 100;
 // Ride: the TFT dash
 // ---------------------------------------------------------------------------
 const REV_LEN = 420; // the rev arc's path length (viewBox units), measured once below
-const RING_LEN = 2 * Math.PI * 44;
+/** The boot gauge: 270° round a 120 radius, bottom-left to bottom-right over the top. */
+const BOOT_ARC = "M 65.15 234.85 A 120 120 0 1 1 234.85 234.85";
+const BOOT_ARC_LEN = 565.5;
+const BOOT_WORDS = ["READY", "TO", "RACE"];
 const TELLS = ["ABS", "TC", "N", "!", "OIL", "HI"];
 const ROUTE =
   "M 30 230 C 80 200, 110 120, 160 130 S 230 220, 280 170 S 330 60, 370 70";
@@ -70,7 +74,6 @@ export function DashExit({
     const gear = el.querySelector<HTMLElement>("[data-gear]");
     const trip = el.querySelector<HTMLElement>("[data-trip]");
     const ign = el.querySelector<HTMLElement>("[data-ign]");
-    const ring = el.querySelector<SVGCircleElement>("[data-ign-ring]");
     const tells = Array.from(el.querySelectorAll<HTMLElement>("[data-tell]"));
     const routeLen = route?.getTotalLength() ?? 600;
     const ctx = gsap.context(() => {
@@ -88,38 +91,65 @@ export function DashExit({
           { opacity: 0, scale: 0.97 },
           { opacity: 1, scale: 1, duration: 0.25, ease: "power2.out" },
         );
-      // Key on: the backlight comes up on the logo screen — the ring draws, the mark settles in.
+      // Key on: the backlight comes up and the display boots — READY · TO · RACE, a word at a time,
+      // then the gauge sweeps round as the digits run down to 0 (the self-test's first beat)…
       tl.add(() => ambient.chime(0.25), 0.1);
       if (ign) {
-        tl.fromTo(ign, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power1.out" }, 0.1);
-        if (ring) {
-          ring.style.strokeDasharray = `${RING_LEN}`;
-          ring.style.strokeDashoffset = `${RING_LEN}`;
-          tl.to(ring, { strokeDashoffset: 0, duration: 0.6, ease: "power2.inOut" }, 0.25);
+        tl.fromTo(ign, { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power1.out" }, 0.1);
+        const word = ign.querySelector<HTMLElement>("[data-ign-word]");
+        const arc = ign.querySelector<SVGPathElement>("[data-ign-arc]");
+        const arcSvg = ign.querySelector<SVGElement>("[data-ign-gauge]");
+        const num = ign.querySelector<HTMLElement>("[data-ign-num]");
+        if (word) {
+          const at = [0.25, 0.64, 1.02];
+          BOOT_WORDS.forEach((w, i) => {
+            tl.add(() => {
+              word.textContent = w;
+            }, at[i]);
+            tl.fromTo(word, { opacity: 0, letterSpacing: "0.34em" }, { opacity: 1, letterSpacing: "0.22em", duration: 0.12, ease: "power2.out" }, at[i]);
+            tl.to(word, { opacity: 0, duration: 0.06 }, at[i] + 0.31);
+          });
         }
-        tl.fromTo(ign.querySelector("[data-ign-mark]"), { opacity: 0, scale: 1.12 }, { opacity: 1, scale: 1, duration: 0.45, ease: "power2.out" }, 0.4);
-        tl.fromTo(ign.querySelector("[data-ign-sub]"), { opacity: 0, letterSpacing: "0.5em" }, { opacity: 1, letterSpacing: "0.28em", duration: 0.5, ease: "power2.out" }, 0.6);
+        if (arc && arcSvg && num) {
+          arc.style.strokeDasharray = `${BOOT_ARC_LEN}`;
+          arc.style.strokeDashoffset = `${BOOT_ARC_LEN}`;
+          const n = { v: 253 };
+          tl.set([arcSvg, num], { opacity: 1 }, 1.42);
+          tl.to(arc, { strokeDashoffset: 0, duration: 0.7, ease: "power2.inOut" }, 1.42);
+          tl.to(
+            n,
+            {
+              v: 0,
+              duration: 0.7,
+              ease: "power2.out",
+              onUpdate: () => {
+                num.textContent = String(Math.round(n.v));
+              },
+            },
+            1.42,
+          );
+        }
         // …and cuts to the dash screen.
-        tl.to(ign, { opacity: 0, duration: 0.16, ease: "power1.in" }, 1.3);
+        tl.to(ign, { opacity: 0, duration: 0.14, ease: "power1.in" }, 2.25);
       }
-      tl.set(el.querySelector("[data-body]"), { opacity: 1 }, 1.34);
-      tl.from(el.querySelectorAll("[data-hd]"), { opacity: 0, duration: 0.2 }, 1.36);
-      tl.from(el.querySelectorAll("[data-cell]"), { opacity: 0, duration: 0.22 }, 1.36);
+      tl.set(el.querySelector("[data-body]"), { opacity: 1 }, 2.29);
+      tl.from(el.querySelectorAll("[data-hd]"), { opacity: 0, duration: 0.2 }, 2.31);
+      tl.from(el.querySelectorAll("[data-cell]"), { opacity: 0, duration: 0.22 }, 2.31);
       // Self-test: every tell-tale lights in turn, the digits flash, the rev arc sweeps to the red
       // line and falls back to idle; then the lamps go out — all but neutral and ABS.
       if (tells.length) {
-        tl.to(tells, { opacity: 1, duration: 0.08, stagger: 0.05 }, 1.42);
-        tl.to(tells.filter((_, i) => i !== 2 && i !== 0), { opacity: 0.18, duration: 0.2, stagger: 0.04 }, 2.4);
+        tl.to(tells, { opacity: 1, duration: 0.08, stagger: 0.05 }, 2.37);
+        tl.to(tells.filter((_, i) => i !== 2 && i !== 0), { opacity: 0.18, duration: 0.2, stagger: 0.04 }, 3.35);
       }
       if (speed) {
         tl.add(() => {
           speed.textContent = "888";
           speed.style.opacity = "0.45";
-        }, 1.42);
+        }, 2.37);
         tl.add(() => {
           speed.textContent = "0";
           speed.style.opacity = "";
-        }, 2.45);
+        }, 3.4);
       }
       const r = { v: 0 };
       if (rev) {
@@ -135,7 +165,7 @@ export function DashExit({
               rev.style.strokeDashoffset = `${REV_LEN * (1 - r.v)}`;
             },
           },
-          1.5,
+          2.45,
         );
         tl.to(r, {
           v: 0.14,
@@ -404,12 +434,14 @@ export function DashExit({
       </div>
       {!still ? (
         <div className="dash-ignition" data-ign style={{ opacity: 0 }} aria-hidden>
-          <svg viewBox="0 0 100 100" className="dash-ign-ring">
-            <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(243,241,236,0.1)" strokeWidth="1" />
-            <circle data-ign-ring cx="50" cy="50" r="44" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" transform="rotate(-90 50 50)" />
+          <b className="dash-ign-word" data-ign-word style={{ opacity: 0 }} />
+          <svg viewBox="0 0 300 300" className="dash-ign-gauge" data-ign-gauge style={{ opacity: 0 }}>
+            <path d={BOOT_ARC} fill="none" stroke="rgba(243,241,236,0.08)" strokeWidth="3" strokeLinecap="round" />
+            <path data-ign-arc d={BOOT_ARC} fill="none" stroke={c} strokeWidth="3" strokeLinecap="round" />
           </svg>
-          <b data-ign-mark>R</b>
-          <small data-ign-sub>system check</small>
+          <b className="dash-ign-num" data-ign-num style={{ opacity: 0 }}>
+            253
+          </b>
         </div>
       ) : null}
       {bodyHidden ? <BootScreen /> : null}

@@ -89,6 +89,7 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
       centre: new THREE.Vector3(),
       v0: new THREE.Vector3(),
       v1: new THREE.Vector3(),
+      eye: new THREE.Vector3(),
     }),
     [],
   );
@@ -211,35 +212,35 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
       pitch -= 0.9 * easeInOut(rewind) * (1 - rewind * 0.5);
     }
 
-    // Through the doorway: the camera flies into the lit screen, straight on — and back out
-    // of it when you return from that world.
-    let into = 0;
-    let swing = 0; // the orbit's share of the way round the setup (ahead of the dive)
+    // Through the doorway, in three beats: the camera swings round the setup to where its owner
+    // sits — the rider's seat behind the dash, the chair in front of the monitor, an arm's length
+    // from the laptop — holds there a moment with the screen in view, then dives straight into
+    // the glass. Coming back from that world runs it in reverse.
+    let swing = 0; // 0…1 along the orbit from the climb's pose to the owner's eye
+    let dive = 0; // 0…1 from the eye into the glass
     let outKick = 0; // the pull-out's lens kick: wide at the start, settling as you land on the climb
     if (s.portal) {
       const u = clamp01((now - s.portal.at) / 1000 / PORTAL_LENGTH);
-      into = easeIn(u);
-      swing = easeInOut(clamp01(u / 0.8));
+      swing = easeInOut(clamp01(u / 0.52));
+      dive = easeIn(clamp01((u - 0.66) / 0.34));
     } else if (s.portalOut) {
       const u = clamp01((now - s.portalOut.at) / 1000 / PORTAL_OUT_LENGTH);
-      into = 1 - easeInOut(u);
-      swing = 1 - easeInOut(clamp01((u - 0.2) / 0.8));
+      dive = 1 - ease(clamp01(u / 0.4));
+      swing = 1 - easeInOut(clamp01((u - 0.3) / 0.7));
       outKick = Math.sin(Math.pow(u, 0.6) * Math.PI);
       if (u >= 1) s.portalOut = null;
     }
+    const into = Math.max(swing, dive);
     if (into > 0 && s.portalAnchor) {
       const a = s.portalAnchor;
       tmp.anchor.set(a.x, a.y, a.z);
       tmp.normal.set(a.nx, a.ny, a.nz);
       tmp.centre.set(a.cx, a.cy, a.cz);
-      // End just in front of the glass, looking through it.
-      tmp.look.copy(tmp.anchor).addScaledVector(tmp.normal, 0.18);
-      // The way there is an orbit, not a straight line: the camera swings round the setup to the side
-      // its screen faces (over the tank and down onto the dash, round to the front of a monitor),
-      // so the object turns beneath you, then it dives in. Direction slerps round the centre while
-      // the distance closes.
+      tmp.eye.set(a.ex, a.ey, a.ez);
+      // The orbit: the direction slerps round the setup's centre from where the climb stands to
+      // where the eye is, while the distance closes; a lift keeps it going over, not through.
       tmp.v0.copy(tmp.pos).sub(tmp.centre);
-      tmp.v1.copy(tmp.look).sub(tmp.centre);
+      tmp.v1.copy(tmp.eye).sub(tmp.centre);
       const r0 = tmp.v0.length();
       const r1 = tmp.v1.length();
       if (r0 > 1e-4 && r1 > 1e-4) {
@@ -253,20 +254,22 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
           const w1 = Math.sin(swing * ang) / sn;
           tmp.dir.copy(tmp.v0).multiplyScalar(w0).addScaledVector(tmp.v1, w1);
         } else tmp.dir.copy(tmp.v0).lerp(tmp.v1, swing).normalize();
-        // Keep height from the orbit a little above the chord so the swing reads as going over, not through.
-        const r = r0 + (r1 - r0) * into;
+        const r = r0 + (r1 - r0) * swing;
         tmp.pos.copy(tmp.centre).addScaledVector(tmp.dir, r);
-        tmp.pos.y += Math.sin(swing * Math.PI) * 0.35 * (1 - into);
-      } else tmp.pos.lerp(tmp.look, into);
-      // Look: at the setup while swinging round it, settling onto the screen as you arrive.
-      const toward = tmp.dir.copy(tmp.centre).lerp(tmp.anchor, Math.max(into, swing * 0.7)).sub(tmp.pos);
+        tmp.pos.y += Math.sin(swing * Math.PI) * 0.3;
+      } else tmp.pos.lerp(tmp.eye, swing);
+      // The dive: from the eye straight in, to just short of the glass.
+      if (dive > 0) tmp.pos.lerp(tmp.look.copy(tmp.anchor).addScaledVector(tmp.normal, 0.1), dive);
+      // Look: at the setup while swinging round it, at its screen once seated and on the way in.
+      const toward = tmp.dir.copy(tmp.centre).lerp(tmp.anchor, into).sub(tmp.pos);
       if (toward.lengthSq() > 1e-6) {
         toward.normalize();
         const wantYaw = Math.atan2(toward.x, -toward.z);
         const wantPitch = Math.asin(THREE.MathUtils.clamp(toward.y, -1, 1));
         let dy = wantYaw - yaw; // shortest turn
         dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-        const hold = Math.max(into, swing);
+        // The head turns onto the setup ahead of the body's swing, so it never slides out of frame.
+        const hold = Math.max(dive, easeInOut(clamp01(swing * 2.4)));
         yaw += dy * hold;
         pitch += (wantPitch - pitch) * hold;
       }
@@ -291,7 +294,7 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
     L.yaw = THREE.MathUtils.damp(L.yaw, s.yaw, 6, dt);
     L.pitch = THREE.MathUtils.damp(L.pitch, s.pitch, 6, dt);
 
-    const free = 1 - Math.max(into, swing);
+    const free = 1 - into;
     const totalYaw = yaw + (L.yaw + L.px * 0.06) * free;
     const totalPitch = Math.min(1.5, pitch + (L.pitch + L.py * 0.05) * free);
     tmp.dir.set(Math.sin(totalYaw) * Math.cos(totalPitch), Math.sin(totalPitch), -Math.cos(totalYaw) * Math.cos(totalPitch));
@@ -302,7 +305,7 @@ function Director({ sectionT, worlds, onPhaseEnd, onPortalHover }: { sectionT: A
     const cam = camera as THREE.PerspectiveCamera;
     // Lens: holding narrows the view; rushing widens it; the visitor's zoom opens it right up.
     const zoomed = fovBase * (1 + s.zoom * 0.95);
-    L.fov = THREE.MathUtils.damp(L.fov, zoomed - (1 - k.scale) * 6 + k.speed * 12 - into * 14 + outKick * 18, outKick > 0 ? 8 : 3, dt);
+    L.fov = THREE.MathUtils.damp(L.fov, zoomed - (1 - k.scale) * 6 + k.speed * 12 - dive * 14 + outKick * 18, outKick > 0 ? 8 : 3, dt);
     if (Math.abs(cam.fov - L.fov) > 0.01) {
       cam.fov = L.fov;
       cam.updateProjectionMatrix();
@@ -412,7 +415,7 @@ function Warmup({ onReady }: { onReady: () => void }) {
   const { clock, state } = useVr();
   useEffect(() => {
     // Dev-only handle for profiling and tests.
-    if (process.env.NODE_ENV !== "production") (window as unknown as { __vr?: unknown }).__vr = { gl, scene, clock, state };
+    if (process.env.NODE_ENV !== "production") (window as unknown as { __vr?: unknown }).__vr = { gl, scene, camera, clock, state };
     let cancelled = false;
     const run = async () => {
       try {

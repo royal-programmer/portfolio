@@ -227,6 +227,8 @@ export function RideAssembly({ world, modelUrl }: { world: World; /** A CC0 .glb
     screenMats,
     yaw: -0.35,
     offset: { fwd: 5.8, right: 1.3, up: -0.7 },
+    // The rider's seat: behind and above the dash, looking down onto it over the top yoke.
+    view: { back: 1.6, up: -0.3 },
     onFrame: (L, place) => {
       refs.forEach((r, i) => r.current && place(r.current, i, i >= 6 ? 0.12 : 0));
       // Wheels keep turning slowly, faster once lit.
@@ -245,7 +247,7 @@ export function RideAssembly({ world, modelUrl }: { world: World; /** A CC0 .glb
   }, [accent, tint]);
 
   if (modelUrl) {
-    // The real bike as one piece (plus its light), the kit and the route panel around it.
+    // The real bike as one piece (plus its light) and its dash — nothing else around it.
     return (
       <group ref={root}>
         <group ref={(el) => void (refs[0].current = el)}>
@@ -265,23 +267,6 @@ export function RideAssembly({ world, modelUrl }: { world: World; /** A CC0 .glb
               <Halo width={PANEL_W * 1.2} height={PANEL_H * 1.2} material={mats.halo} position={[0, 0, -0.02]} />
             </group>
           </group>
-        </group>
-        <group ref={(el) => void (refs[6].current = el)}>
-          <mesh geometry={geo.helmet} material={mats.shell} />
-          <mesh geometry={geo.visor} material={visorMat} rotation-y={0.4} />
-        </group>
-        <group ref={(el) => void (refs[7].current = el)}>
-          <mesh geometry={geo.tankBag} material={fabric} />
-        </group>
-        <group ref={(el) => void (refs[8].current = el)}>
-          <mesh geometry={geo.pannier} material={fabric} />
-        </group>
-        <group ref={(el) => void (refs[9].current = el)}>
-          <mesh geometry={geo.glove} material={fabric} position={[-0.07, 0, 0]} rotation-z={0.2} />
-          <mesh geometry={geo.glove} material={fabric} position={[0.07, 0, 0.04]} rotation-z={-0.15} />
-        </group>
-        <group ref={(el) => void (refs[10].current = el)}>
-          <mesh geometry={geo.intercom} material={mats.glow} />
         </group>
       </group>
     );

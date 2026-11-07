@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Professional front door — persona landings live at `/[persona]`; easter-egg at `/whoami`. */
+/** The front door is the hub (Ratul's call): on the real domain the proxy rewrites `/` to it; path-style hosts (previews, localhost) land here and go the same way. */
 export default function Page() {
-  redirect("/engineer");
+  redirect("/whoami");
 }

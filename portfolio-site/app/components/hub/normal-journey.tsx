@@ -43,6 +43,25 @@ const angleOf = (t: number) => rad(A0 + (A1 - A0) * t);
 
 
 
+/**
+ * Phones: the eight drawn things of a world, composed for the band above the chapter's words. Same
+ * order as every world's list (hero, top-left, top-right, right, right-low, left, bottom-left,
+ * bottom-right); the hero stands in the middle, the rest around it, balanced left and right.
+ * Units: fractions of the band's width, y down.
+ */
+const PHONE_PLACES: ReadonlyArray<{ x: number; y: number }> = [
+  { x: 0, y: 0 },
+  { x: -0.33, y: -0.3 },
+  { x: 0.31, y: -0.31 },
+  { x: 0.41, y: 0.03 },
+  { x: 0.33, y: 0.31 },
+  { x: -0.41, y: 0.03 },
+  { x: -0.3, y: 0.32 },
+  { x: 0.03, y: 0.37 },
+];
+/** The band's height as a fraction of its width that the composition above needs. */
+const PHONE_BAND_RATIO = 0.92;
+
 /** Strokes in a unit box (y down), drawn in order. */
 const CONSTELLATION_LENGTH: Record<string, number[]> = Object.fromEntries(Object.entries(CONSTELLATIONS).map(([k, objs]) => [k, objs.map((o) => strokesLength(o.strokes))]));
 
@@ -322,31 +341,74 @@ export function NormalJourney({ state, worlds, sectionT, recede }: Props) {
       //      arrives (complete at its midpoint), and undraw in reverse as it goes. They drift in from the
       //      light's direction and settle; depth gives parallax. The display's place is read off the
       //      same CSS the DOM uses (normal-display), so the ring always fits around it.
-      if (world && near > 0.02 && ending < 0.98) {
-        const portrait = W / Math.max(1, H) < 1;
+      // Which worlds draw: on phones, every world whose drawing band is on screen (the band sits
+      // at the top of a tall chapter, so the nearest-by-scroll world is often the one before it);
+      // elsewhere the nearest world, its ring around the display. A phone on its side has no bands
+      // (hidden), so it rings too.
+      const portrait = W / Math.max(1, H) < 1;
+      const targets: Array<{ w: World; band: DOMRect | null }> = [];
+      let bands = 0;
+      if (W < 1024) {
+        for (const w of worlds) {
+          const b = document.getElementById(`${w.slug}-art`)?.getBoundingClientRect();
+          if (!b || b.width <= 0 || b.height <= 0) continue;
+          bands++;
+          if (b.bottom > -0.3 * H && b.top < 1.3 * H) targets.push({ w, band: b });
+        }
+      }
+      if (!bands && world && near > 0.02) targets.push({ w: world, band: null });
+      for (const { w: world, band: bandRect } of ending < 0.98 ? targets : []) {
         const objs = CONSTELLATIONS[world.slug] ?? [];
         // Display centre and width, in stage units.
         let dcx: number, dcy: number, dw: number;
-        if (portrait) {
-          dw = (0.92 * W) / s;
-          dcx = (0.5 * W - ox) / s;
-          dcy = (0.09 * H + 0.92 * W * (680 / 1100) * 0.5 - oy) / s;
+        // Phones (Round H): the drawings have their own band above the words, so they gather there
+        // in a composition of their own (PHONE_PLACES) instead of ringing the display. Where there
+        // is no band (desktop, a phone on its side) the ring goes around the display, measured
+        // off the DOM: the in-flow slot on tablets and sideways phones, the fixed window on desktop.
+        const inBand = !!bandRect;
+        if (bandRect) {
+          dw = Math.min(bandRect.width, bandRect.height / PHONE_BAND_RATIO) / s;
+          dcx = (bandRect.left + bandRect.width / 2 - ox) / s;
+          dcy = (bandRect.top + bandRect.height / 2 - oy) / s;
         } else {
-          dw = (Math.min(0.44 * W, 720)) / s;
-          dcx = (W - 0.085 * W - dw * s * 0.5 - ox) / s;
-          dcy = (0.5 * H - oy) / s;
+          const slotEl = (W < 1024 ? document.getElementById(`${world.slug}-display`) : document.querySelector(".normal-display-frame")) as HTMLElement | null;
+          const rect = slotEl?.getBoundingClientRect();
+          if (rect && rect.width > 0) {
+            dw = rect.width / s;
+            dcx = (rect.left + rect.width / 2 - ox) / s;
+            dcy = (rect.top + rect.height / 2 - oy) / s;
+          } else if (portrait) {
+            dw = (0.92 * W) / s;
+            dcx = (0.5 * W - ox) / s;
+            dcy = (0.09 * H + 0.92 * W * (680 / 1100) * 0.5 - oy) / s;
+          } else {
+            dw = (Math.min(0.44 * W, 720)) / s;
+            dcx = (W - 0.085 * W - dw * s * 0.5 - ox) / s;
+            dcy = (0.5 * H - oy) / s;
+          }
         }
-        // Chapter progress 0 → 1 across the chapter; drawn fully at the midpoint.
-        const u = clamp01((c - (world.c - 0.5)) / 1);
-        const draw = easeInOut(u < 0.5 ? u / 0.5 : (1 - u) / 0.5);
+        // Chapter progress 0 → 1 across the chapter; drawn fully at the midpoint. In the phone band
+        // the drawing follows the band itself: it draws as the band rises into view and undraws as
+        // the band leaves at the top, so it is whole while it is on screen.
+        let draw: number;
+        if (bandRect) {
+          const arrive = clamp01((H - bandRect.top) / (0.55 * H));
+          const leave = clamp01((bandRect.bottom + 0.1 * H) / (0.45 * H));
+          draw = easeInOut(Math.min(arrive, leave));
+        } else {
+          const u = clamp01((c - (world.c - 0.5)) / 1);
+          draw = easeInOut(u < 0.5 ? u / 0.5 : (1 - u) / 0.5);
+        }
         const lit = spectrumColor(world.t, 72);
         const bright = spectrumColor(world.t, 84);
         for (let i = 0; i < objs.length; i++) {
           const o = objs[i];
-          if (portrait && o.place.y > 0.2) continue;
-          const px = portrait ? o.place.x * 0.62 : o.place.x;
-          const py = portrait ? o.place.y * 0.9 : o.place.y;
-          const size = o.place.size * dw * (0.82 + 0.18 * o.place.depth);
+          const ring = !inBand && portrait;
+          if (ring && (o.place.y > 0.45 || o.place.y < -0.5)) continue; // sideways phone: nothing under the display (the words) or far above it
+          const home = inBand ? (PHONE_PLACES[i] ?? o.place) : o.place;
+          const px = ring ? o.place.x * 0.8 : home.x;
+          const py = ring ? o.place.y * 0.9 : home.y;
+          const size = o.place.size * dw * (0.82 + 0.18 * o.place.depth) * (inBand ? 1.08 : 1);
           // Each object draws on its own slice of the chapter, staggered by its index, so the ring
           // grows outward rather than all at once; the undraw mirrors it.
           const lag = (i / Math.max(1, objs.length)) * 0.35;
@@ -355,7 +417,7 @@ export function NormalJourney({ state, worlds, sectionT, recede }: Props) {
           // Home around the display: each object is drawn in place, from its own first point,
           // with nothing sliding in; depth gives a little parallax against the scroll.
           const hx = dcx + px * dw;
-          const hy = dcy + py * dw + (c - world.c) * 120 * (1 - o.place.depth);
+          const hy = dcy + py * dw + (inBand ? 0 : (c - world.c) * 120 * (1 - o.place.depth));
           ctx.save();
           ctx.translate(hx - size / 2, hy - size / 2);
           ctx.scale(size, size);
@@ -390,8 +452,8 @@ export function NormalJourney({ state, worlds, sectionT, recede }: Props) {
           ctx.restore();
         }
         ctx.globalAlpha = 1;
-        void back;
       }
+      void back;
 
       if (on && !reduce) raf = requestAnimationFrame(frame);
       else if (on) {

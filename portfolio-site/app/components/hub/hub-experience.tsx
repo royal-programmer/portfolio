@@ -17,6 +17,7 @@
  */
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import { HubGuide, toggleFullscreen } from "./hub-guide";
 import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -61,6 +62,9 @@ const WORLD_SESSION_KEY = "xp-world";
 const NEXT_PHASE: Partial<Record<Phase, Phase>> = { wear: "blink", blink: "sky", approach: "impact", impact: "split", split: "climb" };
 const NEXT_LOWER: Record<Quality, Quality> = { best: "balanced", balanced: "performance", performance: "performance" };
 
+/** How long a tapped doorway waits for its setup to fully form before it gives up on the dive and goes as a plain fade (a model that never arrived). */
+const WAIT_FOR_SETUP_MS = 15000;
+
 function sessionFlag(set?: boolean): boolean {
   try {
     if (set) sessionStorage.setItem(GATE_SESSION_KEY, "1");
@@ -98,7 +102,19 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   const [toast, setToast] = useState<string | null>(null);
   const [active, setActive] = useState(0);
   const [touch, setTouch] = useState(false);
+  /** The rail and the HUD open with the page and fold to their strips once you scroll (Ratul's call). */
+  const [folded, setFolded] = useState(false);
+  const unfoldY = useRef(0);
+  const unfold = useCallback(() => {
+    unfoldY.current = window.scrollY;
+    setFolded(false);
+  }, []);
+  const toggleFold = useCallback(() => {
+    if (folded) unfold();
+    else setFolded(true);
+  }, [folded, unfold]);
   const [hint, setHint] = useState<string | null>(null);
+  /** The shortcuts card (the ? key, or the guide's button). */
   const [blink, setBlink] = useState(false);
   /** "Take off your headset": the dive back down the climb, lids closing, back to the gate. */
   const [rewinding, setRewinding] = useState(false);
@@ -109,6 +125,8 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   const [entering, setEntering] = useState<World | null>(null);
   /** The world just returned from: its finished window shrinks away as the camera pulls out. */
   const [returning, setReturning] = useState<World | null>(null);
+  /** A doorway asked for before its setup has formed: the button waits for the screen, then goes. */
+  const [waiting, setWaiting] = useState<string | null>(null);
   /** public/hub/media.json: Ratul's own pictures per persona (the photographer's sequence uses one). */
   const [media, setMedia] = useState<Partial<Record<string, string[]>>>({});
   const router = useRouter();
@@ -224,16 +242,25 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       const el = document.getElementById(from);
       const world = worlds.find((w) => w.slug === from);
       if (el && world) {
-        const y = el.offsetTop + el.offsetHeight / 2 - window.innerHeight / 2;
-        requestAnimationFrame(() => {
-          window.scrollTo(0, y);
-          lenisRef.current?.scrollTo(y, { immediate: true, force: true });
+        // The chapter's middle, re-aligned a few times while the page settles (fonts, the
+        // chapters' heights, a phone's address bar): the browser's own restore is off, so this
+        // is the only hand on the scroll, and the camera stands exactly at the chapter's station.
+        const align = () => {
+          const y = el.getBoundingClientRect().top + window.scrollY + el.offsetHeight / 2 - window.innerHeight / 2;
+          if (Math.abs(window.scrollY - y) > 1) {
+            window.scrollTo(0, y);
+            lenisRef.current?.scrollTo(y, { immediate: true, force: true });
+          }
           vr.current.c = world.c;
+        };
+        requestAnimationFrame(() => {
+          align();
           // Start inside the screen you left and pull back out to the chapter.
           vr.current.portalOut = { slug: from!, at: performance.now() + 200 };
           setReturning(world);
           window.setTimeout(() => setReturning(null), PORTAL_OUT_LENGTH * 1000 + 300);
         });
+        for (const ms of [120, 300, 600, 1000, 1600]) window.setTimeout(align, ms);
       }
     }
   }, [setPhase, worlds]);
@@ -292,22 +319,74 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     fetch(target.href, { mode: "no-cors", credentials: "include", cache: "force-cache" }).catch(() => {});
   }, []);
 
+  /** Smooth-scroll to a section (the rail, the keys, the Top/End marks, an early tap on a doorway). */
+  const jump = useCallback((id: string) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (lenisRef.current) lenisRef.current.scrollTo(el, { duration: 2.2 });
+    else el.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
   /** Through the doorway: the camera flies into the screen; the world's own sequence runs; we leave when it ends. */
+  const startPortal = useCallback((world: World) => {
+    vr.current.portal = { slug: world.slug, at: performance.now() };
+    vr.current.portalHover = null;
+    sessionFlag(true);
+    try {
+      sessionStorage.setItem(WORLD_SESSION_KEY, world.slug);
+    } catch {}
+    setEntering(world);
+    ambient.chime(1.5);
+  }, []);
   const enterWorld = useCallback(
     (slug: string) => {
       const world = worlds.find((w) => w.slug === slug);
-      if (!world || vr.current.portal) return;
-      vr.current.portal = { slug, at: performance.now() };
-      vr.current.portalHover = null;
-      sessionFlag(true);
-      try {
-        sessionStorage.setItem(WORLD_SESSION_KEY, slug);
-      } catch {}
-      setEntering(world);
-      ambient.chime(1.5);
+      if (!world || vr.current.portal || waiting) return;
+      // The dive needs this world's screen. Before the setup has formed (its model still
+      // arriving) there is nothing to fly into: wait for it, the button showing that it heard.
+      const a = vr.current.portalAnchor;
+      if (!a || a.slug !== slug || !a.formed) {
+        // Ratul's call: the hub drives the scroll to the chapter itself; the parts gather on the
+        // way and the dive fires the moment the setup is whole.
+        setWaiting(slug);
+        jump(slug);
+        return;
+      }
+      startPortal(world);
     },
-    [worlds],
+    [worlds, waiting, startPortal, jump],
   );
+  useEffect(() => {
+    if (!waiting) return;
+    const world = worlds.find((w) => w.slug === waiting);
+    if (!world) {
+      setWaiting(null);
+      return;
+    }
+    const t0 = performance.now();
+    let arrived = false;
+    const id = window.setInterval(() => {
+      // The auto-scroll is still on its way: let it arrive. Once there, scrolling away means the
+      // setup is coming apart and the tap is forgotten.
+      const dc = Math.abs(vr.current.c - world.c);
+      if (dc < 0.15) arrived = true;
+      if (arrived && dc > 0.45) {
+        window.clearInterval(id);
+        setWaiting(null);
+        return;
+      }
+      const a = vr.current.portalAnchor;
+      const formed = !!a && a.slug === waiting && a.formed;
+      if (!formed && performance.now() - t0 < WAIT_FOR_SETUP_MS) return;
+      // Formed: the dive, from the perfect moment. Still nothing after a long wait (the model
+      // never arrived): no anchor, so the doorway is the plain fade into the world's window.
+      if (!formed) vr.current.portalAnchor = null;
+      window.clearInterval(id);
+      setWaiting(null);
+      startPortal(world);
+    }, 60);
+    return () => window.clearInterval(id);
+  }, [waiting, worlds, startPortal]);
   const leaveForWorld = useCallback(() => {
     if (!entering) return;
     const target = personaHref(window.location.origin, entering.slug as PersonaSlug);
@@ -573,14 +652,21 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       const typing = document.activeElement && document.activeElement !== document.body && document.activeElement.tagName !== "BUTTON";
       if (typing) return;
       const p = vr.current.phase;
+      // The chapters answer the keys on the climb, and in Normal mode once the gate is gone.
+      const nav = p === "climb" || (experience === "normal" && gate === null);
       ambient.resume();
+      if ((e.key === "f" || e.key === "F") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        toggleFullscreen();
+        return;
+      }
       if (p === "climb" && !e.ctrlKey && !e.metaKey && (e.key === "-" || e.key === "_" || e.key === "=" || e.key === "+" || e.key === "0")) {
         // Lens: − pulls the view wide (watch an assembly whole), + tightens, 0 resets.
         const s = vr.current;
         s.zoom = e.key === "0" ? 0 : Math.max(-0.5, Math.min(1, s.zoom + (e.key === "-" || e.key === "_" ? 0.25 : -0.25)));
         return;
       }
-      if (p === "climb" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (nav && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const s = vr.current;
         // Glide so the chapter sits centred in the view (its words and its setup), not at the top.
         const centreOf = (el: HTMLElement) => el.offsetTop + el.offsetHeight / 2 - window.innerHeight / 2;
@@ -621,7 +707,8 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
           const slug = s.portalHover ?? (here?.kind === "persona" ? here.slug : null);
           if (slug) {
             e.preventDefault();
-            enterWorld(slug);
+            if (experience === "normal") normalEnter.current?.(slug);
+            else enterWorld(slug);
           }
           return;
         }
@@ -640,13 +727,17 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [gate, status, wear, startLight, sections, active, enterWorld]);
+  }, [gate, status, wear, startLight, sections, active, enterWorld, experience]);
 
   // ---- Smooth scroll + scroll → climb progress ---------------------------------
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const lenis = reduce ? null : new Lenis({ lerp: 0.14, wheelMultiplier: 0.9 });
     lenisRef.current = lenis;
+    // The hub places its own scroll (a return lands on the chapter you left); the browser's restore
+    // would fight it while the page is still finding its height.
+    const prevRestore = history.scrollRestoration;
+    history.scrollRestoration = "manual";
 
     const measure = () => {
       const els = Array.from(document.querySelectorAll<HTMLElement>("[data-section]"));
@@ -669,6 +760,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     const onScroll = () => {
       const c = progress(window.scrollY);
       vr.current.c = c;
+      if (Math.abs(window.scrollY - unfoldY.current) > 40) setFolded(true);
       const idx = Math.round(c);
       if (idx !== lastActive) {
         lastActive = idx;
@@ -699,6 +791,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
       window.addEventListener("scroll", onScroll, { passive: true });
     }
     return () => {
+      history.scrollRestoration = prevRestore;
       ro.disconnect();
       window.removeEventListener("scroll", onScroll);
       if (tick) gsap.ticker.remove(tick);
@@ -792,6 +885,10 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
 
   // ---- Text choreography ------------------------------------------------------
   const textLive = experience === "normal" ? gate === null : introDone;
+  // The rail and the HUD open when the chrome first appears (the gate and the intro move the scroll themselves).
+  useEffect(() => {
+    if (textLive) unfold();
+  }, [textLive, unfold]);
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -836,23 +933,9 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     return () => ctx.revert();
   }, [textLive]);
 
-  const jump = useCallback((id: string) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (lenisRef.current) lenisRef.current.scrollTo(el, { duration: 2.2 });
-    else el.scrollIntoView({ behavior: "smooth" });
-  }, []);
-
   const activeKind = sections[active];
   const activeSlug = activeKind?.kind === "persona" ? activeKind.slug : null;
   const inIntro = immersiveLive && !introDone;
-  const scrollHint = !ready
-    ? ""
-    : experience === "immersive"
-      ? touch
-        ? "Scroll to climb · touch & hold to slow time"
-        : "Scroll to climb · drag to look · hold to slow time"
-      : "Scroll to follow the light";
 
   return (
     <div
@@ -905,9 +988,6 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         </button>
         <div className="flex items-center gap-3 sm:gap-5">
           {ready && experience === "immersive" ? <QualityMenu value={quality} className="hidden md:block" /> : null}
-          <span className="sm:hidden">
-            <SoundToggle compact />
-          </span>
           <span className="hidden sm:block">
             <SoundToggle />
           </span>
@@ -915,32 +995,49 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         </div>
       </header>
 
-      {/* ---------- Spectrum rail (lg+) ---------- */}
-      <nav aria-label="Chapters" className={`fixed top-1/2 right-5 z-30 hidden -translate-y-1/2 flex-col gap-3 transition-opacity duration-700 lg:flex ${textLive ? "opacity-100" : "pointer-events-none opacity-0"}`}>
-        {chapters.map((c) => {
-          const id = personaIdentity(c.slug);
-          const on = activeSlug === c.slug;
-          const color = spectrumColor(c.t);
-          return (
-            <button
-              key={c.slug}
-              type="button"
-              onClick={() => jump(c.slug)}
-              aria-label={`${id.role} chapter`}
-              aria-current={on ? "true" : undefined}
-              data-cursor-color={color}
-              className="group flex items-center justify-end gap-3"
-            >
-              <span className={`font-mono text-[10px] tracking-[0.14em] text-[var(--ink-dim)] uppercase transition-opacity duration-[var(--dur-2)] ${on ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-                {id.role}
-              </span>
-              <span
-                className="block rounded-full transition-all duration-[var(--dur-2)]"
-                style={{ width: 3, height: on ? 34 : 10, backgroundColor: color, boxShadow: on ? `0 0 18px ${color}` : "none", opacity: on ? 1 : 0.55 }}
-              />
-            </button>
-          );
-        })}
+      {/* ---------- Spectrum rail (every size): Top, the worlds, End. Folds to a strip on scroll. ---------- */}
+      <nav aria-label="Chapters" className={`hub-rail ${textLive ? "is-on" : ""} ${folded ? "is-folded" : ""}`}>
+        <button type="button" className="hub-rail-end" onClick={() => jump("hero")} aria-label="Back to the top">
+          <span aria-hidden>▲</span>
+          <span className="hub-rail-word">Top</span>
+        </button>
+        {folded ? (
+          <button type="button" className="hub-rail-marks" onClick={unfold} aria-label="Open the chapters">
+            {chapters.map((c) => {
+              const on = activeSlug === c.slug;
+              const color = spectrumColor(c.t);
+              return <span key={c.slug} className="hub-rail-mark" style={{ height: on ? 22 : 6, backgroundColor: color, boxShadow: on ? `0 0 14px ${color}` : "none", opacity: on ? 1 : 0.5 }} />;
+            })}
+          </button>
+        ) : (
+          <div className="hub-rail-marks">
+            {chapters.map((c) => {
+              const id = personaIdentity(c.slug);
+              const on = activeSlug === c.slug;
+              const color = spectrumColor(c.t);
+              return (
+                <button
+                  key={c.slug}
+                  type="button"
+                  onClick={() => jump(c.slug)}
+                  aria-label={`${id.role} chapter`}
+                  aria-current={on ? "true" : undefined}
+                  data-cursor-color={color}
+                  className="group flex items-center justify-end gap-3"
+                >
+                  <span className={`hub-rail-label font-mono text-[10px] tracking-[0.14em] text-[var(--ink-dim)] uppercase transition-opacity duration-[var(--dur-2)] max-lg:hidden ${on ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                    {id.role}
+                  </span>
+                  <span className="hub-rail-mark" style={{ height: on ? 34 : 10, backgroundColor: color, boxShadow: on ? `0 0 18px ${color}` : "none", opacity: on ? 1 : 0.55 }} />
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <button type="button" className="hub-rail-end" onClick={() => jump("end")} aria-label="Down to the end">
+          <span aria-hidden>▼</span>
+          <span className="hub-rail-word">End</span>
+        </button>
       </nav>
 
       <main className="relative z-10">
@@ -954,9 +1051,6 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
             <p data-hero-item className="mt-7 text-[length:var(--step-1)] text-[var(--ink-dim)]">
               {HUB_COPY.intro} <CyclingPhrase chapters={chapters} />
             </p>
-            <p data-hero-item className="mt-14 font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase">
-              {scrollHint} <span aria-hidden className="hub-scroll-cue" />
-            </p>
           </div>
         </section>
 
@@ -968,7 +1062,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         </section>
 
         {chapters.map((c, i) => (
-          <PersonaChapter key={c.slug} chapter={c} index={i} total={chapters.length} onEnter={immersiveLive && introDone ? enterWorld : experience === "normal" && !sceneWanted && textLive ? (slug) => normalEnter.current?.(slug) : undefined} />
+          <PersonaChapter key={c.slug} chapter={c} index={i} total={chapters.length} waiting={waiting === c.slug} onEnter={immersiveLive && introDone ? enterWorld : experience === "normal" && !sceneWanted && textLive ? (slug) => normalEnter.current?.(slug) : undefined} />
         ))}
 
         {upcoming.length ? (
@@ -991,8 +1085,8 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         ) : null}
 
         {/* ---------- Closing ---------- */}
-        <section id="end" data-section className="flex min-h-[110svh] flex-col justify-center px-4 sm:px-8 lg:px-12">
-          <div className="max-w-2xl lg:max-w-3xl">
+        <section id="end" data-section className="flex min-h-[100svh] flex-col px-4 sm:px-8 lg:px-12">
+          <div className="my-auto max-w-2xl pt-28 lg:max-w-3xl">
             <h2 data-split className="font-display text-[length:var(--step-4)] leading-[0.95]">
               {HUB_COPY.closingTitle.split(/(?<=\.)\s+/).map((line, i) => (
                 <span key={i} className={`block ${i > 0 ? "italic text-[var(--ink-dim)]" : ""}`}>
@@ -1020,14 +1114,23 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
               </div>
             </div>
           </div>
-          <footer className="mt-24 flex items-center justify-between pb-8 font-mono text-[10px] tracking-[0.16em] text-[var(--ink-faint)] uppercase">
+          <footer className="hub-footer mt-16 flex items-center justify-between font-mono text-[10px] tracking-[0.16em] text-[var(--ink-faint)] uppercase">
             <span>© {new Date().getFullYear()} Ratul Roy</span>
-            <span className="sm:hidden">
-              <SoundToggle />
-            </span>
           </footer>
         </section>
       </main>
+
+      {/* ---------- The guide: the HUD in the corner, every way around listed, always on ---------- */}
+      <HubGuide
+        on={ready && gate === null && !inIntro && !entering && !returning && !rewinding}
+        touch={touch}
+        immersive={experience === "immersive"}
+        chapters={chapters.map((c) => ({ slug: c.slug, role: personaIdentity(c.slug).role, color: spectrumColor(c.t) }))}
+        folded={folded}
+        onToggle={toggleFold}
+        onTop={() => jump("hero")}
+        onEnd={() => jump("end")}
+      />
 
       {/* ---------- Intro overlays ---------- */}
       {/* Before any script runs the page IS the loader: the gate's still parts, server-rendered.
@@ -1115,7 +1218,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         />
       ) : null}
       {gate === "returning" ? (
-        <div role="status" className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-[var(--void)]">
+        <div role="status" className="hub-wait fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-[var(--void)]">
           {status === "failed" ? <p className="font-mono text-[10px] tracking-[0.24em] text-[var(--ink-dim)] uppercase">3D couldn’t start</p> : <span aria-label="Loading" className="gate-ring is-spinning" style={{ width: 20, height: 20 }} />}
           <button type="button" onClick={goNormal} className="font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase underline-offset-4 hover:text-[var(--ink)] hover:underline">
             {status === "failed" ? "Continue in Normal view" : "Skip — Normal view"}
@@ -1126,7 +1229,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   );
 }
 
-function PersonaChapter({ chapter, index, total, onEnter }: { chapter: HubChapter; index: number; total: number; /** Immersive: the button goes through the same doorway as the setup (the camera flies into its screen). */ onEnter?: (slug: string) => void }) {
+function PersonaChapter({ chapter, index, total, onEnter, waiting }: { chapter: HubChapter; index: number; total: number; /** The doorway heard the tap and waits for its setup to form. */ waiting?: boolean; /** Immersive: the button goes through the same doorway as the setup (the camera flies into its screen). */ onEnter?: (slug: string) => void }) {
   const id = personaIdentity(chapter.slug);
   const color = spectrumColor(chapter.t);
   return (
@@ -1144,7 +1247,9 @@ function PersonaChapter({ chapter, index, total, onEnter }: { chapter: HubChapte
       >
         {String(index + 1).padStart(2, "0")}
       </span>
-      <div className="relative max-w-2xl">
+      <div className="relative w-full max-w-2xl">
+        {/* Phones, Normal mode: the chapter's drawings gather here, above its words (normal-journey measures it). */}
+        <div id={`${chapter.slug}-art`} className="normal-art-slot" aria-hidden />
         <p className="flex items-center gap-3 font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase">
           <span aria-hidden className="h-px w-8" style={{ backgroundColor: color, boxShadow: `0 0 10px ${color}` }} />
           {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")} · {id.role}
@@ -1178,7 +1283,8 @@ function PersonaChapter({ chapter, index, total, onEnter }: { chapter: HubChapte
                 onEnter(chapter.slug);
               }}
               data-cursor-color={color}
-              className="hub-cta mt-10 inline-flex min-h-12 items-center gap-3 rounded-full border px-6 text-sm font-medium backdrop-blur-md"
+              aria-busy={waiting || undefined}
+              className={`hub-cta mt-10 inline-flex min-h-12 items-center gap-3 rounded-full border px-6 text-sm font-medium backdrop-blur-md ${waiting ? "is-waiting" : ""}`}
               style={{ "--c": color } as CSSProperties}
             >
               {id.cta}
@@ -1192,6 +1298,8 @@ function PersonaChapter({ chapter, index, total, onEnter }: { chapter: HubChapte
             </p>
           </div>
         </div>
+        {/* Phones, Normal mode: the chapter's display sits here, in the flow below its words (normal-displays). */}
+        <div id={`${chapter.slug}-display`} className="normal-display-slot" aria-hidden />
       </div>
     </section>
   );

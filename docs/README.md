@@ -12,6 +12,7 @@ Central documentation for the **Ratul Roy** multi-persona portfolio project. The
 | [04-deployment.md](./04-deployment.md) | Hosting, env vars, and release checklist |
 | [05-other-important-documentation.md](./05-other-important-documentation.md) | Architecture notes, persona rules, assets, glossary, gaps |
 | [06-versioning-and-releases.md](./06-versioning-and-releases.md) | How to commit, tag, bump versions, and publish releases |
+| [assessment/](./assessment/) | **Independent code + product review** — honest opinion on vision, architecture, performance, a11y, SEO, security, scalability, flaws, and a prioritized roadmap |
 
 ## Workspace layout
 
