@@ -5,6 +5,59 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-07 — Round H (part 2b): every drawn object redrawn in detail, one stroke per object
+
+Ratul's call: "make all graffiti detailed to look like real but in 2D, no matter the strokes."
+All 47 hand-drawn objects in `hub/constellations.ts` (the bike stays traced from its model) were
+redrawn at roughly three to five times the detail, each still a set of polylines in a unit box so
+the draw-on, the pen light and the placements are untouched:
+
+- **Code:** the laptop in three-quarter view with a lit screen of code, a cursor, a status bar,
+  hinge caps, a perspective keyboard, trackpad, speaker grilles, ports; the terminal with a title,
+  a progress bar and a scrollbar; two monitors showing an editor (file tree, tabs, minimap) and a
+  dashboard (chart, bars, gauge); earbuds with mesh and stems; a rack of five servers with rails,
+  handles, drive bays, vents and LEDs; a mug with latte swirl and beans; a git graph with two
+  branches, a tag and HEAD; a keyboard with a function row, W A S D legends, arrows and a wrist rest.
+- **Trade:** the chart is a chart (Ratul: "not a desk"): fourteen candles with wicks and bearish
+  fills, a moving average, volume bars, price and time ticks, a crosshair with its price tag, a
+  legend; a coin with reeded edge and lettering; a stack of notes with a portrait, seals and a coin
+  stack; a brain with gyri and a circuit overlay; a clock with sixty ticks, a sub-dial, a date
+  window and a crown; an hourglass with turned posts, grains and a stream; a spiral journal with a
+  checklist and a tiny P&L sketch, and a pen; a calculator with digits, a solar strip and glyphs.
+- **Lens:** a camera with grip, pentaprism, hot shoe, mode dial, seven aperture blades and strap
+  lugs; thirds with a scene (sun, hills, a tree on a crossing, an AF box); the golden spiral with
+  diagonals and a ratio bar; a phone back with a three-lens island, LiDAR, flash and speaker holes;
+  a tripod with a ball head, pan handle, centre column, hook, three two-section legs and a
+  spreader; a lens front with thread, blades and reflections; a softbox with its grid, speedring,
+  stand and rays; an SD card with pins, label and lock.
+- **Art:** an easel whose legs hide behind the canvas, a half-painted landscape, a clip and a rag;
+  a kidney palette with eight dabs and two brushes; a watercolour tin with wells and worn pans; a
+  jar of four brush shapes with a palette knife; a pencil cup with hex pencils, a brush and a
+  ruler; a pen tablet with a profile sketch, layers and a stylus; paint tubes, one squeezed; a
+  twelve-segment colour wheel with both triangles and a pointer.
+- **Ride:** a helmet with visor, pivots, vents, spoiler, chin grille and D-ring; gloves with
+  knuckle guards and stitching; boots with buckles, shin plate, ankle disc and tread; a road to a
+  vanishing point with posts, a sign, mountains and a rider; mountains with two ridges, couloirs,
+  pines and a winding road; a diamond road sign with a plate; a jerry can with three handles,
+  spout chain and level marks.
+- **Play:** a curved ultrawide with a first-person view and HUD (crosshair, health, ammo, minimap,
+  kill feed); a mouse with a ridged wheel, side buttons and RGB ring; a headset with sliders,
+  cushions, a boom mic; a gamepad with gated sticks, D-pad arrows, glyph buttons, a touchpad and
+  triggers; a keyboard with lit W A S D, an underglow strip and a knob; a trophy with laurels and
+  a plaque; a glass-side tower with three fans, cooler, RAM, GPU and PSU shroud; an energy can
+  with a bolt, bands, drops and a straw.
+
+**Performance.** Point counts went from ~1 000 to ~2 500–3 500 per world. The first measure on a
+393 × 852 touch viewport dropped a band's draw from 61 to 17–20 fps: `strokeObject` stroked every
+polyline on its own under the shadow blur. It now builds one path and strokes once per object;
+the same bands measure 51 / 59 / 57 fps (engineer / trader / gamer) against 61 at the hero.
+
+**Dev note:** a preview sheet in the scratchpad (plain-script build of the file, one canvas per
+object with its stroke and point counts) made each world a two-second visual check.
+
+**Admin knobs (16-admin-console):** the drawings themselves are code (SVG-like polylines); an
+admin upload of a world's drawing set as JSON is the later Phase C item already listed.
+
 ## 2026-11-07 — Round H (part 2a): the hub drives the early tap, Top/End marks, the HUD in three columns, both fold on scroll, the sound cycles, `/` is the hub, the stage fits its model, Art and Play whole on phones
 
 Ratul's list, discussed and agreed:
