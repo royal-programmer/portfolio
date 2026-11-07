@@ -1715,6 +1715,7 @@ em.font-display,
   position: relative;
   width: 100%;
   aspect-ratio: 1100 / 680;
+  container-type: inline-size;
   transition: transform 520ms var(--ease-out), filter 520ms var(--ease-out);
   filter: drop-shadow(0 40px 60px rgba(0, 0, 0, 0.6));
 }
@@ -1738,6 +1739,119 @@ em.font-display,
   height: 100%;
   max-height: none;
   aspect-ratio: auto;
+}
+/* The window's type and spacing scale with the frame (container units), so a small display reads
+   like a smaller desktop window. Phones and tablets only (the desktop display keeps its sizes). Scoped here: the full-size loader keeps its own sizes. */
+@media (max-width: 1023px) {
+  .normal-display .hub-exit-bar {
+    height: clamp(22px, 3.5cqw, 38px);
+    flex-shrink: 0;
+    gap: clamp(5px, 0.75cqw, 8px);
+    padding: 0 clamp(8px, 1.3cqw, 14px);
+    font-size: clamp(9px, 2.3cqw, 11px);
+  }
+  .normal-display .hub-exit-bar span {
+    width: clamp(6px, 0.9cqw, 10px);
+    height: clamp(6px, 0.9cqw, 10px);
+  }
+  .normal-display .hub-exit-bar b {
+    margin-left: clamp(4px, 0.9cqw, 10px);
+  }
+  .normal-display .hub-exit-bar em {
+    margin-left: clamp(8px, 1.6cqw, 18px);
+  }
+  .normal-display .hub-exit-body {
+    padding: clamp(8px, 1.6cqw, 18px) clamp(10px, 1.8cqw, 20px);
+    font-size: clamp(9px, 2.7cqw, 13px);
+    line-height: 2;
+  }
+  @container (max-width: 400px) {
+    .normal-display .hub-exit-body {
+      line-height: 1.6;
+    }
+  }
+  .normal-display .hub-exit-trade-grid {
+    grid-template-columns: clamp(90px, 13.6cqw, 150px) 1fr;
+  }
+  .normal-display .hub-exit-list {
+    padding: clamp(6px, 1.3cqw, 14px) 0;
+    font-size: clamp(9px, 1cqw, 11px);
+  }
+  .normal-display .hub-exit-list li {
+    gap: clamp(6px, 0.9cqw, 10px);
+    padding: clamp(4px, 0.7cqw, 8px) clamp(8px, 1.45cqw, 16px);
+  }
+  @media (max-width: 640px) {
+    .normal-display .hub-exit-trade-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .normal-display .vf-corner {
+    width: clamp(16px, 3.1cqw, 34px);
+    height: clamp(16px, 3.1cqw, 34px);
+    border-width: clamp(1px, 0.2cqw, 2px);
+  }
+  /* Dash, monitor, canvas */
+  .normal-display .dash-left,
+  .normal-display .dash-right {
+    padding: clamp(6px, 1.3cqw, 14px) clamp(8px, 1.6cqw, 18px);
+  }
+  .normal-display .dash-speed {
+    gap: clamp(5px, 0.9cqw, 10px);
+  }
+  .normal-display .dash-speed b {
+    font-size: clamp(24px, 7.6cqw, 84px);
+  }
+  .normal-display .dash-speed i,
+  .normal-display .dash-meta,
+  .normal-display .game-hud,
+  .normal-display .game-start {
+    font-size: clamp(9px, 1cqw, 12px);
+  }
+  .normal-display .dash-gear {
+    right: clamp(8px, 1.6cqw, 18px);
+    bottom: clamp(6px, 1.4cqw, 16px);
+  }
+  .normal-display .dash-gear span {
+    font-size: clamp(20px, 5cqw, 54px);
+  }
+  .normal-display .dash-gear em {
+    font-size: clamp(9px, 0.9cqw, 10px);
+  }
+  .normal-display .dash-meta {
+    gap: clamp(6px, 1.1cqw, 12px);
+  }
+  .normal-display .dash-ign-word {
+    font-size: clamp(18px, 5.1cqw, 56px);
+  }
+  .normal-display .dash-ign-gauge {
+    width: clamp(110px, 22.7cqw, 250px);
+    height: clamp(110px, 22.7cqw, 250px);
+  }
+  .normal-display .dash-ign-num {
+    font-size: clamp(30px, 7.6cqw, 84px);
+  }
+  .normal-display .game-body {
+    padding: clamp(6px, 1.3cqw, 14px);
+  }
+  .normal-display .game-hud {
+    gap: clamp(3px, 0.55cqw, 6px);
+  }
+  .normal-display .game-hud-br b {
+    font-size: clamp(16px, 3.5cqw, 38px);
+  }
+  .normal-display .game-hp {
+    width: clamp(80px, 20cqw, 220px);
+  }
+  .normal-display .game-map {
+    width: clamp(44px, 10cqw, 110px);
+  }
+  .normal-display .game-cross {
+    width: clamp(48px, 10.9cqw, 120px);
+  }
+  .normal-display .art-body {
+    padding: clamp(6px, 1.6cqw, 18px);
+  }
 }
 .normal-display-hit {
   position: absolute;
@@ -1931,3 +2045,4 @@ em.font-display,
   opacity: 0;
   pointer-events: none;
 }
+

@@ -5,6 +5,38 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-08 — Checkpoint #3 to production; Round H (part 2c): the phone display's type scales with its frame — the first task run through the model split
+
+**Checkpoint.** PR #3 (`development` → `main`, merge commit `6480e51`) carried Round H parts 1a–2b
+plus the docs index link. Vercel redeploys production from `main`.
+
+**The display's type (phones, Normal mode).** The chapter's display window (`.hub-exit` inside
+`.normal-display`) was sized for an 1100 px window, so on a 361 px frame (a 393 px phone) only
+about seven lines fit and the bar shrank. `.normal-display-frame` is now a size container and,
+under 1024 px, every fixed size inside the window (bar, body type and padding, the trader's list
+column, the viewfinder corners, the dash numbers and gauge, the game HUD, the canvas padding) is a
+`clamp(min, Ncqw, desktop)` so the window reads like a smaller desktop window, type never below
+9 px. Desktop and the full-size world loader are untouched (the rules are scoped to
+`.normal-display` and the phone media query). Verified: 393 × 852 body 9.75 px, bar 22 px, nine
+lines fit, no horizontal scroll; 360 × 780 floors at 9 px; 1280 unchanged; the Rider dash checked
+by the lead.
+
+**How it was built (the split, first run).** The lead (Fable) wrote a brief (goal, the two files,
+the approach, the verification steps, what to report) and handed it to a Sonnet builder, which
+did the CSS, screenshots and computed-style checks in one pass. Cost: the builder used
+~86k tokens over 52 tool calls in ~18 minutes; the lead spent roughly 6k tokens on the brief,
+the diff review and one screenshot sweep. Two lead-side catches: the builder saved
+`globals.css` with CRLF line endings (converted back to LF before the commit), and it skipped the
+loader and the non-Engineer displays, so the lead checked the dash. Lesson for the brief
+template: state the line-ending rule and name every variant to screenshot.
+
+**Keel smoke test (Ratul's session).** `/plugin marketplace add praxikit/keel` failed with
+`EBUSY` while renaming the marketplace cache folder; the folder was gone afterwards, so the fix is
+to retry. Decision: real apps (the trading journal) live in Ratul's personal GitHub, the
+`praxikit` org holds skills and kits only.
+
+---
+
 ## 2026-11-07 — Round H (part 2b): every drawn object redrawn in detail, one stroke per object
 
 Ratul's call: "make all graffiti detailed to look like real but in 2D, no matter the strokes."
