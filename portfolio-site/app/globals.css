@@ -2126,8 +2126,8 @@ em.font-display,
   --term-win: #fbf9f4;
   --ink: #1f2328;
   --ink-dim: #4b5059;
-  --term-faint: #6b7078;
-  --ink-faint: #6b7078;
+  --term-faint: #5a6068;
+  --ink-faint: #5a6068;
   --term-green: #1a7f37;
   --term-violet: #8250df;
 }
@@ -2189,7 +2189,8 @@ em.font-display,
   overflow-wrap: anywhere;
 }
 .terminal-root-body .is-dim {
-  opacity: 0.7;
+  opacity: 1;
+  color: var(--term-faint, var(--ink-faint));
 }
 .terminal-root-picker {
   display: block;
@@ -2563,6 +2564,13 @@ em.font-display,
 }
 .terminal-root-body b[class^="tone-"] {
   font-weight: 400;
+}
+
+/* The chips carry help, / and Esc on touch screens; the status bar's copies would only duplicate them. */
+@media (pointer: coarse) {
+  .terminal-os-status-r {
+    display: none;
+  }
 }
 
 /* Ghost suggestion after the caret. */

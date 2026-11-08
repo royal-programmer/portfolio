@@ -347,7 +347,10 @@ export function createShell(data: TerminalData): Shell {
       const a = args[i];
       if (a === "--oneline") oneline = true;
       else if (a === "--graph") graph = true;
-      else if (a === "-n" && /^\d+$/.test(args[i + 1] ?? "")) limit = Number(args[++i]);
+      else if (a === "-n") {
+        if (!/^\d+$/.test(args[i + 1] ?? "")) return [text(`fatal: '${args[i + 1] ?? ""}' is not a number`)];
+        limit = Number(args[++i]);
+      }
       else if (/^-\d+$/.test(a)) limit = Number(a.slice(1));
       else return [text(`fatal: unrecognized argument: ${a}`)];
     }

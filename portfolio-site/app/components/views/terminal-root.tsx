@@ -89,6 +89,7 @@ type GhCache = {
 };
 
 const ago = (ms: number) => {
+  if (!Number.isFinite(ms)) return "unknown";
   const m = Math.floor(ms / 60_000);
   if (m < 1) return "just now";
   if (m < 60) return `${m}m ago`;
@@ -96,6 +97,10 @@ const ago = (ms: number) => {
   if (h < 48) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
 };
+
+/** A cache or a fresh response is only used if it has the shape the output code reads. */
+const ghValid = (d: GhCache) =>
+  typeof d.t === "number" && !!d.user && typeof d.user === "object" && Array.isArray(d.repos) && Array.isArray(d.events) && d.repos.every((r) => r && typeof r.name === "string");
 
 /** Twelve weeks of push commits as `▁▂▃▄▅▆▇█`, oldest first. */
 function strip(events: GhCache["events"]): string {
@@ -165,7 +170,7 @@ function saveChecks(persona: string, v: Checks) {
 /** Braille portrait: one `<pre>`, in the accent. */
 const BrailleView = memo(function BrailleView({ art, className }: { art: BraillePortrait; className: string }) {
   return (
-    <pre className={`terminal-os-braille ${className}`} role="img" aria-label="Ratul, drawn in braille dots">
+    <pre className={`terminal-os-braille ${className}`} aria-hidden="true">
       {art.lines.join("\n")}
     </pre>
   );
@@ -192,9 +197,12 @@ const PixelsView = memo(function PixelsView({ art }: { art: PixelPortrait }) {
     return out;
   }, [art]);
   return (
-    <pre className="terminal-os-pixels" role="img" aria-label="Ratul, in pixels">
-      {rows}
-    </pre>
+    <>
+      <span className="sr-only">a portrait of Ratul</span>
+      <pre className="terminal-os-pixels" aria-hidden="true">
+        {rows}
+      </pre>
+    </>
   );
 });
 
@@ -265,11 +273,37 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     esc: () => void;
   }>({ open: () => {}, exit: () => {}, esc: () => {} });
   const cancelled = useRef(false);
-  const timers = useRef<number[]>([]);
+  const timers = useRef<Array<{ id: number; resolve: () => void }>>([]);
   const seq = useRef(0);
   const histIdx = useRef(-1);
   const draft = useRef("");
-  const wait = (ms: number) => new Promise<void>((r) => timers.current.push(window.setTimeout(r, ms)));
+  /** Resolves after `ms`; resolves at once when the component is gone, so loops can run their `finally` and exit. */
+  const wait = (ms: number) =>
+    new Promise<void>((resolve) => {
+      if (cancelled.current) return resolve();
+      const id = window.setTimeout(() => {
+        timers.current = timers.current.filter((t) => t.id !== id);
+        resolve();
+      }, ms);
+      timers.current.push({ id, resolve });
+    });
+  /** Capture-phase "any key stops it" listeners (demo, sl): tracked here so unmount can always remove them. */
+  const guards = useRef<Array<() => void>>([]);
+  const guardKeys = (stop: (e: Event) => void) => {
+    window.addEventListener("keydown", stop, true);
+    window.addEventListener("pointerdown", stop, true);
+    const off = () => {
+      window.removeEventListener("keydown", stop, true);
+      window.removeEventListener("pointerdown", stop, true);
+      guards.current = guards.current.filter((g) => g !== off);
+    };
+    guards.current.push(off);
+    return off;
+  };
+  const sendingRef = useRef(false);
+  const crtRef = useRef(false);
+  const entriesRef = useRef<Entry[]>([]);
+  const [demoOn, setDemoOn] = useState(false);
 
   useEffect(() => {
     live.current.cmd = cmd;
@@ -340,6 +374,9 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     line(text, true, false, here());
     return true;
   };
+
+  /** The hidden commands: counted by name like the listed ones. Anything else is sent as "unknown". */
+  const EGGS = ["sl", "cowsay", "fortune", "sudo", "rm", "vim", "vi", "nano", "emacs"];
 
   /** Anonymous usage: the command name only, never arguments. Fire and forget; nothing identifies the visitor. */
   const beacon = (command: string, ok = true) => {
@@ -416,6 +453,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
 
   /** Posts the message; the result replaces the `sending …` line. A failed message is printed back so it is not lost. */
   const sendMail = async (name: string, email: string, message: string) => {
+    sendingRef.current = true;
     const n = ++seq.current;
     append([{ n, k: "out", text: "sending …", dim: true }]);
     const patch = (p: Partial<Extract<Entry, { k: "out" }>>) => setEntries((es) => es.map((e) => (e.n === n && e.k === "out" ? { ...e, ...p } : e)));
@@ -426,16 +464,20 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     try {
       const res = await fetch("/api/lead", {
         method: "POST",
+        keepalive: true,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name, email, message, source: "terminal", persona }),
       });
       const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (cancelled.current) return;
       if (res.ok && j.ok) {
         patch({ text: `sent · I read these myself · reply lands at ${email}`, dim: false, accent: true });
         tick("mail");
       } else fail(j.error ?? `could not send (${res.status})`);
     } catch {
-      fail("could not reach the server");
+      if (!cancelled.current) fail("could not reach the server");
+    } finally {
+      sendingRef.current = false;
     }
   };
 
@@ -491,8 +533,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       }
       stopped = true;
     };
-    window.addEventListener("keydown", stop, true);
-    window.addEventListener("pointerdown", stop, true);
+    const unguard = guardKeys(stop);
+    setDemoOn(true);
     const halted = () => stopped || cancelled.current;
     try {
       for (const step of steps) {
@@ -509,9 +551,9 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         await wait(fast ? 350 : 700);
       }
     } finally {
-      window.removeEventListener("keydown", stop, true);
-      window.removeEventListener("pointerdown", stop, true);
+      unguard();
       demoRef.current = false;
+      setDemoOn(false);
       setCmd("");
       if (cancelled.current) return;
       if (stopped) {
@@ -526,6 +568,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
 
   /** `curl github`: user, recent repos and push events from the public API, cached for an hour. */
   const curlGithub = async () => {
+    if (curlAbort.current) return void line("curl: already fetching", false, true, here());
     const n = ++seq.current;
     append([{ n, k: "out", text: "fetching …", dim: true }]);
     const ac = new AbortController();
@@ -535,7 +578,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       let d: GhCache | null = null;
       try {
         const c = JSON.parse(window.localStorage.getItem(GH_KEY) ?? "null") as GhCache | null;
-        if (c && Date.now() - c.t < GH_TTL) d = c;
+        if (c && ghValid(c) && Date.now() - c.t < GH_TTL) d = c;
       } catch {}
       const cached = d !== null;
       if (!d) {
@@ -544,12 +587,14 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         if (rs.some((r) => !r.ok)) throw new Error(`http ${rs.find((r) => !r.ok)?.status}`);
         const [user, repos, events] = await Promise.all(rs.map((r) => r.json()));
         d = { t: Date.now(), user, repos, events };
+        if (!ghValid(d)) throw new Error("shape");
         try {
           window.localStorage.setItem(GH_KEY, JSON.stringify(d));
         } catch {}
       }
       const pad = Math.max(...d.repos.map((r) => r.name.length), 4);
       const rel = (iso: string) => ago(Date.now() - Date.parse(iso));
+      const safeUrl = (u: string) => (/^https:\/\/github\.com\//.test(u) ? u : "");
       const plain = (text: string, dim = false): Entry => ({ n: ++seq.current, k: "out", text, dim });
       const parts = (text: string, tone?: Tone): Entry => ({ n: ++seq.current, k: "parts", parts: [{ text, tone }] });
       setEntries((es) => es.filter((e) => e.n !== n));
@@ -557,10 +602,10 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         plain("HTTP/2 200", true),
         ...(cached ? [plain(`(cached · ${ago(Date.now() - d.t)})`, true)] : []),
         plain(" "),
-        parts(`${GH_USER} · ${d.user.public_repos} repos · ${d.user.followers} followers`),
+        parts(`${GH_USER} · ${Number(d.user.public_repos) || 0} repos · ${Number(d.user.followers) || 0} followers`),
         ...(d.repos[0] ? [parts(`last push  ${d.repos[0].name} · ${rel(d.repos[0].pushed_at)}`)] : []),
         ...d.repos.slice(0, 5).map(
-          (r): Entry => ({ n: ++seq.current, k: "ghrepo", name: r.name, url: r.html_url, pad, rest: `  ${(r.language ?? "-").padEnd(11)}  ★${r.stargazers_count}  ${rel(r.pushed_at)}` }),
+          (r): Entry => ({ n: ++seq.current, k: "ghrepo", name: String(r.name), url: safeUrl(r.html_url), pad, rest: `  ${(r.language ?? "-").padEnd(11)}  ★${Number(r.stargazers_count) || 0}  ${rel(r.pushed_at)}` }),
         ),
         { n: ++seq.current, k: "parts", parts: [{ text: "contributions (12w)  " }, { text: strip(d.events), tone: "accent" }] },
       ]);
@@ -569,7 +614,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       const msg = aborted ? "^C" : err instanceof Error && err.message === "rate" ? "github: rate limited, try again in a while" : "curl: (6) could not resolve api.github.com";
       patchEntry(n, { text: msg, dim: true });
     } finally {
-      curlAbort.current = null;
+      if (curlAbort.current === ac) curlAbort.current = null;
     }
   };
 
@@ -585,8 +630,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       stopped = true;
     };
     slStop.current = () => (stopped = true);
-    window.addEventListener("keydown", stop, true);
-    window.addEventListener("pointerdown", stop, true);
+    const unguard = guardKeys(stop);
     const n = ++seq.current;
     append([{ n, k: "art", text: "" }]);
     const cols = Math.max(30, Math.floor((body.current?.clientWidth ?? 600) / 7.8) - 4);
@@ -603,8 +647,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       }
     } catch {
     } finally {
-      window.removeEventListener("keydown", stop, true);
-      window.removeEventListener("pointerdown", stop, true);
+      unguard();
       slStop.current = null;
       setEntries((es) => es.filter((e) => e.n !== n));
     }
@@ -636,8 +679,15 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     setOpening(false);
     setCmd("");
     setPartial(null);
+    mailRef.current = null;
+    setMailStep(null);
+    demoRef.current = false;
+    pager.current = null;
+    setPaging(false);
     if (!osRef.current) swap();
-    showViews();
+    const last = entriesRef.current[entriesRef.current.length - 1];
+    if (last?.k === "menu") setMenuN(last.n);
+    else showViews();
     setReady(true);
   };
 
@@ -714,7 +764,10 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       line(`opening ${fx.url}`, false, true);
       append([{ n: ++seq.current, k: "link", label: fx.url, href: fx.url, external: true }]);
       window.open(fx.url, "_blank", "noopener,noreferrer");
-    } else if (fx.kind === "exit") act.current.exit(false);
+    } else if (fx.kind === "exit") {
+      if (sendingRef.current) line("sending · wait a moment", false, true, here());
+      else act.current.exit(false);
+    }
     else if (fx.kind === "clear") {
       setEntries([]);
       setMenuN(null);
@@ -726,7 +779,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       } catch {}
       line(`theme: ${fx.id}`, false, true, here());
     } else if (fx.kind === "crt") {
-      const next = !crt;
+      const next = !crtRef.current;
+      crtRef.current = next;
       setCrt(next);
       try {
         window.localStorage.setItem(CRT_KEY, next ? "1" : "0");
@@ -770,8 +824,11 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     } else print(r.lines);
     tickFor(c, cwd0);
     if (!demoRef.current) {
+      const name = c.split(/\s+/)[0].replace(/^\//, "").toLowerCase();
+      const known = shell.commands.some((x) => x.name === name) || EGGS.includes(name);
       const first = r.lines[0];
-      beacon(c.split(/\s+/)[0].replace(/^\//, "").toLowerCase(), !(first?.kind === "text" && first.text.startsWith("command not found")));
+      // `demo` reports itself as demo_start / demo_stop.
+      if (name !== "demo") beacon(known ? name : "unknown", known && !(first?.kind === "text" && first.text.startsWith("command not found")));
     }
     if (r.effect) effect(r.effect);
     if (!window.matchMedia("(pointer: coarse)").matches) input.current?.focus({ preventScroll: true });
@@ -788,6 +845,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
 
   /** Esc, in order: palette, typed text, menu selection; with none of those, exit. (An auto-open call-off is handled while busy.) */
   act.current.esc = () => {
+    if (sendingRef.current) return void line("sending · wait a moment", false, true, here());
     if (curlAbort.current) curlAbort.current.abort();
     else if (slStop.current) slStop.current();
     else if (mailRef.current) abortMail();
@@ -859,6 +917,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if ((e.key.length === 1 && !e.ctrlKey && !e.metaKey) || e.key === "Backspace" || e.key === "Enter" || e.key === "Tab") ambient.key();
     const menuLive = menu && !cmd;
+    // Ctrl+C with a selection (or Shift) is the browser's copy, not a cancel.
+    if (e.ctrlKey && (e.key === "c" || e.key === "C") && (e.shiftKey || !!window.getSelection()?.toString() || e.currentTarget.selectionStart !== e.currentTarget.selectionEnd)) return;
     if (mailStep) {
       // The form owns the prompt: only its keys are special; typing goes to the input as usual.
       if ((e.ctrlKey && (e.key === "c" || e.key === "C")) || e.key === "Escape") {
@@ -940,7 +1000,6 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     osRef.current = false;
     setOs(false);
     setCwd(HOME);
-    const ts = timers.current;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const instant = via === "normal" || reduce;
     const fromBack = performance.now() - lastPop < 3000;
@@ -1014,8 +1073,20 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     void run();
     return () => {
       cancelled.current = true;
-      ts.forEach((x) => window.clearTimeout(x));
-      ts.length = 0;
+      for (const t of timers.current) {
+        window.clearTimeout(t.id);
+        t.resolve();
+      }
+      timers.current = [];
+      curlAbort.current?.abort();
+      slStop.current?.();
+      for (const off of [...guards.current]) off();
+      demoRef.current = false;
+      mailRef.current = null;
+      pager.current = null;
+      setMailStep(null);
+      setPaging(false);
+      setDemoOn(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persona, via, itemKey, viewKey, color]);
@@ -1028,7 +1099,10 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       if (window.localStorage.getItem(PANE_KEY) === "0") setPaneOn(false);
       const th = window.localStorage.getItem(THEME_KEY);
       if (THEMES.some((t) => t.id === th)) setTheme(th as ThemeId);
-      if (window.localStorage.getItem(CRT_KEY) === "1") setCrt(true);
+      if (window.localStorage.getItem(CRT_KEY) === "1") {
+        crtRef.current = true;
+        setCrt(true);
+      }
     } catch {}
   }, [persona]);
 
@@ -1119,9 +1193,17 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     if (palette) palList.current?.children[palIdx]?.scrollIntoView({ block: "nearest" });
   }, [palette, palIdx]);
 
+  entriesRef.current = entries;
   const keepFocus = (e: { preventDefault: () => void }) => e.preventDefault();
+  /** While the mail form owns the prompt, chips and bar buttons say so instead of doing nothing. */
+  const mailBlocks = () => {
+    if (!mailRef.current) return false;
+    line("finish or Esc the message first", false, true, here());
+    return true;
+  };
   const chipKey = (k: "tab" | "up" | "esc") => {
     input.current?.focus({ preventScroll: true });
+    if (k !== "esc" && mailBlocks()) return;
     if (k === "tab") tab();
     else if (k === "esc") act.current.esc();
     else if (menu && !cmd) setSel((i) => (i + menu.rows.length - 1) % menu.rows.length);
@@ -1169,11 +1251,15 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       <div key={e.n} className="terminal-os-welcome">
         <div className="terminal-os-header">
           <div className="terminal-os-header-art">
+            <span className="sr-only">a portrait of Ratul</span>
             <BrailleView art={PORTRAIT_BRAILLE} className="is-wide" />
             <BrailleView art={PORTRAIT_BRAILLE_SMALL} className="is-small" />
           </div>
           <div className="terminal-os-header-text">
-            <pre className="terminal-os-banner">{e.art.join("\n")}</pre>
+            <pre className="terminal-os-banner" aria-hidden="true">
+              {e.art.join("\n")}
+            </pre>
+            <span className="sr-only">ROYAL PROGRAMMER</span>
             <span className="is-out">{e.welcome}</span>
             {e.overview.map((l) => (
               <span key={l} className="is-cmd">
@@ -1188,6 +1274,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       <PixelsView key={e.n} art={PORTRAIT_PIXELS} />
     ) : e.k === "neofetch" ? (
       <div key={e.n} className="terminal-os-fetch">
+        <span className="sr-only">a portrait of Ratul</span>
         <BrailleView art={PORTRAIT_BRAILLE_SMALL} className="is-fetch" />
         <pre className="terminal-os-fetch-rows">
           <code className="ps-user">{e.rows[0]}</code>
@@ -1213,24 +1300,29 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       </span>
     ) : e.k === "qr" ? (
       // Glyphs are 0.6em wide and 1em tall, two modules per row: stretch rows 1.2x so modules are square.
-      <pre
-        key={e.n}
-        className="terminal-os-qr"
-        role="img"
-        aria-label="QR code for this page"
-        style={{ transform: "scaleY(1.2)", transformOrigin: "top left", marginBottom: `${Math.round(e.lines.length * 13 * 0.2) + 8}px` }}
-      >
-        {e.lines.join("\n")}
-      </pre>
+      <div key={e.n}>
+        <span className="sr-only">a QR code of this page&apos;s address</span>
+        <pre
+          className="terminal-os-qr"
+          aria-hidden="true"
+          style={{ transform: "scaleY(1.2)", transformOrigin: "top left", marginBottom: `${Math.round(e.lines.length * 13 * 0.2) + 8}px` }}
+        >
+          {e.lines.join("\n")}
+        </pre>
+      </div>
     ) : e.k === "art" ? (
       <pre key={e.n} className="terminal-os-sl" aria-hidden="true">
         {e.text}
       </pre>
     ) : e.k === "ghrepo" ? (
       <span key={e.n} className="is-cmd">
-        <a className="terminal-root-link" href={e.url} target="_blank" rel="noreferrer">
-          {e.name}
-        </a>
+        {e.url ? (
+          <a className="terminal-root-link" href={e.url} target="_blank" rel="noreferrer">
+            {e.name}
+          </a>
+        ) : (
+          e.name
+        )}
         {" ".repeat(e.pad - e.name.length)}
         {e.rest}
       </span>
@@ -1312,6 +1404,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     );
 
   const typeChip = (run: () => void) => () => {
+    if (mailBlocks()) return;
     ambient.key();
     run();
   };
@@ -1357,7 +1450,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           }}
         >
           <span className="sr-only">Type commands. help lists them, / opens the menu, banner prints the welcome again, Esc or exit returns to the hub.</span>
-          <div role="log" aria-live="polite" aria-relevant="additions">
+          {demoOn ? <span className="sr-only" role="status">demo running, press any key to stop</span> : null}
+          <div role="log" aria-live={demoOn ? "off" : "polite"} aria-relevant="additions">
             {entries.map(renderEntry)}
           </div>
           {palette ? (
@@ -1448,7 +1542,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
             </button>
           ) : null}
           <span className="terminal-os-status-r">
-            <button type="button" onMouseDown={keepFocus} onClick={() => submit("help")}>
+            <button type="button" onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit("help")}>
               help
             </button>
             <button

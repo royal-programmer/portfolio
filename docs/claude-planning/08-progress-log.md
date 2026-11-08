@@ -5,6 +5,32 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-08 — Engineer terminal: cold review of rounds 1c–1h and the fix pass
+
+**Reviewer (Sonnet, ≈100k)** found 10: (1) demo/`sl`/`curl` outlived the component — cleanup
+cleared timers so `await wait()` never resolved and capture-phase key listeners stayed on
+`window`, eating keys on the next page; (2) beacons sent any typed first token, not only commands;
+(3) paper theme dim text ≈2.7:1; (4) two `curl`s in flight broke Esc; (5) GitHub `html_url` and the
+cache unvalidated; (6) Ctrl+C swallowed copy; (7) mail fetch without `keepalive`; (8) in-memory
+rate limit useless on serverless, PII in logs, no body caps; (9) small (`-n abc` blame, chips
+during mail, `pageshow` double menu, stale `crt`, duplicate phone controls); (10) banner/art in the
+live region, demo steps announced.
+
+**Fixed** — builder (Sonnet, ≈60k): tracked listeners removed in cleanup, cancellable `wait`,
+abort/stop/reset on unmount; beacons allowlisted to known commands + eggs, else `unknown`,
+`view_open` only for real ids, no double `demo`; per-theme `--term-faint` (paper 5.6:1); curl
+in-flight guard and owner-checked abort; GitHub URL protocol check, cache shape validation, NaN
+dates → `unknown`; Ctrl+C yields to copy; `keepalive`, Esc/exit held while sending; `-n abc`
+message; chips answer during mail; `pageshow` reuses the last menu; `crt` via ref; status-bar
+buttons hidden on coarse pointers; art `aria-hidden` with sr-only text; live region off during
+the demo. Lead: body caps on both routes, theme allowlist, hashed email in logs, **migration
+0010** — DB triggers capping `leads` at 60/h and `term_events` at 5000/h (replaces the in-memory
+limiter). Lead verified: a demo interrupted by Back leaves no capture listener behind; phone
+status bar shows no duplicate buttons; tsc + eslint clean.
+
+**Pending on Ratul** — migrations 0008, 0009, 0010 in the SQL editor; then `mail` and the
+beacons go live. Then checkpoint #4.
+
 ## 2026-11-08 — Engineer round 1h: live GitHub, themes, the PDF, QR, eggs, ghost text, analytics
 
 **What shipped** — `curl github` (public API, no token; repos, followers, last push, five repos with
