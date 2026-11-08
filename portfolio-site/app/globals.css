@@ -2046,3 +2046,135 @@ em.font-display,
   pointer-events: none;
 }
 
+
+/* A view's way back (view-shell): the "exit" action in the corner, in the HUD strip's voice. */
+.view-exit {
+  position: fixed;
+  right: 1.25rem;
+  /* Above the page's round control in the same corner (fixed bottom-5 right-5, 48px). */
+  bottom: max(5.5rem, calc(4.25rem + env(safe-area-inset-bottom)));
+  z-index: 60;
+  font-family: var(--font-geist-mono), monospace;
+  text-transform: uppercase;
+}
+.view-exit button {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-height: 1.6rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--void, #07070a) 70%, transparent);
+  backdrop-filter: blur(8px);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: var(--ink-dim, #a9a7a1);
+  transition: color var(--dur-2, 320ms) var(--ease-out, ease);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+@media (pointer: coarse) {
+  .view-exit button {
+    min-height: 44px;
+    padding-inline: 14px;
+  }
+}
+.view-exit button:hover,
+.view-exit button:focus-visible {
+  color: var(--ink, #f3f1ec);
+}
+.view-exit button > span {
+  font-size: 10px;
+  color: var(--ink-faint, #6d6b67);
+}
+
+/* The Engineer page's root (views/terminal-root): the terminal window on a dark stage, picker inside. */
+.terminal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--void, #050507);
+}
+.terminal-root-frame {
+  transform: scale(1);
+  transition: transform 800ms var(--ease-in-out), opacity 650ms var(--ease-in-out);
+}
+.terminal-root.is-opening .terminal-root-frame {
+  transform: scale(1.6);
+  opacity: 0;
+  transition-duration: 650ms;
+}
+.terminal-root.is-direct .terminal-root-frame {
+  animation: world-boot-in 700ms var(--ease-out) both;
+}
+.terminal-root-body {
+  overflow-y: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.terminal-root-picker {
+  display: block;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.terminal-root-picker li {
+  display: block;
+}
+.terminal-root-row {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  width: 100%;
+  min-height: 32px;
+  margin: 0;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.terminal-root-row em {
+  width: 1ch;
+  font-style: normal;
+  color: var(--c);
+}
+.terminal-root-row b {
+  font-weight: 400;
+}
+.terminal-root-row i {
+  font-style: normal;
+  min-width: 0;
+}
+.terminal-root-row.is-sel {
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+}
+@media (pointer: coarse) {
+  .terminal-root-row {
+    min-height: 44px;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 0;
+    line-height: 1.5;
+    padding-block: 6px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-root-frame {
+    transition: none;
+    animation: none;
+  }
+  .terminal-root.is-opening .terminal-root-frame {
+    transform: none;
+  }
+}

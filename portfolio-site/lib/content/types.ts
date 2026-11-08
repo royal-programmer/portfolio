@@ -50,6 +50,23 @@ export function isPersonaSlug(value: string): value is PersonaSlug {
   return (ALL_PERSONAS as readonly string[]).includes(value);
 }
 
+/**
+ * A persona page is one dataset rendered by several selectable *views* (docs/claude-planning/
+ * 17-persona-views.md). The page's root (the Engineer's terminal) lists the enabled views; each view
+ * is a branch at `/<persona>/<view id>`. The registry lives in `lib/content/views.ts` until the
+ * admin console moves it into `site_settings`.
+ */
+export type PersonaView = {
+  /** URL segment and terminal name, e.g. "swarm". Must not collide with an entry slug. */
+  id: string;
+  /** Shown in the picker, e.g. "Swarm". */
+  name: string;
+  /** One sentence shown beside the name in the picker. */
+  line: string;
+  /** Hidden from the picker and its route is a 404 while false. */
+  enabled: boolean;
+};
+
 /** Runtime guard for the narrower set that is actually launched. */
 export function isLaunchedPersona(value: string): value is LaunchedPersona {
   return (LAUNCHED_PERSONAS as readonly string[]).includes(value);

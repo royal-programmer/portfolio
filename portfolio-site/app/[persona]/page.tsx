@@ -8,6 +8,8 @@ import {
 import { placeOnSpectrum } from "@/lib/site/spectrum";
 import { HomePage } from "../components/home-page";
 import { WorldBoot } from "../components/world-boot";
+import { TerminalRoot } from "../components/views/terminal-root";
+import { getViews } from "@/lib/content/views";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -70,10 +72,16 @@ export default async function PersonaPage({ params, searchParams }: PersonaPageP
   const t = placeOnSpectrum(ranked).find((p) => p.slug === launched)?.t ?? 0.5;
   const items = engineerEntries.filter((e) => e.visibility === "public").map((e) => e.slug);
   const photo = media.photographer?.[0] ? `/hub/photographer/${media.photographer[0]}` : undefined;
+  const viaKind = via === "hub" ? "hub" : via === "normal" ? "normal" : null;
+  // The Engineer page is one dataset with many views; its root is the terminal, which lists them
+  // (17-persona-views.md). The other personas keep their page until their own rounds.
+  if (launched === "engineer") {
+    return <TerminalRoot persona={launched} t={t} color={accent} via={viaKind} items={items} views={getViews(launched)} />;
+  }
   return (
     <>
       {/* Opens dark, like the doorway that led here; lifts once the page has drawn. */}
-      <WorldBoot slug={launched} color={accent} t={t} via={via === "hub" ? "hub" : via === "normal" ? "normal" : null} items={items} photo={photo} />
+      <WorldBoot slug={launched} color={accent} t={t} via={viaKind} items={items} photo={photo} />
       <HomePage
         routePersona={launched}
         personas={personas}

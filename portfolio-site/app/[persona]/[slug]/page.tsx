@@ -3,10 +3,17 @@ import { PersonaLink } from "@/lib/site/persona-link";
 import { notFound } from "next/navigation";
 import {
   getEntryBySlug,
+  getPersona,
   isLaunchedPersona,
   listEntries,
   type LaunchedPersona,
 } from "@/lib/content";
+import { getView, getViews } from "@/lib/content/views";
+import { placeOnSpectrum } from "@/lib/site/spectrum";
+import { HomePage } from "../../components/home-page";
+import { WorldBoot } from "../../components/world-boot";
+import { ViewShell } from "../../components/views/view-shell";
+import { loadHomeContent } from "../../load-home-content";
 
 type ProjectDetailProps = {
   params: Promise<{ persona: string; slug: string }>;
@@ -16,8 +23,17 @@ export async function generateStaticParams() {
   const personas: LaunchedPersona[] = ["engineer"];
   const params: Array<{ persona: string; slug: string }> = [];
   for (const persona of personas) {
+    // The page's views are branches at the same depth as its entries (17-persona-views.md).
+    const views = getViews(persona);
+    for (const view of views) params.push({ persona, slug: view.id });
     const entries = await listEntries(persona);
     for (const entry of entries) {
+      // A view id wins over an entry slug (the view is checked first below); an entry with that
+      // slug would be unreachable, so say so where it is written rather than ship it silently.
+      if (views.some((v) => v.id === entry.slug)) {
+        console.error(`[views] ${persona}: entry slug "${entry.slug}" collides with a view id and is shadowed`);
+        continue;
+      }
       params.push({ persona, slug: entry.slug });
     }
   }
@@ -28,6 +44,11 @@ export async function generateMetadata({ params }: ProjectDetailProps): Promise<
   const { persona, slug } = await params;
   if (!isLaunchedPersona(persona)) {
     return { title: "Not found | Ratul Roy", robots: { index: false, follow: false } };
+  }
+  const view = getView(persona, slug);
+  if (view) {
+    const record = await getPersona(persona);
+    return { title: `${view.name} · ${record?.label ?? persona} | Ratul Roy`, description: view.line };
   }
   const entry = await getEntryBySlug(persona, slug);
   if (!entry) {
@@ -43,6 +64,9 @@ export default async function PersonaEntryPage({ params }: ProjectDetailProps) {
   const { persona, slug } = await params;
 
   if (!isLaunchedPersona(persona)) notFound();
+
+  const view = getView(persona, slug);
+  if (view) return <PersonaViewPage persona={persona} view={view.id} />;
 
   const entry = await getEntryBySlug(persona, slug);
   if (!entry) notFound();
@@ -121,4 +145,26 @@ export default async function PersonaEntryPage({ params }: ProjectDetailProps) {
       </div>
     </main>
   );
+}
+
+/**
+ * A view of the page (17-persona-views.md): the same data, one way of seeing it, inside the shell
+ * that remembers the pick and offers Exit. "stage" is the page as it was — the world's stage in 3D,
+ * the projects, the writing — opening on its finished window, as from the hub's Normal display.
+ */
+async function PersonaViewPage({ persona, view }: { persona: LaunchedPersona; view: string }) {
+  const { personas, engineerEntries, engineerBlogPosts } = await loadHomeContent();
+  const accent = personas.find((p) => p.slug === persona)?.accent ?? "#f3f1ec";
+  const ranked = [...personas].sort((a, b) => a.order - b.order).map((p) => p.slug);
+  const t = placeOnSpectrum(ranked).find((p) => p.slug === persona)?.t ?? 0.5;
+  const items = engineerEntries.filter((e) => e.visibility === "public").map((e) => e.slug);
+  if (view === "stage") {
+    return (
+      <ViewShell persona={persona} view={view}>
+        <WorldBoot slug={persona} color={accent} t={t} via="normal" items={items} />
+        <HomePage routePersona={persona} personas={personas} engineerEntries={engineerEntries} engineerBlogPosts={engineerBlogPosts} />
+      </ViewShell>
+    );
+  }
+  notFound();
 }

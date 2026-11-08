@@ -5,6 +5,37 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-08 — Engineer round 1: the terminal is the page's root, views are branches — built through the split
+
+Ratul's model (`17-persona-views.md`): one dataset, many selectable views; the terminal is the
+Engineer page's root and every view is a branch with its own route; a pick is remembered until
+Exit, which returns to the terminal. First two views to come: Swarm, then Series (Netflix-shaped,
+no Netflix marks).
+
+**Shipped.** `PersonaView` in the content contract; the registry `lib/content/views.ts` (`stage`
+enabled; `swarm`, `series` registered, disabled); `lib/site/view-memory.ts`; `/engineer` renders
+`TerminalRoot` (the other personas keep their pages); `/engineer/<view>` renders the view inside
+`ViewShell` (remembers the pick; Esc and an `exit` pill return to the root and forget it); `stage`
+= the page as it was, opening on its finished window. The terminal types the existing script, then
+`ls views/` and the picker: arrows/Enter/digits, tap on phones, a live prompt that takes `open`,
+`ls`, `help`, `exit`/`cd ..` (to the hub). `via=normal` prints instantly; `via=hub` ignores the
+memory. A view id shadows an entry slug and `generateStaticParams` logs it. Verified on 393 × 852
+touch and 1280: typing, picker, tap → `/stage`, remembered auto-open, Esc → root with the picker,
+Back from a view → the picker (no re-open), exit pill clear of the page's corner control, no
+console warnings beyond the slow Supabase reads.
+
+**How it was built.** Haiku scout surveyed the routes and content layer (71k tokens); the lead
+wrote the design doc, the contract type, the registry, the memory helper, `ViewShell` and the
+route wiring; a Sonnet builder wrote `terminal-root.tsx` + CSS from a brief (100k), a Sonnet
+reviewer read it cold and found ten real issues (69k) — Esc mid-script interleaving two typers,
+a Back-button re-open loop, the memory written before the view exists, Esc stealing from open
+panels, bfcache restore, reduced motion, listbox misuse, AltGr/IME, touch target, re-subscribing
+listeners — all fixed by the builder in a second pass (127k). Lead spend ≈ 30k across briefs,
+review and verification. Lesson: the reviewer leg paid for itself; keep it for interaction-heavy
+pieces.
+
+---
+
 ## 2026-11-08 — Checkpoint #3 to production; Round H (part 2c): the phone display's type scales with its frame — the first task run through the model split
 
 **Checkpoint.** PR #3 (`development` → `main`, merge commit `6480e51`) carried Round H parts 1a–2b
