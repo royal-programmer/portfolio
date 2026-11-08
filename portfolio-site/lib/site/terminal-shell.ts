@@ -455,14 +455,13 @@ export function createShell(data: TerminalData): Shell {
     const r = data.resume;
     const role = r.title.split(" · ");
     const wants = role.slice(1).join(" · ");
-    const reloc = r.location.split(" · ")[1];
     const b = r.experience[0]?.bullets ?? [];
     const proof = [b[1], b[5], b[7]].filter((x): x is string => !!x);
     const linkedin = data.contact.find((c) => c.label === "linkedin" && /^https:\/\//i.test(c.href));
     return [
       { kind: "parts", parts: [{ text: r.name, tone: "accent" }, { text: ` — ${r.title}` }] },
       text(r.location, true),
-      text(`looking for:  ${wants}${reloc ? `; ${reloc}` : ""}`),
+      text(`looking for:  ${wants}`),
       text("proof:"),
       ...proof.map((p) => text(`  • ${p}`)),
       text(`stack:  ${data.stack.join(" · ")}`),

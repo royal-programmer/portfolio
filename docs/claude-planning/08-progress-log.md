@@ -17,6 +17,14 @@ clickable portfolio contents with done marks (achievement on the eight non-mail 
 git log (+ `--oneline -n 3`), tour to the end, portrait fit, quick pick `2`, `?run=hire`, Home-key caret,
 pane row clicks; console clean. Not verified: a `school` period (unknown), rate-limited GitHub.
 
+**Lead verification (Fable) and nits:** `hire` no longer says "willing to relocate" twice; `git log`
+messages cut at a word boundary with `…` instead of mid-word; sections with nothing in them
+(`writing · 0 posts` today) are left out of the contents pane, the status counts, the next-hint and
+the achievement. Site-wide audit by a Sonnet reviewer (≈115k): hub and non-Engineer persona pages
+still show pre-redesign placeholders (debug "Identity Shift Panel" copy, "Performance (sample)",
+empty "Recent frames", "I am a Storytelling Frames"), no contact path off the Engineer host, phone
+hero under the guide HUD, soft 404 — queued as round 1j.
+
 ---
 
 ## 2026-11-08 — Engineer terminal: cold review of rounds 1c–1h and the fix pass

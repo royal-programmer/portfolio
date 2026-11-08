@@ -413,12 +413,17 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     } catch {}
   };
 
-  /** Marks a contents row done; when the eight (all but mail) are done, the achievement prints once, ever. */
+  /** Sections with nothing in them are not listed, not required and never suggested. */
+  const emptyIds: CheckId[] = [...(data.projects.length ? [] : ["projects" as const]), ...(data.posts.length ? [] : ["writing" as const]), ...(data.views.length ? [] : ["views" as const])];
+  const required = REQUIRED.filter((r) => !emptyIds.includes(r));
+  const rowOrder = ROW_ORDER.filter((r) => !emptyIds.includes(r));
+
+  /** Marks a contents row done; when the listed rows (all but mail) are done, the achievement prints once, ever. */
   const tick = (id: CheckId) => {
     const cur = checksRef.current;
     if (cur[id]) return;
     let next: Checks = { ...cur, [id]: true };
-    if (!next.achieved && osRef.current && REQUIRED.every((r) => next[r])) {
+    if (!next.achieved && osRef.current && required.every((r) => next[r])) {
       next = { ...next, achieved: true };
       append([{ n: ++seq.current, k: "out", text: "achievement unlocked · explorer — try: sudo make me a sandwich", accent: true }]);
       beacon("achievement");
@@ -445,7 +450,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     }
   };
 
-  const nextTry = ROW_ORDER.find((r) => !checks[r]);
+  const nextTry = rowOrder.find((r) => !checks[r]);
   const hintCmd = nextTry ? ROW_CMD[nextTry]! : "sudo make me a sandwich";
 
   const endPaging = () => {
@@ -703,7 +708,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
               try {
                 const r = await fetch(`https://api.github.com/repos/${x.repo}/commits/${x.sha}`, { signal: ac.signal });
                 const m = r.ok ? String(((await r.json()) as { commit?: { message?: string } }).commit?.message ?? "").split("\n")[0] : "";
-                if (m) known[x.sha] = m.slice(0, 120);
+                if (m) known[x.sha] = m.length > 100 ? `${m.slice(0, 100).replace(/\s+\S*$/, "")}…` : m;
               } catch {}
             }),
         );
@@ -1368,7 +1373,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
   const firstYear = Math.min(...data.periods.map((p) => Number(p.from.slice(0, 4))).filter(Boolean), ...data.timeline.map((c) => Number(c.date.slice(0, 4))).filter(Boolean));
-  const contents: Array<{ id: CheckId; cmd: string; label: string; note: string }> = [
+  const allContents: Array<{ id: CheckId; cmd: string; label: string; note: string }> = [
     { id: "resume", cmd: "resume", label: "resume", note: "the overview · 6 files" },
     { id: "projects", cmd: "projects", label: "projects", note: plural(data.projects.length, "project") },
     { id: "writing", cmd: "writing", label: "writing", note: plural(data.posts.length, "post") },
@@ -1379,6 +1384,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     { id: "contact", cmd: "contact", label: "contact", note: "mail · github · linkedin" },
     { id: "mail", cmd: "mail", label: "mail", note: "write to me" },
   ];
+  const contents = allContents.filter((row) => !emptyIds.includes(row.id));
 
   /** A name in a listing: runs `cat` (file), `cd` (dir) or `open` (view). Dirs take the accent, views green. */
   const pathButton = (it: FileItem) => (
@@ -1716,7 +1722,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           <code className="terminal-os-status-l">{`${USER}@code  ${shortPath(cwd)}`}</code>
           {tourStep ? <code className="terminal-os-status-tour">{`tour ${tourStep.i}/${tourStep.n} · any key stops`}</code> : null}
           <code className="terminal-os-status-m is-counts" hidden={!!tourStep}>
-            {plural(data.projects.length, "project")} · {plural(data.posts.length, "post")} · {plural(data.views.length, "view")}
+            {[plural(data.projects.length, "project"), plural(data.posts.length, "post"), plural(data.views.length, "view")].filter((t) => !t.startsWith("0 ")).join(" · ")}
           </code>
           {nextTry && !tourStep ? (
             <button type="button" className="terminal-os-status-hint" onMouseDown={keepFocus} onClick={() => submit(hintCmd)}>
