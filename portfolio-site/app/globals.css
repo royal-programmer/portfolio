@@ -2568,7 +2568,7 @@ em.font-display,
 
 /* The chips carry help, / and Esc on touch screens; the status bar's copies would only duplicate them. */
 @media (pointer: coarse) {
-  .terminal-os-status-r {
+  .terminal-os-status .terminal-os-status-r {
     display: none;
   }
 }
