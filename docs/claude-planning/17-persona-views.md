@@ -67,3 +67,63 @@ Each round ends with Ratul's phone check and a checkpoint.
 4. Designer site: light, lanyard ID badge, scattered "Selected Work" cards snapping to a grid,
    laptop-closes outro.
 5. Agency site: bold uppercase type, service rows with pill images, works list with years.
+
+## 6. The terminal, in full (round 1b — Ratul, 2026-11-08)
+
+Ratul's correction after round 1: the root is not an entry animation with a picker; it is **a
+real terminal**, the way Claude Code or a Linux TUI is: every command works, `/` opens a command
+menu, lists are chosen from with the arrow keys, and it can go full screen. The views are still
+branches; the terminal is a place in its own right.
+
+### 6.1 Shape
+
+- **Window on desktop, full screen on phones.** The green title-bar dot and `fullscreen` toggle
+  full screen on desktop (remembered on the device, key `xp-term-full`). Yellow clears, red exits.
+- **A hidden real input** carries every keystroke, so phones raise their keyboard when the body is
+  tapped; IME composition is honoured. Phones also get a **chip strip** above the keyboard:
+  `help` `/` `ls` `views` `Tab` `↑`, since those keys are hard to reach on a glass keyboard.
+- **Boot** is the current script (ssh, whoami, cat stack, uptime, ls /engineer), then one hint line
+  `type help, or / for the menu`, then `ls views/` with the picker. A remembered view still opens
+  by itself after the script; Esc or Backspace calls it off.
+
+### 6.2 The file system (pure, from the content layer)
+
+```
+~  (= /engineer)
+├── about            persona body, in a terminal's voice
+├── stack            one stack item per line
+├── uptime
+├── contact          mail · github · linkedin, as links
+├── projects/<slug>.md   title, year, role, stack, summary, repo ↗, live ↗, "open <slug>" for the page
+├── writing/<slug>.md    title, date, body (markdown shown as plain text)
+└── views/<id>*          executable: runs open <id>
+```
+
+`cd`, `pwd`, `ls [-l] [path]`, `cat <file>`, `tree`, `..`, `~`, `/engineer` all resolve. Unknown
+paths answer like a shell (`ls: cannot access 'x': No such file or directory`).
+
+### 6.3 Commands
+
+`help` / `/help` (grouped, one line each) · `man <cmd>` · `ls` `cd` `pwd` `cat` `tree` · `open
+<view|slug|url>` · `views` `projects` `writing` (menus, see 6.4) · `whoami` `stack` `uptime`
+`about` `contact` `neofetch` (a stat card: host, uptime, stack, projects, posts, views) · `history`
+· `clear` · `fullscreen` · `echo` · `exit` / `cd ..` from `~` (the hub). **Tab** completes commands,
+paths, view ids and slugs; a second Tab lists candidates. **↑/↓** walk the history (session
+storage). Unknown: `command not found: x` plus the nearest command when the distance is small.
+
+### 6.4 Menus, like Claude Code
+
+- Typing `/` at an empty prompt opens the **command palette** above the prompt: every command with
+  its one-line description, filtered as you type, ↑/↓ to move, Enter runs, Esc closes.
+- `views`, `projects`, `writing` print a **select list** (the current picker's look): `▸` on the
+  selected row, ↑/↓ and the row number choose, Enter acts (views: open; projects/writing: `cat`,
+  with `open` and the repo/live links at the foot of the printout), Esc leaves the list and returns
+  to the prompt. Rows are tappable, 44 px on coarse pointers.
+- **Esc order:** close the palette or a list → cancel an auto-open → at an empty idle prompt,
+  exit to the hub.
+
+### 6.5 Split for this round
+
+Lead: this spec, props and route plumbing, browser verification at 1280 and 393×852 touch. Sonnet
+builder: `lib/site/terminal-fs.ts` and `lib/site/terminal-shell.ts` (pure, no React), the
+terminal UI and CSS. Sonnet reviewer: cold read plus a command-by-command pass in the browser.
