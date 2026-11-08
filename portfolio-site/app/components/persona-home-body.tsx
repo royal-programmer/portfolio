@@ -32,16 +32,10 @@ function ComingUpCard({ content }: { content: PersonaContent }) {
         <Sparkles className="h-4 w-4 text-[var(--accent)]" aria-hidden />
         What&apos;s coming here
       </div>
-      <ul className="space-y-2 text-sm text-[var(--muted)]">
-        {content.points.slice(0, 3).map((point) => (
-          <li key={point} className="flex gap-2">
-            <span aria-hidden className="text-[var(--accent)]">
-              ·
-            </span>
-            {point}
-          </li>
-        ))}
-      </ul>
+      <p className="text-sm text-[var(--muted)]">
+        This world is being built: {content.points.slice(0, 3).join(", ").toLowerCase()}. The pieces land here as they are
+        ready.
+      </p>
       <p className="mt-5 text-sm text-[var(--fg)]">
         Until then,{" "}
         <PersonaLink persona="engineer" className="font-medium text-[var(--accent)] underline-offset-4 hover:underline">
