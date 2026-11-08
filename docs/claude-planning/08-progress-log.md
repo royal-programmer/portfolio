@@ -5,6 +5,30 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-08 — Engineer round 1f: the pane, checkpoints, braille and pixel portraits, shell feel
+
+**Ratul:** took the whole feature list (§6.9); asked whether the portrait could be more detailed and
+whether a 3/4 + 1/4 layout with hints would be better — lead recommended the pane, he agreed.
+
+**What shipped** — at ≥1024px a tmux-style split: terminal 3fr, pane `clamp(280px, 25%, 380px)`
+with the braille portrait, *where* (cwd), *checkpoints* (boot · help · resume · projects · views ·
+portrait · contact · mail-soon; ticked in the accent, stored in `xp-term-checks:engineer`; all
+seven → `achievement unlocked · explorer` printed once, `sudo` answers `nice try`), *next* (the
+first unticked, tappable) and *keys*. `pane` toggles it (remembered); phones show the next hint in
+the status bar. Portraits: braille (2×4 dots per cell, backdrop masked by hue, face crop) in the
+pane / phone header / neofetch; `portrait` is a true-colour half-block photo (84×65 cells,
+64-colour palette, 3,797 merged spans) — unmistakably him. Header hides its portrait when the
+pane shows it. Shell feel: coloured `ls` (dirs accent, views green), clickable names (`cat`/`cd`/
+`open`), `less`-style paging over 40 lines, Ctrl+L, Ctrl+C, `date`, `cal`.
+
+**Verified (lead)** — pane at 1280 with one portrait, phone header at 393 with no horizontal
+scroll, console clean, tsc + eslint clean. Builder verified checkpoints persist, achievement once,
+paging, Ctrl keys, clicked path.
+
+**How** — lead ≈30k (spec, three braille generations, verification); Sonnet builder ≈135k.
+Braille glyphs fall back to a system font (advance 0.76em vs 0.6em), so braille width varies a
+little by machine; the pixel portrait does not.
+
 ## 2026-11-08 — Engineer round 1e: boot as the profile tool, the Linux box, the header with the portrait
 
 **Ratul's answers:** prompt stays Ubuntu-shaped, user `ratulroy@code`; overview in the `whoami`

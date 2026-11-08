@@ -14,10 +14,10 @@ import { BOOT_BAR_STEPS, bootBar, terminalScript } from "@/app/components/hub/ex
 import type { LaunchedPersona, PersonaView } from "@/lib/content/types";
 import { ambient } from "@/lib/site/ambient-sound";
 import { hubHref, personaHref, useOrigin } from "@/lib/site/persona-link";
-import { PORTRAIT_LARGE, PORTRAIT_SMALL, type AsciiPortrait } from "@/lib/site/terminal-art";
+import { PIXEL_INDEX, PORTRAIT_BRAILLE, PORTRAIT_BRAILLE_SMALL, PORTRAIT_PIXELS, type BraillePortrait, type PixelPortrait } from "@/lib/site/terminal-art";
 import type { TerminalData } from "@/lib/site/terminal-data";
-import { HOME, shortPath, USER } from "@/lib/site/terminal-fs";
-import { createShell, HISTORY_CAP, initialShellState, type Effect, type MenuId, type MenuRow, type Out, type ShellState } from "@/lib/site/terminal-shell";
+import { HOME, resolvePath, shortPath, USER } from "@/lib/site/terminal-fs";
+import { createShell, HISTORY_CAP, initialShellState, type Effect, type FileItem, type MenuId, type MenuRow, type Out, type ShellState } from "@/lib/site/terminal-shell";
 import { forgetView, readView } from "@/lib/site/view-memory";
 
 export type TerminalRootProps = {
@@ -40,6 +40,9 @@ type Entry =
   | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string; tag?: "ok" | "wait" | "bar" }
   | { n: number; k: "links"; items: Array<{ label: string; href: string; external?: boolean }> }
   | { n: number; k: "portrait" }
+  | { n: number; k: "files"; inline: boolean; items: FileItem[] }
+  | { n: number; k: "cal"; title: string; weeks: Array<Array<number | null>>; today: number }
+  | { n: number; k: "more" }
   | { n: number; k: "neofetch"; rows: string[] }
   | { n: number; k: "banner"; art: string[]; welcome: string; overview: string[]; tips: Array<{ cmd: string; desc: string }> }
   | { n: number; k: "link"; label: string; href: string; external?: boolean }
@@ -64,30 +67,63 @@ function loadHistory(persona: string): string[] {
   }
 }
 
-/** The portrait, one `<span data-tone>` per run of equal tone. Memoized: it is ~1k nodes and never changes. */
-const ArtView = memo(function ArtView({ art, className, label }: { art: AsciiPortrait; className: string; label: string }) {
-  const rows = useMemo(
-    () =>
-      art.lines.flatMap((line, y) => {
-        const tones = art.tones[y] ?? "";
-        const out: ReactNode[] = [];
-        let from = 0;
-        for (let x = 1; x <= line.length; x++) {
-          if (x < line.length && (tones[x] ?? "n") === (tones[from] ?? "n")) continue;
-          out.push(
-            <span key={`${y}-${from}`} data-tone={tones[from] ?? "n"}>
-              {line.slice(from, x)}
-            </span>,
-          );
-          from = x;
-        }
-        out.push("\n");
-        return out;
-      }),
-    [art],
-  );
+const PAGE = 40;
+const PANE_KEY = "xp-term-pane";
+const checksKey = (persona: string) => `xp-term-checks:${persona}`;
+
+/** The checkpoints, in the pane's order. `mail` arrives with its command (round 1g). */
+const CHECKS = ["boot", "help", "resume", "projects", "views", "portrait", "contact", "mail"] as const;
+type CheckId = (typeof CHECKS)[number];
+const REQUIRED: CheckId[] = ["boot", "help", "resume", "projects", "views", "portrait", "contact"];
+/** What to suggest for each unticked checkpoint. */
+const TRY: Partial<Record<CheckId, string>> = { help: "help", resume: "resume", projects: "projects", views: "views", portrait: "portrait", contact: "contact" };
+type Checks = Partial<Record<CheckId | "achieved", boolean>>;
+
+function loadChecks(persona: string): Checks {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(checksKey(persona)) ?? "{}");
+    return v && typeof v === "object" ? (v as Checks) : {};
+  } catch {
+    return {};
+  }
+}
+function saveChecks(persona: string, v: Checks) {
+  try {
+    window.localStorage.setItem(checksKey(persona), JSON.stringify(v));
+  } catch {}
+}
+
+/** Braille portrait: one `<pre>`, in the accent. */
+const BrailleView = memo(function BrailleView({ art, className }: { art: BraillePortrait; className: string }) {
   return (
-    <pre className={className} role="img" aria-label={label}>
+    <pre className={`terminal-os-braille ${className}`} role="img" aria-label="Ratul, drawn in braille dots">
+      {art.lines.join("\n")}
+    </pre>
+  );
+});
+
+/** True-colour half-blocks: each `▀` takes the top pixel as text colour, the bottom as background. Built once. */
+const PixelsView = memo(function PixelsView({ art }: { art: PixelPortrait }) {
+  const rows = useMemo(() => {
+    const out: ReactNode[] = [];
+    art.top.forEach((top, y) => {
+      const bot = art.bottom[y] ?? "";
+      let from = 0;
+      for (let x = 1; x <= top.length; x++) {
+        if (x < top.length && top[x] === top[from] && bot[x] === bot[from]) continue;
+        out.push(
+          <span key={`${y}-${from}`} style={{ color: art.palette[PIXEL_INDEX.indexOf(top[from])], background: art.palette[PIXEL_INDEX.indexOf(bot[from] ?? top[from])] }}>
+            {"▀".repeat(x - from)}
+          </span>,
+        );
+        from = x;
+      }
+      out.push("\n");
+    });
+    return out;
+  }, [art]);
+  return (
+    <pre className="terminal-os-pixels" role="img" aria-label="Ratul, in pixels">
       {rows}
     </pre>
   );
@@ -134,6 +170,12 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const [menuN, setMenuN] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const [opening, setOpening] = useState(false);
+  const [checks, setChecks] = useState<Checks>({});
+  const checksRef = useRef<Checks>({});
+  const [paneOn, setPaneOn] = useState(true);
+  /** Long output waits behind `-- more --`; `rest` is what has not been printed yet. */
+  const [paging, setPaging] = useState(false);
+  const pager = useRef<{ rest: Out[] } | null>(null);
 
   // Latest values for the long-lived async run and the window listener.
   const live = useRef({ cmd, sel, ready, busy: false, aborted: false, auto: false, cancelAuto: false, shell: initialShellState() as ShellState });
@@ -174,6 +216,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       if (o.kind === "text") return { n, k: "out", text: o.text, dim: o.dim, accent: o.accent };
       if (o.kind === "links") return { n, k: "links", items: o.items };
       if (o.kind === "portrait") return { n, k: "portrait" };
+      if (o.kind === "files") return { n, k: "files", inline: o.inline, items: o.items };
+      if (o.kind === "cal") return { n, k: "cal", title: o.title, weeks: o.weeks, today: o.today };
       if (o.kind === "neofetch") return { n, k: "neofetch", rows: o.rows };
       if (o.kind === "banner") return { n, k: "banner", art: o.art, welcome: o.welcome, overview: o.overview, tips: o.tips };
       if (o.kind === "link") return { n, k: "link", label: o.label, href: o.href, external: o.external };
@@ -212,6 +256,53 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     setPartial("");
     line(text, true, false, here());
     return true;
+  };
+
+  /** Ticks a checkpoint; when the seven available are done, the achievement prints once, ever. */
+  const tick = (id: CheckId) => {
+    const cur = checksRef.current;
+    if (cur[id]) return;
+    let next: Checks = { ...cur, [id]: true };
+    if (!next.achieved && osRef.current && REQUIRED.every((r) => next[r])) {
+      next = { ...next, achieved: true };
+      append([{ n: ++seq.current, k: "out", text: "achievement unlocked · explorer — try: sudo make me a sandwich", accent: true }]);
+    }
+    checksRef.current = next;
+    setChecks(next);
+    saveChecks(persona, next);
+  };
+
+  /** Which checkpoint a command line earns. */
+  const tickFor = (c: string, cwd0: string) => {
+    const parts = c.split(/\s+/);
+    const name = parts[0].replace(/^\//, "").toLowerCase();
+    if (name === "help" || name === "resume" || name === "projects" || name === "portrait" || name === "contact") tick(name);
+    else if (name === "cat") {
+      for (const a of parts.slice(1)) {
+        const path = resolvePath(cwd0, a);
+        if (path.startsWith(`${HOME}/resume/`)) tick("resume");
+        else if (path.startsWith(`${HOME}/projects/`)) tick("projects");
+        else if (path === `${HOME}/contact`) tick("contact");
+      }
+    }
+  };
+
+  const nextTry = REQUIRED.find((r) => !checks[r] && TRY[r]);
+  const hintCmd = nextTry ? TRY[nextTry]! : "sudo make me a sandwich";
+
+  const endPaging = () => {
+    pager.current = null;
+    setPaging(false);
+    setEntries((l) => l.filter((e) => e.k !== "more"));
+  };
+  const nextPage = () => {
+    const rest = pager.current?.rest ?? [];
+    setEntries((l) => l.filter((e) => e.k !== "more"));
+    print(rest.slice(0, PAGE));
+    if (rest.length > PAGE) {
+      pager.current = { rest: rest.slice(PAGE) };
+      append([{ n: ++seq.current, k: "more" }]);
+    } else endPaging();
   };
 
   /** The views menu, as `ls views/` prints it (the picker). */
@@ -264,6 +355,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
 
   act.current.open = async (path, label, auto = false) => {
     if (live.current.busy) return;
+    if (views.some((v) => `/${v.id}` === path)) tick("views");
     live.current.busy = true;
     live.current.aborted = true;
     live.current.auto = auto;
@@ -297,6 +389,15 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     }
   };
 
+  const togglePane = () => {
+    if (window.innerWidth < 1024) return void line("the pane needs a screen at least 1024px wide", false, true, here());
+    const next = !paneOn;
+    setPaneOn(next);
+    try {
+      window.localStorage.setItem(PANE_KEY, next ? "1" : "0");
+    } catch {}
+  };
+
   const effect = (fx: Effect) => {
     if (fx.kind === "open-view") act.current.open(`/${fx.id}`, null);
     else if (fx.kind === "open-slug") act.current.open(fx.blog ? `/blog/${fx.slug}` : `/${fx.slug}`, null);
@@ -308,7 +409,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     else if (fx.kind === "clear") {
       setEntries([]);
       setMenuN(null);
-    } else toggleFull();
+    } else if (fx.kind === "pane") togglePane();
+    else toggleFull();
   };
 
   /** Runs one command line: echo, shell, output, effect. */
@@ -318,13 +420,20 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     setCmd("");
     histIdx.current = -1;
     line(c, true, false, here());
+    const cwd0 = live.current.shell.cwd;
     const r = shell.run(c, live.current.shell);
     live.current.shell = r.state;
     setCwd(r.state.cwd);
     try {
       window.sessionStorage.setItem(histKey(persona), JSON.stringify(r.state.history));
     } catch {}
-    print(r.lines);
+    if (r.lines.length > PAGE) {
+      print(r.lines.slice(0, PAGE));
+      pager.current = { rest: r.lines.slice(PAGE) };
+      setPaging(true);
+      append([{ n: ++seq.current, k: "more" }]);
+    } else print(r.lines);
+    tickFor(c, cwd0);
     if (r.effect) effect(r.effect);
     if (!window.matchMedia("(pointer: coarse)").matches) input.current?.focus({ preventScroll: true });
   };
@@ -340,7 +449,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
 
   /** Esc, in order: palette, typed text, menu selection; with none of those, exit. (An auto-open call-off is handled while busy.) */
   act.current.esc = () => {
-    if (palette || cmd) setCmd("");
+    if (paging) endPaging();
+    else if (palette || cmd) setCmd("");
     else if (menuN !== null) {
       setMenuN(null);
       live.current.shell = { ...live.current.shell, lastMenu: undefined };
@@ -395,6 +505,26 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if ((e.key.length === 1 && !e.ctrlKey && !e.metaKey) || e.key === "Backspace" || e.key === "Enter" || e.key === "Tab") ambient.key();
     const menuLive = menu && !cmd;
+    if (e.ctrlKey && !e.altKey && !e.metaKey && (e.key === "c" || e.key === "C" || e.key === "l" || e.key === "L")) {
+      e.preventDefault();
+      if (e.key.toLowerCase() === "l") {
+        if (paging) endPaging();
+        setEntries([]);
+        setMenuN(null);
+      } else {
+        if (paging) endPaging();
+        line(`${cmd}^C`, true, false, here());
+        setCmd("");
+        histIdx.current = -1;
+      }
+      return;
+    }
+    if (paging) {
+      e.preventDefault();
+      if (e.key === " " || e.key === "ArrowDown" || e.key === "Enter") nextPage();
+      else if (e.key === "q" || e.key === "Q" || e.key === "Escape") endPaging();
+      return;
+    }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       const d = e.key === "ArrowDown" ? 1 : -1;
@@ -487,12 +617,14 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         if (nav?.type === "back_forward" || fromBack) remembered = null;
       } catch {}
       if (remembered) {
+        tick("boot");
         act.current.open(`/${remembered}`, `open ${remembered}`, true);
         return;
       }
       // Connected: the window takes the world's light, then dissolves into the terminal.
       if (win.current && !instant) gsap.to(win.current, { boxShadow: `0 0 80px -10px ${color}`, duration: 0.4 });
       swap();
+      tick("boot");
       if (!instant) await wait(520);
       if (stopped()) return;
       line("type help, or / for the menu", false, true);
@@ -510,6 +642,15 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persona, via, itemKey, viewKey, color]);
+
+  // Checkpoints and the pane's on/off, remembered on the device.
+  useEffect(() => {
+    checksRef.current = loadChecks(persona);
+    setChecks(checksRef.current);
+    try {
+      if (window.localStorage.getItem(PANE_KEY) === "0") setPaneOn(false);
+    } catch {}
+  }, [persona]);
 
   useEffect(() => {
     if (via) {
@@ -623,6 +764,20 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
 
   const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
+  /** A name in a listing: runs `cat` (file), `cd` (dir) or `open` (view). Dirs take the accent, views green. */
+  const pathButton = (it: FileItem) => (
+    <button
+      type="button"
+      className="terminal-root-path"
+      data-kind={it.type}
+      onMouseDown={keepFocus}
+      onClick={() => submit(it.type === "dir" ? `cd ${shortPath(it.path)}` : it.type === "exec" ? `open ${it.name}` : `cat ${shortPath(it.path)}`)}
+    >
+      {it.name}
+      {it.type === "dir" ? "/" : it.type === "exec" ? "*" : ""}
+    </button>
+  );
+
   const renderEntry = (e: Entry) =>
     e.k === "out" ? (
       <span key={e.n} className={`${e.prompt ? "is-cmd" : "is-out"} ${e.dim ? "is-dim" : ""} ${e.accent ? "is-accent" : ""}`}>
@@ -633,7 +788,10 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     ) : e.k === "banner" ? (
       <div key={e.n} className="terminal-os-welcome">
         <div className="terminal-os-header">
-          <ArtView art={PORTRAIT_SMALL} className="terminal-os-art is-small" label="Ratul, drawn in characters" />
+          <div className="terminal-os-header-art">
+            <BrailleView art={PORTRAIT_BRAILLE} className="is-wide" />
+            <BrailleView art={PORTRAIT_BRAILLE_SMALL} className="is-small" />
+          </div>
           <div className="terminal-os-header-text">
             <pre className="terminal-os-banner">{e.art.join("\n")}</pre>
             <span className="is-out">{e.welcome}</span>
@@ -647,10 +805,10 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         <Tips tips={e.tips} />
       </div>
     ) : e.k === "portrait" ? (
-      <ArtView key={e.n} art={PORTRAIT_LARGE} className="terminal-os-art" label="Ratul, drawn in characters" />
+      <PixelsView key={e.n} art={PORTRAIT_PIXELS} />
     ) : e.k === "neofetch" ? (
       <div key={e.n} className="terminal-os-fetch">
-        <ArtView art={PORTRAIT_SMALL} className="terminal-os-art is-small" label="Ratul, drawn in characters" />
+        <BrailleView art={PORTRAIT_BRAILLE_SMALL} className="is-fetch" />
         <pre className="terminal-os-fetch-rows">
           <code className="ps-user">{e.rows[0]}</code>
           {`\n${e.rows.slice(1).join("\n")}\n\n`}
@@ -661,6 +819,34 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           ))}
         </pre>
       </div>
+    ) : e.k === "files" ? (
+      <span key={e.n} className="is-out">
+        {e.items.map((it, i) => (
+          <Fragment key={it.path}>
+            {e.inline ? (i ? "   " : "") : (it.meta ?? "")}
+            {pathButton(it)}
+          </Fragment>
+        ))}
+      </span>
+    ) : e.k === "cal" ? (
+      <pre key={e.n} className="terminal-os-cal">
+        {`${e.title.padStart(Math.floor((20 + e.title.length) / 2))}\nSu Mo Tu We Th Fr Sa\n`}
+        {e.weeks.map((w, wi) => (
+          <Fragment key={wi}>
+            {w.map((d, di) => (
+              <Fragment key={di}>
+                {di ? " " : ""}
+                {d === null ? "  " : d === e.today ? <b className="is-accent">{String(d).padStart(2)}</b> : String(d).padStart(2)}
+              </Fragment>
+            ))}
+            {wi < e.weeks.length - 1 ? "\n" : ""}
+          </Fragment>
+        ))}
+      </pre>
+    ) : e.k === "more" ? (
+      <button key={e.n} type="button" className="terminal-root-more" onMouseDown={keepFocus} onClick={nextPage}>
+        -- more (space / ↓ next, q quit) --
+      </button>
     ) : e.k === "links" ? (
       <span key={e.n} className="is-out">
         {e.items.map((l, i) => (
@@ -680,7 +866,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       </span>
     ) : e.k === "run" ? (
       <span key={e.n} className="is-out">
-        <button type="button" className="terminal-root-link" onMouseDown={keepFocus} onClick={() => submit(e.cmd)}>
+        <button type="button" className="terminal-root-path" data-kind="file" onMouseDown={keepFocus} onClick={() => submit(e.cmd)}>
           {e.text}
         </button>
       </span>
@@ -743,7 +929,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       </div>
 
       {/* The terminal: the whole viewport. */}
-      <div className="terminal-os" aria-hidden={!os}>
+      <div className={`terminal-os ${paneOn ? "has-pane" : ""}`} aria-hidden={!os}>
+        <div className="terminal-os-split">
         <div
           ref={body}
           className="hub-exit-body terminal-root-body terminal-os-body"
@@ -783,11 +970,13 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           ) : null}
           {os && (partial !== null || ready) ? (
             <span className="terminal-root-prompt is-cmd">
-              <code className="terminal-root-typed" aria-hidden="true">
-                {ps1(shortPath(cwd))}
-                {partial !== null ? partial : cmd}
-                <i className="hub-enter-caret" />
-              </code>
+              {paging ? null : (
+                <code className="terminal-root-typed" aria-hidden="true">
+                  {ps1(shortPath(cwd))}
+                  {partial !== null ? partial : cmd}
+                  <i className="hub-enter-caret" />
+                </code>
+              )}
               <input
                 ref={input}
                 className="terminal-root-input"
@@ -809,11 +998,39 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
             </span>
           ) : null}
         </div>
+        <aside className="terminal-os-pane" aria-label="Side pane">
+          <div className="terminal-os-pane-art">
+            <BrailleView art={PORTRAIT_BRAILLE} className="is-pane" />
+          </div>
+          <h3>where</h3>
+          <p className="terminal-os-pane-where">{shortPath(cwd)}</p>
+          <h3>checkpoints</h3>
+          <ul role="list" className="terminal-os-checks">
+            {CHECKS.map((id) => (
+              <li key={id} className={id === "mail" ? "is-soon" : checks[id] ? "is-done" : ""}>
+                <b>{checks[id] ? "[x]" : "[ ]"}</b> {id}
+                {id === "mail" ? <i> soon</i> : null}
+              </li>
+            ))}
+          </ul>
+          <h3>next</h3>
+          <button type="button" className="terminal-os-pane-next" onMouseDown={keepFocus} onClick={() => submit(hintCmd)}>
+            {nextTry ? `try: ${hintCmd}` : "all done · try: sudo make me a sandwich"}
+          </button>
+          <h3>keys</h3>
+          <p className="terminal-os-keys">Tab complete · ↑ history · / menu · Ctrl+L clear · Ctrl+C cancel · Esc exit</p>
+        </aside>
+        </div>
         <div className="terminal-os-status">
           <code className="terminal-os-status-l">{`${USER}@code  ${shortPath(cwd)}`}</code>
-          <code className="terminal-os-status-m">
+          <code className="terminal-os-status-m is-counts">
             {plural(data.projects.length, "project")} · {plural(data.posts.length, "post")} · {plural(data.views.length, "view")}
           </code>
+          {nextTry ? (
+            <button type="button" className="terminal-os-status-hint" onMouseDown={keepFocus} onClick={() => submit(hintCmd)}>
+              {`try: ${hintCmd}`}
+            </button>
+          ) : null}
           <span className="terminal-os-status-r">
             <button type="button" onMouseDown={keepFocus} onClick={() => submit("help")}>
               help
@@ -828,6 +1045,9 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
               }}
             >
               /
+            </button>
+            <button type="button" className="is-pane-btn" onMouseDown={keepFocus} onClick={togglePane}>
+              pane
             </button>
             <button type="button" onMouseDown={keepFocus} onClick={() => act.current.esc()}>
               Esc

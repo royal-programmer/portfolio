@@ -17,6 +17,7 @@ import {
   shortPath,
   stat,
   type Fs,
+  type EntryKind,
   type FsEntry,
 } from "@/lib/site/terminal-fs";
 import type { TerminalData } from "@/lib/site/terminal-data";
@@ -24,11 +25,18 @@ import type { TerminalData } from "@/lib/site/terminal-data";
 export type MenuId = "views" | "projects" | "writing";
 export type MenuRow = { key: string; label: string; line: string };
 
+/** One name in a listing: a button that runs `cat` (files), `cd` (dirs) or `open` (views). */
+export type FileItem = { name: string; type: EntryKind; path: string; meta?: string };
+
 export type Out =
   | { kind: "text"; text: string; dim?: boolean; accent?: boolean }
   /** Several links on one line, joined by " · ". */
   | { kind: "links"; items: Array<{ label: string; href: string; external?: boolean }> }
-  /** The large portrait (`portrait`). */
+  /** A listing: `inline` joins the names on one line (`ls`); otherwise it is one row, `meta` before the name. */
+  | { kind: "files"; inline: boolean; items: FileItem[] }
+  /** `cal`: weeks of day numbers (null = blank), today highlighted. */
+  | { kind: "cal"; title: string; weeks: Array<Array<number | null>>; today: number }
+  /** The pixel portrait (`portrait`). */
   | { kind: "portrait" }
   /** The `neofetch` card: the small portrait on the left, these rows on the right. */
   | { kind: "neofetch"; rows: string[] }
@@ -45,7 +53,8 @@ export type Effect =
   | { kind: "open-url"; url: string }
   | { kind: "exit" }
   | { kind: "clear" }
-  | { kind: "fullscreen" };
+  | { kind: "fullscreen" }
+  | { kind: "pane" };
 
 export type ShellState = { cwd: string; history: string[]; lastMenu?: MenuId };
 export type RunResult = { lines: Out[]; effect?: Effect; state: ShellState };
@@ -88,6 +97,9 @@ const COMMANDS: CommandDoc[] = [
   { name: "banner", group: "terminal", usage: "banner", desc: "print the welcome again" },
   { name: "history", group: "terminal", usage: "history", desc: "commands typed this session" },
   { name: "clear", group: "terminal", usage: "clear", desc: "empty the screen" },
+  { name: "pane", group: "terminal", usage: "pane", desc: "show or hide the side pane" },
+  { name: "date", group: "terminal", usage: "date", desc: "the local date and time" },
+  { name: "cal", group: "terminal", usage: "cal", desc: "this month, today highlighted" },
   { name: "fullscreen", group: "terminal", usage: "fullscreen", desc: "toggle browser full screen" },
   { name: "echo", group: "terminal", usage: "echo <text>", desc: "print text" },
   { name: "exit", group: "terminal", usage: "exit", desc: "back to the hub", long: "Esc at an empty prompt does the same." },
@@ -175,12 +187,11 @@ export function createShell(data: TerminalData): Shell {
     },
   ];
 
-  const longFormat = (e: FsEntry) => {
+  const longMeta = (e: FsEntry) => {
     const perms = e.kind === "dir" ? "drwxr-xr-x" : e.kind === "exec" ? "-rwxr-xr-x" : "-rw-r--r--";
-    const name = e.kind === "dir" ? `${e.name}/` : e.kind === "exec" ? `${e.name}*` : e.name;
-    return `${perms}  ${String(e.size).padStart(5)}  ${name}`;
+    return `${perms}  ${String(e.size).padStart(5)}  `;
   };
-  const shortFormat = (e: FsEntry) => (e.kind === "dir" ? `${e.name}/` : e.kind === "exec" ? `${e.name}*` : e.name);
+  const item = (dir: string, e: FsEntry, meta?: string): FileItem => ({ name: e.name, type: e.kind, path: join(dir, e.name), meta });
 
   const ls = (args: string[], st: ShellState): { lines: Out[]; menu?: MenuId } => {
     const long = args.some((a) => /^-[a-zA-Z]*l/.test(a));
@@ -195,7 +206,10 @@ export function createShell(data: TerminalData): Shell {
       if (!kind) {
         out.push(text(`ls: cannot access '${raw}': No such file or directory`));
       } else if (kind !== "dir") {
-        out.push(text(long ? longFormat({ name: raw, kind, size: readFile(fs, path)?.join("\n").length ?? 0 }) : raw));
+        const size = readFile(fs, path)?.join("\n").length ?? 0;
+        const dir = path.slice(0, path.lastIndexOf("/")) || "/";
+        const e: FsEntry = { name: path.slice(path.lastIndexOf("/") + 1), kind, size };
+        out.push({ kind: "files", inline: !long, items: [item(dir, e, long ? longMeta(e) : undefined)] });
       } else if (path === `${HOME}/views` && !long) {
         const m = menu("views");
         out.push(...m.lines);
@@ -203,8 +217,8 @@ export function createShell(data: TerminalData): Shell {
       } else {
         const entries = listDir(fs, path) ?? [];
         if (!entries.length) continue;
-        if (long) out.push(...entries.map((e) => text(longFormat(e))));
-        else out.push(text(entries.map(shortFormat).join("   ")));
+        if (long) for (const e of entries) out.push({ kind: "files", inline: false, items: [item(path, e, longMeta(e))] });
+        else out.push({ kind: "files", inline: true, items: entries.map((e) => item(path, e)) });
       }
     }
     return { lines: out, menu: picked };
@@ -215,17 +229,37 @@ export function createShell(data: TerminalData): Shell {
     const kind = stat(fs, path);
     if (!kind) return [text(`tree: ${raw}: No such file or directory`)];
     if (kind !== "dir") return [text(raw ?? ".")];
-    const out: string[] = [shortPath(path)];
+    const out: Out[] = [text(shortPath(path))];
     const walk = (dir: string, prefix: string) => {
       const es = listDir(fs, dir) ?? [];
       es.forEach((e, i) => {
         const last = i === es.length - 1;
-        out.push(`${prefix}${last ? "└── " : "├── "}${shortFormat(e)}`);
+        out.push({ kind: "files", inline: false, items: [item(dir, e, `${prefix}${last ? "└── " : "├── "}`)] });
         if (e.kind === "dir") walk(join(dir, e.name), `${prefix}${last ? "    " : "│   "}`);
       });
     };
     walk(path, "");
-    return texts(out);
+    return out;
+  };
+
+  /** `Sun Nov  8 15:04:05 IST 2026`, in the visitor's zone. */
+  const date = (): Out[] => {
+    const d = new Date();
+    const wd = d.toLocaleDateString("en-US", { weekday: "short" });
+    const mo = d.toLocaleDateString("en-US", { month: "short" });
+    const hms = [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => String(n).padStart(2, "0")).join(":");
+    const zone = new Intl.DateTimeFormat("en-IN", { timeZoneName: "short" }).formatToParts(d).find((p) => p.type === "timeZoneName")?.value ?? "";
+    return [text(`${wd} ${mo} ${String(d.getDate()).padStart(2, " ")} ${hms} ${zone} ${d.getFullYear()}`)];
+  };
+
+  const cal = (): Out[] => {
+    const d = new Date();
+    const first = new Date(d.getFullYear(), d.getMonth(), 1).getDay();
+    const days = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    const cells: Array<number | null> = [...Array<null>(first).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
+    const weeks: Array<Array<number | null>> = [];
+    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+    return [{ kind: "cal", title: d.toLocaleDateString("en-US", { month: "long", year: "numeric" }), weeks, today: d.getDate() }];
   };
 
   const cat = (args: string[], st: ShellState): Out[] => {
@@ -352,6 +386,14 @@ export function createShell(data: TerminalData): Shell {
         return { lines: cat(["~/uptime"], st) };
       case "contact":
         return { lines: cat(["~/contact"], st) };
+      case "pane":
+        return { lines: [], effect: { kind: "pane" } };
+      case "date":
+        return { lines: date() };
+      case "cal":
+        return { lines: cal() };
+      case "sudo":
+        return { lines: [text("nice try")] };
       case "whoami":
         return { lines: [text(USER), text(data.who, true)] };
       case "neofetch":
