@@ -14,10 +14,11 @@ import { BOOT_BAR_STEPS, bootBar, terminalScript } from "@/app/components/hub/ex
 import type { LaunchedPersona, PersonaView } from "@/lib/content/types";
 import { ambient } from "@/lib/site/ambient-sound";
 import { hubHref, personaHref, useOrigin } from "@/lib/site/persona-link";
+import { qrLines, qrModules } from "@/lib/site/qr";
 import { PIXEL_INDEX, PORTRAIT_BRAILLE, PORTRAIT_BRAILLE_SMALL, PORTRAIT_PIXELS, type BraillePortrait, type PixelPortrait } from "@/lib/site/terminal-art";
 import type { TerminalData } from "@/lib/site/terminal-data";
 import { HOME, resolvePath, shortPath, USER } from "@/lib/site/terminal-fs";
-import { createShell, HISTORY_CAP, initialShellState, type Effect, type FileItem, type MenuId, type MenuRow, type Out, type ShellState, type Tone } from "@/lib/site/terminal-shell";
+import { createShell, HISTORY_CAP, initialShellState, THEMES, type Effect, type FileItem, type MenuId, type MenuRow, type Out, type ShellState, type ThemeId, type Tone } from "@/lib/site/terminal-shell";
 import { forgetView, readView } from "@/lib/site/view-memory";
 
 export type TerminalRootProps = {
@@ -40,7 +41,10 @@ type Entry =
   | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string; label?: string; tag?: "ok" | "wait" | "bar" }
   | { n: number; k: "links"; items: Array<{ label: string; href: string; external?: boolean }> }
   | { n: number; k: "portrait" }
-  | { n: number; k: "parts"; parts: Array<{ text: string; tone?: Tone }> }
+  | { n: number; k: "parts"; parts: Array<{ text: string; tone?: Tone; color?: string }> }
+  | { n: number; k: "qr"; lines: string[] }
+  | { n: number; k: "art"; text: string }
+  | { n: number; k: "ghrepo"; name: string; url: string; pad: number; rest: string }
   | { n: number; k: "files"; inline: boolean; items: FileItem[] }
   | { n: number; k: "cal"; title: string; weeks: Array<Array<number | null>>; today: number }
   | { n: number; k: "more" }
@@ -70,6 +74,54 @@ function loadHistory(persona: string): string[] {
 
 const PAGE = 40;
 const SEEN_KEY = "xp-term-seen";
+const THEME_KEY = "xp-term-theme";
+const CRT_KEY = "xp-term-crt";
+const GH_USER = "royal-programmer";
+const GH_KEY = "xp-gh-cache";
+const GH_TTL = 3_600_000;
+const WEEK = 7 * 86_400_000;
+
+type GhCache = {
+  t: number;
+  user: { public_repos: number; followers: number };
+  repos: Array<{ name: string; html_url: string; language: string | null; stargazers_count: number; pushed_at: string }>;
+  events: Array<{ type: string; created_at: string; payload?: { size?: number; commits?: unknown[] } }>;
+};
+
+const ago = (ms: number) => {
+  const m = Math.floor(ms / 60_000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+};
+
+/** Twelve weeks of push commits as `▁▂▃▄▅▆▇█`, oldest first. */
+function strip(events: GhCache["events"]): string {
+  const monday = (t: number) => {
+    const d = new Date(t);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return d.getTime();
+  };
+  const now = monday(Date.now());
+  const counts = Array<number>(12).fill(0);
+  for (const e of events) {
+    if (e.type !== "PushEvent") continue;
+    const b = Math.round((now - monday(Date.parse(e.created_at))) / WEEK);
+    if (b >= 0 && b < 12) counts[11 - b] += e.payload?.commits?.length ?? e.payload?.size ?? 1;
+  }
+  const max = Math.max(...counts);
+  return counts.map((c) => (!c || !max ? "▁" : "▁▂▃▄▅▆▇█"[Math.min(7, Math.max(1, Math.ceil((c / max) * 7)))])).join("");
+}
+
+/** The locomotive, frame `i`: the smoke and the wheels change. */
+const slFrame = (i: number) => {
+  const smoke = ["  o O o  ", "  O o O  ", " o  O  o ", " O o  O  ", "  o  O o ", " O  o O  "][i % 6];
+  const w = i % 2 ? "o" : "O";
+  return [`      ${smoke}`, "       _||_____    ", "   ___/ |     |___ ", "  |  [] [] []  ==| ", `  '-${w}-${w}-----${w}-${w}-' `];
+};
 const MAIL_LABEL = { name: "name: ", email: "email: ", message: "message: " } as const;
 type MailStep = keyof typeof MAIL_LABEL;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -198,6 +250,12 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const mailRef = useRef<{ step: MailStep; name: string; email: string; lines: string[] } | null>(null);
   /** The `demo` tour, while it runs. */
   const demoRef = useRef<boolean>(false);
+  const [theme, setTheme] = useState<ThemeId>("accent");
+  const themeRef = useRef<ThemeId>("accent");
+  const [crt, setCrt] = useState(false);
+  /** A `curl github` in flight, and a `sl` crossing the screen: Ctrl+C or Esc ends them. */
+  const curlAbort = useRef<AbortController | null>(null);
+  const slStop = useRef<(() => void) | null>(null);
 
   // Latest values for the long-lived async run and the window listener.
   const live = useRef({ cmd, sel, ready, busy: false, aborted: false, auto: false, cancelAuto: false, shell: initialShellState() as ShellState });
@@ -219,6 +277,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     live.current.ready = ready;
   });
 
+  themeRef.current = theme;
   const palette = ready && !mailStep && cmd.startsWith("/") && !/\s/.test(cmd);
   const palMatches = useMemo(() => {
     if (!cmd.startsWith("/")) return [];
@@ -239,6 +298,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       if (o.kind === "links") return { n, k: "links", items: o.items };
       if (o.kind === "portrait") return { n, k: "portrait" };
       if (o.kind === "parts") return { n, k: "parts", parts: o.parts };
+      if (o.kind === "qr") return { n, k: "qr", lines: o.lines };
       if (o.kind === "files") return { n, k: "files", inline: o.inline, items: o.items };
       if (o.kind === "cal") return { n, k: "cal", title: o.title, weeks: o.weeks, today: o.today };
       if (o.kind === "neofetch") return { n, k: "neofetch", rows: o.rows };
@@ -281,6 +341,14 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     return true;
   };
 
+  /** Anonymous usage: the command name only, never arguments. Fire and forget; nothing identifies the visitor. */
+  const beacon = (command: string, ok = true) => {
+    try {
+      if (typeof navigator === "undefined" || !navigator.sendBeacon) return;
+      navigator.sendBeacon("/api/term-event", JSON.stringify({ command, ok, persona, theme: themeRef.current, viewport: window.innerWidth < 768 ? "phone" : "desktop" }));
+    } catch {}
+  };
+
   /** Ticks a checkpoint; when the seven available are done, the achievement prints once, ever. */
   const tick = (id: CheckId) => {
     const cur = checksRef.current;
@@ -289,6 +357,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     if (!next.achieved && osRef.current && REQUIRED.every((r) => next[r])) {
       next = { ...next, achieved: true };
       append([{ n: ++seq.current, k: "out", text: "achievement unlocked · explorer — try: sudo make me a sandwich", accent: true }]);
+      beacon("achievement");
     }
     checksRef.current = next;
     setChecks(next);
@@ -410,6 +479,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const startDemo = async () => {
     if (demoRef.current) return;
     demoRef.current = true;
+    beacon("demo_start");
     const fast = via === "normal" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const first = data.projects[0]?.slug;
     const steps = ["help", "resume", "ls ~/projects", ...(first ? [`cat ~/projects/${first}.md`] : []), "git log --graph -5", "portrait", "contact"];
@@ -444,8 +514,99 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       demoRef.current = false;
       setCmd("");
       if (cancelled.current) return;
-      if (stopped) line("^C demo", false, true, here());
+      if (stopped) {
+        line("^C demo", false, true, here());
+        beacon("demo_stop");
+      }
       else line("tour over · type a command, or open stage", false, true, here());
+    }
+  };
+
+  const patchEntry = (n: number, p: Partial<Extract<Entry, { k: "out" }>>) => setEntries((es) => es.map((e) => (e.n === n && e.k === "out" ? { ...e, ...p } : e)));
+
+  /** `curl github`: user, recent repos and push events from the public API, cached for an hour. */
+  const curlGithub = async () => {
+    const n = ++seq.current;
+    append([{ n, k: "out", text: "fetching …", dim: true }]);
+    const ac = new AbortController();
+    curlAbort.current = ac;
+    const api = `https://api.github.com/users/${GH_USER}`;
+    try {
+      let d: GhCache | null = null;
+      try {
+        const c = JSON.parse(window.localStorage.getItem(GH_KEY) ?? "null") as GhCache | null;
+        if (c && Date.now() - c.t < GH_TTL) d = c;
+      } catch {}
+      const cached = d !== null;
+      if (!d) {
+        const rs = await Promise.all([`${api}`, `${api}/repos?sort=pushed&per_page=5`, `${api}/events/public?per_page=100`].map((u) => fetch(u, { signal: ac.signal })));
+        if (rs.some((r) => r.status === 403 || r.status === 429)) throw new Error("rate");
+        if (rs.some((r) => !r.ok)) throw new Error(`http ${rs.find((r) => !r.ok)?.status}`);
+        const [user, repos, events] = await Promise.all(rs.map((r) => r.json()));
+        d = { t: Date.now(), user, repos, events };
+        try {
+          window.localStorage.setItem(GH_KEY, JSON.stringify(d));
+        } catch {}
+      }
+      const pad = Math.max(...d.repos.map((r) => r.name.length), 4);
+      const rel = (iso: string) => ago(Date.now() - Date.parse(iso));
+      const plain = (text: string, dim = false): Entry => ({ n: ++seq.current, k: "out", text, dim });
+      const parts = (text: string, tone?: Tone): Entry => ({ n: ++seq.current, k: "parts", parts: [{ text, tone }] });
+      setEntries((es) => es.filter((e) => e.n !== n));
+      append([
+        plain("HTTP/2 200", true),
+        ...(cached ? [plain(`(cached · ${ago(Date.now() - d.t)})`, true)] : []),
+        plain(" "),
+        parts(`${GH_USER} · ${d.user.public_repos} repos · ${d.user.followers} followers`),
+        ...(d.repos[0] ? [parts(`last push  ${d.repos[0].name} · ${rel(d.repos[0].pushed_at)}`)] : []),
+        ...d.repos.slice(0, 5).map(
+          (r): Entry => ({ n: ++seq.current, k: "ghrepo", name: r.name, url: r.html_url, pad, rest: `  ${(r.language ?? "-").padEnd(11)}  ★${r.stargazers_count}  ${rel(r.pushed_at)}` }),
+        ),
+        { n: ++seq.current, k: "parts", parts: [{ text: "contributions (12w)  " }, { text: strip(d.events), tone: "accent" }] },
+      ]);
+    } catch (err) {
+      const aborted = ac.signal.aborted;
+      const msg = aborted ? "^C" : err instanceof Error && err.message === "rate" ? "github: rate limited, try again in a while" : "curl: (6) could not resolve api.github.com";
+      patchEntry(n, { text: msg, dim: true });
+    } finally {
+      curlAbort.current = null;
+    }
+  };
+
+  /** `sl`: a locomotive crosses the width in about two seconds; any key or tap stops it. */
+  const startSl = async () => {
+    if (slStop.current || demoRef.current) return;
+    let stopped = false;
+    const stop = (e: Event) => {
+      if (e instanceof KeyboardEvent) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      stopped = true;
+    };
+    slStop.current = () => (stopped = true);
+    window.addEventListener("keydown", stop, true);
+    window.addEventListener("pointerdown", stop, true);
+    const n = ++seq.current;
+    append([{ n, k: "art", text: "" }]);
+    const cols = Math.max(30, Math.floor((body.current?.clientWidth ?? 600) / 7.8) - 4);
+    const steps = 26;
+    try {
+      for (let i = 0; i <= steps && !stopped && !cancelled.current; i++) {
+        const off = Math.round(cols - ((cols + 22) * i) / steps);
+        const text = slFrame(i)
+          .map((l) => (off >= 0 ? " ".repeat(off) + l : l.slice(-off)).slice(0, cols))
+          .join("\n");
+        setEntries((es) => es.map((e) => (e.n === n && e.k === "art" ? { ...e, text } : e)));
+        ambient.key();
+        await wait(80);
+      }
+    } catch {
+    } finally {
+      window.removeEventListener("keydown", stop, true);
+      window.removeEventListener("pointerdown", stop, true);
+      slStop.current = null;
+      setEntries((es) => es.filter((e) => e.n !== n));
     }
   };
 
@@ -500,7 +661,10 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
 
   act.current.open = async (path, label, auto = false) => {
     if (live.current.busy) return;
-    if (views.some((v) => `/${v.id}` === path)) tick("views");
+    if (views.some((v) => `/${v.id}` === path)) {
+      tick("views");
+      beacon(`view_open:${path.slice(1)}`);
+    }
     live.current.busy = true;
     live.current.aborted = true;
     live.current.auto = auto;
@@ -554,7 +718,31 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     else if (fx.kind === "clear") {
       setEntries([]);
       setMenuN(null);
-    } else if (fx.kind === "demo") void startDemo();
+    } else if (fx.kind === "window") window.open(fx.url, "_blank", "noopener");
+    else if (fx.kind === "theme") {
+      setTheme(fx.id);
+      try {
+        window.localStorage.setItem(THEME_KEY, fx.id);
+      } catch {}
+      line(`theme: ${fx.id}`, false, true, here());
+    } else if (fx.kind === "crt") {
+      const next = !crt;
+      setCrt(next);
+      try {
+        window.localStorage.setItem(CRT_KEY, next ? "1" : "0");
+      } catch {}
+      line(`crt ${next ? "on" : "off"}`, false, true, here());
+    } else if (fx.kind === "qr") {
+      const url = `${window.location.origin}${window.location.pathname}`;
+      const m = qrModules(url);
+      if (!m) line("qr: this address is too long to encode", false, false, here());
+      else {
+        append([{ n: ++seq.current, k: "qr", lines: qrLines(m) }]);
+        line(url, false, true, here());
+      }
+    } else if (fx.kind === "curl-github") void curlGithub();
+    else if (fx.kind === "sl") void startSl();
+    else if (fx.kind === "demo") void startDemo();
     else if (fx.kind === "mail") startMail();
     else if (fx.kind === "pane") togglePane();
     else toggleFull();
@@ -581,6 +769,10 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       append([{ n: ++seq.current, k: "more" }]);
     } else print(r.lines);
     tickFor(c, cwd0);
+    if (!demoRef.current) {
+      const first = r.lines[0];
+      beacon(c.split(/\s+/)[0].replace(/^\//, "").toLowerCase(), !(first?.kind === "text" && first.text.startsWith("command not found")));
+    }
     if (r.effect) effect(r.effect);
     if (!window.matchMedia("(pointer: coarse)").matches) input.current?.focus({ preventScroll: true });
   };
@@ -596,7 +788,9 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
 
   /** Esc, in order: palette, typed text, menu selection; with none of those, exit. (An auto-open call-off is handled while busy.) */
   act.current.esc = () => {
-    if (mailRef.current) abortMail();
+    if (curlAbort.current) curlAbort.current.abort();
+    else if (slStop.current) slStop.current();
+    else if (mailRef.current) abortMail();
     else if (paging) endPaging();
     else if (palette || cmd) setCmd("");
     else if (menuN !== null) {
@@ -650,6 +844,17 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     } else submit(c.name);
   };
 
+  /** Fish-style suggestion: the latest history line that continues what is typed, else the first completion. */
+  const ghost = (() => {
+    if (!ready || !cmd || mailStep || paging || demoRef.current || palette || cmd.startsWith("/")) return "";
+    const hist = live.current.shell.history;
+    for (let i = hist.length - 1; i >= 0; i--) if (hist[i].length > cmd.length && hist[i].toLowerCase().startsWith(cmd.toLowerCase())) return hist[i].slice(cmd.length);
+    const c = shell.complete(cmd, live.current.shell)[0];
+    if (!c) return "";
+    const full = (/^(.*?)\S*$/.exec(cmd)?.[1] ?? "") + c;
+    return full.length > cmd.length && full.toLowerCase().startsWith(cmd.toLowerCase()) ? full.slice(cmd.length) : "";
+  })();
+
   const onInputKey = (e: ReactKeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if ((e.key.length === 1 && !e.ctrlKey && !e.metaKey) || e.key === "Backspace" || e.key === "Enter" || e.key === "Tab") ambient.key();
@@ -668,12 +873,20 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       }
       return;
     }
+    if (ghost && (e.key === "ArrowRight" || e.key === "End") && e.currentTarget.selectionStart === cmd.length) {
+      e.preventDefault();
+      setCmd(cmd + ghost);
+      return;
+    }
     if (e.ctrlKey && !e.altKey && !e.metaKey && (e.key === "c" || e.key === "C" || e.key === "l" || e.key === "L")) {
       e.preventDefault();
       if (e.key.toLowerCase() === "l") {
         if (paging) endPaging();
         setEntries([]);
         setMenuN(null);
+      } else if (curlAbort.current || slStop.current) {
+        curlAbort.current?.abort();
+        slStop.current?.();
       } else {
         if (paging) endPaging();
         line(`${cmd}^C`, true, false, here());
@@ -813,6 +1026,9 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     setChecks(checksRef.current);
     try {
       if (window.localStorage.getItem(PANE_KEY) === "0") setPaneOn(false);
+      const th = window.localStorage.getItem(THEME_KEY);
+      if (THEMES.some((t) => t.id === th)) setTheme(th as ThemeId);
+      if (window.localStorage.getItem(CRT_KEY) === "1") setCrt(true);
     } catch {}
   }, [persona]);
 
@@ -986,14 +1202,37 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     ) : e.k === "parts" ? (
       <span key={e.n} className="is-cmd">
         {e.parts.map((p, i) =>
-          p.tone ? (
-            <b key={i} className={`tone-${p.tone}`}>
+          p.tone || p.color ? (
+            <b key={i} className={p.tone ? `tone-${p.tone}` : undefined} style={p.color ? { color: p.color } : undefined}>
               {p.text}
             </b>
           ) : (
             p.text
           ),
         )}
+      </span>
+    ) : e.k === "qr" ? (
+      // Glyphs are 0.6em wide and 1em tall, two modules per row: stretch rows 1.2x so modules are square.
+      <pre
+        key={e.n}
+        className="terminal-os-qr"
+        role="img"
+        aria-label="QR code for this page"
+        style={{ transform: "scaleY(1.2)", transformOrigin: "top left", marginBottom: `${Math.round(e.lines.length * 13 * 0.2) + 8}px` }}
+      >
+        {e.lines.join("\n")}
+      </pre>
+    ) : e.k === "art" ? (
+      <pre key={e.n} className="terminal-os-sl" aria-hidden="true">
+        {e.text}
+      </pre>
+    ) : e.k === "ghrepo" ? (
+      <span key={e.n} className="is-cmd">
+        <a className="terminal-root-link" href={e.url} target="_blank" rel="noreferrer">
+          {e.name}
+        </a>
+        {" ".repeat(e.pad - e.name.length)}
+        {e.rest}
       </span>
     ) : e.k === "files" ? (
       <span key={e.n} className="is-out">
@@ -1080,8 +1319,9 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   return (
     <div
       ref={root}
-      className={`terminal-root ${via === "hub" ? "is-via-hub" : "is-direct"} ${opening ? "is-opening" : ""} ${os ? "is-os" : ""}`}
-      style={{ "--c": color } as CSSProperties}
+      className={`terminal-root ${via === "hub" ? "is-via-hub" : "is-direct"} ${opening ? "is-opening" : ""} ${os ? "is-os" : ""} ${crt ? "has-crt" : ""}`}
+      style={{ "--persona-c": color } as CSSProperties}
+      data-theme={theme}
       role="region"
       aria-label="Engineer terminal"
     >
@@ -1151,6 +1391,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
                   {mailStep ? <code className="ps-user">{MAIL_LABEL[mailStep]}</code> : ps1(shortPath(cwd))}
                   {partial !== null ? partial : cmd}
                   <i className="hub-enter-caret" />
+                  {ghost ? <i className="terminal-root-ghost">{ghost}</i> : null}
                 </code>
               )}
               <input

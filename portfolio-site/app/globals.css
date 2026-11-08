@@ -2092,6 +2092,66 @@ em.font-display,
   color: var(--ink-faint, #6d6b67);
 }
 
+/* Themes: every terminal colour goes through these variables, so one attribute re-skins boot window,
+   menus, palette, tips box, pane and status bar. `--persona-c` is the page's own accent. */
+.terminal-root {
+  --c: var(--persona-c);
+}
+.terminal-root[data-theme="amber"] {
+  --c: #ffb000;
+  --void: #0b0a07;
+  --term-win: #100d08;
+  --ink: #ffd98a;
+  --ink-dim: #d4a84f;
+  --term-faint: #a08040;
+  --ink-faint: #a08040;
+  --term-green: #c9d65a;
+  --term-violet: #e0a060;
+}
+.terminal-root[data-theme="green"] {
+  --c: #33ff66;
+  --void: #050a06;
+  --term-win: #07100a;
+  --ink: #a8ffbd;
+  --ink-dim: #5fd37d;
+  --term-faint: #44a45f;
+  --ink-faint: #44a45f;
+  --term-green: #33ff66;
+  --term-violet: #7fe0c0;
+}
+.terminal-root[data-theme="paper"] {
+  --c: #0b57d0;
+  --link: #0b57d0;
+  --void: #f4f1ea;
+  --term-win: #fbf9f4;
+  --ink: #1f2328;
+  --ink-dim: #4b5059;
+  --term-faint: #6b7078;
+  --ink-faint: #6b7078;
+  --term-green: #1a7f37;
+  --term-violet: #8250df;
+}
+.terminal-root .hub-exit {
+  background: var(--term-win, #0a0a0f);
+}
+
+/* CRT: scanlines and a soft vignette over everything; off under reduced motion. */
+.terminal-root.has-crt::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.06) 0, rgba(0, 0, 0, 0.06) 1px, transparent 1px, transparent 2px),
+    radial-gradient(ellipse at center, transparent 62%, rgba(0, 0, 0, 0.28) 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-root.has-crt::after {
+    display: none;
+  }
+}
+
 /* The Engineer page's root (views/terminal-root): the terminal window on a dark stage, picker inside. */
 .terminal-root {
   position: fixed;
@@ -2236,6 +2296,7 @@ em.font-display,
 
 /* Output links: the accent, underlined. `open <slug>` is a button that looks the same. */
 .terminal-root-link {
+  --accent-link: var(--link, var(--c));
   display: inline;
   margin: 0;
   padding: 0;
@@ -2243,7 +2304,7 @@ em.font-display,
   background: none;
   font: inherit;
   letter-spacing: inherit;
-  color: var(--c);
+  color: var(--accent-link);
   text-align: left;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -2272,7 +2333,7 @@ em.font-display,
   scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent;
   border: 1px solid color-mix(in srgb, var(--c) 28%, transparent);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--c) 5%, #0a0a0f);
+  background: color-mix(in srgb, var(--c) 5%, var(--term-win, #0a0a0f));
 }
 .terminal-root-palette li {
   display: block;
@@ -2355,7 +2416,7 @@ em.font-display,
   --adv-br: 0.76;
   --adv-px: 0.6;
   /* Dim text one step lighter than the site's caption grey: 4.9:1 on #050507 (the site token is 3.8:1). */
-  --ink-faint: #7f7d79;
+  --ink-faint: var(--term-faint, #7f7d79);
 }
 .terminal-os-body {
   min-height: 0;
@@ -2479,7 +2540,7 @@ em.font-display,
   color: var(--c);
 }
 .terminal-root-path[data-kind="exec"] {
-  color: #5fbf6a;
+  color: var(--term-green, #5fbf6a);
 }
 @media (pointer: coarse) {
   .terminal-root-path {
@@ -2492,16 +2553,50 @@ em.font-display,
   color: var(--c);
 }
 .terminal-root-body .tone-green {
-  color: #5fbf6a;
+  color: var(--term-green, #5fbf6a);
 }
 .terminal-root-body .tone-violet {
-  color: #b38ad9;
+  color: var(--term-violet, #b38ad9);
 }
 .terminal-root-body .tone-dim {
   color: var(--ink-faint);
 }
 .terminal-root-body b[class^="tone-"] {
   font-weight: 400;
+}
+
+/* Ghost suggestion after the caret. */
+.terminal-root-ghost {
+  font-style: normal;
+  color: var(--ink-faint);
+  opacity: 0.75;
+}
+
+/* `qr`: dark modules as ink on a light tile, so phone scanners see the usual code. `sl`: the locomotive. */
+.terminal-os-qr {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin: 8px 0;
+  overflow: hidden;
+  background: #fff;
+  color: #000;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: pre;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.terminal-os-sl {
+  margin: 4px 0;
+  overflow: hidden;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: pre;
+  color: var(--ink);
 }
 
 /* `cal`, and the pager line (reverse video). */

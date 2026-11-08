@@ -5,6 +5,23 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-08 — Engineer round 1h: live GitHub, themes, the PDF, QR, eggs, ghost text, analytics
+
+**What shipped** — `curl github` (public API, no token; repos, followers, last push, five repos with
+links, a 12-week contribution strip; cached an hour in `xp-gh-cache`); `theme accent|amber|green|
+paper` through CSS variables (remembered), `crt` scanlines (off under reduced motion); `resume
+--pdf` opens `/Ratul_Roy_Resume.pdf` (generated with reportlab from the résumé text, no phone
+number); `qr` — an in-house QR encoder (`lib/site/qr.ts`, byte mode, level M, versions 1–6,
+Reed–Solomon, 8 masks scored), drawn dark-on-white with a quiet zone, decoded by jsQR from a
+screenshot; eggs `sl`, `cowsay`, `fortune` (12 lines), `sudo` (`nice try`; the sandwich gets the
+cow), `rm -rf /`, `vim`/`nano`/`emacs`; fish-style ghost suggestions (→ or End accepts); anonymous
+analytics — one `sendBeacon` per visitor command to `/api/term-event` (first token only, plus
+`view_open:<id>`, `demo_*`, `achievement`; no ids, no IP, no arguments) into `term_events`
+(migration 0009, **not applied yet** — same as 0008).
+
+**How** — lead ≈20k (PDF, migration + route, verification); Sonnet builder ≈150k. A cold review
+of rounds 1c–1h follows as one pass before the checkpoint.
+
 ## 2026-11-08 — Engineer round 1g: demo tour, git log, mail; the leads table
 
 **What shipped** — `demo`: a typed tour (help → resume → ls → cat → git log --graph → portrait →

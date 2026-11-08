@@ -30,10 +30,71 @@ export type FileItem = { name: string; type: EntryKind; path: string; meta?: str
 
 export type Tone = "accent" | "green" | "violet" | "dim";
 
+/** The terminal's themes (`theme <name>`). `color` is the swatch; the UI maps each id to CSS variables. */
+export const THEMES = [
+  { id: "accent", color: "var(--persona-c)", note: "the persona colour, on near-black" },
+  { id: "amber", color: "#ffb000", note: "amber on brown-black" },
+  { id: "green", color: "#33ff66", note: "green phosphor" },
+  { id: "paper", color: "#cfc8b4", note: "a light terminal" },
+] as const;
+export type ThemeId = (typeof THEMES)[number]["id"];
+
+const FORTUNES = [
+  "Ship it small. The second release is where the real bug report arrives.",
+  "An API is a promise with a version number. Mind the number.",
+  "If you do a thing three times, a script should have done it twice.",
+  "Roster season: everyone wants the schedule, nobody wants it to change.",
+  "Bengaluru traffic is a queue with no consumer. Leave early, or deploy remotely.",
+  "Idempotency keys are cheaper than apologies.",
+  "The retry that works on Thursday was written on Monday by someone worried.",
+  "Reconcile before you celebrate. The two totals rarely agree the first time.",
+  "Automation is documentation that runs.",
+  "Production is the only environment where the data is honest.",
+  "A migration with no rollback plan is a one-way door and a long night.",
+  "Query slow? Read the join first, blame the network last.",
+];
+
+/** The classic cow, with `msg` wrapped at 40 columns in the bubble. */
+function cow(msg: string): string[] {
+  const words = (msg || "moo").split(/\s+/).filter(Boolean);
+  const rows: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    if (cur && cur.length + 1 + w.length > 40) {
+      rows.push(cur);
+      cur = w;
+    } else cur = cur ? `${cur} ${w}` : w;
+  }
+  rows.push(cur);
+  const width = Math.max(...rows.map((r) => r.length));
+  const bubble =
+    rows.length === 1
+      ? [` ${"_".repeat(width + 2)}`, `< ${rows[0]} >`, ` ${"-".repeat(width + 2)}`]
+      : [
+          ` ${"_".repeat(width + 2)}`,
+          ...rows.map((r, i) => {
+            const [l, rr] = i === 0 ? ["/", "\\"] : i === rows.length - 1 ? ["\\", "/"] : ["|", "|"];
+            return `${l} ${r.padEnd(width)} ${rr}`;
+          }),
+          ` ${"-".repeat(width + 2)}`,
+        ];
+  return [...bubble, "        \\   ^__^", "         \\  (oo)\\_______", "            (__)\\       )\\/\\", "                ||----w |", "                ||     ||"];
+}
+
+/** Docs for the hidden commands: `man` knows them, `help` and the palette do not. */
+const HIDDEN_DOCS: CommandDoc[] = [
+  { name: "sl", group: "terminal", usage: "sl", desc: "a steam locomotive crosses the screen" },
+  { name: "cowsay", group: "terminal", usage: "cowsay <text>", desc: "a cow says it" },
+  { name: "fortune", group: "terminal", usage: "fortune", desc: "a line from the desk" },
+  { name: "sudo", group: "terminal", usage: "sudo <command>", desc: "nice try", long: "sudo make me a sandwich is the one that works." },
+];
+
 export type Out =
   | { kind: "text"; text: string; dim?: boolean; accent?: boolean }
-  /** One line of differently coloured runs (`git log`). */
-  | { kind: "parts"; parts: Array<{ text: string; tone?: Tone }> }
+  /** One line of differently coloured runs (`git log`, `theme`); `color` is a CSS colour for a swatch. */
+  | { kind: "parts"; parts: Array<{ text: string; tone?: Tone; color?: string }> }
+  /** A QR code as text rows (`qr`). */
+  | { kind: "qr"; lines: string[] }
   /** Several links on one line, joined by " · ". */
   | { kind: "links"; items: Array<{ label: string; href: string; external?: boolean }> }
   /** A listing: `inline` joins the names on one line (`ls`); otherwise it is one row, `meta` before the name. */
@@ -61,6 +122,12 @@ export type Effect =
   | { kind: "pane" }
   /** The guided tour, and the inline contact form: both run in the UI, which owns the prompt. */
   | { kind: "demo" }
+  | { kind: "window"; url: string }
+  | { kind: "theme"; id: ThemeId }
+  | { kind: "crt" }
+  | { kind: "qr" }
+  | { kind: "curl-github" }
+  | { kind: "sl" }
   | { kind: "mail" };
 
 export type ShellState = { cwd: string; history: string[]; lastMenu?: MenuId };
@@ -93,7 +160,11 @@ const COMMANDS: CommandDoc[] = [
   { name: "stack", group: "read", usage: "stack", desc: "the tools I work in" },
   { name: "uptime", group: "read", usage: "uptime", desc: "time in production" },
   { name: "contact", group: "read", usage: "contact", desc: "mail and github, as links" },
-  { name: "resume", group: "read", usage: "resume", desc: "the overview, like the résumé's first page" },
+  { name: "curl", group: "read", usage: "curl github", desc: "live: repos, last push, contributions" },
+  { name: "qr", group: "open", usage: "qr", desc: "this page as a QR code" },
+  { name: "theme", group: "terminal", usage: "theme [name]", desc: "accent · amber · green · paper" },
+  { name: "crt", group: "terminal", usage: "crt", desc: "toggle scanlines" },
+  { name: "resume", group: "read", usage: "resume [--pdf]", desc: "the overview, like the résumé's first page" },
   { name: "portrait", group: "read", usage: "portrait", desc: "me, in characters" },
   { name: "whoami", group: "read", usage: "whoami", desc: "one line about me" },
   { name: "neofetch", group: "read", usage: "neofetch", desc: "a stat card for this host" },
@@ -371,7 +442,7 @@ export function createShell(data: TerminalData): Shell {
 
   const man = (name: string | undefined): Out[] => {
     if (!name) return [text("what manual page do you want? try: man ls")];
-    const c = COMMANDS.find((x) => x.name === name.replace(/^\//, ""));
+    const c = [...COMMANDS, ...HIDDEN_DOCS].find((x) => x.name === name.replace(/^\//, ""));
     if (!c) return [text(`No manual entry for ${name}`)];
     return texts(["NAME", `  ${c.name} - ${c.desc}`, "USAGE", `  ${c.usage}`, ...(c.long ? ["NOTES", `  ${c.long}`] : [])]);
   };
@@ -481,13 +552,57 @@ export function createShell(data: TerminalData): Shell {
       case "cal":
         return { lines: cal() };
       case "sudo":
+        if (args.join(" ").toLowerCase() === "make me a sandwich") return { lines: [text("okay."), ...texts(cow("one sandwich: ham, cheese, zero downtime"))] };
         return { lines: [text("nice try")] };
       case "whoami":
         return { lines: [text(USER), text(data.who, true)] };
       case "neofetch":
         return { lines: neofetch() };
       case "resume":
+        if (args.includes("--pdf"))
+          return {
+            lines: [
+              text("opening the résumé (pdf) · no phone number in the public copy"),
+              { kind: "link", label: "/Ratul_Roy_Resume.pdf", href: "/Ratul_Roy_Resume.pdf", external: true },
+            ],
+            effect: { kind: "window", url: "/Ratul_Roy_Resume.pdf" },
+          };
         return { lines: resume() };
+      case "curl": {
+        const t = (args[0] ?? "").replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/$/, "").toLowerCase();
+        if (!args.length) return { lines: [text("usage: curl github")] };
+        if (t === "github" || t === "github.com/royal-programmer") return { lines: [], effect: { kind: "curl-github" } };
+        return { lines: [text(`curl: (6) could not resolve host: ${args[0]}`)] };
+      }
+      case "theme": {
+        if (!args[0])
+          return {
+            lines: [
+              ...THEMES.map((th): Out => ({ kind: "parts", parts: [{ text: "███ ", color: th.color }, { text: th.id.padEnd(8) }, { text: th.note, tone: "dim" }] })),
+              text("theme <name> to switch", true),
+            ],
+          };
+        const th = THEMES.find((x) => x.id === args[0].toLowerCase());
+        if (!th) return { lines: [text(`theme: unknown theme '${args[0]}' (${THEMES.map((x) => x.id).join(", ")})`)] };
+        return { lines: [], effect: { kind: "theme", id: th.id } };
+      }
+      case "crt":
+        return { lines: [], effect: { kind: "crt" } };
+      case "qr":
+        return { lines: [], effect: { kind: "qr" } };
+      case "sl":
+        return { lines: [], effect: { kind: "sl" } };
+      case "cowsay":
+        return { lines: texts(cow(args.join(" "))) };
+      case "fortune":
+        return { lines: [text(FORTUNES[Math.floor(Math.random() * FORTUNES.length)])] };
+      case "rm":
+        return { lines: [text(args.some((a) => a === "/" || /^-\w*r\w*$/.test(a)) ? "nice try. this is my home." : "rm: read-only file system")] };
+      case "vim":
+      case "vi":
+      case "nano":
+      case "emacs":
+        return { lines: [text("no. try cat.")] };
       case "portrait":
         return { lines: [{ kind: "portrait" }] };
       case "open":
@@ -551,6 +666,9 @@ export function createShell(data: TerminalData): Shell {
         const pool = [...viewIds, ...data.projects.map((p) => p.slug), ...data.posts.map((p) => p.slug)];
         return [...pool.filter((n) => n.startsWith(word)), ...completePath(fs, state.cwd, word)].filter((v, i, a) => a.indexOf(v) === i);
       }
+      if (cmd === "theme") return THEMES.map((t) => t.id as string).filter((n) => n.startsWith(word));
+      if (cmd === "resume") return ["--pdf"].filter((n) => n.startsWith(word));
+      if (cmd === "curl") return ["github"].filter((n) => n.startsWith(word));
       if (cmd === "git") {
         if (head.trim() === "git") return ["log", "status"].filter((n) => n.startsWith(word));
         if (/^git\s+log\b/.test(head)) return ["--oneline", "--graph", "-n"].filter((n) => n.startsWith(word));
