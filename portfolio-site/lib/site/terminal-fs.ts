@@ -2,11 +2,12 @@
  * The Engineer terminal's file system (17-persona-views.md §6.2): a virtual tree built from
  * `TerminalData`. Pure: no React, no DOM, so it can be tested on its own.
  *
- *   ~ (= /engineer = /)   about  stack  uptime  contact  resume/  projects/  writing/  views/
+ *   /home/ratulroy (~)   about  stack  uptime  contact  resume/  projects/  writing/  views/
  */
 import type { TerminalData } from "@/lib/site/terminal-data";
 
-export const HOME = "/engineer";
+export const USER = "ratulroy";
+export const HOME = `/home/${USER}`;
 
 export type EntryKind = "file" | "dir" | "exec";
 export type FsEntry = { name: string; kind: EntryKind; size: number };
@@ -89,33 +90,32 @@ export function buildFs(data: TerminalData): Fs {
   for (const [name, lines] of Object.entries(resumeFiles)) add(`${HOME}/resume/${name}`, { kind: "file", lines });
   add(`${HOME}/resume`, { kind: "dir", children: Object.keys(resumeFiles) });
 
+  add("/", { kind: "dir", children: ["home"] });
+  add("/home", { kind: "dir", children: [USER] });
   add(HOME, { kind: "dir", children: ["about", "stack", "uptime", "contact", "resume", "projects", "writing", "views"] });
   return { nodes };
 }
 
 /**
- * Absolute, normalised path for `input` typed in `cwd`. `~`, `/` and `/engineer` are all home;
- * `..` never climbs above it (the shell turns `cd ..` at home into an exit).
+ * Absolute, normalised path for `input` typed in `cwd`. `~` and `~/x` are home; `..` climbs as far
+ * as `/`. Anything else is a plain path (`/engineer` no longer exists).
  */
 export function resolvePath(cwd: string, input: string): string {
   let raw = input.trim();
   if (!raw || raw === "~") return HOME;
   if (raw.startsWith("~/")) raw = `${HOME}/${raw.slice(2)}`;
-  else if (raw === "/") raw = HOME;
-  else if (raw.startsWith("/") && raw !== HOME && !raw.startsWith(`${HOME}/`)) raw = `${HOME}${raw}`;
   const abs = raw.startsWith("/") ? raw : `${cwd}/${raw}`;
   const out: string[] = [];
   for (const part of abs.split("/")) {
     if (!part || part === ".") continue;
-    if (part === "..") {
-      if (out.length > 1) out.pop();
-      continue;
-    }
-    out.push(part);
+    if (part === "..") out.pop();
+    else out.push(part);
   }
-  if (out[0] !== "engineer") return HOME;
   return `/${out.join("/")}`;
 }
+
+/** `dir` + `name`, without doubling the slash at the root. */
+export const join = (dir: string, name: string) => (dir === "/" ? `/${name}` : `${dir}/${name}`);
 
 export function stat(fs: Fs, path: string): EntryKind | null {
   return fs.nodes.get(path)?.kind ?? null;
@@ -128,7 +128,7 @@ export function listDir(fs: Fs, path: string): FsEntry[] | null {
   const n = fs.nodes.get(path);
   if (!n || n.kind !== "dir") return null;
   const entries = n.children.map((name): FsEntry => {
-    const c = fs.nodes.get(`${path}/${name}`)!;
+    const c = fs.nodes.get(join(path, name))!;
     return { name, kind: c.kind, size: sizeOf(c) };
   });
   return [...entries.filter((e) => e.kind === "dir"), ...entries.filter((e) => e.kind !== "dir")];
@@ -155,5 +155,5 @@ export function complete(fs: Fs, cwd: string, partial: string): string[] {
 
 /** The path as a prompt would show it: `~`, `~/projects`. */
 export function shortPath(path: string): string {
-  return path === HOME ? "~" : path.replace(`${HOME}/`, "~/");
+  return path === HOME ? "~" : path.startsWith(`${HOME}/`) ? `~/${path.slice(HOME.length + 1)}` : path;
 }

@@ -118,7 +118,7 @@ const MAX_BODY = 6000;
 export function terminalData(persona: Persona | undefined, entries: Entry[], posts: BlogPost[], views: PersonaView[]): TerminalData {
   const handle = personaIdentity("engineer").handle ?? "royal-programmer";
   return {
-    who: "ratul · software engineer · bengaluru",
+    who: "ratulroy · software engineer · bengaluru",
     about: persona?.body ?? "",
     stack: ["c#", ".net", "react", "typescript", "python", "fastapi", "sql server", "postgresql", "rabbitmq"],
     uptime: "2 years in production · 200+ users on the last rebuild · 11 automations kept alive",

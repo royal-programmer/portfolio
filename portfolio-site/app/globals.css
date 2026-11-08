@@ -1220,6 +1220,10 @@ em.font-display,
 .hub-exit-body .is-out {
   color: var(--ink-faint);
 }
+.hub-exit-body .is-ok {
+  font-weight: 400;
+  color: var(--c);
+}
 .hub-exit-term .hub-enter-caret {
   background: var(--c);
 }
@@ -2185,10 +2189,23 @@ em.font-display,
     padding-block: 6px;
   }
 }
+/* Output selects on desktop (copy, like a terminal); on touch nothing does. The prompt, menus, palette,
+   chips and status bar never do. */
 .terminal-root-row,
-.terminal-root-prompt {
+.terminal-root-prompt,
+.terminal-root-picker,
+.terminal-root-palette,
+.terminal-root-chips,
+.terminal-os-status {
   user-select: none;
   -webkit-user-select: none;
+}
+@media (pointer: coarse) {
+  .terminal-root {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
 }
 
 /* The prompt: what you see is a span; the real input sits over it, invisible, and takes the keys. */
@@ -2334,6 +2351,8 @@ em.font-display,
   /* One gutter for the body and for the art that must fit inside it. --adv: Geist Mono's advance, in em. */
   --os-pad: clamp(16px, 4vw, 48px);
   --adv: 0.6;
+  /* Dim text one step lighter than the site's caption grey: 4.9:1 on #050507 (the site token is 3.8:1). */
+  --ink-faint: #7f7d79;
 }
 .terminal-os-body {
   min-height: 0;
@@ -2343,48 +2362,75 @@ em.font-display,
   color: var(--c);
 }
 
-/* The welcome: block-letter banner in the accent, the welcome line, a boxed tips block (44 columns, all three). */
+/* The header: portrait left; banner, version line and the three-line overview right. One blank-line rhythm below it. */
 .terminal-os-welcome {
   margin-bottom: 8px;
 }
-.terminal-os-banner,
-.terminal-os-tips {
-  margin: 0;
+.terminal-os-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 3ch;
+  align-items: start;
+  margin-bottom: 16px;
+}
+.terminal-os-header-text {
+  min-width: 0;
+  /* The banner sizes against this column (cqw), not the viewport. */
+  container-type: inline-size;
+}
+.terminal-os-banner {
+  margin: 0 0 8px;
   font-family: var(--font-geist-mono), monospace;
   white-space: pre;
   overflow: hidden;
   letter-spacing: 0;
-}
-.terminal-os-banner {
-  /* 88 columns inside the gutters, at most 13px. */
-  font-size: min(13px, calc((100vw - 2 * var(--os-pad)) / 88 / var(--adv)));
+  /* 88 columns across the column, at most 13px. */
+  font-size: min(13px, calc(100cqw / 88 / var(--adv)));
   line-height: 1.05;
   color: var(--c);
 }
+@media (max-width: 639px) {
+  .terminal-os-header {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 12px;
+  }
+  .terminal-os-header .terminal-os-art {
+    justify-self: center;
+  }
+}
+
+/* The tips box: borders drawn in CSS, the title in the top border. */
 .terminal-os-tips {
+  min-width: 0;
+  max-width: 88ch;
+  margin: 0 0 16px;
+  padding: 6px 14px 8px;
+  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  border-radius: 4px;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.7;
+}
+.terminal-os-tips legend {
+  margin-left: 8px;
+  padding: 0 8px;
+  color: var(--ink-dim);
+}
+.terminal-os-tip {
+  display: grid;
+  grid-template-columns: 16ch minmax(0, 1fr);
+  gap: 0 1ch;
+}
+.terminal-os-tip b {
+  font-weight: 400;
   color: var(--ink);
 }
-.terminal-os-tips i {
+.terminal-os-tip i {
   font-style: normal;
   color: var(--ink-faint);
 }
-/* Two boxes, one shown: 88 columns where it fits at 13px, 44 on phones. */
-.terminal-os-tips.is-wide {
-  display: none;
-}
-@media (min-width: 780px) {
-  .terminal-os-tips.is-wide {
-    display: block;
-  }
-  .terminal-os-tips.is-narrow {
-    display: none;
-  }
-}
-@media (max-width: 699px) {
-  .terminal-os-tips {
-    font-size: min(13px, calc((100vw - 2 * var(--os-pad)) / 44 / var(--adv)));
+@media (max-width: 639px) {
+  .terminal-os-tip {
+    grid-template-columns: 14ch minmax(0, 1fr);
   }
 }
 
@@ -2408,13 +2454,13 @@ em.font-display,
   color: color-mix(in srgb, var(--c) 55%, #16233f);
 }
 .terminal-os-art [data-tone="s"] {
-  color: #e2b48f;
+  color: #f0c4a0;
 }
 .terminal-os-art [data-tone="d"] {
   color: #3b4150;
 }
 .terminal-os-art [data-tone="w"] {
-  color: #ece7dc;
+  color: #f4f0e6;
 }
 .terminal-os-art [data-tone="n"] {
   color: #8d96a3;

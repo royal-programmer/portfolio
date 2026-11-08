@@ -5,6 +5,27 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-08 — Engineer round 1e: boot as the profile tool, the Linux box, the header with the portrait
+
+**Ratul's answers:** prompt stays Ubuntu-shaped, user `ratulroy@code`; overview in the `whoami`
+voice; boot should look like *running the profile tool*, with progress. Spec: `17-persona-views.md` §6.8.
+
+**What shipped** — the boot window types `royal-programmer --boot`, prints the tool line and six
+`[..]`→`[ok]` rows (profile, mount ~/projects, ~/resume, ~/views, link github, sound), then a
+10-step progress bar to `100%  ready`, then the swap. The hub's exit window shares the script.
+Header after the swap: portrait left; banner `ROYAL / PROGRAMMER` (no hyphen), `royal-programmer
+v1 · code.ratulroy.me`, and the three overview lines (who · stack · uptime) right; phones stack
+the portrait above. The machine is a Linux box: home `/home/ratulroy`, `pwd` real, `/engineer`
+gone, `cd /` shows `home/`, `exit` the only way to the hub, `whoami` → `ratulroy`. Selection on
+desktop output only. Tips box drawn with CSS (fieldset + legend) so borders align; dim text raised
+to 4.9:1; portrait skin/shirt brightened. Builder found and fixed a `//home` join bug at `/`.
+
+**Verified (lead)** — boot rows and bar observed mid-flight at 1280; header at 1280 and 393;
+remembered view still auto-opens to `/stage`; tsc + eslint clean. The hub's Normal display was
+not driven to the engineer window this round (shared code, type-checked).
+
+**How** — lead ≈15k (spec, banner regen, verification); Sonnet builder ≈110k.
+
 ## 2026-11-08 — Engineer round 1d: royal-programmer banner, the résumé in the terminal, the ASCII portrait
 
 **Ratul's asks:** the banner spells `royal-programmer`; an overview like the résumé; a detailed

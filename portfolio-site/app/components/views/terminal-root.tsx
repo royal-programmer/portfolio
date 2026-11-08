@@ -10,14 +10,13 @@
 import gsap from "gsap";
 import { useRouter } from "next/navigation";
 import { Fragment, memo, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
-import { terminalScript } from "@/app/components/hub/exit-sequence";
+import { BOOT_BAR_STEPS, bootBar, terminalScript } from "@/app/components/hub/exit-sequence";
 import type { LaunchedPersona, PersonaView } from "@/lib/content/types";
 import { ambient } from "@/lib/site/ambient-sound";
-import { DISPLAY_ROOT, personaIdentity } from "@/lib/site/brand";
 import { hubHref, personaHref, useOrigin } from "@/lib/site/persona-link";
 import { PORTRAIT_LARGE, PORTRAIT_SMALL, type AsciiPortrait } from "@/lib/site/terminal-art";
 import type { TerminalData } from "@/lib/site/terminal-data";
-import { HOME, shortPath } from "@/lib/site/terminal-fs";
+import { HOME, shortPath, USER } from "@/lib/site/terminal-fs";
 import { createShell, HISTORY_CAP, initialShellState, type Effect, type MenuId, type MenuRow, type Out, type ShellState } from "@/lib/site/terminal-shell";
 import { forgetView, readView } from "@/lib/site/view-memory";
 
@@ -38,17 +37,17 @@ export type TerminalRootProps = {
 
 type Entry =
   /** `ps`: the path the command was typed at (the OS prompt); absent on the boot script's plain `$ `. */
-  | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string }
+  | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string; tag?: "ok" | "wait" | "bar" }
   | { n: number; k: "links"; items: Array<{ label: string; href: string; external?: boolean }> }
   | { n: number; k: "portrait" }
   | { n: number; k: "neofetch"; rows: string[] }
-  | { n: number; k: "banner"; art: string[]; welcome: string; tips: Array<{ cmd: string; desc: string }> }
+  | { n: number; k: "banner"; art: string[]; welcome: string; overview: string[]; tips: Array<{ cmd: string; desc: string }> }
   | { n: number; k: "link"; label: string; href: string; external?: boolean }
   | { n: number; k: "run"; text: string; cmd: string }
   | { n: number; k: "menu"; id: MenuId; rows: MenuRow[] };
 type Dest = { href: string; crossOrigin: boolean };
 
-const HOST = `${personaIdentity("engineer").subdomain}.${DISPLAY_ROOT}`;
+const TITLE = `${USER}@code — royal-programmer`;
 const TRANSCRIPT_CAP = 500;
 // Client-side Back/Forward (popstate) is not a new navigation entry, so note when one just happened.
 let lastPop = -1e9;
@@ -94,22 +93,18 @@ const ArtView = memo(function ArtView({ art, className, label }: { art: AsciiPor
   );
 });
 
-/** The tips box, `w` columns wide, the command column `cmdW` wide. */
-function TipsBox({ tips, w, cmdW, className }: { tips: Array<{ cmd: string; desc: string }>; w: number; cmdW: number; className: string }) {
-  const fit = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t.padEnd(n));
+/** The tips box: CSS borders with the title in the top one, so the frame always lines up with the text. */
+function Tips({ tips }: { tips: Array<{ cmd: string; desc: string }> }) {
   return (
-    <pre className={`terminal-os-tips ${className}`}>
-      {`┌─ Tips for getting started ${"─".repeat(w - 29)}┐\n`}
+    <fieldset className="terminal-os-tips">
+      <legend>Tips for getting started</legend>
       {tips.map((t) => (
-        <Fragment key={t.cmd}>
-          {"│ "}
-          {fit(t.cmd, cmdW)}
-          <i>{fit(t.desc, w - 4 - cmdW)}</i>
-          {" │\n"}
-        </Fragment>
+        <div key={t.cmd} className="terminal-os-tip">
+          <b>{t.cmd}</b>
+          <i>{t.desc}</i>
+        </div>
       ))}
-      {`└${"─".repeat(w - 2)}┘`}
-    </pre>
+    </fieldset>
   );
 }
 
@@ -180,7 +175,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       if (o.kind === "links") return { n, k: "links", items: o.items };
       if (o.kind === "portrait") return { n, k: "portrait" };
       if (o.kind === "neofetch") return { n, k: "neofetch", rows: o.rows };
-      if (o.kind === "banner") return { n, k: "banner", art: o.art, welcome: o.welcome, tips: o.tips };
+      if (o.kind === "banner") return { n, k: "banner", art: o.art, welcome: o.welcome, overview: o.overview, tips: o.tips };
       if (o.kind === "link") return { n, k: "link", label: o.label, href: o.href, external: o.external };
       if (o.kind === "run") return { n, k: "run", text: o.text, cmd: o.cmd };
       return { n, k: "menu", id: o.id, rows: o.rows };
@@ -452,14 +447,32 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       await wait(via === "hub" ? 150 : 100);
       if (stopped()) return;
       setBooting(false);
-      const script = terminalScript(items).slice(0, -1);
+      const script = terminalScript({ projects: items.length, posts: data.posts.length, views: views.length });
       for (const l of script) {
         if (stopped()) return;
         if (l.typed && !instant) await type(l.text, 13, false);
-        else {
+        else if (l.tag === "ok" && !instant) {
+          // `[..]` for a beat, then it resolves to `[ok]`.
+          await wait(140);
+          if (stopped()) return;
+          const n = ++seq.current;
+          append([{ n, k: "out", text: l.text, tag: "wait" }]);
+          await wait(120);
+          if (stopped()) return;
+          setBootEntries((es) => es.map((e) => (e.n === n && e.k === "out" ? { ...e, tag: "ok" } : e)));
+        } else if (l.tag === "bar" && !instant) {
+          const n = ++seq.current;
+          append([{ n, k: "out", text: bootBar(0), tag: "bar" }]);
+          for (let f = 1; f <= BOOT_BAR_STEPS; f++) {
+            await wait(60);
+            if (stopped()) return;
+            setBootEntries((es) => es.map((e) => (e.n === n && e.k === "out" ? { ...e, text: bootBar(f) } : e)));
+            ambient.key();
+          }
+        } else {
           if (!instant) await wait(90);
           if (stopped()) return;
-          line(l.text, !!l.prompt);
+          append([{ n: ++seq.current, k: "out", text: l.text, prompt: !!l.prompt, tag: l.tag }]);
         }
       }
       if (stopped()) return;
@@ -594,14 +607,14 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     else walkHistory(-1);
   };
 
-  /** `ratul@code:~/projects$ ` like a PS1; phones drop the `ratul@code:` lead. No path: the boot script's plain `$ `. */
+  /** `ratulroy@code:~/projects$ ` like a PS1; phones drop the `ratulroy@code:` lead. No path: the boot script's plain `$ `. */
   const ps1 = (path?: string) =>
     path === undefined ? (
       "$ "
     ) : (
       <>
         <code className="ps-lead">
-          <code className="ps-user">ratul@code</code>:
+          <code className="ps-user">ratulroy@code</code>:
         </code>
         <code className="ps-path">{path}</code>
         <code className="ps-dollar">$</code>{" "}
@@ -614,14 +627,24 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     e.k === "out" ? (
       <span key={e.n} className={`${e.prompt ? "is-cmd" : "is-out"} ${e.dim ? "is-dim" : ""} ${e.accent ? "is-accent" : ""}`}>
         {e.prompt ? ps1(e.ps) : ""}
+        {e.tag === "ok" ? <b className="is-ok">[ok] </b> : e.tag === "wait" ? "[..] " : ""}
         {e.text || " "}
       </span>
     ) : e.k === "banner" ? (
       <div key={e.n} className="terminal-os-welcome">
-        <pre className="terminal-os-banner">{e.art.join("\n")}</pre>
-        <span className="is-out is-dim">{e.welcome}</span>
-        <TipsBox tips={e.tips} w={88} cmdW={16} className="is-wide" />
-        <TipsBox tips={e.tips} w={44} cmdW={14} className="is-narrow" />
+        <div className="terminal-os-header">
+          <ArtView art={PORTRAIT_SMALL} className="terminal-os-art is-small" label="Ratul, drawn in characters" />
+          <div className="terminal-os-header-text">
+            <pre className="terminal-os-banner">{e.art.join("\n")}</pre>
+            <span className="is-out">{e.welcome}</span>
+            {e.overview.map((l) => (
+              <span key={l} className="is-cmd">
+                {l}
+              </span>
+            ))}
+          </div>
+        </div>
+        <Tips tips={e.tips} />
       </div>
     ) : e.k === "portrait" ? (
       <ArtView key={e.n} art={PORTRAIT_LARGE} className="terminal-os-art" label="Ratul, drawn in characters" />
@@ -705,7 +728,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         <div ref={win} className={`hub-exit hub-exit-term terminal-root-win ${booting ? "is-boot" : ""}`}>
           <div className="hub-exit-bar">
             <span /> <span /> <span />
-            <b>ratul@{HOST} — zsh</b>
+            <b>{TITLE}</b>
           </div>
           <div ref={bootBody} className="hub-exit-body terminal-root-body">
             {bootEntries.map(renderEntry)}
@@ -787,7 +810,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           ) : null}
         </div>
         <div className="terminal-os-status">
-          <code className="terminal-os-status-l">{`ratul@code  ${shortPath(cwd)}`}</code>
+          <code className="terminal-os-status-l">{`${USER}@code  ${shortPath(cwd)}`}</code>
           <code className="terminal-os-status-m">
             {plural(data.projects.length, "project")} · {plural(data.posts.length, "post")} · {plural(data.views.length, "view")}
           </code>

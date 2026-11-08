@@ -9,6 +9,8 @@ import {
   buildFs,
   complete as completePath,
   HOME,
+  join,
+  USER,
   listDir,
   readFile,
   resolvePath,
@@ -35,7 +37,7 @@ export type Out =
   | { kind: "run"; text: string; cmd: string }
   | { kind: "menu"; id: MenuId; rows: MenuRow[] }
   /** The welcome: block-letter art (88 columns), the welcome line, and the tips box rows. */
-  | { kind: "banner"; art: string[]; welcome: string; tips: Array<{ cmd: string; desc: string }> };
+  | { kind: "banner"; art: string[]; welcome: string; overview: string[]; tips: Array<{ cmd: string; desc: string }> };
 
 export type Effect =
   | { kind: "open-view"; id: string }
@@ -67,7 +69,7 @@ const COMMANDS: CommandDoc[] = [
   { name: "help", group: "terminal", usage: "help", desc: "list the commands", long: "/help does the same." },
   { name: "man", group: "terminal", usage: "man <command>", desc: "the manual for one command" },
   { name: "ls", group: "navigate", usage: "ls [-l] [path]", desc: "list files; ls views is the picker" },
-  { name: "cd", group: "navigate", usage: "cd [path]", desc: "change directory; cd .. at ~ exits to the hub" },
+  { name: "cd", group: "navigate", usage: "cd [path]", desc: "change directory" },
   { name: "pwd", group: "navigate", usage: "pwd", desc: "where you are" },
   { name: "tree", group: "navigate", usage: "tree [path]", desc: "the whole tree" },
   { name: "cat", group: "read", usage: "cat <file>", desc: "print a file" },
@@ -161,7 +163,8 @@ export function createShell(data: TerminalData): Shell {
     {
       kind: "banner",
       art: [...BANNER_ROYAL_PROGRAMMER],
-      welcome: `Welcome to ${host} · ${data.commit ?? "v1"}`,
+      welcome: `royal-programmer ${data.commit ?? "v1"} · ${host}`,
+      overview: [data.who, data.stack.join(" · "), data.uptime],
       tips: [
         { cmd: "help", desc: "every command" },
         { cmd: "/", desc: "the command menu" },
@@ -218,7 +221,7 @@ export function createShell(data: TerminalData): Shell {
       es.forEach((e, i) => {
         const last = i === es.length - 1;
         out.push(`${prefix}${last ? "└── " : "├── "}${shortFormat(e)}`);
-        if (e.kind === "dir") walk(`${dir}/${e.name}`, `${prefix}${last ? "    " : "│   "}`);
+        if (e.kind === "dir") walk(join(dir, e.name), `${prefix}${last ? "    " : "│   "}`);
       });
     };
     walk(path, "");
@@ -267,7 +270,7 @@ export function createShell(data: TerminalData): Shell {
       ["views", String(data.views.length)],
     ];
     if (data.commit) rows.push(["commit", data.commit]);
-    return [{ kind: "neofetch", rows: [`ratul@${host}`, "-".repeat(`ratul@${host}`.length), ...rows.map(([k, v]) => `${k.padEnd(9)}${v}`)] }];
+    return [{ kind: "neofetch", rows: [`${USER}@code`, "-".repeat(`${USER}@code`.length), ...rows.map(([k, v]) => `${k.padEnd(9)}${v}`)] }];
   };
 
   /** The résumé's first page: name, title, links, summary, then a line or two per section. */
@@ -305,7 +308,7 @@ export function createShell(data: TerminalData): Shell {
     if (postSlugs.has(arg)) return { lines: [], effect: { kind: "open-slug", slug: arg, blog: true } };
     if (/^https?:\/\//i.test(arg)) return { lines: [], effect: { kind: "open-url", url: arg } };
     const path = resolvePath(st.cwd, arg);
-    const m = /^\/engineer\/(projects|writing)\/(.+)\.md$/.exec(path);
+    const m = new RegExp(`^${HOME}/(projects|writing)/(.+)\\.md$`).exec(path);
     if (m && stat(fs, path)) return { lines: [], effect: { kind: "open-slug", slug: m[2], blog: m[1] === "writing" } };
     return { lines: [text(`open: no such view, page or link: ${arg}`)] };
   };
@@ -333,7 +336,6 @@ export function createShell(data: TerminalData): Shell {
         const kind = stat(fs, path);
         if (!kind) return { lines: [text(`cd: no such file or directory: ${args[0]}`)] };
         if (kind !== "dir") return { lines: [text(`cd: not a directory: ${args[0]}`)] };
-        if (st.cwd === HOME && /^\.\.\/*$/.test(args[0])) return { lines: [], effect: { kind: "exit" } };
         return { lines: [], cwd: path };
       }
       case "pwd":
@@ -351,7 +353,7 @@ export function createShell(data: TerminalData): Shell {
       case "contact":
         return { lines: cat(["~/contact"], st) };
       case "whoami":
-        return { lines: [text(data.who)] };
+        return { lines: [text(USER), text(data.who, true)] };
       case "neofetch":
         return { lines: neofetch() };
       case "resume":
