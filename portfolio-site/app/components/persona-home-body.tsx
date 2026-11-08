@@ -1,8 +1,10 @@
 "use client";
 
-import { BarChart3, CalendarDays, ImageIcon } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { forwardRef } from "react";
 import type { BlogPost, Entry } from "@/lib/content";
+import { PersonaLink } from "@/lib/site/persona-link";
+import { HirePill } from "./hire-pill";
 import type { Persona } from "../persona-provider";
 import type { PersonaContent } from "./site-content";
 import { SITE_SHELL } from "./site-shell";
@@ -19,87 +21,33 @@ import { WorldStage } from "./world-stage";
 
 export type { PersonaMotionOrchestratorHandle };
 
-function TraderCalendarCard() {
-  const days = ["M", "T", "W", "T", "F", "S", "S"];
-  return (
-    <div
-      className="rounded-3xl border p-5 backdrop-blur-2xl"
-      style={{ backgroundColor: "var(--surface-bg)", borderColor: "var(--surface-border)", boxShadow: "var(--panel-shadow)" }}
-    >
-      <div className="mb-4 flex items-center gap-2 text-sm font-medium text-[var(--fg)]">
-        <CalendarDays className="h-4 w-4 text-[var(--accent)]" aria-hidden />
-        Week view
-      </div>
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] uppercase tracking-wide text-[var(--muted)]">
-        {days.map((d, i) => (
-          <span key={`d-${i}`}>{d}</span>
-        ))}
-      </div>
-      <div className="mt-2 grid grid-cols-7 gap-1">
-        {Array.from({ length: 7 }, (_, i) => (
-          <span
-            key={i}
-            className="flex aspect-square items-center justify-center rounded-lg text-xs"
-            style={{
-              backgroundColor: i === 2 ? "color-mix(in srgb, var(--accent) 22%, transparent)" : "var(--chip-bg)",
-              color: i === 2 ? "var(--accent)" : "var(--muted)",
-            }}
-          >
-            {12 + i}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TraderGraphCard() {
-  const bars = [40, 72, 55, 88, 62, 95, 48, 78];
-  return (
-    <div
-      className="rounded-3xl border p-6 backdrop-blur-2xl"
-      style={{ backgroundColor: "var(--surface-bg)", borderColor: "var(--surface-border)", boxShadow: "var(--panel-shadow)" }}
-    >
-      <div className="mb-5 flex items-center gap-2 text-sm font-medium text-[var(--fg)]">
-        <BarChart3 className="h-4 w-4 text-[var(--accent)]" aria-hidden />
-        Performance (sample)
-      </div>
-      <div className="flex h-36 items-end justify-between gap-1.5 px-1">
-        {bars.map((h, i) => (
-          <div
-            key={i}
-            className="min-w-0 flex-1 rounded-t-md bg-[var(--accent)] opacity-90"
-            style={{ height: `${h}%`, opacity: 0.35 + (i % 3) * 0.15 }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PhotographerGalleryStrip() {
+/** Until a world's own page lands: what it will hold, and a way to something real. */
+function ComingUpCard({ content }: { content: PersonaContent }) {
   return (
     <div
       className="rounded-3xl border p-6 backdrop-blur-2xl"
       style={{ backgroundColor: "var(--surface-bg)", borderColor: "var(--surface-border)", boxShadow: "var(--panel-shadow)" }}
     >
       <div className="mb-4 flex items-center gap-2 text-sm font-medium text-[var(--fg)]">
-        <ImageIcon className="h-4 w-4 text-[var(--accent)]" aria-hidden />
-        Recent frames
+        <Sparkles className="h-4 w-4 text-[var(--accent)]" aria-hidden />
+        What&apos;s coming here
       </div>
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-        {Array.from({ length: 4 }, (_, i) => (
-          <div
-            key={i}
-            className="aspect-[4/3] rounded-xl border"
-            style={{
-              borderColor: "var(--surface-border)",
-              background:
-                "linear-gradient(145deg, color-mix(in srgb, var(--fg) 8%, transparent), color-mix(in srgb, var(--accent) 18%, transparent))",
-            }}
-          />
+      <ul className="space-y-2 text-sm text-[var(--muted)]">
+        {content.points.slice(0, 3).map((point) => (
+          <li key={point} className="flex gap-2">
+            <span aria-hidden className="text-[var(--accent)]">
+              ·
+            </span>
+            {point}
+          </li>
         ))}
-      </div>
+      </ul>
+      <p className="mt-5 text-sm text-[var(--fg)]">
+        Until then,{" "}
+        <PersonaLink persona="engineer" className="font-medium text-[var(--accent)] underline-offset-4 hover:underline">
+          the Engineer side is live.
+        </PersonaLink>
+      </p>
     </div>
   );
 }
@@ -150,14 +98,9 @@ export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, Perso
               </PersonaMotionSlot>
               <PersonaMotionSlot id="tr-right-col" dir="right" exitOrder={1} enterOrder={1}>
                 <div className="flex flex-col gap-6">
-                  <TraderCalendarCard />
+                  <ComingUpCard content={content} />
                   <IdentityPanel persona={persona} content={content} />
                 </div>
-              </PersonaMotionSlot>
-            </section>
-            <section className={`${SITE_SHELL} pb-10`}>
-              <PersonaMotionSlot id="tr-graph" dir="down" exitOrder={2} enterOrder={2}>
-                <TraderGraphCard />
               </PersonaMotionSlot>
             </section>
           </>
@@ -170,12 +113,10 @@ export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, Perso
                 <HomeHero persona={persona} content={content} />
               </PersonaMotionSlot>
               <PersonaMotionSlot id="ph-identity" dir="right" exitOrder={1} enterOrder={1}>
-                <IdentityPanel persona={persona} content={content} />
-              </PersonaMotionSlot>
-            </section>
-            <section className={`${SITE_SHELL} pb-16 md:pb-24`}>
-              <PersonaMotionSlot id="ph-gallery" dir="down" exitOrder={2} enterOrder={2}>
-                <PhotographerGalleryStrip />
+                <div className="flex flex-col gap-6">
+                  <ComingUpCard content={content} />
+                  <IdentityPanel persona={persona} content={content} />
+                </div>
               </PersonaMotionSlot>
             </section>
           </>
@@ -190,6 +131,8 @@ export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, Perso
             </PersonaMotionSlot>
           </section>
         )}
+        {/* A way to reach me from every world but the Engineer's (its terminal has `hire`). */}
+        {persona !== "engineer" ? <HirePill /> : null}
       </PersonaMotionOrchestrator>
     );
   },

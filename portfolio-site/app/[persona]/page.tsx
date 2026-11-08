@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import {
   getPersona,
   isLaunchedPersona,
@@ -23,7 +24,6 @@ async function hubMedia(): Promise<Partial<Record<string, string[]>>> {
   }
 }
 import { loadHomeContent } from "../load-home-content";
-import { InvalidPersonaView } from "./invalid-persona-view";
 
 type PersonaPageProps = {
   params: Promise<{ persona: string }>;
@@ -62,7 +62,8 @@ export default async function PersonaPage({ params, searchParams }: PersonaPageP
   const [{ persona }, { via }] = await Promise.all([params, searchParams]);
 
   if (!isLaunchedPersona(persona)) {
-    return <InvalidPersonaView attempted={persona} />;
+    // The friendly page lives in ./not-found.tsx; calling notFound() makes the status a real 404.
+    notFound();
   }
 
   const [{ personas, engineerEntries, engineerBlogPosts }, media] = await Promise.all([loadHomeContent(), hubMedia()]);

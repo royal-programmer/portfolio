@@ -2,6 +2,8 @@
 
 import { motion } from "framer-motion";
 import { Bike, Briefcase, Camera, CandlestickChart, Gamepad2, Palette } from "lucide-react";
+import { HubLink } from "@/lib/site/persona-link";
+import { DISPLAY_ROOT } from "@/lib/site/brand";
 import type { Persona } from "../persona-provider";
 import type { PersonaContent } from "./site-content";
 
@@ -33,23 +35,26 @@ export function IdentityPanel({ persona, content }: { persona: Persona; content:
         ) : (
           <Gamepad2 className="h-4 w-4" />
         )}
-        Identity Shift Panel
+        {content.label.replace(/\s*mode$/i, "")}
       </div>
       <div className="space-y-4">
         {content.points.map((point) => (
           <div
             key={point}
-            className="rounded-2xl border px-4 py-3"
-            style={{ backgroundColor: "var(--chip-bg)", borderColor: "var(--chip-border)" }}
+            className="rounded-2xl border px-4 py-3 text-[var(--fg)]"
+            // Opaque enough to read over a bright photo: the translucent chip tint sits on the page colour.
+            style={{
+              backgroundColor: "color-mix(in srgb, var(--background) 90%, var(--accent) 10%)",
+              backgroundImage: "linear-gradient(var(--chip-bg), var(--chip-bg))",
+              borderColor: "var(--chip-border)",
+            }}
           >
             {point}
           </div>
         ))}
       </div>
       <p className="mt-6 text-xs text-[var(--muted)]">
-        Know me more at <span className="font-medium text-[var(--fg)]">/whoami</span> — a hub of
-        persona doors. On this page: 1× click + hold → Engineer, 2× → Trader, 3× → Photographer.
-        Konami still cycles.
+        <HubLink className="underline-offset-4 hover:underline">From the hub: {DISPLAY_ROOT}</HubLink>
       </p>
     </motion.div>
   );

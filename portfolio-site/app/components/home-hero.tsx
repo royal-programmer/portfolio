@@ -46,7 +46,8 @@ export function HomeHero({
     >
       <p className="text-xs uppercase tracking-[0.2em] text-[var(--accent)] sm:text-sm">{content.eyebrow}</p>
       <p className="text-base text-[var(--muted)] sm:text-lg md:text-2xl">
-        I am a{" "}
+        {/* Only the engineer's words are roles; the other worlds' phrases stand alone. */}
+        {persona === "engineer" ? <>I am a </> : null}
         <span className="font-semibold text-[var(--accent)]">
           <TypeAnimation
             key={persona}

@@ -24,6 +24,8 @@ export const HUB_COPY = {
   closingBody:
     "Each colour is a part of me with its own world. Together they’re the whole picture — and the picture keeps growing.",
   email: "ratul.arya.roy@gmail.com",
+  /** One line under the hero, from the résumé (2 years, Bengaluru, relocation). */
+  pitch: "Software engineer · 2 years in production · Bengaluru, open to relocation",
 } as const;
 
 export type PersonaIdentity = {

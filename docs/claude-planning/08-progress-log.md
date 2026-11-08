@@ -5,6 +5,20 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-09 — Round 1j: honest placeholders, `Hire me` everywhere, real 404, phone hero
+
+Builder (Sonnet, ≈110k tokens incl. verification), after a Sonnet audit of the live site. Removed the
+fake and debug copy (identity panel, trader/photographer sample cards, "I am a Storytelling Frames");
+one `ComingUpCard` instead; `Hire me` pill with a PDF/email/terminal popover on the hub and the
+non-engineer pages; hub hero reserves the HUD's height and carries a résumé pitch line; unknown
+personas return a real 404 with the same friendly page; tap targets ≥ 44px on coarse pointers; opaque
+persona chips and a dark plate behind the HUD. Verified at 1280 and 393 touch: hub Normal first screen,
+the pill on hub, lens and trade (open, Esc, outside tap, hrefs), no "sample / Week view / Recent frames /
+Identity Shift / Konami" on lens and trade, `curl` 404 for `/nope`, typed hero line, console clean. Not
+verified: the pill on the hub while the headset gate is open (by construction it is hidden).
+
+---
+
 ## 2026-11-09 — Engineer terminal round 1i: contents pane, `timeline`, real `git log`, `hire`
 
 Builder (Sonnet, ≈190k tokens incl. verification). Caret follows the input's cursor; the portrait

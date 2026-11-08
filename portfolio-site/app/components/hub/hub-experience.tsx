@@ -33,6 +33,7 @@ import { spectrumColor } from "@/lib/site/spectrum";
 import { useExperience } from "../../experience-provider";
 import { ModeSwitch, QualityMenu, QUALITY_LABEL, SoundToggle } from "../experience-controls";
 import { BootFrame, ExitFrame } from "./exit-sequence";
+import { HirePill } from "../hire-pill";
 import { GateSkeleton, HeadsetGate, type LoadStatus } from "./headset-gate";
 import { printCredits } from "@/lib/site/credits";
 import { LightCursor } from "./light-cursor";
@@ -982,7 +983,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         <button
           type="button"
           onClick={() => jump("hero")}
-          className="font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase transition-colors hover:text-[var(--ink)]"
+          className="hit font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase transition-colors hover:text-[var(--ink)]"
         >
           {DISPLAY_ROOT}
         </button>
@@ -1023,7 +1024,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
                   aria-label={`${id.role} chapter`}
                   aria-current={on ? "true" : undefined}
                   data-cursor-color={color}
-                  className="group flex items-center justify-end gap-3"
+                  className="group hit flex items-center justify-end gap-3"
                 >
                   <span className={`hub-rail-label font-mono text-[10px] tracking-[0.14em] text-[var(--ink-dim)] uppercase transition-opacity duration-[var(--dur-2)] max-lg:hidden ${on ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                     {id.role}
@@ -1042,7 +1043,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
 
       <main className="relative z-10">
         {/* ---------- Hero ---------- */}
-        <section id="hero" data-section className="flex min-h-[100svh] items-end px-4 pb-14 sm:px-8 lg:items-center lg:px-12 lg:pb-0">
+        <section id="hero" data-section className="flex min-h-[100svh] items-end px-4 pb-[calc(11rem+env(safe-area-inset-bottom))] sm:px-8 md:pb-14 lg:items-center lg:px-12 lg:pb-0">
           <div className="max-w-3xl">
             <h1 data-hero-title className="font-display text-[length:clamp(2.9rem,1rem+5.4vw,7rem)] leading-[0.96] tracking-[-0.02em] text-balance">
               <span className="block">One mind.</span>
@@ -1050,6 +1051,9 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
             </h1>
             <p data-hero-item className="mt-7 text-[length:var(--step-1)] text-[var(--ink-dim)]">
               {HUB_COPY.intro} <CyclingPhrase chapters={chapters} />
+            </p>
+            <p data-hero-item className="mt-3 font-mono text-[11px] leading-relaxed tracking-[0.06em] text-[var(--ink-faint)] sm:text-xs">
+              {HUB_COPY.pitch}
             </p>
           </div>
         </section>
@@ -1103,6 +1107,14 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
                 >
                   Say hello <span aria-hidden>→</span>
                 </a>
+                <a
+                  href="/Ratul_Roy_Resume.pdf"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hit ml-3 inline-flex min-h-12 items-center rounded-full border border-[var(--line)] px-6 text-sm text-[var(--ink-dim)] transition-colors hover:text-[var(--ink)]"
+                >
+                  Résumé (PDF)
+                </a>
                 <p className="mt-4 font-mono text-xs text-[var(--ink-faint)]">{HUB_COPY.email}</p>
                 {immersiveLive && introDone ? (
                   // The one line in the empty sky (D38): click it and the journey rewinds to the headset.
@@ -1131,6 +1143,8 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         onTop={() => jump("hero")}
         onEnd={() => jump("end")}
       />
+
+      <HirePill hub on={ready && gate === null && !inIntro && !entering && !returning && !rewinding} />
 
       {/* ---------- Intro overlays ---------- */}
       {/* Before any script runs the page IS the loader: the gate's still parts, server-rendered.

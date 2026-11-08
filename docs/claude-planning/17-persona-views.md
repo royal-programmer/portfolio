@@ -233,3 +233,26 @@ Then a checkpoint to production, then Swarm.
 - **Removed:** ghost suggestions (Tab and the palette stay), the pane/header braille portrait, the unused
   ramp portraits and the large braille from `terminal-art.ts`.
 
+### 6.11 Round 1j: honest placeholders, a contact path everywhere, a real 404 (2026-11-09)
+
+A cold audit of the live site found pre-redesign placeholders and no contact path outside the terminal.
+This round is an honest-placeholder pass, not a rebuild of the other personas (each gets its own round).
+
+- **Fake and debug copy gone.** The identity panel's heading is the persona's name; the `/whoami` and
+  Konami paragraph became one `From the hub` link. Trader's "Performance (sample)" and "Week view" and the
+  photographer's four empty tiles are replaced by one `What's coming here` card (three of the persona's own
+  points, plus "Until then, the Engineer side is live" linking to the Engineer host). Only the engineer's
+  hero says "I am a"; the other worlds' typed phrases stand alone. Persona chips sit on an opaque tint.
+- **`Hire me` pill** (`hire-pill.tsx`) on the hub and every non-engineer page: a small popover with the PDF
+  résumé, an email and `Terminal: hire` (the Engineer host with `?run=hire`). Always there, nothing
+  remembered; on the hub it hides with the guide HUD (gate, warp, climb). Bottom-left on phones (the HUD and
+  the persona pages' round control own bottom-right), top-right under the header on desktop. The hub's
+  closing section gains `Résumé (PDF)` beside `Say hello`.
+- **Hub on phones.** The hero now reserves the HUD's height (`padding-bottom`), so the headline and the
+  line never sit under it, and a one-line pitch from the résumé sits under them (`HUB_COPY.pitch`).
+- **Real 404.** `/[persona]` calls `notFound()`; `app/[persona]/not-found.tsx` renders the friendly view for a
+  mistyped persona (hub or path host) and plain copy on a persona's own host or deeper in a path.
+- **Touch targets.** A `.hit` pseudo-element grows the hit area to about 44px on coarse pointers (header link,
+  mode pills, sound, quality, chapter dots, Top/End, the HUD buttons, the gate's "proceed" link) without
+  changing how anything looks. The HUD gets a dark plate so it holds up over bright warp streaks.
+

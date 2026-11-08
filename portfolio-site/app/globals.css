@@ -492,6 +492,10 @@ html.is-dragging * {
   align-items: flex-end;
   gap: 0.55rem;
   padding: 0.7rem 0.85rem 0.65rem;
+  /* A dark plate so the readout holds up against bright warp streaks. */
+  background: color-mix(in srgb, var(--void, #07070a) 62%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   pointer-events: none;
   opacity: 0;
   transform: translateY(6px);
@@ -2876,5 +2880,119 @@ em.font-display,
   }
   .terminal-root.is-os .terminal-root-frame {
     transform: none;
+  }
+}
+
+/* Touch targets: the visual size stays, the hit area grows to about 44px. */
+@media (pointer: coarse) {
+  .hit,
+  .hub-rail-end,
+  .hub-hud-actions button,
+  .hub-rail-marks button {
+    position: relative;
+  }
+  .hit::after,
+  .hub-hud-actions button::after {
+    content: "";
+    position: absolute;
+    inset: -14px -14px;
+  }
+  .hub-rail-end::after {
+    content: "";
+    position: absolute;
+    inset: -14px -18px;
+  }
+  .hub-rail-marks button::after {
+    content: "";
+    position: absolute;
+    inset: -18px -20px;
+  }
+}
+
+/* "Hire me": a quiet pill and a small popover, on every host but the terminal. Hub tokens (--ink) and the
+   persona pages' (--fg, --accent) both work through the fallbacks. */
+.hire-pill {
+  --hp-bg: var(--background, #090b15);
+  --hp-fg: var(--fg, #f4f7ff);
+  --hp-accent: var(--accent, #3b82f6);
+  position: fixed;
+  z-index: 40;
+  left: max(1rem, env(safe-area-inset-left, 0px));
+  bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 500ms ease;
+  font-family: var(--font-geist-mono), monospace;
+}
+/* On the hub the page's own dark tokens apply. */
+.hire-pill.is-hub {
+  --hp-bg: var(--void, #07070a);
+  --hp-fg: var(--ink, #f3f1ec);
+  --hp-accent: var(--ink-dim, #a9a7a1);
+}
+.hire-pill.is-on {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (min-width: 1024px) {
+  .hire-pill {
+    left: auto;
+    bottom: auto;
+    top: 4.75rem;
+    right: 2.75rem;
+    align-items: flex-end;
+    flex-direction: column-reverse;
+  }
+}
+.hire-pill-btn {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--hp-accent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hp-bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: var(--hp-fg);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.hire-pill-btn:hover,
+.hire-pill-btn:focus-visible {
+  background: color-mix(in srgb, var(--hp-accent) 18%, var(--hp-bg));
+}
+.hire-pill-pop {
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  padding: 6px;
+  border: 1px solid var(--hp-accent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--hp-bg) 94%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.hire-pill-pop a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  color: var(--hp-fg);
+  font-size: 12px;
+  text-decoration: none;
+}
+.hire-pill-pop a:hover,
+.hire-pill-pop a:focus-visible {
+  background: color-mix(in srgb, var(--hp-accent) 16%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hire-pill {
+    transition: none;
   }
 }

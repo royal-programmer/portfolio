@@ -152,7 +152,7 @@ export function HeadsetGate({ device, quality, onQuality, status, startedAt, lea
           <button
             type="button"
             onClick={onNormal}
-            className="pointer-events-auto justify-self-start font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline sm:justify-self-end"
+            className="hit pointer-events-auto justify-self-start font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline sm:justify-self-end"
           >
             Or proceed without the headset →
           </button>
