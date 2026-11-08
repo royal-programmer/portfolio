@@ -2330,9 +2330,17 @@ em.font-display,
   opacity: 0;
   transition: opacity 500ms var(--ease-in-out), transform 650ms var(--ease-in-out);
 }
+.terminal-os {
+  /* One gutter for the body and for the art that must fit inside it. --adv: Geist Mono's advance, in em. */
+  --os-pad: clamp(16px, 4vw, 48px);
+  --adv: 0.6;
+}
 .terminal-os-body {
   min-height: 0;
-  padding: 20px clamp(16px, 4vw, 48px) 28px;
+  padding: 20px var(--os-pad) 28px;
+}
+.terminal-root-body .is-accent {
+  color: var(--c);
 }
 
 /* The welcome: block-letter banner in the accent, the welcome line, a boxed tips block (44 columns, all three). */
@@ -2348,7 +2356,8 @@ em.font-display,
   letter-spacing: 0;
 }
 .terminal-os-banner {
-  font-size: 13px;
+  /* 88 columns inside the gutters, at most 13px. */
+  font-size: min(13px, calc((100vw - 2 * var(--os-pad)) / 88 / var(--adv)));
   line-height: 1.05;
   color: var(--c);
 }
@@ -2361,12 +2370,79 @@ em.font-display,
   font-style: normal;
   color: var(--ink-faint);
 }
-@media (max-width: 479px) {
-  .terminal-os-banner {
-    font-size: clamp(6px, 2.05vw, 13px);
+/* Two boxes, one shown: 88 columns where it fits at 13px, 44 on phones. */
+.terminal-os-tips.is-wide {
+  display: none;
+}
+@media (min-width: 780px) {
+  .terminal-os-tips.is-wide {
+    display: block;
   }
+  .terminal-os-tips.is-narrow {
+    display: none;
+  }
+}
+@media (max-width: 699px) {
   .terminal-os-tips {
-    font-size: clamp(9px, 2.6vw, 13px);
+    font-size: min(13px, calc((100vw - 2 * var(--os-pad)) / 44 / var(--adv)));
+  }
+}
+
+/* `portrait` and `neofetch`: the headshot in characters, one span per run of tone. */
+.terminal-os-art {
+  margin: 4px 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: min(11px, calc((100vw - 2 * var(--os-pad)) / 84 / var(--adv)));
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: pre;
+  overflow: hidden;
+}
+.terminal-os-art.is-small {
+  font-size: min(11px, calc((100vw - 2 * var(--os-pad)) / 38 / var(--adv)));
+}
+.terminal-os-art span {
+  display: inline;
+}
+.terminal-os-art [data-tone="b"] {
+  color: color-mix(in srgb, var(--c) 55%, #16233f);
+}
+.terminal-os-art [data-tone="s"] {
+  color: #e2b48f;
+}
+.terminal-os-art [data-tone="d"] {
+  color: #3b4150;
+}
+.terminal-os-art [data-tone="w"] {
+  color: #ece7dc;
+}
+.terminal-os-art [data-tone="n"] {
+  color: #8d96a3;
+}
+.terminal-os-fetch {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 3ch;
+  align-items: start;
+  margin: 4px 0;
+}
+.terminal-os-fetch-rows {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+.terminal-os-fetch-rows b {
+  font-weight: 400;
+}
+@media (max-width: 639px) {
+  .terminal-os-fetch {
+    grid-template-columns: 1fr;
+    row-gap: 8px;
   }
 }
 

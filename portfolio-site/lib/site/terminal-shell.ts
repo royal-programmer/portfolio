@@ -4,6 +4,7 @@
  * toggle full screen). Pure: no React, no DOM, no navigation; the UI resolves hrefs.
  */
 import { DISPLAY_ROOT, personaIdentity } from "@/lib/site/brand";
+import { BANNER_ROYAL_PROGRAMMER } from "@/lib/site/terminal-art";
 import {
   buildFs,
   complete as completePath,
@@ -22,12 +23,18 @@ export type MenuId = "views" | "projects" | "writing";
 export type MenuRow = { key: string; label: string; line: string };
 
 export type Out =
-  | { kind: "text"; text: string; dim?: boolean }
+  | { kind: "text"; text: string; dim?: boolean; accent?: boolean }
+  /** Several links on one line, joined by " · ". */
+  | { kind: "links"; items: Array<{ label: string; href: string; external?: boolean }> }
+  /** The large portrait (`portrait`). */
+  | { kind: "portrait" }
+  /** The `neofetch` card: the small portrait on the left, these rows on the right. */
+  | { kind: "neofetch"; rows: string[] }
   | { kind: "link"; label: string; href: string; external?: boolean }
   /** A line that runs a command when clicked (`open <slug>` at the foot of a project). */
   | { kind: "run"; text: string; cmd: string }
   | { kind: "menu"; id: MenuId; rows: MenuRow[] }
-  /** The welcome: block-letter art (44 columns), the welcome line, and the tips box rows. */
+  /** The welcome: block-letter art (88 columns), the welcome line, and the tips box rows. */
   | { kind: "banner"; art: string[]; welcome: string; tips: Array<{ cmd: string; desc: string }> };
 
 export type Effect =
@@ -43,15 +50,6 @@ export type RunResult = { lines: Out[]; effect?: Effect; state: ShellState };
 
 export type CommandGroup = "navigate" | "read" | "open" | "terminal";
 export type CommandDoc = { name: string; group: CommandGroup; usage: string; desc: string; long?: string };
-
-export const BANNER_ART = [
-  "██████╗  █████╗ ████████╗██╗   ██╗██╗",
-  "██╔══██╗██╔══██╗╚══██╔══╝██║   ██║██║",
-  "██████╔╝███████║   ██║   ██║   ██║██║",
-  "██╔══██╗██╔══██║   ██║   ██║   ██║██║",
-  "██║  ██║██║  ██║   ██║   ╚██████╔╝███████╗",
-  "╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚══════╝",
-];
 
 export type Shell = {
   /** The welcome block (banner, welcome line, tips), as `banner` prints it. */
@@ -77,6 +75,8 @@ const COMMANDS: CommandDoc[] = [
   { name: "stack", group: "read", usage: "stack", desc: "the tools I work in" },
   { name: "uptime", group: "read", usage: "uptime", desc: "time in production" },
   { name: "contact", group: "read", usage: "contact", desc: "mail and github, as links" },
+  { name: "resume", group: "read", usage: "resume", desc: "the overview, like the résumé's first page" },
+  { name: "portrait", group: "read", usage: "portrait", desc: "me, in characters" },
   { name: "whoami", group: "read", usage: "whoami", desc: "one line about me" },
   { name: "neofetch", group: "read", usage: "neofetch", desc: "a stat card for this host" },
   { name: "open", group: "open", usage: "open <view|slug|url>", desc: "open a view, a project or post, or a link" },
@@ -160,13 +160,14 @@ export function createShell(data: TerminalData): Shell {
   const banner = (): Out[] => [
     {
       kind: "banner",
-      art: BANNER_ART,
+      art: [...BANNER_ROYAL_PROGRAMMER],
       welcome: `Welcome to ${host} · ${data.commit ?? "v1"}`,
       tips: [
         { cmd: "help", desc: "every command" },
         { cmd: "/", desc: "the command menu" },
         ...(data.views[0] ? [{ cmd: `open ${data.views[0].id}`, desc: "enter a view" }] : []),
         { cmd: "projects", desc: "read what I built" },
+        { cmd: "resume", desc: "the overview" },
       ],
     },
   ];
@@ -266,7 +267,33 @@ export function createShell(data: TerminalData): Shell {
       ["views", String(data.views.length)],
     ];
     if (data.commit) rows.push(["commit", data.commit]);
-    return texts([`ratul@${host}`, "-".repeat(`ratul@${host}`.length), ...rows.map(([k, v]) => `${k.padEnd(9)}${v}`)]);
+    return [{ kind: "neofetch", rows: [`ratul@${host}`, "-".repeat(`ratul@${host}`.length), ...rows.map(([k, v]) => `${k.padEnd(9)}${v}`)] }];
+  };
+
+  /** The résumé's first page: name, title, links, summary, then a line or two per section. */
+  const resume = (): Out[] => {
+    const r = data.resume;
+    const links = data.contact.map((c) => ({
+      label: c.label,
+      href: c.href,
+      external: /^https?:\/\//i.test(c.href),
+    })).filter((l) => l.external || /^mailto:/i.test(l.href));
+    const out: Out[] = [{ kind: "text", text: r.name, accent: true }, text(r.title), text(r.location, true)];
+    if (links.length) out.push({ kind: "links", items: links });
+    out.push(text(""), text(r.summary), text(""), text("experience", true));
+    for (const x of r.experience) out.push(text(`${x.role} · ${x.company} · ${x.period}`), text(x.headline, true));
+    out.push(text(""), text("skills", true));
+    for (const g of r.skills) out.push(text(g.group, true), text(g.items.join(" · ")));
+    out.push(text(""), text("education", true));
+    for (const e of r.education) out.push(text(`${e.degree} · ${e.school} · ${e.year}`));
+    const named = r.certifications.find((c) => c.items?.length);
+    const more = r.certifications.map((c) => /(\d+\+)/.exec(c.line)?.[1]).find(Boolean);
+    if (named) {
+      out.push(text(""), text("certifications", true));
+      out.push(text(`${named.items?.length} ${named.issuer.split(" / ")[0]} credentials${more ? ` · ${more} more` : ""}`));
+    }
+    out.push(text(""), text("cat ~/resume/experience for the full story · ls ~/resume", true));
+    return out;
   };
 
   const open = (arg: string | undefined, st: ShellState): { lines: Out[]; effect?: Effect } => {
@@ -327,6 +354,10 @@ export function createShell(data: TerminalData): Shell {
         return { lines: [text(data.who)] };
       case "neofetch":
         return { lines: neofetch() };
+      case "resume":
+        return { lines: resume() };
+      case "portrait":
+        return { lines: [{ kind: "portrait" }] };
       case "open":
         return open(args.join(" ").trim() || undefined, st);
       case "views":

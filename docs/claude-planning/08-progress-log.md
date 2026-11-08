@@ -5,6 +5,27 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-08 — Engineer round 1d: royal-programmer banner, the résumé in the terminal, the ASCII portrait
+
+**Ratul's asks:** the banner spells `royal-programmer`; an overview like the résumé; a detailed
+ASCII portrait from his headshot. Spec: `17-persona-views.md` §6.7.
+
+**What shipped** — banner is figlet ANSI Shadow `ROYAL-` over `PROGRAMMER` (88 columns, sized to
+fit any width; 6.8px on a 393 phone, no horizontal scroll). `~/resume/` with `summary experience
+skills projects certifications education` and the `resume` card (name, title, location, links,
+summary, experience line, skills groups, education, certifications, footer) from
+`Ratul_Roy_Resume.pdf` typed into `terminal-data.ts` (no phone number). `portrait` prints the
+84-column headshot in a 70-step ramp, coloured per tone run (backdrop blue, skin, hair/jacket,
+shirt) as 467 memoized spans; `neofetch` shows the 38-column portrait beside the stats with a
+colour strip, stacked under 640px. `contact` gains LinkedIn. Tips box has a `resume` row and is
+88 columns from 780px up, 44 on phones.
+
+**How** — lead (Fable): résumé extraction (pypdf), art generation (pyfiglet + Pillow), data module,
+spec, fix of the banner wrap (pyfiglet had split the handle at 80 columns), verification ≈25k.
+Sonnet builder ≈90k. Generation script lives in this session's scratchpad `portrait/`.
+
+**Known** — the portrait's face reads dark on dark; a contrast pass on the generator would help.
+
 ## 2026-11-08 — Engineer round 1c: the terminal as a full-screen OS
 
 **Ratul's references:** Claude Code's welcome, katoolin, vulnx on a phone. His asks: full-screen

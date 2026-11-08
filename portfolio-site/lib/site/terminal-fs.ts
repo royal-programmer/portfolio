@@ -2,7 +2,7 @@
  * The Engineer terminal's file system (17-persona-views.md §6.2): a virtual tree built from
  * `TerminalData`. Pure: no React, no DOM, so it can be tested on its own.
  *
- *   ~ (= /engineer = /)   about  stack  uptime  contact  projects/  writing/  views/
+ *   ~ (= /engineer = /)   about  stack  uptime  contact  resume/  projects/  writing/  views/
  */
 import type { TerminalData } from "@/lib/site/terminal-data";
 
@@ -72,7 +72,24 @@ export function buildFs(data: TerminalData): Fs {
   for (const v of data.views) add(`${HOME}/views/${v.id}`, { kind: "exec", id: v.id, lines: [`${v.id}  ${v.line}`, `run: open ${v.id}`] });
   add(`${HOME}/views`, { kind: "dir", children: data.views.map((v) => v.id) });
 
-  add(HOME, { kind: "dir", children: ["about", "stack", "uptime", "contact", "projects", "writing", "views"] });
+  const r = data.resume;
+  const resumeFiles: Record<string, string[]> = {
+    summary: [r.name, r.title, r.location, "", r.summary],
+    experience: r.experience.flatMap((x, i) => [
+      ...(i ? [""] : []),
+      `${x.role} · ${x.company} · ${x.period}`,
+      x.headline,
+      ...x.bullets.map((b) => `• ${b}`),
+    ]),
+    skills: r.skills.flatMap((g, i) => [...(i ? [""] : []), g.group, g.items.join(" · ")]),
+    projects: r.personalProjects.flatMap((p, i) => [...(i ? [""] : []), `${p.name} · ${p.status}`, p.line, ...(p.url ? [p.url] : [])]),
+    certifications: r.certifications.flatMap((c, i) => [...(i ? [""] : []), c.issuer, c.line, ...(c.items ?? []).map((t) => `  • ${t}`)]),
+    education: r.education.flatMap((e, i) => [...(i ? [""] : []), `${e.degree} · ${e.school} · ${e.year}`, ...(e.note ? [e.note] : [])]),
+  };
+  for (const [name, lines] of Object.entries(resumeFiles)) add(`${HOME}/resume/${name}`, { kind: "file", lines });
+  add(`${HOME}/resume`, { kind: "dir", children: Object.keys(resumeFiles) });
+
+  add(HOME, { kind: "dir", children: ["about", "stack", "uptime", "contact", "resume", "projects", "writing", "views"] });
   return { nodes };
 }
 

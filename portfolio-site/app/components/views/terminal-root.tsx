@@ -9,12 +9,13 @@
  */
 import gsap from "gsap";
 import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { Fragment, memo, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { terminalScript } from "@/app/components/hub/exit-sequence";
 import type { LaunchedPersona, PersonaView } from "@/lib/content/types";
 import { ambient } from "@/lib/site/ambient-sound";
 import { DISPLAY_ROOT, personaIdentity } from "@/lib/site/brand";
 import { hubHref, personaHref, useOrigin } from "@/lib/site/persona-link";
+import { PORTRAIT_LARGE, PORTRAIT_SMALL, type AsciiPortrait } from "@/lib/site/terminal-art";
 import type { TerminalData } from "@/lib/site/terminal-data";
 import { HOME, shortPath } from "@/lib/site/terminal-fs";
 import { createShell, HISTORY_CAP, initialShellState, type Effect, type MenuId, type MenuRow, type Out, type ShellState } from "@/lib/site/terminal-shell";
@@ -37,7 +38,10 @@ export type TerminalRootProps = {
 
 type Entry =
   /** `ps`: the path the command was typed at (the OS prompt); absent on the boot script's plain `$ `. */
-  | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; ps?: string }
+  | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string }
+  | { n: number; k: "links"; items: Array<{ label: string; href: string; external?: boolean }> }
+  | { n: number; k: "portrait" }
+  | { n: number; k: "neofetch"; rows: string[] }
   | { n: number; k: "banner"; art: string[]; welcome: string; tips: Array<{ cmd: string; desc: string }> }
   | { n: number; k: "link"; label: string; href: string; external?: boolean }
   | { n: number; k: "run"; text: string; cmd: string }
@@ -60,6 +64,56 @@ function loadHistory(persona: string): string[] {
     return [];
   }
 }
+
+/** The portrait, one `<span data-tone>` per run of equal tone. Memoized: it is ~1k nodes and never changes. */
+const ArtView = memo(function ArtView({ art, className, label }: { art: AsciiPortrait; className: string; label: string }) {
+  const rows = useMemo(
+    () =>
+      art.lines.flatMap((line, y) => {
+        const tones = art.tones[y] ?? "";
+        const out: ReactNode[] = [];
+        let from = 0;
+        for (let x = 1; x <= line.length; x++) {
+          if (x < line.length && (tones[x] ?? "n") === (tones[from] ?? "n")) continue;
+          out.push(
+            <span key={`${y}-${from}`} data-tone={tones[from] ?? "n"}>
+              {line.slice(from, x)}
+            </span>,
+          );
+          from = x;
+        }
+        out.push("\n");
+        return out;
+      }),
+    [art],
+  );
+  return (
+    <pre className={className} role="img" aria-label={label}>
+      {rows}
+    </pre>
+  );
+});
+
+/** The tips box, `w` columns wide, the command column `cmdW` wide. */
+function TipsBox({ tips, w, cmdW, className }: { tips: Array<{ cmd: string; desc: string }>; w: number; cmdW: number; className: string }) {
+  const fit = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t.padEnd(n));
+  return (
+    <pre className={`terminal-os-tips ${className}`}>
+      {`┌─ Tips for getting started ${"─".repeat(w - 29)}┐\n`}
+      {tips.map((t) => (
+        <Fragment key={t.cmd}>
+          {"│ "}
+          {fit(t.cmd, cmdW)}
+          <i>{fit(t.desc, w - 4 - cmdW)}</i>
+          {" │\n"}
+        </Fragment>
+      ))}
+      {`└${"─".repeat(w - 2)}┘`}
+    </pre>
+  );
+}
+
+const PALETTE = ["#3b4150", "#e5655d", "#5fbf6a", "#d9b44a", "var(--c)", "#b38ad9", "#5fc6c9", "#ece7dc"];
 
 export function TerminalRoot({ persona, color, via, items, views, data }: TerminalRootProps) {
   const router = useRouter();
@@ -122,7 +176,10 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const toEntries = (lines: Out[]): Entry[] =>
     lines.map((o): Entry => {
       const n = ++seq.current;
-      if (o.kind === "text") return { n, k: "out", text: o.text, dim: o.dim };
+      if (o.kind === "text") return { n, k: "out", text: o.text, dim: o.dim, accent: o.accent };
+      if (o.kind === "links") return { n, k: "links", items: o.items };
+      if (o.kind === "portrait") return { n, k: "portrait" };
+      if (o.kind === "neofetch") return { n, k: "neofetch", rows: o.rows };
       if (o.kind === "banner") return { n, k: "banner", art: o.art, welcome: o.welcome, tips: o.tips };
       if (o.kind === "link") return { n, k: "link", label: o.label, href: o.href, external: o.external };
       if (o.kind === "run") return { n, k: "run", text: o.text, cmd: o.cmd };
@@ -551,23 +608,11 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       </>
     );
 
-  const tipRow = (cmd: string, desc: string) => {
-    const fit = (t: string, w: number) => (t.length > w ? `${t.slice(0, w - 1)}…` : t.padEnd(w));
-    return (
-      <>
-        {"│ "}
-        {fit(cmd, 14)}
-        <i>{fit(desc, 26)}</i>
-        {" │\n"}
-      </>
-    );
-  };
-
   const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
   const renderEntry = (e: Entry) =>
     e.k === "out" ? (
-      <span key={e.n} className={`${e.prompt ? "is-cmd" : "is-out"} ${e.dim ? "is-dim" : ""}`}>
+      <span key={e.n} className={`${e.prompt ? "is-cmd" : "is-out"} ${e.dim ? "is-dim" : ""} ${e.accent ? "is-accent" : ""}`}>
         {e.prompt ? ps1(e.ps) : ""}
         {e.text || " "}
       </span>
@@ -575,14 +620,35 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       <div key={e.n} className="terminal-os-welcome">
         <pre className="terminal-os-banner">{e.art.join("\n")}</pre>
         <span className="is-out is-dim">{e.welcome}</span>
-        <pre className="terminal-os-tips">
-          {`┌─ Tips for getting started ${"─".repeat(15)}┐\n`}
-          {e.tips.map((t) => (
-            <Fragment key={t.cmd}>{tipRow(t.cmd, t.desc)}</Fragment>
+        <TipsBox tips={e.tips} w={88} cmdW={16} className="is-wide" />
+        <TipsBox tips={e.tips} w={44} cmdW={14} className="is-narrow" />
+      </div>
+    ) : e.k === "portrait" ? (
+      <ArtView key={e.n} art={PORTRAIT_LARGE} className="terminal-os-art" label="Ratul, drawn in characters" />
+    ) : e.k === "neofetch" ? (
+      <div key={e.n} className="terminal-os-fetch">
+        <ArtView art={PORTRAIT_SMALL} className="terminal-os-art is-small" label="Ratul, drawn in characters" />
+        <pre className="terminal-os-fetch-rows">
+          <code className="ps-user">{e.rows[0]}</code>
+          {`\n${e.rows.slice(1).join("\n")}\n\n`}
+          {PALETTE.map((c, i) => (
+            <b key={i} style={{ color: c }}>
+              {"███"}
+            </b>
           ))}
-          {`└${"─".repeat(42)}┘`}
         </pre>
       </div>
+    ) : e.k === "links" ? (
+      <span key={e.n} className="is-out">
+        {e.items.map((l, i) => (
+          <Fragment key={l.href}>
+            {i ? " · " : ""}
+            <a className="terminal-root-link" href={l.href} {...(l.external ? { target: "_blank", rel: "noreferrer" } : {})}>
+              {l.label}
+            </a>
+          </Fragment>
+        ))}
+      </span>
     ) : e.k === "link" ? (
       <span key={e.n} className="is-out">
         <a className="terminal-root-link" href={e.href} {...(e.external ? { target: "_blank", rel: "noreferrer" } : {})}>
