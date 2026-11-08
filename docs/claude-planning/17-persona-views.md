@@ -164,3 +164,21 @@ numbered menu), katoolin (ASCII banner, numbered list, bare prompt), vulnx on a 
   38-column portrait beside the stats, like the real tool; stacked on phones.
 - Generation: pyfiglet for the banner; Pillow for the portrait (autocontrast, ×1.35 contrast, 0.5
   cell aspect, HSV tone classes). Script kept in the session scratchpad; re-run if the photo changes.
+
+### 6.8 Boot as the profile tool; the Linux box, not the route tree (Ratul, 2026-11-08)
+
+- **Boot = starting a CLI tool.** The boot window no longer plays an ssh session. It types
+  `royal-programmer --boot`, prints the tool line (`royal-programmer v1 · the profile tool of Ratul
+  Roy`), then progress rows that each resolve to `[ok]`: profile, mount `~/projects` (n), mount
+  `~/resume` (6 files), mount `~/views` (n), link github, sound; then a progress bar that fills
+  (`[██████████] 100%  ready`) and the swap to the OS terminal. `via=normal` prints it instantly.
+  The hub's exit window plays the same lines (one shared script).
+- **Header after the swap** carries what the old script said: portrait left; right, the banner
+  `ROYAL / PROGRAMMER` (no hyphen), `royal-programmer v1 · code.ratulroy.me`, then a three-line
+  overview in the `whoami` voice (who · stack · uptime). Nothing is printed twice.
+- **The machine is a Linux box.** User `ratulroy`, host `code`; prompt `ratulroy@code:~/projects$`
+  (Ubuntu shape, confirmed). Home is `/home/ratulroy`, shown as `~`; `pwd` prints the real path;
+  `/engineer` is gone from the file system. `whoami` prints `ratulroy` and the one-line identity.
+- **Selection:** desktop output selectable (copy, like a terminal); phones never select on tap.
+- **Polish:** one rhythm of blank lines between blocks, dim text one step lighter, tips box borders
+  aligned, the status bar and dim colours shared with the hub's HUD, the portrait brightened.

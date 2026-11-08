@@ -6,12 +6,12 @@
  * Regenerate with the script noted in docs/claude-planning/08-progress-log.md (round 1d).
  */
 
-/** 88 columns, two lines of block letters: ROYAL- / PROGRAMMER. */
+/** 88 columns, two lines of block letters: ROYAL / PROGRAMMER. */
 export const BANNER_ROYAL_PROGRAMMER: readonly string[] = [
   "██████╗  ██████╗ ██╗   ██╗ █████╗ ██╗",
   "██╔══██╗██╔═══██╗╚██╗ ██╔╝██╔══██╗██║",
-  "██████╔╝██║   ██║ ╚████╔╝ ███████║██║█████╗",
-  "██╔══██╗██║   ██║  ╚██╔╝  ██╔══██║██║╚════╝",
+  "██████╔╝██║   ██║ ╚████╔╝ ███████║██║",
+  "██╔══██╗██║   ██║  ╚██╔╝  ██╔══██║██║",
   "██║  ██║╚██████╔╝   ██║   ██║  ██║███████╗",
   "╚═╝  ╚═╝ ╚═════╝    ╚═╝   ╚═╝  ╚═╝╚══════╝",
   "██████╗ ██████╗  ██████╗  ██████╗ ██████╗  █████╗ ███╗   ███╗███╗   ███╗███████╗██████╗",
