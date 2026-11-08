@@ -150,3 +150,17 @@ numbered menu), katoolin (ASCII banner, numbered list, bare prompt), vulnx on a 
 - `fullscreen` now asks the browser for real full screen (Fullscreen API) and back; the terminal
   itself is always full screen. The three dots are gone; the commands and chips carry exit/clear.
 - The remembered view still opens straight after the boot screen, before the banner.
+
+### 6.7 Banner, résumé, portrait (Ratul, 2026-11-08, after 1c)
+
+- The banner spells the handle, **`royal-programmer`** (figlet ANSI Shadow, two lines, 77 columns,
+  type sized so it fits any width). Generated into `lib/site/terminal-art.ts`.
+- **`~/resume/`** (`summary experience skills projects certifications education`) and the
+  **`resume`** command, an overview card like the résumé's first page. Data from
+  `Ratul_Roy_Resume.pdf` typed into `terminal-data.ts` (`RESUME`), no phone number; moves into the
+  content layer with the admin console.
+- **`portrait`**: Ratul's headshot as detailed ASCII (84 columns, 70-step ramp), each cell carrying a
+  tone (backdrop, skin, hair/jacket, shirt, neutral) so the UI colours it. **`neofetch`** shows the
+  38-column portrait beside the stats, like the real tool; stacked on phones.
+- Generation: pyfiglet for the banner; Pillow for the portrait (autocontrast, ×1.35 contrast, 0.5
+  cell aspect, HSV tone classes). Script kept in the session scratchpad; re-run if the photo changes.
