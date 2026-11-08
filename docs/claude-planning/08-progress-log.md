@@ -5,6 +5,26 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-08 — Engineer round 1c: the terminal as a full-screen OS
+
+**Ratul's references:** Claude Code's welcome, katoolin, vulnx on a phone. His asks: full-screen
+terminal look, typing sounds, the path in the prompt (`projects$`), the ssh window only as a boot
+screen. Spec: `17-persona-views.md` §6.6.
+
+**What shipped** — the ssh window types the script, then grows and dissolves into `.terminal-os`,
+the whole viewport: a block-letter `RATUL` banner in the accent, `Welcome to code.ratulroy.me ·
+v1`, a boxed *Tips for getting started*, the views as a numbered list, then the prompt
+`ratul@code:~$` (`~$` on phones) whose path follows `cd` on each transcript line. A tmux-like
+status bar (`ratul@code ~/projects │ 1 project · 0 posts · 1 view │ help / Esc`) sits at the
+bottom, above the phone chips. Every keystroke plays the hub's key click through `ambient.key()`
+(respects the site sound setting). `banner` reprints the welcome; `fullscreen` asks the browser's
+Fullscreen API; the title dots and `xp-term-full` are gone. Remembered view still opens from the
+boot window before the swap. Verified at 1280 and 393×852 touch: no horizontal scroll, banner
+8px on phones, status bar 767–795, chips 44px below it, console clean, tsc + eslint clean.
+
+**How** — lead (Fable) spec + brief + verification ≈15k; Sonnet builder ≈70k. No separate review
+this round (1b's reviewer findings all still hold; a 1c review goes with the Swarm round).
+
 ## 2026-11-08 — Engineer round 1b: the terminal in full — a real shell, not an entry animation
 
 **Ratul's correction** after round 1 (screenshot: his own `ls /engineer` answered `command not found`):

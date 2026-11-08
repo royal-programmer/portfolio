@@ -2264,43 +2264,6 @@ em.font-display,
   padding: 0 6px;
 }
 
-/* Title-bar dots: red exits, yellow clears, green toggles full screen. */
-.terminal-root-win .hub-exit-bar .terminal-root-dot {
-  position: relative;
-  flex: none;
-  cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 160ms var(--ease-out, ease);
-}
-.terminal-root-win .hub-exit-bar .terminal-root-dot:hover,
-.terminal-root-win .hub-exit-bar .terminal-root-dot:focus-visible {
-  opacity: 1;
-}
-.terminal-root-win .hub-exit-bar .terminal-root-dot.is-red {
-  background: #e5655d;
-}
-.terminal-root-win .hub-exit-bar .terminal-root-dot.is-yellow {
-  background: #d9b44a;
-}
-.terminal-root-win .hub-exit-bar .terminal-root-dot.is-green {
-  background: #5fbf6a;
-}
-.terminal-root-dot::after {
-  content: "";
-  position: absolute;
-  inset: -7px;
-}
-@media (pointer: coarse) {
-  /* 10px dot + 17px each side = a 44px target; the gap keeps neighbours from overlapping much. */
-  .terminal-root-dot::after {
-    inset: -17px;
-  }
-  .terminal-root-win .hub-exit-bar {
-    gap: 34px;
-    padding-left: 24px;
-  }
-}
-
 /* Phone key strip, above the keyboard: the keys a glass keyboard hides. Coarse pointers only. */
 .terminal-root-chips {
   display: none;
@@ -2332,38 +2295,147 @@ em.font-display,
   }
 }
 
-/* Full screen: the window fills the viewport (always, on phones). --vvh/--vvt follow the on-screen keyboard. */
-.terminal-root.is-full {
-  align-items: stretch;
+/* The full-screen terminal: the ssh window (frame) grows and dissolves into it. --vvh/--vvt follow the on-screen keyboard. */
+.terminal-os {
+  position: fixed;
+  inset: var(--vvt, 0px) 0 auto 0;
+  height: var(--vvh, 100dvh);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--void, #050507);
+  visibility: hidden;
+  opacity: 0;
+  transform: scale(1);
+  transition: opacity 500ms var(--ease-in-out), transform 650ms var(--ease-in-out), visibility 0s 500ms;
 }
-.terminal-root.is-full .terminal-root-frame,
-.terminal-root.is-full .terminal-root-win {
-  width: 100%;
-  height: 100%;
+.terminal-root-frame {
+  position: relative;
+  z-index: 2;
 }
-.terminal-root.is-full .terminal-root-win {
-  border: 0;
-  border-radius: 0;
-  box-shadow: none !important;
+.terminal-root.is-os .terminal-os {
+  visibility: visible;
+  opacity: 1;
+  transition-delay: 0s;
+}
+.terminal-root.is-os .terminal-root-frame {
+  transform: scale(1.08);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 500ms var(--ease-out), opacity 500ms var(--ease-out), visibility 0s 500ms;
+}
+.terminal-root.is-os.is-opening .terminal-os {
+  transform: scale(1.12);
+  opacity: 0;
+  transition: opacity 500ms var(--ease-in-out), transform 650ms var(--ease-in-out);
+}
+.terminal-os-body {
+  min-height: 0;
+  padding: 20px clamp(16px, 4vw, 48px) 28px;
+}
+
+/* The welcome: block-letter banner in the accent, the welcome line, a boxed tips block (44 columns, all three). */
+.terminal-os-welcome {
+  margin-bottom: 8px;
+}
+.terminal-os-banner,
+.terminal-os-tips {
+  margin: 0;
+  font-family: var(--font-geist-mono), monospace;
+  white-space: pre;
+  overflow: hidden;
+  letter-spacing: 0;
+}
+.terminal-os-banner {
+  font-size: 13px;
+  line-height: 1.05;
+  color: var(--c);
+}
+.terminal-os-tips {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+.terminal-os-tips i {
+  font-style: normal;
+  color: var(--ink-faint);
+}
+@media (max-width: 479px) {
+  .terminal-os-banner {
+    font-size: clamp(6px, 2.05vw, 13px);
+  }
+  .terminal-os-tips {
+    font-size: clamp(9px, 2.6vw, 13px);
+  }
+}
+
+/* The prompt, like a Linux PS1: user@host in the accent, the path in a cooler tint. */
+.terminal-root-body code {
+  font: inherit;
+}
+.ps-user,
+.ps-dollar {
+  color: var(--c);
+}
+.ps-path {
+  color: color-mix(in srgb, var(--c) 60%, #9ab);
 }
 @media (max-width: 767px) {
-  .terminal-root {
-    inset: auto 0 auto 0;
-    top: var(--vvt, 0px);
-    height: var(--vvh, 100dvh);
-    align-items: stretch;
-  }
-  .terminal-root .terminal-root-frame,
-  .terminal-root .terminal-root-win {
-    width: 100%;
-    height: 100%;
-  }
-  .terminal-root .terminal-root-win {
-    border: 0;
-    border-radius: 0;
-    box-shadow: none !important;
+  .ps-lead {
+    display: none;
   }
 }
+
+/* The status bar, tmux-like: where you are, what is here, the three keys. */
+.terminal-os-status {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+  padding: 0 clamp(12px, 3vw, 24px);
+  border-top: 1px solid color-mix(in srgb, var(--c) 25%, transparent);
+  background: color-mix(in srgb, var(--c) 6%, var(--void, #050507));
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  color: var(--ink-dim);
+  white-space: pre;
+}
+.terminal-os-status code {
+  font: inherit;
+}
+.terminal-os-status-l {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.terminal-os-status-m {
+  color: var(--ink-faint);
+}
+.terminal-os-status-r {
+  display: flex;
+  gap: 4px;
+}
+.terminal-os-status-r button {
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ink-dim);
+  -webkit-tap-highlight-color: transparent;
+}
+.terminal-os-status-r button:hover,
+.terminal-os-status-r button:focus-visible {
+  color: var(--ink);
+}
+@media (max-width: 639px) {
+  .terminal-os-status-m {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .terminal-root-frame {
     transition: none;
@@ -2372,9 +2444,14 @@ em.font-display,
   .terminal-root.is-opening .terminal-root-frame {
     transform: none;
   }
-  .terminal-root-win .hub-exit-bar .terminal-root-dot,
+  .terminal-os,
+  .terminal-root.is-os .terminal-os,
+  .terminal-root.is-os .terminal-root-frame,
   .terminal-root-link {
     transition: none;
+  }
+  .terminal-root.is-os .terminal-root-frame {
+    transform: none;
   }
 }
 

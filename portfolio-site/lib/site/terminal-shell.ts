@@ -26,7 +26,9 @@ export type Out =
   | { kind: "link"; label: string; href: string; external?: boolean }
   /** A line that runs a command when clicked (`open <slug>` at the foot of a project). */
   | { kind: "run"; text: string; cmd: string }
-  | { kind: "menu"; id: MenuId; rows: MenuRow[] };
+  | { kind: "menu"; id: MenuId; rows: MenuRow[] }
+  /** The welcome: block-letter art (44 columns), the welcome line, and the tips box rows. */
+  | { kind: "banner"; art: string[]; welcome: string; tips: Array<{ cmd: string; desc: string }> };
 
 export type Effect =
   | { kind: "open-view"; id: string }
@@ -42,7 +44,18 @@ export type RunResult = { lines: Out[]; effect?: Effect; state: ShellState };
 export type CommandGroup = "navigate" | "read" | "open" | "terminal";
 export type CommandDoc = { name: string; group: CommandGroup; usage: string; desc: string; long?: string };
 
+export const BANNER_ART = [
+  "██████╗  █████╗ ████████╗██╗   ██╗██╗",
+  "██╔══██╗██╔══██╗╚══██╔══╝██║   ██║██║",
+  "██████╔╝███████║   ██║   ██║   ██║██║",
+  "██╔══██╗██╔══██║   ██║   ██║   ██║██║",
+  "██║  ██║██║  ██║   ██║   ╚██████╔╝███████╗",
+  "╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚══════╝",
+];
+
 export type Shell = {
+  /** The welcome block (banner, welcome line, tips), as `banner` prints it. */
+  banner: () => Out[];
   run: (input: string, state: ShellState) => RunResult;
   /** Candidates for the last token of `input` (whole-token strings; the UI swaps the token in). */
   complete: (input: string, state: ShellState) => string[];
@@ -70,9 +83,10 @@ const COMMANDS: CommandDoc[] = [
   { name: "views", group: "open", usage: "views", desc: "pick a view" },
   { name: "projects", group: "open", usage: "projects", desc: "pick a project to read" },
   { name: "writing", group: "open", usage: "writing", desc: "pick a post to read" },
+  { name: "banner", group: "terminal", usage: "banner", desc: "print the welcome again" },
   { name: "history", group: "terminal", usage: "history", desc: "commands typed this session" },
   { name: "clear", group: "terminal", usage: "clear", desc: "empty the screen" },
-  { name: "fullscreen", group: "terminal", usage: "fullscreen", desc: "toggle full screen" },
+  { name: "fullscreen", group: "terminal", usage: "fullscreen", desc: "toggle browser full screen" },
   { name: "echo", group: "terminal", usage: "echo <text>", desc: "print text" },
   { name: "exit", group: "terminal", usage: "exit", desc: "back to the hub", long: "Esc at an empty prompt does the same." },
 ];
@@ -142,6 +156,20 @@ export function createShell(data: TerminalData): Shell {
       return text(l);
     });
   };
+
+  const banner = (): Out[] => [
+    {
+      kind: "banner",
+      art: BANNER_ART,
+      welcome: `Welcome to ${host} · ${data.commit ?? "v1"}`,
+      tips: [
+        { cmd: "help", desc: "every command" },
+        { cmd: "/", desc: "the command menu" },
+        ...(data.views[0] ? [{ cmd: `open ${data.views[0].id}`, desc: "enter a view" }] : []),
+        { cmd: "projects", desc: "read what I built" },
+      ],
+    },
+  ];
 
   const longFormat = (e: FsEntry) => {
     const perms = e.kind === "dir" ? "drwxr-xr-x" : e.kind === "exec" ? "-rwxr-xr-x" : "-rw-r--r--";
@@ -217,7 +245,7 @@ export function createShell(data: TerminalData): Shell {
       out.push(text(g, true));
       for (const c of COMMANDS.filter((x) => x.group === g)) out.push(text(`  ${c.usage.padEnd(w)}${c.desc}`));
     }
-    out.push(text("Tab completes, ↑ recalls, / opens the menu, Esc leaves.", true));
+    out.push(text("Tab completes, ↑ recalls, / opens the menu, banner shows the welcome, Esc leaves.", true));
     return out;
   };
 
@@ -305,6 +333,8 @@ export function createShell(data: TerminalData): Shell {
       case "projects":
       case "writing":
         return menu(low);
+      case "banner":
+        return { lines: banner() };
       case "history":
         return { lines: texts(st.history.map((h, i) => `${String(i + 1).padStart(4)}  ${h}`)) };
       case "clear":
@@ -336,6 +366,7 @@ export function createShell(data: TerminalData): Shell {
 
   return {
     commands: COMMANDS,
+    banner,
     run(input, state) {
       const line = input.trim();
       if (!line) return { lines: [], state };
