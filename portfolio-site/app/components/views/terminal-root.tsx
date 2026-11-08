@@ -15,7 +15,7 @@ import type { LaunchedPersona, PersonaView } from "@/lib/content/types";
 import { ambient } from "@/lib/site/ambient-sound";
 import { hubHref, personaHref, useOrigin } from "@/lib/site/persona-link";
 import { qrLines, qrModules } from "@/lib/site/qr";
-import { PIXEL_INDEX, PORTRAIT_BRAILLE, PORTRAIT_BRAILLE_SMALL, PORTRAIT_PIXELS, type BraillePortrait, type PixelPortrait } from "@/lib/site/terminal-art";
+import { PIXEL_INDEX, PORTRAIT_BRAILLE_SMALL, PORTRAIT_PIXELS, type BraillePortrait, type PixelPortrait } from "@/lib/site/terminal-art";
 import type { TerminalData } from "@/lib/site/terminal-data";
 import { HOME, resolvePath, shortPath, USER } from "@/lib/site/terminal-fs";
 import { createShell, HISTORY_CAP, initialShellState, THEMES, type Effect, type FileItem, type MenuId, type MenuRow, type Out, type ShellState, type ThemeId, type Tone } from "@/lib/site/terminal-shell";
@@ -39,7 +39,8 @@ export type TerminalRootProps = {
 type Entry =
   /** `ps`: the path the command was typed at (the OS prompt); absent on the boot script's plain `$ `. */
   | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string; label?: string; tag?: "ok" | "wait" | "bar" }
-  | { n: number; k: "links"; items: Array<{ label: string; href: string; external?: boolean }> }
+  | { n: number; k: "links"; items: Array<{ label: string; href?: string; external?: boolean; cmd?: string }> }
+  | { n: number; k: "ghcommit"; label: string; url: string; rest: string }
   | { n: number; k: "portrait" }
   | { n: number; k: "parts"; parts: Array<{ text: string; tone?: Tone; color?: string }> }
   | { n: number; k: "qr"; lines: string[] }
@@ -52,7 +53,7 @@ type Entry =
   | { n: number; k: "banner"; art: string[]; welcome: string; overview: string[]; tips: Array<{ cmd: string; desc: string }> }
   | { n: number; k: "link"; label: string; href: string; external?: boolean }
   | { n: number; k: "run"; text: string; cmd: string }
-  | { n: number; k: "menu"; id: MenuId; rows: MenuRow[] };
+  | { n: number; k: "menu"; id: MenuId; rows: MenuRow[]; numbered?: boolean };
 type Dest = { href: string; crossOrigin: boolean };
 
 const TITLE = `${USER}@code — royal-programmer`;
@@ -85,7 +86,12 @@ type GhCache = {
   t: number;
   user: { public_repos: number; followers: number };
   repos: Array<{ name: string; html_url: string; language: string | null; stargazers_count: number; pushed_at: string }>;
-  events: Array<{ type: string; created_at: string; payload?: { size?: number; commits?: unknown[] } }>;
+  events: Array<{
+    type: string;
+    created_at: string;
+    repo?: { name?: string };
+    payload?: { size?: number; head?: string; ref?: string; commits?: Array<{ sha?: string; message?: string; author?: { name?: string } }> };
+  }>;
 };
 
 const ago = (ms: number) => {
@@ -145,12 +151,23 @@ const markSeen = () => {
 const PANE_KEY = "xp-term-pane";
 const checksKey = (persona: string) => `xp-term-checks:${persona}`;
 
-/** The checkpoints, in the pane's order. `mail` arrives with its command (round 1g). */
-const CHECKS = ["boot", "help", "resume", "projects", "views", "portrait", "contact", "mail"] as const;
+/** The pane's contents rows, in order. `boot` is internal: it only counts toward the achievement. `mail` is optional. */
+const CHECKS = ["boot", "resume", "projects", "writing", "views", "timeline", "gitlog", "portrait", "contact", "mail"] as const;
 type CheckId = (typeof CHECKS)[number];
-const REQUIRED: CheckId[] = ["boot", "help", "resume", "projects", "views", "portrait", "contact"];
-/** What to suggest for each unticked checkpoint. */
-const TRY: Partial<Record<CheckId, string>> = { help: "help", resume: "resume", projects: "projects", views: "views", portrait: "portrait", contact: "contact" };
+const REQUIRED: CheckId[] = ["boot", "resume", "projects", "writing", "views", "timeline", "gitlog", "portrait", "contact"];
+/** The command each contents row runs. */
+const ROW_CMD: Partial<Record<CheckId, string>> = {
+  resume: "resume",
+  projects: "projects",
+  writing: "writing",
+  views: "views",
+  timeline: "timeline",
+  gitlog: "git log",
+  portrait: "portrait",
+  contact: "contact",
+  mail: "mail",
+};
+const ROW_ORDER = CHECKS.filter((c) => c !== "boot");
 type Checks = Partial<Record<CheckId | "achieved", boolean>>;
 
 function loadChecks(persona: string): Checks {
@@ -210,9 +227,10 @@ const PixelsView = memo(function PixelsView({ art }: { art: PixelPortrait }) {
 function Tips({ tips }: { tips: Array<{ cmd: string; desc: string }> }) {
   return (
     <fieldset className="terminal-os-tips">
-      <legend>Tips for getting started</legend>
-      {tips.map((t) => (
+      <legend>Tips · type a number or a command</legend>
+      {tips.map((t, k) => (
         <div key={t.cmd} className="terminal-os-tip">
+          <em>{k + 1}</em>
           <b>{t.cmd}</b>
           <i>{t.desc}</i>
         </div>
@@ -241,6 +259,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const [cwd, setCwd] = useState(HOME);
   const [partial, setPartial] = useState<string | null>("");
   const [cmd, setCmd] = useState("");
+  /** Where the real input's cursor is, so the drawn caret follows Home, arrows and clicks. */
+  const [caret, setCaret] = useState(0);
   const [sel, setSel] = useState(0);
   const [palSel, setPalSel] = useState(0);
   /** The menu the arrow keys drive: the latest one shown, until Esc or another command. */
@@ -304,6 +324,13 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const crtRef = useRef(false);
   const entriesRef = useRef<Entry[]>([]);
   const [demoOn, setDemoOn] = useState(false);
+  /** The tour's step, for the status bar. */
+  const [tourStep, setTourStep] = useState<{ i: number; n: number } | null>(null);
+
+  // A programmatic change of `cmd` (history, Tab, chips, the tour) puts the input's cursor at the end; read it back.
+  useEffect(() => {
+    setCaret(input.current?.selectionStart ?? cmd.length);
+  }, [cmd]);
 
   useEffect(() => {
     live.current.cmd = cmd;
@@ -325,7 +352,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const viewKey = views.map((v) => v.id).join();
   const itemKey = items.join();
 
-  const toEntries = (lines: Out[]): Entry[] =>
+  const toEntries = (lines: Out[], numbered = true): Entry[] =>
     lines.map((o): Entry => {
       const n = ++seq.current;
       if (o.kind === "text") return { n, k: "out", text: o.text, dim: o.dim, accent: o.accent };
@@ -339,7 +366,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       if (o.kind === "banner") return { n, k: "banner", art: o.art, welcome: o.welcome, overview: o.overview, tips: o.tips };
       if (o.kind === "link") return { n, k: "link", label: o.label, href: o.href, external: o.external };
       if (o.kind === "run") return { n, k: "run", text: o.text, cmd: o.cmd };
-      return { n, k: "menu", id: o.id, rows: o.rows };
+      return { n, k: "menu", id: o.id, rows: o.rows, numbered };
     });
 
   /** Appends entries (older menus stay, inert). Returns the new menu's key. */
@@ -351,8 +378,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const line = (text: string, prompt = false, dim = false, ps?: string) => append([{ n: ++seq.current, k: "out", text, prompt, dim, ps }]);
   /** The path shown in the prompt right now; undefined while the boot window is up. */
   const here = () => (osRef.current ? shortPath(live.current.shell.cwd) : undefined);
-  const print = (lines: Out[]) => {
-    const m = append(toEntries(lines));
+  const print = (lines: Out[], numbered = true) => {
+    const m = append(toEntries(lines, numbered));
     setMenuN(m);
     if (m !== null) setSel(0);
   };
@@ -386,7 +413,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     } catch {}
   };
 
-  /** Ticks a checkpoint; when the seven available are done, the achievement prints once, ever. */
+  /** Marks a contents row done; when the eight (all but mail) are done, the achievement prints once, ever. */
   const tick = (id: CheckId) => {
     const cur = checksRef.current;
     if (cur[id]) return;
@@ -405,19 +432,21 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const tickFor = (c: string, cwd0: string) => {
     const parts = c.split(/\s+/);
     const name = parts[0].replace(/^\//, "").toLowerCase();
-    if (name === "help" || name === "resume" || name === "projects" || name === "portrait" || name === "contact") tick(name);
+    if (name === "resume" || name === "projects" || name === "writing" || name === "timeline" || name === "portrait" || name === "contact") tick(name);
+    else if (name === "git" && parts[1] === "log") tick("gitlog");
     else if (name === "cat") {
       for (const a of parts.slice(1)) {
         const path = resolvePath(cwd0, a);
         if (path.startsWith(`${HOME}/resume/`)) tick("resume");
         else if (path.startsWith(`${HOME}/projects/`)) tick("projects");
+        else if (path.startsWith(`${HOME}/writing/`)) tick("writing");
         else if (path === `${HOME}/contact`) tick("contact");
       }
     }
   };
 
-  const nextTry = REQUIRED.find((r) => !checks[r] && TRY[r]);
-  const hintCmd = nextTry ? TRY[nextTry]! : "sudo make me a sandwich";
+  const nextTry = ROW_ORDER.find((r) => !checks[r]);
+  const hintCmd = nextTry ? ROW_CMD[nextTry]! : "sudo make me a sandwich";
 
   const endPaging = () => {
     pager.current = null;
@@ -517,14 +546,20 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     }
   };
 
-  /** Types each step into the real prompt and runs it; any key or tap stops the tour. */
+  /** The tour: a dim comment, then the step typed into the real prompt and run. Any key or tap stops it. */
   const startDemo = async () => {
     if (demoRef.current) return;
     demoRef.current = true;
-    beacon("demo_start");
+    beacon("tour_start");
     const fast = via === "normal" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const first = data.projects[0]?.slug;
-    const steps = ["help", "resume", "ls ~/projects", ...(first ? [`cat ~/projects/${first}.md`] : []), "git log --graph -5", "portrait", "contact"];
+    const steps: Array<[string, string]> = [
+      ["help", "every command, in groups"],
+      ["resume", "the résumé, six files"],
+      ["projects", "what I built"],
+      ["timeline", "school → college → work"],
+      ["portrait", "the face behind it"],
+      ["contact", "say hi"],
+    ];
     let stopped = false;
     const stop = (e: Event) => {
       if (e instanceof KeyboardEvent) {
@@ -537,10 +572,15 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     setDemoOn(true);
     const halted = () => stopped || cancelled.current;
     try {
-      for (const step of steps) {
+      for (let k = 0; k < steps.length; k++) {
+        const [step, note] = steps[k];
         if (halted()) break;
-        for (let i = 1; i <= step.length && !halted(); i++) {
-          setCmd(step.slice(0, i));
+        setTourStep({ i: k + 1, n: steps.length });
+        line(`# ${k + 1}/${steps.length} · ${note}`, false, true, here());
+        await wait(fast ? 100 : 450);
+        if (halted()) break;
+        for (let c = 1; c <= step.length && !halted(); c++) {
+          setCmd(step.slice(0, c));
           ambient.key();
           await wait(fast ? 12 : 28 + Math.random() * 12);
         }
@@ -554,69 +594,151 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       unguard();
       demoRef.current = false;
       setDemoOn(false);
+      setTourStep(null);
       setCmd("");
-      if (cancelled.current) return;
-      if (stopped) {
-        line("^C demo", false, true, here());
-        beacon("demo_stop");
+      if (!cancelled.current) {
+        if (stopped) {
+          line("^C tour", false, true, here());
+          beacon("tour_stop");
+        } else line("tour over · type a command, or view", false, true, here());
       }
-      else line("tour over · type a command, or open stage", false, true, here());
     }
   };
 
   const patchEntry = (n: number, p: Partial<Extract<Entry, { k: "out" }>>) => setEntries((es) => es.map((e) => (e.n === n && e.k === "out" ? { ...e, ...p } : e)));
 
-  /** `curl github`: user, recent repos and push events from the public API, cached for an hour. */
-  const curlGithub = async () => {
-    if (curlAbort.current) return void line("curl: already fetching", false, true, here());
+  /** The public GitHub data for `curl github` and `git log`: cached for an hour, validated before use. */
+  const loadGithub = async (ac: AbortController): Promise<{ d: GhCache; cached: boolean }> => {
+    try {
+      const c = JSON.parse(window.localStorage.getItem(GH_KEY) ?? "null") as GhCache | null;
+      if (c && ghValid(c) && Date.now() - c.t < GH_TTL) return { d: c, cached: true };
+    } catch {}
+    const api = `https://api.github.com/users/${GH_USER}`;
+    const rs = await Promise.all([`${api}`, `${api}/repos?sort=pushed&per_page=5`, `${api}/events/public?per_page=100`].map((u) => fetch(u, { signal: ac.signal })));
+    if (rs.some((r) => r.status === 403 || r.status === 429)) throw new Error("rate");
+    if (rs.some((r) => !r.ok)) throw new Error(`http ${rs.find((r) => !r.ok)?.status}`);
+    const [user, repos, events] = await Promise.all(rs.map((r) => r.json()));
+    const d: GhCache = { t: Date.now(), user, repos, events };
+    if (!ghValid(d)) throw new Error("shape");
+    try {
+      window.localStorage.setItem(GH_KEY, JSON.stringify(d));
+    } catch {}
+    return { d, cached: false };
+  };
+
+  /** One run of a GitHub command: a `fetching …` line that the result or the error replaces. */
+  const withGithub = async (who: string, show: (d: GhCache, cached: boolean, ac: AbortController) => Promise<Entry[]>, fail: (kind: "rate" | "net") => string) => {
+    if (curlAbort.current) return void line(`${who}: already fetching`, false, true, here());
     const n = ++seq.current;
     append([{ n, k: "out", text: "fetching …", dim: true }]);
     const ac = new AbortController();
     curlAbort.current = ac;
-    const api = `https://api.github.com/users/${GH_USER}`;
     try {
-      let d: GhCache | null = null;
-      try {
-        const c = JSON.parse(window.localStorage.getItem(GH_KEY) ?? "null") as GhCache | null;
-        if (c && ghValid(c) && Date.now() - c.t < GH_TTL) d = c;
-      } catch {}
-      const cached = d !== null;
-      if (!d) {
-        const rs = await Promise.all([`${api}`, `${api}/repos?sort=pushed&per_page=5`, `${api}/events/public?per_page=100`].map((u) => fetch(u, { signal: ac.signal })));
-        if (rs.some((r) => r.status === 403 || r.status === 429)) throw new Error("rate");
-        if (rs.some((r) => !r.ok)) throw new Error(`http ${rs.find((r) => !r.ok)?.status}`);
-        const [user, repos, events] = await Promise.all(rs.map((r) => r.json()));
-        d = { t: Date.now(), user, repos, events };
-        if (!ghValid(d)) throw new Error("shape");
-        try {
-          window.localStorage.setItem(GH_KEY, JSON.stringify(d));
-        } catch {}
-      }
-      const pad = Math.max(...d.repos.map((r) => r.name.length), 4);
-      const rel = (iso: string) => ago(Date.now() - Date.parse(iso));
-      const safeUrl = (u: string) => (/^https:\/\/github\.com\//.test(u) ? u : "");
-      const plain = (text: string, dim = false): Entry => ({ n: ++seq.current, k: "out", text, dim });
-      const parts = (text: string, tone?: Tone): Entry => ({ n: ++seq.current, k: "parts", parts: [{ text, tone }] });
-      setEntries((es) => es.filter((e) => e.n !== n));
-      append([
-        plain("HTTP/2 200", true),
-        ...(cached ? [plain(`(cached · ${ago(Date.now() - d.t)})`, true)] : []),
-        plain(" "),
-        parts(`${GH_USER} · ${Number(d.user.public_repos) || 0} repos · ${Number(d.user.followers) || 0} followers`),
-        ...(d.repos[0] ? [parts(`last push  ${d.repos[0].name} · ${rel(d.repos[0].pushed_at)}`)] : []),
-        ...d.repos.slice(0, 5).map(
-          (r): Entry => ({ n: ++seq.current, k: "ghrepo", name: String(r.name), url: safeUrl(r.html_url), pad, rest: `  ${(r.language ?? "-").padEnd(11)}  ★${Number(r.stargazers_count) || 0}  ${rel(r.pushed_at)}` }),
-        ),
-        { n: ++seq.current, k: "parts", parts: [{ text: "contributions (12w)  " }, { text: strip(d.events), tone: "accent" }] },
-      ]);
+      const { d, cached } = await loadGithub(ac);
+      const es = await show(d, cached, ac);
+      if (cancelled.current) return;
+      setEntries((l) => l.filter((e) => e.n !== n));
+      append(es);
     } catch (err) {
-      const aborted = ac.signal.aborted;
-      const msg = aborted ? "^C" : err instanceof Error && err.message === "rate" ? "github: rate limited, try again in a while" : "curl: (6) could not resolve api.github.com";
-      patchEntry(n, { text: msg, dim: true });
+      if (cancelled.current) return;
+      patchEntry(n, { text: ac.signal.aborted ? "^C" : fail(err instanceof Error && err.message === "rate" ? "rate" : "net"), dim: true });
     } finally {
       if (curlAbort.current === ac) curlAbort.current = null;
     }
   };
+
+  /** `curl github`: user, recent repos and the 12-week strip. */
+  const curlGithub = () =>
+    withGithub(
+      "curl",
+      async (d, cached) => {
+        const pad = Math.max(...d.repos.map((r) => r.name.length), 4);
+        const rel = (iso: string) => ago(Date.now() - Date.parse(iso));
+        const safeUrl = (u: string) => (/^https:\/\/github\.com\//.test(u) ? u : "");
+        const plain = (text: string, dim = false): Entry => ({ n: ++seq.current, k: "out", text, dim });
+        const parts = (text: string): Entry => ({ n: ++seq.current, k: "parts", parts: [{ text }] });
+        return [
+          plain("HTTP/2 200", true),
+          ...(cached ? [plain(`(cached · ${ago(Date.now() - d.t)})`, true)] : []),
+          plain(" "),
+          parts(`${GH_USER} · ${Number(d.user.public_repos) || 0} repos · ${Number(d.user.followers) || 0} followers`),
+          ...(d.repos[0] ? [parts(`last push  ${d.repos[0].name} · ${rel(d.repos[0].pushed_at)}`)] : []),
+          ...d.repos.slice(0, 5).map(
+            (r): Entry => ({ n: ++seq.current, k: "ghrepo", name: String(r.name), url: safeUrl(r.html_url), pad, rest: `  ${(r.language ?? "-").padEnd(11)}  ★${Number(r.stargazers_count) || 0}  ${rel(r.pushed_at)}` }),
+          ),
+          { n: ++seq.current, k: "parts", parts: [{ text: "contributions (12w)  " }, { text: strip(d.events), tone: "accent" }] },
+        ];
+      },
+      (kind) => (kind === "rate" ? "github: rate limited, try again in a while" : "curl: (6) could not resolve api.github.com"),
+    );
+
+  /**
+   * `git log`: the latest public pushes, newest first. The public events feed no longer carries commit
+   * messages, so each push shows its head commit, with the message looked up once and kept on the device.
+   */
+  const gitLogLive = (oneline: boolean, limit: number) =>
+    withGithub(
+      "git",
+      async (d, _cached, ac) => {
+        type Item = { sha: string; repo: string; msg?: string; date: string };
+        const items: Item[] = [];
+        for (const e of d.events) {
+          if (e.type !== "PushEvent" || !/^[\w.-]+\/[\w.-]+$/.test(e.repo?.name ?? "")) continue;
+          const repo = e.repo!.name!;
+          const cs = Array.isArray(e.payload?.commits) ? e.payload!.commits!.filter((c) => /^[0-9a-f]{7,40}$/i.test(c.sha ?? "")) : [];
+          if (cs.length) for (const c of cs.slice().reverse()) items.push({ sha: c.sha!, repo, msg: (c.message ?? "").split("\n")[0], date: e.created_at });
+          else if (/^[0-9a-f]{40}$/i.test(e.payload?.head ?? "")) items.push({ sha: e.payload!.head!, repo, date: e.created_at });
+        }
+        // The feed is nearly, not strictly, newest first.
+        items.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+        const shown = items.slice(0, limit);
+        let known: Record<string, string> = {};
+        try {
+          known = JSON.parse(window.localStorage.getItem("xp-gh-msgs") ?? "{}") ?? {};
+        } catch {}
+        await Promise.all(
+          shown
+            .filter((x) => x.msg === undefined && !(x.sha in known))
+            .map(async (x) => {
+              try {
+                const r = await fetch(`https://api.github.com/repos/${x.repo}/commits/${x.sha}`, { signal: ac.signal });
+                const m = r.ok ? String(((await r.json()) as { commit?: { message?: string } }).commit?.message ?? "").split("\n")[0] : "";
+                if (m) known[x.sha] = m.slice(0, 120);
+              } catch {}
+            }),
+        );
+        try {
+          window.localStorage.setItem("xp-gh-msgs", JSON.stringify(Object.fromEntries(Object.entries(known).slice(-150))));
+        } catch {}
+        const local = (iso: string) => {
+          const t = new Date(iso);
+          if (Number.isNaN(t.getTime())) return "unknown";
+          const off = -t.getTimezoneOffset();
+          const hh = (n: number) => String(n).padStart(2, "0");
+          return `${t.toLocaleDateString("en-US", { weekday: "short" })} ${t.toLocaleDateString("en-US", { month: "short" })} ${t.getDate()} ${hh(t.getHours())}:${hh(t.getMinutes())} ${t.getFullYear()} ${off < 0 ? "-" : "+"}${hh(Math.floor(Math.abs(off) / 60))}${hh(Math.abs(off) % 60)}`;
+        };
+        const plain = (text: string, dim = false): Entry => ({ n: ++seq.current, k: "out", text, dim });
+        const parts = (text: string): Entry => ({ n: ++seq.current, k: "parts", parts: [{ text }] });
+        const out: Entry[] = [plain(`# public activity, last 90 days · github.com/${GH_USER}`, true)];
+        if (!shown.length) out.push(plain("no public pushes in the last 90 days", true));
+        for (const x of shown) {
+          const msg = x.msg ?? known[x.sha] ?? "(message unavailable)";
+          const url = `https://github.com/${x.repo}/commit/${x.sha}`;
+          if (oneline) out.push({ n: ++seq.current, k: "ghcommit", label: x.sha.slice(0, 7), url, rest: ` ${x.repo}: ${msg}` });
+          else
+            out.push(
+              { n: ++seq.current, k: "ghcommit", label: `commit ${x.sha.slice(0, 7)}`, url, rest: `  (${x.repo})` },
+              parts(`Author: ${GH_USER}`),
+              parts(`Date:   ${local(x.date)}`),
+              plain(" "),
+              parts(`    ${msg}`),
+              plain(" "),
+            );
+        }
+        return out;
+      },
+      (kind) => (kind === "rate" ? "fatal: github rate limited · try `timeline`" : "fatal: github unreachable · try `timeline`"),
+    );
 
   /** `sl`: a locomotive crosses the width in about two seconds; any key or tap stops it. */
   const startSl = async () => {
@@ -654,10 +776,11 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   };
 
   /** The views menu, as `ls views/` prints it (the picker). */
-  const showViews = () => {
+  const showViews = (boot = false) => {
     const r = shell.run("views", { ...live.current.shell, history: [] });
-    live.current.shell = { ...live.current.shell, lastMenu: r.state.lastMenu };
-    print(r.lines);
+    // The boot picker is not numbered and does not take digits: 1-7 belong to the tips box.
+    live.current.shell = { ...live.current.shell, lastMenu: boot ? undefined : r.state.lastMenu };
+    print(r.lines, !boot);
   };
 
   /** The boot window grows and dissolves; the full-screen terminal opens with the welcome. */
@@ -687,7 +810,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     if (!osRef.current) swap();
     const last = entriesRef.current[entriesRef.current.length - 1];
     if (last?.k === "menu") setMenuN(last.n);
-    else showViews();
+    else showViews(true);
     setReady(true);
   };
 
@@ -795,22 +918,33 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         line(url, false, true, here());
       }
     } else if (fx.kind === "curl-github") void curlGithub();
+    else if (fx.kind === "git-log") void gitLogLive(fx.oneline, fx.limit);
+    else if (fx.kind === "run") {
+      // A tip's number: the real command runs next (`/` opens the palette).
+      if (fx.cmd === "/") {
+        setCmd("/");
+        setPalSel(0);
+        input.current?.focus({ preventScroll: true });
+      } else submit(fx.cmd);
+    }
     else if (fx.kind === "sl") void startSl();
-    else if (fx.kind === "demo") void startDemo();
+    else if (fx.kind === "tour") void startDemo();
     else if (fx.kind === "mail") startMail();
     else if (fx.kind === "pane") togglePane();
     else toggleFull();
   };
 
   /** Runs one command line: echo, shell, output, effect. */
-  const submit = (raw: string) => {
+  const submit = (raw: string, echo = true) => {
     const c = raw.trim();
     if (!live.current.ready || !c || mailRef.current) return;
     setCmd("");
     histIdx.current = -1;
-    line(c, true, false, here());
+    if (echo) line(c, true, false, here());
     const cwd0 = live.current.shell.cwd;
-    const r = shell.run(c, live.current.shell);
+    // Characters per line, for output that has a wide and a narrow form (`timeline`).
+    const cols = Math.floor(((body.current?.clientWidth ?? window.innerWidth) - 64) / 7.8);
+    const r = shell.run(c, live.current.shell, { cols });
     live.current.shell = r.state;
     setCwd(r.state.cwd);
     try {
@@ -827,8 +961,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       const name = c.split(/\s+/)[0].replace(/^\//, "").toLowerCase();
       const known = shell.commands.some((x) => x.name === name) || EGGS.includes(name);
       const first = r.lines[0];
-      // `demo` reports itself as demo_start / demo_stop.
-      if (name !== "demo") beacon(known ? name : "unknown", known && !(first?.kind === "text" && first.text.startsWith("command not found")));
+      // The tour reports itself as tour_start / tour_stop.
+      if (name !== "tour" && name !== "demo") beacon(known ? name : "unknown", known && !(first?.kind === "text" && first.text.startsWith("command not found")));
     }
     if (r.effect) effect(r.effect);
     if (!window.matchMedia("(pointer: coarse)").matches) input.current?.focus({ preventScroll: true });
@@ -902,16 +1036,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     } else submit(c.name);
   };
 
-  /** Fish-style suggestion: the latest history line that continues what is typed, else the first completion. */
-  const ghost = (() => {
-    if (!ready || !cmd || mailStep || paging || demoRef.current || palette || cmd.startsWith("/")) return "";
-    const hist = live.current.shell.history;
-    for (let i = hist.length - 1; i >= 0; i--) if (hist[i].length > cmd.length && hist[i].toLowerCase().startsWith(cmd.toLowerCase())) return hist[i].slice(cmd.length);
-    const c = shell.complete(cmd, live.current.shell)[0];
-    if (!c) return "";
-    const full = (/^(.*?)\S*$/.exec(cmd)?.[1] ?? "") + c;
-    return full.length > cmd.length && full.toLowerCase().startsWith(cmd.toLowerCase()) ? full.slice(cmd.length) : "";
-  })();
+  const syncCaret = (e: { currentTarget: HTMLInputElement }) => setCaret(e.currentTarget.selectionStart ?? cmd.length);
 
   const onInputKey = (e: ReactKeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
@@ -931,11 +1056,6 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         e.preventDefault();
         mailEnter(cmd);
       }
-      return;
-    }
-    if (ghost && (e.key === "ArrowRight" || e.key === "End") && e.currentTarget.selectionStart === cmd.length) {
-      e.preventDefault();
-      setCmd(cmd + ghost);
       return;
     }
     if (e.ctrlKey && !e.altKey && !e.metaKey && (e.key === "c" || e.key === "C" || e.key === "l" || e.key === "L")) {
@@ -982,7 +1102,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     } else if (e.key === "Escape") {
       e.preventDefault();
       act.current.esc();
-    } else if (/^[1-9]$/.test(e.key) && menuLive && menu.rows[Number(e.key) - 1]) {
+    } else if (/^[1-9]$/.test(e.key) && menuLive && menu.numbered !== false && menu.rows[Number(e.key) - 1]) {
       e.preventDefault();
       setSel(Number(e.key) - 1);
       pick(menu.id, menu.rows[Number(e.key) - 1]);
@@ -1005,6 +1125,18 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     const fromBack = performance.now() - lastPop < 3000;
     const stopped = () => cancelled.current || live.current.aborted;
     const firstVisit = !seenBefore();
+    // `?run=<command>` (from a link) runs once after boot; the parameter is stripped so a reload does not repeat it.
+    let runCmd: string | null = null;
+    try {
+      const u = new URL(window.location.href);
+      const r = u.searchParams.get("run");
+      if (r !== null) {
+        u.searchParams.delete("run");
+        window.history.replaceState(window.history.state, "", u);
+        const t = r.trim();
+        if (/^[a-z][a-z0-9 ._~/-]{0,40}$/i.test(t) && shell.commands.some((c) => c.name === t.split(/\s+/)[0].toLowerCase())) runCmd = t;
+      }
+    } catch {}
     const run = async () => {
       setEntries([]);
       setBootEntries([]);
@@ -1013,24 +1145,24 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       await wait(via === "hub" ? 150 : 100);
       if (stopped()) return;
       setBooting(false);
-      const script = terminalScript({ projects: items.length, posts: data.posts.length, views: views.length });
+      const script = terminalScript({ projects: items.length, posts: data.posts.length, views: views.length }, !firstVisit);
       for (const l of script) {
         if (stopped()) return;
         if (l.typed && !instant) await type(l.text, 13, false);
         else if (l.tag === "ok" && !instant) {
           // `[..]` for a beat, then it resolves to `[ok]`.
-          await wait(140);
+          await wait(firstVisit ? 140 : 40);
           if (stopped()) return;
           const n = ++seq.current;
           append([{ n, k: "out", text: l.text, tag: "wait" }]);
-          await wait(120);
+          await wait(firstVisit ? 120 : 30);
           if (stopped()) return;
           setBootEntries((es) => es.map((e) => (e.n === n && e.k === "out" ? { ...e, tag: "ok" } : e)));
         } else if (l.tag === "bar" && !instant) {
           const n = ++seq.current;
           append([{ n, k: "out", text: bootBar(0), tag: "bar" }]);
           for (let f = 1; f <= BOOT_BAR_STEPS; f++) {
-            await wait(60);
+            await wait(firstVisit ? 60 : 20);
             if (stopped()) return;
             setBootEntries((es) => es.map((e) => (e.n === n && e.k === "out" ? { ...e, text: bootBar(f) } : e)));
             ambient.key();
@@ -1052,6 +1184,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
         if (nav?.type === "back_forward" || fromBack) remembered = null;
       } catch {}
+      if (runCmd) remembered = null;
       if (remembered) {
         tick("boot");
         act.current.open(`/${remembered}`, `open ${remembered}`, true);
@@ -1063,11 +1196,19 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       tick("boot");
       if (!instant) await wait(520);
       if (stopped()) return;
-      line(firstVisit ? "type help, / for the menu, or demo for a tour" : "type help, or / for the menu", false, true);
+      line(firstVisit ? "new here? type tour · hiring? type hire · help lists everything" : "type help, / for the menu · hire for the short version", false, true);
       await type("ls views/", 13, instant);
       if (stopped()) return;
-      showViews();
+      showViews(true);
       setReady(true);
+      live.current.ready = true;
+      if (runCmd) {
+        await type(runCmd, 13, instant);
+        if (stopped()) return;
+        setPartial(null);
+        submit(runCmd, false);
+        return;
+      }
       setPartial(null);
     };
     void run();
@@ -1226,6 +1367,19 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
 
   const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
+  const firstYear = Math.min(...data.periods.map((p) => Number(p.from.slice(0, 4))).filter(Boolean), ...data.timeline.map((c) => Number(c.date.slice(0, 4))).filter(Boolean));
+  const contents: Array<{ id: CheckId; cmd: string; label: string; note: string }> = [
+    { id: "resume", cmd: "resume", label: "resume", note: "the overview · 6 files" },
+    { id: "projects", cmd: "projects", label: "projects", note: plural(data.projects.length, "project") },
+    { id: "writing", cmd: "writing", label: "writing", note: plural(data.posts.length, "post") },
+    { id: "views", cmd: "views", label: "views", note: plural(data.views.length, "view") },
+    { id: "timeline", cmd: "timeline", label: "timeline", note: `${Number.isFinite(firstYear) ? firstYear : "…"} → now` },
+    { id: "gitlog", cmd: "git log", label: "git log", note: "live from github" },
+    { id: "portrait", cmd: "portrait", label: "portrait", note: "the face behind it" },
+    { id: "contact", cmd: "contact", label: "contact", note: "mail · github · linkedin" },
+    { id: "mail", cmd: "mail", label: "mail", note: "write to me" },
+  ];
+
   /** A name in a listing: runs `cat` (file), `cd` (dir) or `open` (view). Dirs take the accent, views green. */
   const pathButton = (it: FileItem) => (
     <button
@@ -1250,11 +1404,6 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     ) : e.k === "banner" ? (
       <div key={e.n} className="terminal-os-welcome">
         <div className="terminal-os-header">
-          <div className="terminal-os-header-art">
-            <span className="sr-only">a portrait of Ratul</span>
-            <BrailleView art={PORTRAIT_BRAILLE} className="is-wide" />
-            <BrailleView art={PORTRAIT_BRAILLE_SMALL} className="is-small" />
-          </div>
           <div className="terminal-os-header-text">
             <pre className="terminal-os-banner" aria-hidden="true">
               {e.art.join("\n")}
@@ -1326,6 +1475,17 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         {" ".repeat(e.pad - e.name.length)}
         {e.rest}
       </span>
+    ) : e.k === "ghcommit" ? (
+      <span key={e.n} className="is-cmd">
+        {/^https:\/\/github\.com\//.test(e.url) ? (
+          <a className="terminal-root-link terminal-gh-sha" href={e.url} target="_blank" rel="noreferrer">
+            {e.label}
+          </a>
+        ) : (
+          e.label
+        )}
+        {e.rest}
+      </span>
     ) : e.k === "files" ? (
       <span key={e.n} className="is-out">
         {e.items.map((it, i) => (
@@ -1357,11 +1517,17 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     ) : e.k === "links" ? (
       <span key={e.n} className="is-out">
         {e.items.map((l, i) => (
-          <Fragment key={l.href}>
+          <Fragment key={l.label}>
             {i ? " · " : ""}
-            <a className="terminal-root-link" href={l.href} {...(l.external ? { target: "_blank", rel: "noreferrer" } : {})}>
-              {l.label}
-            </a>
+            {l.cmd ? (
+              <button type="button" className="terminal-root-link" onMouseDown={keepFocus} onClick={() => submit(l.cmd!)}>
+                {l.label}
+              </button>
+            ) : (
+              <a className="terminal-root-link" href={l.href} {...(l.external ? { target: "_blank", rel: "noreferrer" } : {})}>
+                {l.label}
+              </a>
+            )}
           </Fragment>
         ))}
       </span>
@@ -1393,7 +1559,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
               >
                 <em>{on ? "▸" : " "}</em>
                 <b className="is-cmd">
-                  {n + 1}) {r.label}
+                  {e.numbered === false ? "" : `${n + 1}) `}
+                  {r.label}
                 </b>
                 <i className="is-out">{r.line}</i>
               </button>
@@ -1449,8 +1616,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
             input.current?.focus({ preventScroll: true });
           }}
         >
-          <span className="sr-only">Type commands. help lists them, / opens the menu, banner prints the welcome again, Esc or exit returns to the hub.</span>
-          {demoOn ? <span className="sr-only" role="status">demo running, press any key to stop</span> : null}
+          <span className="sr-only">Type commands. help lists them, hire is the short version, / opens the menu, banner prints the welcome again, Esc or exit returns to the hub.</span>
+          {demoOn ? <span className="sr-only" role="status">tour running, press any key to stop</span> : null}
           <div role="log" aria-live={demoOn ? "off" : "polite"} aria-relevant="additions">
             {entries.map(renderEntry)}
           </div>
@@ -1483,9 +1650,18 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
               {paging ? null : (
                 <code className="terminal-root-typed" aria-hidden="true">
                   {mailStep ? <code className="ps-user">{MAIL_LABEL[mailStep]}</code> : ps1(shortPath(cwd))}
-                  {partial !== null ? partial : cmd}
-                  <i className="hub-enter-caret" />
-                  {ghost ? <i className="terminal-root-ghost">{ghost}</i> : null}
+                  {partial !== null ? (
+                    <>
+                      {partial}
+                      <i className="hub-enter-caret" />
+                    </>
+                  ) : (
+                    <>
+                      {cmd.slice(0, Math.min(caret, cmd.length))}
+                      <i className="hub-enter-caret" />
+                      {cmd.slice(Math.min(caret, cmd.length))}
+                    </>
+                  )}
                 </code>
               )}
               <input
@@ -1500,26 +1676,31 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
                 spellCheck={false}
                 enterKeyHint="go"
                 onChange={(e) => {
+                  setCaret(e.target.selectionStart ?? e.target.value.length);
                   setCmd(e.target.value.slice(0, 200));
                   histIdx.current = -1;
                   setPalSel(0);
                 }}
                 onKeyDown={onInputKey}
+                onKeyUp={syncCaret}
+                onSelect={syncCaret}
+                onClick={syncCaret}
               />
             </span>
           ) : null}
         </div>
         <aside className="terminal-os-pane" aria-label="Side pane">
-          <div className="terminal-os-pane-art">
-            <BrailleView art={PORTRAIT_BRAILLE} className="is-pane" />
-          </div>
           <h3>where</h3>
           <p className="terminal-os-pane-where">{shortPath(cwd)}</p>
-          <h3>checkpoints</h3>
-          <ul role="list" className="terminal-os-checks">
-            {CHECKS.map((id) => (
-              <li key={id} className={checks[id] ? "is-done" : ""}>
-                <b>{checks[id] ? "[x]" : "[ ]"}</b> {id}
+          <h3>contents</h3>
+          <ul role="list" className="terminal-os-contents">
+            {contents.map((r) => (
+              <li key={r.id}>
+                <button type="button" className={`terminal-os-content-row ${checks[r.id] ? "is-done" : ""}`} onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit(r.cmd)}>
+                  <b>{checks[r.id] ? "✓" : " "}</b>
+                  <span>{r.label}</span>
+                  <i>{r.note}</i>
+                </button>
               </li>
             ))}
           </ul>
@@ -1533,10 +1714,11 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         </div>
         <div className="terminal-os-status">
           <code className="terminal-os-status-l">{`${USER}@code  ${shortPath(cwd)}`}</code>
-          <code className="terminal-os-status-m is-counts">
+          {tourStep ? <code className="terminal-os-status-tour">{`tour ${tourStep.i}/${tourStep.n} · any key stops`}</code> : null}
+          <code className="terminal-os-status-m is-counts" hidden={!!tourStep}>
             {plural(data.projects.length, "project")} · {plural(data.posts.length, "post")} · {plural(data.views.length, "view")}
           </code>
-          {nextTry ? (
+          {nextTry && !tourStep ? (
             <button type="button" className="terminal-os-status-hint" onMouseDown={keepFocus} onClick={() => submit(hintCmd)}>
               {`try: ${hintCmd}`}
             </button>
@@ -1579,8 +1761,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           >
             /
           </button>
-          <button type="button" onMouseDown={keepFocus} onClick={typeChip(() => submit("demo"))}>
-            demo
+          <button type="button" onMouseDown={keepFocus} onClick={typeChip(() => submit("tour"))}>
+            tour
           </button>
           <button type="button" onMouseDown={keepFocus} onClick={typeChip(() => submit("views"))}>
             views

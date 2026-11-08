@@ -96,7 +96,7 @@ export type Out =
   /** A QR code as text rows (`qr`). */
   | { kind: "qr"; lines: string[] }
   /** Several links on one line, joined by " · ". */
-  | { kind: "links"; items: Array<{ label: string; href: string; external?: boolean }> }
+  | { kind: "links"; items: Array<{ label: string; href?: string; external?: boolean; cmd?: string }> }
   /** A listing: `inline` joins the names on one line (`ls`); otherwise it is one row, `meta` before the name. */
   | { kind: "files"; inline: boolean; items: FileItem[] }
   /** `cal`: weeks of day numbers (null = blank), today highlighted. */
@@ -121,7 +121,11 @@ export type Effect =
   | { kind: "fullscreen" }
   | { kind: "pane" }
   /** The guided tour, and the inline contact form: both run in the UI, which owns the prompt. */
-  | { kind: "demo" }
+  | { kind: "tour" }
+  /** Run another command line as if typed (a tip's number). */
+  | { kind: "run"; cmd: string }
+  /** `git log`: the UI fetches the public activity. */
+  | { kind: "git-log"; oneline: boolean; limit: number }
   | { kind: "window"; url: string }
   | { kind: "theme"; id: ThemeId }
   | { kind: "crt" }
@@ -139,7 +143,8 @@ export type CommandDoc = { name: string; group: CommandGroup; usage: string; des
 export type Shell = {
   /** The welcome block (banner, welcome line, tips), as `banner` prints it. */
   banner: () => Out[];
-  run: (input: string, state: ShellState) => RunResult;
+  /** `env.cols`: how many characters fit on a line right now (for `timeline`). */
+  run: (input: string, state: ShellState, env?: { cols?: number }) => RunResult;
   /** Candidates for the last token of `input` (whole-token strings; the UI swaps the token in). */
   complete: (input: string, state: ShellState) => string[];
   commands: CommandDoc[];
@@ -175,8 +180,11 @@ const COMMANDS: CommandDoc[] = [
   { name: "banner", group: "terminal", usage: "banner", desc: "print the welcome again" },
   { name: "history", group: "terminal", usage: "history", desc: "commands typed this session" },
   { name: "clear", group: "terminal", usage: "clear", desc: "empty the screen" },
-  { name: "demo", group: "terminal", usage: "demo", desc: "a guided tour; any key stops it" },
-  { name: "git", group: "read", usage: "git log [--oneline|--graph|-n k]", desc: "the career as a git history" },
+  { name: "tour", group: "terminal", usage: "tour", desc: "a guided tour; any key stops it" },
+  { name: "hire", group: "read", usage: "hire", desc: "the 20-second version, for recruiters" },
+  { name: "timeline", group: "read", usage: "timeline", desc: "school → college → work, as one line" },
+  { name: "view", group: "open", usage: "view [id]", desc: "enter a view (no id: pick from the list)" },
+  { name: "git", group: "read", usage: "git log [--oneline] [-n k]", desc: "live: my public commits on github" },
   { name: "mail", group: "open", usage: "mail", desc: "send me a message, right here" },
   { name: "pane", group: "terminal", usage: "pane", desc: "show or hide the side pane" },
   { name: "date", group: "terminal", usage: "date", desc: "the local date and time" },
@@ -186,6 +194,17 @@ const COMMANDS: CommandDoc[] = [
   { name: "exit", group: "terminal", usage: "exit", desc: "back to the hub", long: "Esc at an empty prompt does the same." },
 ];
 const NAMES = COMMANDS.map((c) => c.name);
+
+/** The tips box, numbered 1-7: typing a number runs that row's command. */
+const TIPS = [
+  { cmd: "help", desc: "every command" },
+  { cmd: "hire", desc: "the short version, for recruiters" },
+  { cmd: "/", desc: "the command menu" },
+  { cmd: "view", desc: "enter a view" },
+  { cmd: "projects", desc: "read what I built" },
+  { cmd: "resume", desc: "the overview" },
+  { cmd: "tour", desc: "a guided tour" },
+];
 
 const text = (t: string, dim = false): Out => ({ kind: "text", text: t, dim: dim || undefined });
 const texts = (ls: string[]): Out[] => ls.map((l) => text(l));
@@ -258,14 +277,7 @@ export function createShell(data: TerminalData): Shell {
       art: [...BANNER_ROYAL_PROGRAMMER],
       welcome: `royal-programmer ${data.commit ?? "v1"} · ${host}`,
       overview: [data.who, data.stack.join(" · "), data.uptime],
-      tips: [
-        { cmd: "help", desc: "every command" },
-        { cmd: "/", desc: "the command menu" },
-        ...(data.views[0] ? [{ cmd: `open ${data.views[0].id}`, desc: "enter a view" }] : []),
-        { cmd: "projects", desc: "read what I built" },
-        { cmd: "resume", desc: "the overview" },
-        { cmd: "demo", desc: "a guided tour" },
-      ],
+      tips: TIPS,
     },
   ];
 
@@ -325,77 +337,140 @@ export function createShell(data: TerminalData): Shell {
   };
 
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const fmtDate = (iso: string) => {
-    const [y, m, d] = iso.split("-");
-    return `${MONTHS[Number(m) - 1] ?? m} ${d} ${y}`;
-  };
-  /** A stable 7-hex id from date + subject (FNV-1a). */
-  const hashOf = (c: TermCommit) => {
-    let h = 0x811c9dc5;
-    for (const ch of `${c.date}${c.subject}`) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
-    return h.toString(16).padStart(8, "0").slice(0, 7);
-  };
-  const LANE: Record<TermCommit["branch"], number> = { main: 0, side: 1, learn: 2 };
-  const LANE_TONE: Tone[] = ["accent", "green", "violet"];
 
-  /** `git log [--oneline] [--graph] [-n k | -k]`: newest first; `--graph` draws main, side and learn as lanes. */
-  const gitLog = (args: string[]): Out[] => {
-    let limit = Infinity;
-    let oneline = false;
-    let graph = false;
-    for (let i = 0; i < args.length; i++) {
-      const a = args[i];
-      if (a === "--oneline") oneline = true;
-      else if (a === "--graph") graph = true;
-      else if (a === "-n") {
-        if (!/^\d+$/.test(args[i + 1] ?? "")) return [text(`fatal: '${args[i + 1] ?? ""}' is not a number`)];
-        limit = Number(args[++i]);
-      }
-      else if (/^-\d+$/.test(a)) limit = Number(a.slice(1));
-      else return [text(`fatal: unrecognized argument: ${a}`)];
-    }
-    const list = data.timeline.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, limit);
-    // A side lane is open from its newest commit to its oldest in this list.
-    const first: number[] = [-1, -1, -1];
-    const last: number[] = [-1, -1, -1];
-    list.forEach((c, i) => {
-      const l = LANE[c.branch];
-      if (first[l] < 0) first[l] = i;
-      last[l] = i;
-    });
-    const active = (i: number, skip = -1) => [0, 1, 2].map((l) => l !== skip && (l === 0 || (first[l] >= 0 && first[l] <= i && i <= last[l])));
-    const lanes = (on: boolean[], star = -1): Array<{ text: string; tone?: Tone }> =>
-      [0, 1, 2].map((l) => ({ text: `${star === l ? "*" : on[l] ? "|" : " "} `, tone: LANE_TONE[l] }));
-    const connector = (on: boolean[], lane: number, ch: string): Array<{ text: string; tone?: Tone }> => {
-      const cells = [0, 1, 2].map((l) => (on[l] ? "| " : "  ").split(""));
-      cells[lane - 1][1] = ch;
-      return cells.map((c, l) => ({ text: c.join(""), tone: l === lane - 1 ? LANE_TONE[lane] : LANE_TONE[l] }));
+  /** `timeline`: school, college, work on one line. Wide: year column, rail, period brackets. Narrow: stacked. */
+  const timeline = (cols: number): Out[] => {
+    const ym = (iso: string) => {
+      const [y, m] = iso.split("-").map(Number);
+      return { y, m: m || 1, i: y * 12 + ((m || 1) - 1) };
     };
-    const out: Out[] = [];
-    list.forEach((c, i) => {
-      const l = LANE[c.branch];
-      const hash = hashOf(c);
-      const tag = c.tag ? [{ text: ` (tag: ${c.tag})`, tone: "green" as Tone }] : [];
-      if (graph && l > 0 && first[l] === i) out.push({ kind: "parts", parts: connector(active(i, l), l, "\\") });
-      const g = (star: boolean) => (graph ? lanes(active(i), star ? l : -1) : []);
-      if (oneline) {
-        out.push({ kind: "parts", parts: [...g(true), { text: hash, tone: "accent" }, ...tag, { text: ` ${c.subject}` }] });
-      } else {
-        out.push({ kind: "parts", parts: [...g(true), { text: `commit ${hash}`, tone: "accent" }, ...tag] });
-        const rest = [`Date:   ${fmtDate(c.date)}`, "", `    ${c.subject}`, ...(c.body ?? []).map((b) => `    ${b}`), ""];
-        for (const r of rest) out.push({ kind: "parts", parts: [...g(false), { text: r }] });
+    const periods = data.periods.filter((p) => /^\d{4}-\d{2}$/.test(p.from));
+    const now = new Date();
+    const nowI = now.getFullYear() * 12 + now.getMonth();
+    const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+    const dur = (p: (typeof periods)[number]) => {
+      if (p.to) {
+        const y = ym(p.to).y - ym(p.from).y;
+        return y >= 1 ? plural(y, "yr") : plural(ym(p.to).i - ym(p.from).i, "mo");
       }
-      if (graph && l > 0 && last[l] === i && i < list.length - 1) out.push({ kind: "parts", parts: connector(active(i + 1, l), l, "/") });
+      const mo = nowI - ym(p.from).i;
+      return [mo >= 12 ? plural(Math.floor(mo / 12), "yr") : "", mo % 12 ? `${mo % 12} mo` : ""].filter(Boolean).join(" ") || "new";
+    };
+    const inside = (p: (typeof periods)[number], i: number) => i >= ym(p.from).i && (p.to ? i <= ym(p.to).i : true);
+
+    type Row = { i: number; y: number; mon: string; subject: string; tag?: string; branch: TermCommit["branch"] };
+    const rows: Row[] = data.timeline.map((c) => {
+      const t = ym(c.date.slice(0, 7));
+      return { i: t.i, y: t.y, mon: MONTHS[t.m - 1], subject: c.subject, tag: c.tag, branch: c.branch };
     });
+    // A period that no entry marks still starts somewhere: add its first month.
+    for (const p of periods) {
+      const t = ym(p.from);
+      if (!rows.some((r) => r.i === t.i)) rows.push({ i: t.i, y: t.y, mon: MONTHS[t.m - 1], subject: `start · ${p.label}`, branch: "learn" });
+    }
+    rows.sort((a, b) => a.i - b.i);
+
+    const out: Out[] = [];
+    if (cols >= 80) {
+      const bracket = Math.min(cols - 28, 96);
+      const spans = periods.map((p) => {
+        const idx = rows.map((r, k) => (inside(p, r.i) ? k : -1)).filter((k) => k >= 0);
+        return { p, lo: idx[0] ?? -1, hi: idx[idx.length - 1] ?? -1 };
+      });
+      let prevY = 0;
+      rows.forEach((r, k) => {
+        const dim = r.branch !== "main";
+        const head = `${r.y !== prevY ? String(r.y) : "    "}  `;
+        prevY = r.y;
+        const tag = r.tag ? `  ${r.tag}` : "";
+        const room = bracket - head.length - 3 - 5;
+        const subj = r.subject.length + tag.length > room ? `${r.subject.slice(0, Math.max(8, room - tag.length - 1))}…` : r.subject;
+        const left = `${head}├─ `;
+        const parts: Array<{ text: string; tone?: Tone }> = [
+          { text: left, tone: dim ? "dim" : undefined },
+          { text: `${r.mon}  `, tone: dim ? "dim" : undefined },
+          { text: subj, tone: dim ? "dim" : undefined },
+        ];
+        if (tag) parts.push({ text: tag, tone: "accent" });
+        const used = left.length + 5 + subj.length + tag.length;
+        parts.push({ text: " ".repeat(Math.max(1, bracket - used)) });
+        const sp = spans.find((s) => s.lo >= 0 && k >= s.lo && k <= s.hi);
+        if (sp) {
+          const glyph = sp.lo === sp.hi ? "─" : k === sp.lo ? "┐" : k === sp.hi ? "┘" : "│";
+          parts.push({ text: glyph, tone: "dim" });
+          if (k === Math.floor((sp.lo + sp.hi) / 2)) parts.push({ text: ` ${sp.p.id} · ${dur(sp.p)}`, tone: "accent" });
+        }
+        out.push({ kind: "parts", parts });
+      });
+      return out;
+    }
+    let prevY = 0;
+    const opened = new Set<string>();
+    for (const r of rows) {
+      for (const p of periods) {
+        if (!opened.has(p.id) && inside(p, r.i)) {
+          opened.add(p.id);
+          out.push({ kind: "parts", parts: [{ text: `── ${p.id} · ${p.from.slice(0, 4)} → ${p.to ? p.to.slice(0, 4) : "now"} ──`, tone: "dim" }] });
+        }
+      }
+      if (r.y !== prevY) {
+        out.push({ kind: "parts", parts: [{ text: String(r.y) }] });
+        prevY = r.y;
+      }
+      const dim = r.branch !== "main";
+      const parts: Array<{ text: string; tone?: Tone }> = [{ text: `  ${r.mon}  `, tone: dim ? "dim" : undefined }, { text: r.subject }];
+      if (r.tag) parts.push({ text: `  ${r.tag}`, tone: "accent" });
+      out.push({ kind: "parts", parts });
+    }
     return out;
   };
 
-  const git = (args: string[]): Out[] => {
+  /** `git log [--oneline] [-n k] | -k`: the UI loads the public activity; here only the flags are checked. */
+  const gitLog = (args: string[]): { lines: Out[]; effect?: Effect } => {
+    let limit = 10;
+    let oneline = false;
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
+      if (a === "--oneline") oneline = true;
+      else if (a === "--graph") return { lines: [text("git: '--graph' moved · the career is now `timeline`")] };
+      else if (a === "-n") {
+        if (!/^\d+$/.test(args[i + 1] ?? "")) return { lines: [text(`fatal: '${args[i + 1] ?? ""}' is not a number`)] };
+        limit = Number(args[++i]);
+      } else if (/^-\d+$/.test(a)) limit = Number(a.slice(1));
+      else return { lines: [text(`fatal: unrecognized argument: ${a}`)] };
+    }
+    return { lines: [], effect: { kind: "git-log", oneline, limit: Math.max(1, limit) } };
+  };
+
+  const git = (args: string[]): { lines: Out[]; effect?: Effect } => {
     const sub = args[0];
     if (sub === "log") return gitLog(args.slice(1));
-    if (sub === "status") return [text("On branch main · nothing to commit, working tree clean")];
-    if (sub) return [text(`git: '${sub}' is not a git command. See 'git'.`)];
-    return texts(["usage: git <command>", "  log [--oneline] [--graph] [-n k]   the career as a git history", "  status                             where things stand"]);
+    if (sub === "status") return { lines: [text("On branch main · nothing to commit, working tree clean")] };
+    if (sub) return { lines: [text(`git: '${sub}' is not a git command. See 'git'.`)] };
+    return { lines: texts(["usage: git <command>", "  log [--oneline] [-n k]   my public commits on github, live", "  status                   where things stand"]) };
+  };
+
+  /** The 20-second version for recruiters, from the résumé only. */
+  const hire = (): Out[] => {
+    const r = data.resume;
+    const role = r.title.split(" · ");
+    const wants = role.slice(1).join(" · ");
+    const reloc = r.location.split(" · ")[1];
+    const b = r.experience[0]?.bullets ?? [];
+    const proof = [b[1], b[5], b[7]].filter((x): x is string => !!x);
+    const linkedin = data.contact.find((c) => c.label === "linkedin" && /^https:\/\//i.test(c.href));
+    return [
+      { kind: "parts", parts: [{ text: r.name, tone: "accent" }, { text: ` — ${r.title}` }] },
+      text(r.location, true),
+      text(`looking for:  ${wants}${reloc ? `; ${reloc}` : ""}`),
+      text("proof:"),
+      ...proof.map((p) => text(`  • ${p}`)),
+      text(`stack:  ${data.stack.join(" · ")}`),
+      {
+        kind: "links",
+        items: [{ label: "resume --pdf", cmd: "resume --pdf" }, { label: "mail", cmd: "mail" }, ...(linkedin ? [{ label: "linkedin", href: linkedin.href, external: true }] : [])],
+      },
+    ];
   };
 
   /** `Sun Nov  8 15:04:05 IST 2026`, in the visitor's zone. */
@@ -505,7 +580,7 @@ export function createShell(data: TerminalData): Shell {
 
   type Exec = { lines: Out[]; effect?: Effect; menu?: MenuId; cwd?: string };
 
-  const exec = (line: string, st: ShellState): Exec => {
+  const exec = (line: string, st: ShellState, env?: { cols?: number }): Exec => {
     const tokens = line.trim().split(/\s+/);
     let name = tokens[0];
     if (name.startsWith("/") && name.length > 1) name = name.slice(1);
@@ -543,9 +618,16 @@ export function createShell(data: TerminalData): Shell {
       case "contact":
         return { lines: cat(["~/contact"], st) };
       case "git":
-        return { lines: git(args) };
+        return git(args);
+      case "tour":
       case "demo":
-        return { lines: [], effect: { kind: "demo" } };
+        return { lines: [], effect: { kind: "tour" } };
+      case "hire":
+        return { lines: hire() };
+      case "timeline":
+        return { lines: timeline(env?.cols ?? 100) };
+      case "view":
+        return args[0] ? open(args[0], st) : menu("views");
       case "mail":
         return { lines: [], effect: { kind: "mail" } };
       case "pane":
@@ -641,6 +723,9 @@ export function createShell(data: TerminalData): Shell {
       return item ? { lines: cat([`~/${st.lastMenu}/${item.slug}.md`], st) } : { lines: [text(`no row ${low}`)] };
     }
 
+    // A bare 1-7 with no menu showing is the tips box's number.
+    if (/^[1-7]$/.test(low) && !args.length) return { lines: [], effect: { kind: "run", cmd: TIPS[Number(low) - 1].cmd } };
+
     const near = nearest(low, NAMES);
     return { lines: [text(`command not found: ${name}`), ...(near ? [text(`did you mean: ${near}`, true)] : [])] };
   };
@@ -648,11 +733,13 @@ export function createShell(data: TerminalData): Shell {
   return {
     commands: COMMANDS,
     banner,
-    run(input, state) {
+    run(input, state, env) {
       const line = input.trim();
       if (!line) return { lines: [], state };
-      const history = state.history[state.history.length - 1] === line ? state.history : [...state.history, line].slice(-HISTORY_CAP);
-      const r = exec(line, { ...state, history });
+      const withLine = state.history[state.history.length - 1] === line ? state.history : [...state.history, line].slice(-HISTORY_CAP);
+      const r = exec(line, { ...state, history: withLine }, env);
+      // A tip's number runs the real command next, and that is what history should keep.
+      const history = r.effect?.kind === "run" ? state.history : withLine;
       return { lines: r.lines, effect: r.effect, state: { cwd: r.cwd ?? state.cwd, history, lastMenu: r.menu } };
     },
     complete(input, state) {
@@ -669,6 +756,7 @@ export function createShell(data: TerminalData): Shell {
         const pool = [...viewIds, ...data.projects.map((p) => p.slug), ...data.posts.map((p) => p.slug)];
         return [...pool.filter((n) => n.startsWith(word)), ...completePath(fs, state.cwd, word)].filter((v, i, a) => a.indexOf(v) === i);
       }
+      if (cmd === "view") return viewIds.filter((n) => n.startsWith(word));
       if (cmd === "theme") return THEMES.map((t) => t.id as string).filter((n) => n.startsWith(word));
       if (cmd === "resume") return ["--pdf"].filter((n) => n.startsWith(word));
       if (cmd === "curl") return ["github"].filter((n) => n.startsWith(word));

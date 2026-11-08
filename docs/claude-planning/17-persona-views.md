@@ -208,3 +208,28 @@ palette) — a low-res photo. Both from a tighter face crop. `neofetch` uses the
   (block-character QR of the page URL), eggs (`sl`, `cowsay`, `fortune` with Ratul's lines, `sudo`),
   fish-style ghost suggestions (→ accepts), anonymous command analytics into Supabase for the admin.
 Then a checkpoint to production, then Swarm.
+
+### 6.10 Round 1i: contents, timeline, hire (Ratul's feedback + a conversion pass, 2026-11-09)
+
+- **Portrait only through the command.** The braille portrait leaves the header and the pane; `portrait`
+  shows the 132x102 half-block pixel art, sized to the body width *and* the viewport height; `neofetch`
+  keeps its small braille.
+- **`timeline` replaces the career `git log`.** School, college, work as one line: wide, a year
+  column, a rail of `├─ Mon subject` markers and a bracket per period (`college · 4 yrs`, `work · 2 yrs 1 mo`);
+  narrow, stacked with period lines. Periods live in `TIMELINE_PERIODS`; the `school` period is a commented
+  stub for Ratul (name and years unknown, not invented). **`git log` is now real:** the latest public
+  pushes of `royal-programmer` (`--oneline`, `-n k`), loaded with the same cache as `curl github`. The public
+  events feed no longer carries commit messages, so each push shows its head commit and the message is
+  looked up once per sha and kept in `xp-gh-msgs`. `--graph` says it moved to `timeline`.
+- **`tour`** (alias `demo`, unlisted): six steps, each introduced by a dim `# n/6 · note` line, the
+  status bar shows `tour n/6 · any key stops`. Beacons `tour_start` / `tour_stop`.
+- **The pane lists the portfolio's contents,** not checkpoints: resume, projects, writing, views, timeline,
+  git log, portrait, contact, mail, each a button, a check once visited; `next` is the first unvisited. The
+  explorer achievement fires when the eight non-mail rows are done. Old `xp-term-checks` ids are ignored.
+- **Conversion:** `hire` (the 20-second version, from the résumé only), `?run=<command>` deep link (strictly
+  validated, stripped from the URL, runs after boot; skips a remembered view), numbered tips 1-7 (a bare
+  digit runs that row's command when no numbered menu is showing; the boot picker is not numbered so the
+  digits stay free), faster boot for repeat visitors (`cached profile`). `view` enters a view.
+- **Removed:** ghost suggestions (Tab and the palette stay), the pane/header braille portrait, the unused
+  ramp portraits and the large braille from `terminal-art.ts`.
+

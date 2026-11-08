@@ -87,12 +87,12 @@ export const bootBar = (fill: number) =>
   `[${"█".repeat(fill)}${"░".repeat(BOOT_BAR_STEPS - fill)}] ${fill * 10}%${fill === BOOT_BAR_STEPS ? "  ready" : ""}`;
 
 /** The profile tool starting up: one function for the hub's exit window and the Engineer terminal's boot. */
-export function terminalScript(n: { projects: number; posts: number; views: number }): Line[] {
+export function terminalScript(n: { projects: number; posts: number; views: number }, cached = false): Line[] {
   const plural = (c: number, w: string) => `${c} ${w}${c === 1 ? "" : "s"}`;
   const row = (label: string, text: string): Line => ({ text: `${label.padEnd(18)}${text}`, typed: false, tag: "ok" });
   return [
     { text: "royal-programmer --boot", typed: true, prompt: true },
-    { text: "royal-programmer v1 · the profile tool of Ratul Roy", typed: false },
+    { text: `royal-programmer v1 · the profile tool of Ratul Roy${cached ? " · cached profile" : ""}`, typed: false },
     row("profile", "ratulroy · software engineer · bengaluru"),
     row("mount ~/projects", plural(n.projects, "project")),
     row("mount ~/resume", "6 files"),

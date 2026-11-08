@@ -5,6 +5,20 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-09 — Engineer terminal round 1i: contents pane, `timeline`, real `git log`, `hire`
+
+Builder (Sonnet, ≈190k tokens incl. verification). Caret follows the input's cursor; the portrait
+is command-only (132x102 pixel art, fits width and height); `timeline` (wide and stacked) replaces
+the career `git log`, which now shows the latest public pushes of royal-programmer (head commit per
+push, message looked up once per sha, `xp-gh-msgs`); ghost suggestions removed; `view` command and
+new tips wording; `demo` → `tour` (hidden alias) with narrated steps and a status-bar counter; pane =
+clickable portfolio contents with done marks (achievement on the eight non-mail rows); `hire`,
+`?run=`, numbered tips, faster repeat boot. Verified at 1280x720 and 393x852 touch: hire, timeline,
+git log (+ `--oneline -n 3`), tour to the end, portrait fit, quick pick `2`, `?run=hire`, Home-key caret,
+pane row clicks; console clean. Not verified: a `school` period (unknown), rate-limited GitHub.
+
+---
+
 ## 2026-11-08 — Engineer terminal: cold review of rounds 1c–1h and the fix pass
 
 **Reviewer (Sonnet, ≈100k)** found 10: (1) demo/`sl`/`curl` outlived the component — cleanup

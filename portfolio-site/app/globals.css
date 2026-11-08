@@ -2129,6 +2129,7 @@ em.font-display,
   --term-faint: #5a6068;
   --ink-faint: #5a6068;
   --term-green: #1a7f37;
+  --term-yellow: #9a6700;
   --term-violet: #8250df;
 }
 .terminal-root .hub-exit {
@@ -2420,6 +2421,7 @@ em.font-display,
   --ink-faint: var(--term-faint, #7f7d79);
 }
 .terminal-os-body {
+  container-type: inline-size;
   min-height: 0;
   padding: 20px var(--os-pad) 28px;
 }
@@ -2427,15 +2429,11 @@ em.font-display,
   color: var(--c);
 }
 
-/* The header: portrait left; banner, version line and the three-line overview right. One blank-line rhythm below it. */
+/* The header: banner, version line and the three-line overview. One blank-line rhythm below it. */
 .terminal-os-welcome {
   margin-bottom: 8px;
 }
 .terminal-os-header {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  column-gap: 3ch;
-  align-items: start;
   margin-bottom: 16px;
 }
 .terminal-os-header-text {
@@ -2454,34 +2452,7 @@ em.font-display,
   line-height: 1.05;
   color: var(--c);
 }
-@media (max-width: 639px) {
-  .terminal-os-header {
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: 12px;
-  }
-  .terminal-os-header-art {
-    justify-self: center;
-  }
-  .terminal-os-header .terminal-os-braille.is-wide {
-    display: none;
-  }
-  .terminal-os-header .terminal-os-braille.is-small {
-    display: block;
-    font-size: min(13px, calc((100vw - 2 * var(--os-pad)) / 26 / var(--adv-br)));
-  }
-}
-
-/* With the pane open the portrait lives there: the header drops it and the text takes the full width. */
-@media (min-width: 1024px) {
-  .terminal-os.has-pane .terminal-os-header-art {
-    display: none;
-  }
-  .terminal-os.has-pane .terminal-os-header {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-/* Braille portrait (2x4 dots per cell), in the accent. */
+/* `neofetch`'s braille portrait (2x4 dots per cell), in the accent. */
 .terminal-os-braille {
   margin: 0;
   font-family: var(--font-geist-mono), monospace;
@@ -2491,24 +2462,16 @@ em.font-display,
   overflow: hidden;
   color: var(--c);
 }
-.terminal-os-braille.is-wide {
-  font-size: 10px;
-}
-.terminal-os-braille.is-small {
-  display: none;
-}
 .terminal-os-braille.is-fetch {
   font-size: min(13px, calc((100vw - 2 * var(--os-pad)) / 26 / var(--adv-br)));
-}
-.terminal-os-braille.is-pane {
-  font-size: min(13px, calc(100cqw / 40 / var(--adv-br)));
 }
 
 /* `portrait`: true-colour half-blocks, top pixel as text, bottom as background. */
 .terminal-os-pixels {
   margin: 4px 0;
   font-family: var(--font-geist-mono), monospace;
-  font-size: min(10px, calc((100vw - 2 * var(--os-pad)) / 84 / var(--adv-px)));
+  /* 132 cells across the body (cqw) and 102 rows within the viewport height, at most 10px. */
+  font-size: min(10px, calc(100cqw / 132 / var(--adv-px)), calc((100dvh - 170px) / 102));
   line-height: 1;
   letter-spacing: 0;
   white-space: pre;
@@ -2573,11 +2536,14 @@ em.font-display,
   }
 }
 
-/* Ghost suggestion after the caret. */
-.terminal-root-ghost {
-  font-style: normal;
-  color: var(--ink-faint);
-  opacity: 0.75;
+/* git log: the sha is yellow. */
+.terminal-gh-sha {
+  --accent-link: var(--term-yellow, #e5c07b);
+}
+
+/* The status bar's tour progress (shown on every width while the tour runs). */
+.terminal-os-status-tour {
+  color: var(--c);
 }
 
 /* `qr`: dark modules as ink on a light tile, so phone scanners see the usual code. `sl`: the locomotive. */
@@ -2666,9 +2632,6 @@ em.font-display,
     scrollbar-width: thin;
   }
 }
-.terminal-os-pane-art {
-  container-type: inline-size;
-}
 .terminal-os-pane h3 {
   margin: 18px 0 6px;
   font: inherit;
@@ -2677,34 +2640,54 @@ em.font-display,
   text-transform: uppercase;
   color: var(--ink-faint);
 }
-.terminal-os-pane-art + h3 {
-  margin-top: 14px;
-}
 .terminal-os-pane p {
   margin: 0;
 }
 .terminal-os-pane-where {
   color: var(--ink);
 }
-.terminal-os-checks {
+/* Contents: one button per part of the portfolio; a check once visited. */
+.terminal-os-contents {
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.terminal-os-checks b {
-  font-weight: 400;
-}
-.terminal-os-checks .is-done {
+.terminal-os-content-row {
+  display: grid;
+  grid-template-columns: 2ch 9ch minmax(0, 1fr);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  line-height: 1.7;
+  text-align: left;
   color: var(--ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.terminal-os-checks .is-done b {
+.terminal-os-content-row b {
+  font-weight: 400;
   color: var(--c);
 }
-.terminal-os-checks .is-soon {
+.terminal-os-content-row i {
+  font-style: normal;
   color: var(--ink-faint);
 }
-.terminal-os-checks i {
-  font-style: normal;
+.terminal-os-content-row:hover span,
+.terminal-os-content-row:focus-visible span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.terminal-os-content-row.is-done {
+  color: var(--ink-faint);
+}
+@media (pointer: coarse) {
+  .terminal-os-content-row {
+    min-height: 32px;
+    align-items: center;
+  }
 }
 .terminal-os-pane-next,
 .terminal-os-status-hint {
@@ -2763,8 +2746,12 @@ em.font-display,
 }
 .terminal-os-tip {
   display: grid;
-  grid-template-columns: 16ch minmax(0, 1fr);
+  grid-template-columns: 2ch 12ch minmax(0, 1fr);
   gap: 0 1ch;
+}
+.terminal-os-tip em {
+  font-style: normal;
+  color: var(--c);
 }
 .terminal-os-tip b {
   font-weight: 400;
@@ -2776,41 +2763,10 @@ em.font-display,
 }
 @media (max-width: 639px) {
   .terminal-os-tip {
-    grid-template-columns: 14ch minmax(0, 1fr);
+    grid-template-columns: 2ch 10ch minmax(0, 1fr);
   }
 }
 
-/* `portrait` and `neofetch`: the headshot in characters, one span per run of tone. */
-.terminal-os-art {
-  margin: 4px 0;
-  font-family: var(--font-geist-mono), monospace;
-  font-size: min(11px, calc((100vw - 2 * var(--os-pad)) / 84 / var(--adv)));
-  line-height: 1;
-  letter-spacing: 0;
-  white-space: pre;
-  overflow: hidden;
-}
-.terminal-os-art.is-small {
-  font-size: min(11px, calc((100vw - 2 * var(--os-pad)) / 38 / var(--adv)));
-}
-.terminal-os-art span {
-  display: inline;
-}
-.terminal-os-art [data-tone="b"] {
-  color: color-mix(in srgb, var(--c) 55%, #16233f);
-}
-.terminal-os-art [data-tone="s"] {
-  color: #f0c4a0;
-}
-.terminal-os-art [data-tone="d"] {
-  color: #3b4150;
-}
-.terminal-os-art [data-tone="w"] {
-  color: #f4f0e6;
-}
-.terminal-os-art [data-tone="n"] {
-  color: #8d96a3;
-}
 .terminal-os-fetch {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -2922,4 +2878,3 @@ em.font-display,
     transform: none;
   }
 }
-

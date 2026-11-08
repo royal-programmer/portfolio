@@ -127,6 +127,16 @@ export const TIMELINE: TermCommit[] = [
   { date: "2026-11-01", subject: "Build this terminal", branch: "side", body: ["You are reading its output."] },
 ];
 
+/** A stretch of the story, drawn as a bracket in `timeline`. `to: null` means still going. */
+export type TermPeriod = { id: string; label: string; from: string; to: string | null };
+
+export const TIMELINE_PERIODS: TermPeriod[] = [
+  // Ratul: fill in the school's name and years, then uncomment.
+  // { id: "school", label: "", from: "", to: "" },
+  { id: "college", label: "B.Tech CSE · ITER, SOA University", from: "2020-08", to: "2024-06" },
+  { id: "work", label: "SLK → SLK Digital → Altimetrik", from: "2024-10", to: null },
+];
+
 export type TerminalData = {
   /** One-line identity and the longer `about` text. */
   who: string;
@@ -139,6 +149,7 @@ export type TerminalData = {
   views: PersonaView[];
   resume: TermResume;
   timeline: TermCommit[];
+  periods: TermPeriod[];
   /** Build id, when the deploy exposes one. */
   commit?: string;
 };
@@ -177,6 +188,7 @@ export function terminalData(persona: Persona | undefined, entries: Entry[], pos
     views,
     resume: RESUME,
     timeline: TIMELINE,
+    periods: TIMELINE_PERIODS,
     commit: process.env.NEXT_PUBLIC_COMMIT || undefined,
   };
 }
