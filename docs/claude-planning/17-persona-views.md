@@ -182,3 +182,29 @@ numbered menu), katoolin (ASCII banner, numbered list, bare prompt), vulnx on a 
 - **Selection:** desktop output selectable (copy, like a terminal); phones never select on tap.
 - **Polish:** one rhythm of blank lines between blocks, dim text one step lighter, tips box borders
   aligned, the status bar and dim colours shared with the hub's HUD, the portrait brightened.
+
+### 6.9 The pane, the checkpoints, and the feature list (Ratul, 2026-11-08)
+
+Ratul took the whole list. Layout decision (lead's recommendation, Ratul asked for it): on
+**≥ 1024px** a tmux-style split — terminal three quarters, a fixed **pane** on the right quarter.
+The pane holds the **portrait** (braille, in the accent), *you are here* (the path), the
+**checkpoints** (boot · help · resume · projects · views · portrait · contact · mail, ticked as the
+visitor does them, remembered on the device; all eight → an achievement line and an unlocked
+egg), the **next hint**, and the key bindings. `pane` toggles it (remembered). Phones: no pane; the
+hint lives in the status bar; the braille portrait (26 columns) tops the header.
+
+**Portrait detail.** Header/pane: braille, 2×4 dots per cell (≈ 8× the detail of the ramp).
+`portrait`: true-colour half-blocks (`▀`, top pixel as text colour, bottom as background, 64-colour
+palette) — a low-res photo. Both from a tighter face crop. `neofetch` uses the braille one.
+
+**Rounds.**
+- **1f** pane + checkpoints + portrait upgrade + shell feel: coloured `ls` (dirs accent, executables
+  green), `less` paging for long output (space/↓/q), Ctrl+L clear, Ctrl+C cancels the line, `date`,
+  `cal`, clickable paths in output (`cat` them).
+- **1g** `demo` (a typed tour; any key stops it), `git log` (career as commits; `--graph` draws SLK→
+  Altimetrik and side branches), `mail` (inline form: name, email, message → the existing lead API).
+- **1h** `curl github` (public API: repos, last push, contribution strip), `theme` (accent · amber ·
+  green phosphor) + `crt` scanlines, `resume --pdf` (public copy without the phone number), `qr`
+  (block-character QR of the page URL), eggs (`sl`, `cowsay`, `fortune` with Ratul's lines, `sudo`),
+  fish-style ghost suggestions (→ accepts), anonymous command analytics into Supabase for the admin.
+Then a checkpoint to production, then Swarm.
