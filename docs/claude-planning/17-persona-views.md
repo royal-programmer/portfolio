@@ -127,3 +127,26 @@ storage). Unknown: `command not found: x` plus the nearest command when the dist
 Lead: this spec, props and route plumbing, browser verification at 1280 and 393×852 touch. Sonnet
 builder: `lib/site/terminal-fs.ts` and `lib/site/terminal-shell.ts` (pure, no React), the
 terminal UI and CSS. Sonnet reviewer: cold read plus a command-by-command pass in the browser.
+
+### 6.6 Full screen like an OS (Ratul, 2026-11-08, after round 1b)
+
+Ratul's references: Claude Code's welcome (pixel art, a boxed "Tips for getting started", a
+numbered menu), katoolin (ASCII banner, numbered list, bare prompt), vulnx on a phone.
+
+- **The ssh window is only the boot screen.** It types the script as today, then the window grows
+  and dissolves into the **full-screen terminal**: no title bar, no dots, no frame; the whole
+  viewport is the terminal, dark, with a one-line **status bar** at the bottom (tmux-like):
+  `ratul@code  ~/projects │ 1 project · 0 posts · 1 view │ help  /  Esc`. Phones keep the chip
+  strip above the keyboard, status bar above the chips.
+- **Banner** on arrival, in the accent: a figlet-style `RATUL` in block characters (ANSI Shadow,
+  44 columns; the banner's type shrinks on phones so it fits), then
+  `Welcome to code.ratulroy.me · <commit or v1>`, a boxed **Tips for getting started**
+  (`help`, `/`, `open stage`, `projects`), then the **views as a numbered list** (`1) stage  The
+  setup in 3D…`), then the prompt. `clear` clears to a bare prompt; `banner` prints it again.
+- **Prompt shows the path**: `ratul@code:~$ `, `ratul@code:~/projects$ `; on phones just
+  `~/projects$ `. Transcript lines keep the prompt they were typed at.
+- **Typing sounds**: every keystroke the visitor types plays the hub's key click (`ambient.key()`),
+  which already respects the site's sound setting.
+- `fullscreen` now asks the browser for real full screen (Fullscreen API) and back; the terminal
+  itself is always full screen. The three dots are gone; the commands and chips carry exit/clear.
+- The remembered view still opens straight after the boot screen, before the banner.
