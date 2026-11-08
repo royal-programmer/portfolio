@@ -2111,9 +2111,21 @@ em.font-display,
   animation: world-boot-in 700ms var(--ease-out) both;
 }
 .terminal-root-body {
+  min-height: 0;
   overflow-y: auto;
-  user-select: none;
-  -webkit-user-select: none;
+  overflow-wrap: anywhere;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent;
+  cursor: text;
+}
+.terminal-root-body .is-cmd,
+.terminal-root-body .is-out {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.terminal-root-body .is-dim {
+  opacity: 0.7;
 }
 .terminal-root-picker {
   display: block;
@@ -2123,6 +2135,10 @@ em.font-display,
 }
 .terminal-root-picker li {
   display: block;
+}
+/* A menu that is no longer the one the keys drive: still clickable, but it reads as history. */
+.terminal-root-picker.is-inert {
+  opacity: 0.55;
 }
 .terminal-root-row {
   display: flex;
@@ -2169,6 +2185,185 @@ em.font-display,
     padding-block: 6px;
   }
 }
+.terminal-root-row,
+.terminal-root-prompt {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* The prompt: what you see is a span; the real input sits over it, invisible, and takes the keys. */
+.terminal-root-prompt {
+  position: relative;
+}
+.terminal-root-typed {
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.terminal-root-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  opacity: 0;
+  /* 16px: anything smaller makes iOS zoom the page on focus. */
+  font-size: 16px;
+}
+
+/* Output links: the accent, underlined. `open <slug>` is a button that looks the same. */
+.terminal-root-link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--c);
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.terminal-root-link:hover,
+.terminal-root-link:focus-visible {
+  color: var(--ink);
+}
+@media (pointer: coarse) {
+  .terminal-root-link {
+    padding-block: 10px;
+  }
+}
+
+/* The command palette, above the prompt: at most eight rows, then it scrolls. */
+.terminal-root-palette {
+  display: block;
+  max-height: calc(8 * 32px + 8px);
+  margin: 4px 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent;
+  border: 1px solid color-mix(in srgb, var(--c) 28%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--c) 5%, #0a0a0f);
+}
+.terminal-root-palette li {
+  display: block;
+}
+.terminal-root-palette-none {
+  padding: 0 6px;
+}
+
+/* Title-bar dots: red exits, yellow clears, green toggles full screen. */
+.terminal-root-win .hub-exit-bar .terminal-root-dot {
+  position: relative;
+  flex: none;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 160ms var(--ease-out, ease);
+}
+.terminal-root-win .hub-exit-bar .terminal-root-dot:hover,
+.terminal-root-win .hub-exit-bar .terminal-root-dot:focus-visible {
+  opacity: 1;
+}
+.terminal-root-win .hub-exit-bar .terminal-root-dot.is-red {
+  background: #e5655d;
+}
+.terminal-root-win .hub-exit-bar .terminal-root-dot.is-yellow {
+  background: #d9b44a;
+}
+.terminal-root-win .hub-exit-bar .terminal-root-dot.is-green {
+  background: #5fbf6a;
+}
+.terminal-root-dot::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+}
+@media (pointer: coarse) {
+  /* 10px dot + 17px each side = a 44px target; the gap keeps neighbours from overlapping much. */
+  .terminal-root-dot::after {
+    inset: -17px;
+  }
+  .terminal-root-win .hub-exit-bar {
+    gap: 34px;
+    padding-left: 24px;
+  }
+}
+
+/* Phone key strip, above the keyboard: the keys a glass keyboard hides. Coarse pointers only. */
+.terminal-root-chips {
+  display: none;
+}
+@media (pointer: coarse) {
+  .terminal-root-chips {
+    flex: none;
+    display: flex;
+    gap: 6px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    overflow-x: auto;
+    border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  }
+  .terminal-root-chips button {
+    flex: 1 0 auto;
+    min-width: 44px;
+    height: 44px;
+    padding: 0 12px;
+    border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+    border-radius: 8px;
+    background: transparent;
+    font-family: var(--font-geist-mono), monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .terminal-root-chips button:active {
+    background: color-mix(in srgb, var(--c) 14%, transparent);
+  }
+}
+
+/* Full screen: the window fills the viewport (always, on phones). --vvh/--vvt follow the on-screen keyboard. */
+.terminal-root.is-full {
+  align-items: stretch;
+}
+.terminal-root.is-full .terminal-root-frame,
+.terminal-root.is-full .terminal-root-win {
+  width: 100%;
+  height: 100%;
+}
+.terminal-root.is-full .terminal-root-win {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none !important;
+}
+@media (max-width: 767px) {
+  .terminal-root {
+    inset: auto 0 auto 0;
+    top: var(--vvt, 0px);
+    height: var(--vvh, 100dvh);
+    align-items: stretch;
+  }
+  .terminal-root .terminal-root-frame,
+  .terminal-root .terminal-root-win {
+    width: 100%;
+    height: 100%;
+  }
+  .terminal-root .terminal-root-win {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none !important;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .terminal-root-frame {
     transition: none;
@@ -2177,4 +2372,9 @@ em.font-display,
   .terminal-root.is-opening .terminal-root-frame {
     transform: none;
   }
+  .terminal-root-win .hub-exit-bar .terminal-root-dot,
+  .terminal-root-link {
+    transition: none;
+  }
 }
+

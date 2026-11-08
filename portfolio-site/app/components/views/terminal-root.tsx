@@ -1,17 +1,21 @@
 "use client";
 
 /**
- * The Engineer page's root: a terminal. Boots, lists the views, waits. A remembered pick opens
- * after a beat. `exit` returns to the hub (17-persona-views.md).
+ * The Engineer page's root: a real terminal (17-persona-views.md §6). It boots, then takes
+ * commands through a hidden input (so phones raise their keyboard), opens a command palette on
+ * `/`, prints arrow-key menus for views, projects and writing, and goes full screen. A remembered
+ * view still opens after the script; `exit` returns to the hub.
  */
 import gsap from "gsap";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { terminalScript } from "@/app/components/hub/exit-sequence";
 import type { LaunchedPersona, PersonaView } from "@/lib/content/types";
 import { ambient } from "@/lib/site/ambient-sound";
 import { DISPLAY_ROOT, personaIdentity } from "@/lib/site/brand";
 import { hubHref, personaHref, useOrigin } from "@/lib/site/persona-link";
+import type { TerminalData } from "@/lib/site/terminal-data";
+import { createShell, HISTORY_CAP, initialShellState, type Effect, type MenuId, type MenuRow, type Out, type ShellState } from "@/lib/site/terminal-shell";
 import { forgetView, readView } from "@/lib/site/view-memory";
 
 export type TerminalRootProps = {
@@ -25,41 +29,68 @@ export type TerminalRootProps = {
   items: string[];
   /** Enabled views, in picker order. */
   views: PersonaView[];
+  /** What the shell and its file system know. */
+  data: TerminalData;
 };
 
-type Entry = { k: "line"; text: string; prompt: boolean } | { k: "picker" };
+type Entry =
+  | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean }
+  | { n: number; k: "link"; label: string; href: string; external?: boolean }
+  | { n: number; k: "run"; text: string; cmd: string }
+  | { n: number; k: "menu"; id: MenuId; rows: MenuRow[] };
 type Dest = { href: string; crossOrigin: boolean };
 
 const HOST = `${personaIdentity("engineer").subdomain}.${DISPLAY_ROOT}`;
+const TRANSCRIPT_CAP = 500;
+const FULL_KEY = "xp-term-full";
 // Client-side Back/Forward (popstate) is not a new navigation entry, so note when one just happened.
 let lastPop = -1e9;
 if (typeof window !== "undefined") window.addEventListener("popstate", () => (lastPop = performance.now()));
 
-const HELP = "commands: open <id> · <id> · <number> · ls · exit · help";
+const histKey = (persona: string) => `xp-term-history:${persona}`;
 
-export function TerminalRoot({ persona, color, via, items, views }: TerminalRootProps) {
+function loadHistory(persona: string): string[] {
+  try {
+    const v = JSON.parse(window.sessionStorage.getItem(histKey(persona)) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(-HISTORY_CAP) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function TerminalRoot({ persona, color, via, items, views, data }: TerminalRootProps) {
   const router = useRouter();
   const origin = useOrigin();
+  const shell = useMemo(() => createShell(data), [data]);
+  const root = useRef<HTMLDivElement>(null);
   const win = useRef<HTMLDivElement>(null);
-  const body = useRef<HTMLPreElement>(null);
+  const body = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
   const [booting, setBooting] = useState(true);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [partial, setPartial] = useState<string | null>("");
   const [cmd, setCmd] = useState("");
   const [sel, setSel] = useState(0);
+  const [palSel, setPalSel] = useState(0);
+  /** The menu the arrow keys drive: the latest one shown, until Esc or another command. */
+  const [menuN, setMenuN] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const [opening, setOpening] = useState(false);
+  const [full, setFull] = useState(false);
+  const fullRef = useRef(false);
 
-  // Latest values for the long-lived async run and the key listener.
-  const live = useRef({ cmd, sel, ready, busy: false, aborted: false, auto: false, cancelAuto: false });
-  const rows = useRef<Array<HTMLButtonElement | null>>([]);
-  const act = useRef<{ open: (id: string, typeIt: boolean, auto?: boolean) => void; exit: (typeIt: boolean) => void; run: (c: string) => void }>({
-    open: () => {},
-    exit: () => {},
-    run: () => {},
-  });
+  // Latest values for the long-lived async run and the window listener.
+  const live = useRef({ cmd, sel, ready, busy: false, aborted: false, auto: false, cancelAuto: false, shell: initialShellState() as ShellState });
+  const act = useRef<{
+    open: (path: string, label: string | null, auto?: boolean) => void;
+    exit: (typeIt: boolean) => void;
+    esc: () => void;
+  }>({ open: () => {}, exit: () => {}, esc: () => {} });
   const cancelled = useRef(false);
   const timers = useRef<number[]>([]);
+  const seq = useRef(0);
+  const histIdx = useRef(-1);
+  const draft = useRef("");
   const wait = (ms: number) => new Promise<void>((r) => timers.current.push(window.setTimeout(r, ms)));
 
   useEffect(() => {
@@ -68,8 +99,40 @@ export function TerminalRoot({ persona, color, via, items, views }: TerminalRoot
     live.current.ready = ready;
   });
 
-  const push = (e: Entry) => setEntries((l) => [...(e.k === "picker" ? l.filter((x) => x.k !== "picker") : l), e]);
-  const line = (text: string, prompt = false) => push({ k: "line", text, prompt });
+  const palette = ready && cmd.startsWith("/") && !/\s/.test(cmd);
+  const palMatches = useMemo(() => {
+    if (!cmd.startsWith("/")) return [];
+    const f = cmd.slice(1).toLowerCase();
+    const all = shell.commands;
+    return [...all.filter((c) => c.name.startsWith(f)), ...(f ? all.filter((c) => !c.name.startsWith(f) && c.name.includes(f)) : [])];
+  }, [cmd, shell]);
+  const palIdx = Math.min(palSel, Math.max(0, palMatches.length - 1));
+  const menu = entries.find((e) => e.k === "menu" && e.n === menuN) as Extract<Entry, { k: "menu" }> | undefined;
+
+  const viewKey = views.map((v) => v.id).join();
+  const itemKey = items.join();
+
+  const toEntries = (lines: Out[]): Entry[] =>
+    lines.map((o): Entry => {
+      const n = ++seq.current;
+      if (o.kind === "text") return { n, k: "out", text: o.text, dim: o.dim };
+      if (o.kind === "link") return { n, k: "link", label: o.label, href: o.href, external: o.external };
+      if (o.kind === "run") return { n, k: "run", text: o.text, cmd: o.cmd };
+      return { n, k: "menu", id: o.id, rows: o.rows };
+    });
+
+  /** Appends entries (older menus stay, inert). Returns the new menu's key. */
+  const append = (es: Entry[]): number | null => {
+    setEntries((l) => [...l, ...es].slice(-TRANSCRIPT_CAP));
+    const m = es.find((e) => e.k === "menu");
+    return m ? m.n : null;
+  };
+  const line = (text: string, prompt = false, dim = false) => append([{ n: ++seq.current, k: "out", text, prompt, dim }]);
+  const print = (lines: Out[]) => {
+    const m = append(toEntries(lines));
+    setMenuN(m);
+    if (m !== null) setSel(0);
+  };
 
   /** Types into the transcript. `own`: an open/exit's typing (keeps going after an abort). Returns false if it stopped early. */
   const type = async (text: string, ms: number, instant: boolean, own = false): Promise<boolean> => {
@@ -89,7 +152,14 @@ export function TerminalRoot({ persona, color, via, items, views }: TerminalRoot
     return true;
   };
 
-  /** Back to the waiting picker (Back from a bfcache page, or a cancelled auto-open). */
+  /** The views menu, as `ls views/` prints it (the picker). */
+  const showViews = () => {
+    const r = shell.run("views", { ...live.current.shell, history: [] });
+    live.current.shell = { ...live.current.shell, lastMenu: r.state.lastMenu };
+    print(r.lines);
+  };
+
+  /** Back to the waiting prompt (Back from a bfcache page, or a cancelled auto-open). */
   const restore = () => {
     const s = live.current;
     s.busy = false;
@@ -100,7 +170,7 @@ export function TerminalRoot({ persona, color, via, items, views }: TerminalRoot
     setOpening(false);
     setCmd("");
     setPartial(null);
-    showPicker();
+    showViews();
     setReady(true);
   };
 
@@ -112,29 +182,28 @@ export function TerminalRoot({ persona, color, via, items, views }: TerminalRoot
       restore();
       return false;
     }
-    if (dest.crossOrigin) window.location.assign(dest.href);
-    else router.push(dest.href);
+    try {
+      if (dest.crossOrigin) window.location.assign(dest.href);
+      else router.push(dest.href);
+    } catch {
+      restore();
+      return false;
+    }
     return true;
   };
 
-  const showPicker = () => {
-    if (!views.length) return line("no views yet");
-    setSel(0);
-    push({ k: "picker" });
-  };
-
-  act.current.open = async (id, typeIt, auto = false) => {
+  act.current.open = async (path, label, auto = false) => {
     if (live.current.busy) return;
     live.current.busy = true;
     live.current.aborted = true;
     live.current.auto = auto;
     live.current.ready = false;
     setReady(false);
-    if (typeIt && !(await type(`open ${id}`, 12, false, true))) {
+    if (label && !(await type(label, 12, false, true))) {
       if (live.current.cancelAuto && !cancelled.current) restore();
       return;
     }
-    await go(personaHref(origin, persona, `/${id}`));
+    await go(personaHref(origin, persona, path));
   };
   act.current.exit = async (typeIt) => {
     if (live.current.busy) return;
@@ -142,33 +211,153 @@ export function TerminalRoot({ persona, color, via, items, views }: TerminalRoot
     live.current.aborted = true;
     live.current.ready = false;
     setReady(false);
+    setCmd("");
     if (typeIt && !(await type("exit", 12, false, true))) return;
     await go(hubHref(origin));
   };
-  act.current.run = (raw) => {
-    const c = raw.trim();
-    if (!c) return;
-    const low = c.toLowerCase();
-    setCmd("");
-    line(c, true);
-    if (low === "exit" || low === "cd ..") return void act.current.exit(false);
-    if (low === "ls" || low === "ls views" || low === "ls views/") return showPicker();
-    if (low === "help") return line(HELP);
-    const arg = low.startsWith("open ") ? low.slice(5).trim() : low;
-    const byId = views.find((v) => v.id.toLowerCase() === arg);
-    const byNum = /^\d+$/.test(arg) ? views[Number(arg) - 1] : undefined;
-    const v = byId ?? byNum;
-    if (v) return void act.current.open(v.id, false);
-    line(`command not found: ${c.split(/\s+/)[0]}`);
+
+  const toggleFull = () => {
+    const next = !fullRef.current;
+    fullRef.current = next;
+    setFull(next);
+    try {
+      window.localStorage.setItem(FULL_KEY, next ? "1" : "0");
+    } catch {}
   };
 
-  // The script, then the picker (or the remembered pick).
+  const effect = (fx: Effect) => {
+    if (fx.kind === "open-view") act.current.open(`/${fx.id}`, null);
+    else if (fx.kind === "open-slug") act.current.open(fx.blog ? `/blog/${fx.slug}` : `/${fx.slug}`, null);
+    else if (fx.kind === "open-url") {
+      line(`opening ${fx.url}`, false, true);
+      append([{ n: ++seq.current, k: "link", label: fx.url, href: fx.url, external: true }]);
+      window.open(fx.url, "_blank", "noopener,noreferrer");
+    } else if (fx.kind === "exit") act.current.exit(false);
+    else if (fx.kind === "clear") {
+      setEntries([]);
+      setMenuN(null);
+    } else toggleFull();
+  };
+
+  /** Runs one command line: echo, shell, output, effect. */
+  const submit = (raw: string) => {
+    const c = raw.trim();
+    if (!live.current.ready || !c) return;
+    setCmd("");
+    histIdx.current = -1;
+    line(c, true);
+    const r = shell.run(c, live.current.shell);
+    live.current.shell = r.state;
+    try {
+      window.sessionStorage.setItem(histKey(persona), JSON.stringify(r.state.history));
+    } catch {}
+    print(r.lines);
+    if (r.effect) effect(r.effect);
+    if (!window.matchMedia("(pointer: coarse)").matches) input.current?.focus({ preventScroll: true });
+  };
+
+  /** A menu row acted on: views open; projects and writing print their file. */
+  const pick = (id: MenuId, row: MenuRow) => {
+    if (!live.current.ready) return;
+    if (id === "views") {
+      setCmd("");
+      act.current.open(`/${row.key}`, `open ${row.key}`);
+    } else submit(`cat ~/${id}/${row.key}.md`);
+  };
+
+  /** Esc, in order: palette, typed text, menu selection; with none of those, exit. (An auto-open call-off is handled while busy.) */
+  act.current.esc = () => {
+    if (palette || cmd) setCmd("");
+    else if (menuN !== null) {
+      setMenuN(null);
+      live.current.shell = { ...live.current.shell, lastMenu: undefined };
+    } else act.current.exit(true);
+  };
+
+  /** ↑/↓ through the history; the unsent text is kept as the draft. */
+  const walkHistory = (dir: -1 | 1) => {
+    const h = live.current.shell.history;
+    if (!h.length) return;
+    if (histIdx.current === -1) {
+      if (dir === 1) return;
+      draft.current = cmd;
+      histIdx.current = h.length - 1;
+    } else {
+      const n = histIdx.current + (dir === -1 ? -1 : 1);
+      if (n >= h.length) {
+        histIdx.current = -1;
+        return setCmd(draft.current);
+      }
+      histIdx.current = Math.max(0, n);
+    }
+    setCmd(h[histIdx.current]);
+  };
+
+  const tab = () => {
+    if (palette) {
+      const c = palMatches[palIdx];
+      if (c) setCmd(`/${c.name} `);
+      return;
+    }
+    const cands = shell.complete(cmd, live.current.shell);
+    if (!cands.length) return;
+    const head = /^(.*?)\S*$/.exec(cmd)?.[1] ?? "";
+    if (cands.length === 1) return setCmd(head + cands[0] + (cands[0].endsWith("/") ? "" : " "));
+    let prefix = cands[0];
+    for (const c of cands) while (!c.startsWith(prefix)) prefix = prefix.slice(0, -1);
+    if (prefix) setCmd(head + prefix);
+    line(cands.join("   "), false, true);
+  };
+
+  const runPalette = (name: string | undefined) => {
+    const c = shell.commands.find((x) => x.name === name);
+    if (!c) return submit(cmd);
+    if (c.usage.includes("<") || c.name === "cd") {
+      setCmd(`${c.name} `);
+      input.current?.focus({ preventScroll: true });
+    } else submit(c.name);
+  };
+
+  const onInputKey = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) ambient.key();
+    const menuLive = menu && !cmd;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const d = e.key === "ArrowDown" ? 1 : -1;
+      if (palette) setPalSel(palMatches.length ? (palIdx + d + palMatches.length) % palMatches.length : 0);
+      else if (menuLive) setSel((i) => (i + d + menu.rows.length) % menu.rows.length);
+      else walkHistory(d === 1 ? 1 : -1);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (palette) runPalette(palMatches[palIdx]?.name);
+      else if (menuLive) pick(menu.id, menu.rows[Math.min(sel, menu.rows.length - 1)]);
+      else submit(cmd);
+    } else if (e.key === "Tab") {
+      // Only take Tab when it completes something; otherwise focus moves on (chips, dots, links).
+      if (e.shiftKey || !cmd) return;
+      const any = palette ? palMatches.length > 0 : shell.complete(cmd, live.current.shell).length > 0;
+      if (!any) return;
+      e.preventDefault();
+      tab();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      act.current.esc();
+    } else if (/^[1-9]$/.test(e.key) && menuLive && menu.rows[Number(e.key) - 1]) {
+      e.preventDefault();
+      setSel(Number(e.key) - 1);
+      pick(menu.id, menu.rows[Number(e.key) - 1]);
+    }
+  };
+
+  // The script, then the hint and the views menu (or the remembered pick).
   useEffect(() => {
     cancelled.current = false;
     live.current.busy = false;
     live.current.aborted = false;
     live.current.auto = false;
     live.current.cancelAuto = false;
+    live.current.shell = initialShellState(loadHistory(persona));
     const ts = timers.current;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const instant = via === "normal" || reduce;
@@ -176,6 +365,7 @@ export function TerminalRoot({ persona, color, via, items, views }: TerminalRoot
     const stopped = () => cancelled.current || live.current.aborted;
     const run = async () => {
       setEntries([]);
+      setMenuN(null);
       setPartial("");
       await wait(via === "hub" ? 150 : 100);
       if (stopped()) return;
@@ -197,17 +387,18 @@ export function TerminalRoot({ persona, color, via, items, views }: TerminalRoot
         remembered = null;
       }
       try {
-        // Back from a view lands here with the pick still set: show the picker instead of re-opening it.
+        // Back from a view lands here with the pick still set: show the menu instead of re-opening it.
         const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
         if (nav?.type === "back_forward" || fromBack) remembered = null;
       } catch {}
       if (remembered) {
-        act.current.open(remembered, true, true);
+        act.current.open(`/${remembered}`, `open ${remembered}`, true);
         return;
       }
+      line("type help, or / for the menu", false, true);
       await type("ls views/", 13, instant);
       if (stopped()) return;
-      showPicker();
+      showViews();
       setReady(true);
       setPartial(null);
       if (win.current) {
@@ -223,7 +414,7 @@ export function TerminalRoot({ persona, color, via, items, views }: TerminalRoot
       ts.length = 0;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [persona, via, items, views, color]);
+  }, [persona, via, itemKey, viewKey, color]);
 
   useEffect(() => {
     if (via) {
@@ -244,11 +435,22 @@ export function TerminalRoot({ persona, color, via, items, views }: TerminalRoot
     window.addEventListener("pageshow", onShow);
     return () => window.removeEventListener("pageshow", onShow);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [views]);
+  }, [viewKey]);
 
-  // Keys.
+  // The remembered window size (desktop); phones are always full screen by CSS.
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(FULL_KEY) === "1") {
+        fullRef.current = true;
+        setFull(true);
+      }
+    } catch {}
+  }, []);
+
+  // Keys outside the input: Esc, the auto-open call-off, and typing after focus was lost.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.target === input.current) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
       if (e.isComposing || e.metaKey) return;
@@ -264,45 +466,75 @@ export function TerminalRoot({ persona, color, via, items, views }: TerminalRoot
       }
       if (e.key === "Escape") {
         e.preventDefault();
-        return void act.current.exit(true);
-      }
-      if (!s.ready) return;
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        e.preventDefault();
-        if (views.length) setSel((i) => (i + (e.key === "ArrowDown" ? 1 : views.length - 1)) % views.length);
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        if (s.cmd.trim()) act.current.run(s.cmd);
-        else if (views[s.sel]) act.current.open(views[s.sel].id, true);
-      } else if (e.key === "Backspace") {
-        e.preventDefault();
-        setCmd((c) => c.slice(0, -1));
-      } else if (/^[1-9]$/.test(e.key) && !s.cmd && views[Number(e.key) - 1]) {
-        e.preventDefault();
-        setSel(Number(e.key) - 1);
-        act.current.open(views[Number(e.key) - 1].id, true);
-      } else if (e.key.length === 1) {
-        e.preventDefault();
-        ambient.key();
-        setCmd((c) => (c + e.key).slice(0, 80));
+        act.current.esc();
+      } else if (s.ready && e.key.length === 1 && !el?.closest("a,button,[role=button]")) {
+        // Focus lands before the key's character is inserted.
+        input.current?.focus({ preventScroll: true });
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [views]);
+  }, []);
 
+  // Desktop: the prompt is live as soon as it is ready. Phones wait for a tap (the keyboard covers the menu).
   useEffect(() => {
-    if (ready) rows.current[sel]?.focus({ preventScroll: true });
-  }, [sel, ready]);
+    if (ready && !window.matchMedia("(pointer: coarse)").matches) input.current?.focus({ preventScroll: true });
+  }, [ready]);
+
+  // The on-screen keyboard shrinks the visual viewport only; fit the window to it and keep the prompt in view.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const fit = () => {
+      root.current?.style.setProperty("--vvh", `${vv.height}px`);
+      root.current?.style.setProperty("--vvt", `${vv.offsetTop}px`);
+      const b = body.current;
+      if (b) b.scrollTop = b.scrollHeight;
+    };
+    vv.addEventListener("resize", fit);
+    vv.addEventListener("scroll", fit);
+    return () => {
+      vv.removeEventListener("resize", fit);
+      vv.removeEventListener("scroll", fit);
+    };
+  }, []);
 
   useEffect(() => {
     const b = body.current;
     if (b) b.scrollTop = b.scrollHeight;
-  }, [entries, partial, cmd]);
+  }, [entries, partial, cmd, full, palette]);
+
+  const palList = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    if (palette) palList.current?.children[palIdx]?.scrollIntoView({ block: "nearest" });
+  }, [palette, palIdx]);
+
+  const keepFocus = (e: { preventDefault: () => void }) => e.preventDefault();
+  const dot = (label: string, run: () => void) => ({
+    role: "button" as const,
+    tabIndex: 0,
+    "aria-label": label,
+    title: label,
+    onClick: run,
+    onKeyDown: (e: ReactKeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        run();
+      }
+    },
+  });
+  const chipKey = (k: "tab" | "up" | "esc") => {
+    input.current?.focus({ preventScroll: true });
+    if (k === "tab") tab();
+    else if (k === "esc") act.current.esc();
+    else if (menu && !cmd) setSel((i) => (i + menu.rows.length - 1) % menu.rows.length);
+    else walkHistory(-1);
+  };
 
   return (
     <div
-      className={`terminal-root ${via === "hub" ? "is-via-hub" : "is-direct"} ${opening ? "is-opening" : ""}`}
+      ref={root}
+      className={`terminal-root ${via === "hub" ? "is-via-hub" : "is-direct"} ${opening ? "is-opening" : ""} ${full ? "is-full" : ""}`}
       style={{ "--c": color } as CSSProperties}
       role="region"
       aria-label="Engineer terminal"
@@ -310,52 +542,151 @@ export function TerminalRoot({ persona, color, via, items, views }: TerminalRoot
       <div className="terminal-root-frame">
         <div ref={win} className={`hub-exit hub-exit-term terminal-root-win ${booting ? "is-boot" : ""}`}>
           <div className="hub-exit-bar">
-            <span /> <span /> <span />
+            <span className="terminal-root-dot is-red" {...dot("Exit to the hub", () => (live.current.ready ? submit("exit") : act.current.exit(true)))} />{" "}
+            <span className="terminal-root-dot is-yellow" {...dot("Clear the screen", () => submit("clear"))} />{" "}
+            <span className="terminal-root-dot is-green" {...dot(full ? "Leave full screen" : "Full screen", toggleFull)} />
             <b>ratul@{HOST} — zsh</b>
           </div>
-          <pre ref={body} className="hub-exit-body terminal-root-body" aria-live="polite">
-            <span className="sr-only">Arrow keys and Enter choose a view. Esc or `exit` returns to the hub.</span>
-            {entries.map((e, i) =>
-              e.k === "line" ? (
-                <span key={i} className={e.prompt ? "is-cmd" : "is-out"}>
-                  {e.prompt ? "$ " : ""}
-                  {e.text}
-                </span>
-              ) : (
-                <ul key={i} role="list" className="terminal-root-picker">
-                  {views.map((v, n) => (
-                    <li key={v.id}>
+          <div
+            ref={body}
+            className="hub-exit-body terminal-root-body"
+            onClick={(e) => {
+              if (!live.current.ready || (e.target as HTMLElement).closest("a,button,[role=button]")) return;
+              if (window.getSelection()?.toString()) return;
+              input.current?.focus({ preventScroll: true });
+            }}
+          >
+            <span className="sr-only">Type commands. help lists them, / opens the menu, Esc or exit returns to the hub.</span>
+            <div role="log" aria-live="polite" aria-relevant="additions">
+              {entries.map((e) =>
+                e.k === "out" ? (
+                  <span key={e.n} className={`${e.prompt ? "is-cmd" : "is-out"} ${e.dim ? "is-dim" : ""}`}>
+                    {e.prompt ? "$ " : ""}
+                    {e.text || " "}
+                  </span>
+                ) : e.k === "link" ? (
+                  <span key={e.n} className="is-out">
+                    <a
+                      className="terminal-root-link"
+                      href={e.href}
+                      {...(e.external ? { target: "_blank", rel: "noreferrer" } : {})}
+                    >
+                      {e.label}
+                    </a>
+                  </span>
+                ) : e.k === "run" ? (
+                  <span key={e.n} className="is-out">
+                    <button type="button" className="terminal-root-link" onMouseDown={keepFocus} onClick={() => submit(e.cmd)}>
+                      {e.text}
+                    </button>
+                  </span>
+                ) : (
+                  <ul key={e.n} role="list" className={`terminal-root-picker ${e.n === menuN ? "" : "is-inert"}`}>
+                    {e.rows.map((r, n) => {
+                      const on = e.n === menuN && n === sel;
+                      return (
+                        <li key={r.key}>
+                          <button
+                            type="button"
+                            tabIndex={-1}
+                            className={`terminal-root-row ${on ? "is-sel" : ""}`}
+                            onMouseDown={keepFocus}
+                            onMouseEnter={() => e.n === menuN && setSel(n)}
+                            onClick={() => pick(e.id, r)}
+                          >
+                            <em>{on ? "▸" : " "}</em>
+                            <b className="is-cmd">{r.label}</b>
+                            <i className="is-out">{r.line}</i>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ),
+              )}
+            </div>
+            {palette ? (
+              <ul ref={palList} role="listbox" aria-label="Commands" className="terminal-root-palette">
+                {palMatches.length ? (
+                  palMatches.map((c, n) => (
+                    <li key={c.name} role="option" aria-selected={n === palIdx}>
                       <button
-                        ref={(el) => {
-                          rows.current[n] = el;
-                        }}
                         type="button"
-                        tabIndex={n === sel ? 0 : -1}
-                        className={`terminal-root-row ${n === sel ? "is-sel" : ""}`}
-                        onMouseEnter={() => setSel(n)}
-                        onClick={() => act.current.open(v.id, true)}
+                        tabIndex={-1}
+                        className={`terminal-root-row ${n === palIdx ? "is-sel" : ""}`}
+                        onMouseDown={keepFocus}
+                        onMouseEnter={() => setPalSel(n)}
+                        onClick={() => runPalette(c.name)}
                       >
-                        <em>{n === sel ? "▸" : " "}</em>
-                        <b className="is-cmd">{v.id}</b>
-                        <i className="is-out">{v.line}</i>
+                        <em>{n === palIdx ? "▸" : " "}</em>
+                        <b className="is-cmd">/{c.name}</b>
+                        <i className="is-out">{c.desc}</i>
                       </button>
                     </li>
-                  ))}
-                </ul>
-              ),
-            )}
-            {partial !== null ? (
-              <span className="is-cmd">
-                $ {partial}
-                <i className="hub-enter-caret" />
-              </span>
-            ) : ready ? (
-              <span className="is-cmd">
-                $ {cmd}
-                <i className="hub-enter-caret" />
+                  ))
+                ) : (
+                  <li className="terminal-root-palette-none is-out">no command matches</li>
+                )}
+              </ul>
+            ) : null}
+            {partial !== null || ready ? (
+              <span className="terminal-root-prompt is-cmd">
+                <code className="terminal-root-typed" aria-hidden="true">
+                  $ {partial !== null ? partial : cmd}
+                  <i className="hub-enter-caret" />
+                </code>
+                <input
+                  ref={input}
+                  className="terminal-root-input"
+                  value={cmd}
+                  disabled={!ready}
+                  aria-label="terminal command"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  autoComplete="off"
+                  spellCheck={false}
+                  enterKeyHint="go"
+                  onChange={(e) => {
+                    setCmd(e.target.value.slice(0, 200));
+                    histIdx.current = -1;
+                    setPalSel(0);
+                  }}
+                  onKeyDown={onInputKey}
+                />
               </span>
             ) : null}
-          </pre>
+          </div>
+          <div className="terminal-root-chips" aria-label="Terminal keys">
+            <button type="button" onMouseDown={keepFocus} onClick={() => submit("help")}>
+              help
+            </button>
+            <button
+              type="button"
+              onMouseDown={keepFocus}
+              onClick={() => {
+                setCmd("/");
+                setPalSel(0);
+                input.current?.focus({ preventScroll: true });
+              }}
+            >
+              /
+            </button>
+            <button type="button" onMouseDown={keepFocus} onClick={() => submit("ls")}>
+              ls
+            </button>
+            <button type="button" onMouseDown={keepFocus} onClick={() => submit("views")}>
+              views
+            </button>
+            <button type="button" onMouseDown={keepFocus} onClick={() => chipKey("tab")}>
+              Tab
+            </button>
+            <button type="button" onMouseDown={keepFocus} onClick={() => chipKey("up")} aria-label="Up">
+              ↑
+            </button>
+            <button type="button" onMouseDown={keepFocus} onClick={() => chipKey("esc")}>
+              Esc
+            </button>
+          </div>
         </div>
       </div>
     </div>

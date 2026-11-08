@@ -5,6 +5,39 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-08 — Engineer round 1b: the terminal in full — a real shell, not an entry animation
+
+**Ratul's correction** after round 1 (screenshot: his own `ls /engineer` answered `command not found`):
+the root should be a full terminal, like Claude Code or a Linux TUI — every command, `/help`,
+menus chosen with the arrows, full screen. Spec: `17-persona-views.md` §6.
+
+**What shipped (on `development`)**
+- `lib/site/terminal-data.ts` — what the terminal knows, built on the server from the content
+  layer (who, about, stack, uptime, contact, projects, posts, views, commit).
+- `lib/site/terminal-fs.ts` — a virtual file system: `~` = `/engineer`, `about stack uptime
+  contact`, `projects/<slug>.md`, `writing/<slug>.md`, `views/<id>*`; `..`/`~`/trailing slashes
+  resolve; shell-voice errors.
+- `lib/site/terminal-shell.ts` — the interpreter: `help` (grouped) `man` `ls [-l]` `cd` `pwd` `cat`
+  `tree` `open <view|slug|url>` `views` `projects` `writing` (select lists) `whoami` `stack` `uptime`
+  `about` `contact` `neofetch` `history` `clear` `fullscreen` `echo` `exit`; Tab completion;
+  did-you-mean for 3+ letter typos; `javascript:` and non-http links refused.
+- `terminal-root.tsx` — hidden real input (phones raise the keyboard; 16px so iOS does not zoom),
+  `/` command palette filtered as you type, menus with ▸ / arrows / digits / taps, stale menus
+  dimmed, ↑/↓ history (session storage), full screen via the green dot or `fullscreen`
+  (remembered), yellow clears, red exits, phone chip strip (`help / ls views Tab ↑ Esc`),
+  `visualViewport` fitting, `role=log` transcript, Esc order palette → text → menu → auto-open →
+  hub. Every round-1 behaviour kept (boot script, remembered view, Back, bfcache, reduced motion).
+
+**How it was built** — lead (Fable): spec, data module, route plumbing, two browser passes
+(1280 and 393×852 touch), ≈25k tokens. Sonnet builder: fs + shell + UI + CSS, ≈142k; fix pass
+≈158k cumulative. Sonnet reviewer: 13 findings (menu pick from a subdirectory broke, Tab keyboard
+trap, Esc order, unchecked hrefs from content, did-you-mean on one letter, `/cd` ran bare,
+stale menus looked live, aria-live noise, 24px dots on phones, impure setState, boot deps, no
+navigation recovery), ≈97k. All 13 fixed and the first six re-verified by the lead.
+
+**Known** — the palette rows wrap on phones (usable); the caret sits at the end of the text;
+sample project links are placeholders from the data, not the code.
+
 ## 2026-11-08 — Engineer round 1: the terminal is the page's root, views are branches — built through the split
 
 Ratul's model (`17-persona-views.md`): one dataset, many selectable views; the terminal is the
