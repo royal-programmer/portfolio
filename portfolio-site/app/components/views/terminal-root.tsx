@@ -17,7 +17,7 @@ import { hubHref, personaHref, useOrigin } from "@/lib/site/persona-link";
 import { PIXEL_INDEX, PORTRAIT_BRAILLE, PORTRAIT_BRAILLE_SMALL, PORTRAIT_PIXELS, type BraillePortrait, type PixelPortrait } from "@/lib/site/terminal-art";
 import type { TerminalData } from "@/lib/site/terminal-data";
 import { HOME, resolvePath, shortPath, USER } from "@/lib/site/terminal-fs";
-import { createShell, HISTORY_CAP, initialShellState, type Effect, type FileItem, type MenuId, type MenuRow, type Out, type ShellState } from "@/lib/site/terminal-shell";
+import { createShell, HISTORY_CAP, initialShellState, type Effect, type FileItem, type MenuId, type MenuRow, type Out, type ShellState, type Tone } from "@/lib/site/terminal-shell";
 import { forgetView, readView } from "@/lib/site/view-memory";
 
 export type TerminalRootProps = {
@@ -37,9 +37,10 @@ export type TerminalRootProps = {
 
 type Entry =
   /** `ps`: the path the command was typed at (the OS prompt); absent on the boot script's plain `$ `. */
-  | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string; tag?: "ok" | "wait" | "bar" }
+  | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string; label?: string; tag?: "ok" | "wait" | "bar" }
   | { n: number; k: "links"; items: Array<{ label: string; href: string; external?: boolean }> }
   | { n: number; k: "portrait" }
+  | { n: number; k: "parts"; parts: Array<{ text: string; tone?: Tone }> }
   | { n: number; k: "files"; inline: boolean; items: FileItem[] }
   | { n: number; k: "cal"; title: string; weeks: Array<Array<number | null>>; today: number }
   | { n: number; k: "more" }
@@ -68,6 +69,22 @@ function loadHistory(persona: string): string[] {
 }
 
 const PAGE = 40;
+const SEEN_KEY = "xp-term-seen";
+const MAIL_LABEL = { name: "name: ", email: "email: ", message: "message: " } as const;
+type MailStep = keyof typeof MAIL_LABEL;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const seenBefore = () => {
+  try {
+    return window.localStorage.getItem(SEEN_KEY) !== null;
+  } catch {
+    return true;
+  }
+};
+const markSeen = () => {
+  try {
+    window.localStorage.setItem(SEEN_KEY, "1");
+  } catch {}
+};
 const PANE_KEY = "xp-term-pane";
 const checksKey = (persona: string) => `xp-term-checks:${persona}`;
 
@@ -176,6 +193,11 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   /** Long output waits behind `-- more --`; `rest` is what has not been printed yet. */
   const [paging, setPaging] = useState(false);
   const pager = useRef<{ rest: Out[] } | null>(null);
+  /** The `mail` form: which field the prompt is asking for, and what has been typed so far. */
+  const [mailStep, setMailStep] = useState<MailStep | null>(null);
+  const mailRef = useRef<{ step: MailStep; name: string; email: string; lines: string[] } | null>(null);
+  /** The `demo` tour, while it runs. */
+  const demoRef = useRef<boolean>(false);
 
   // Latest values for the long-lived async run and the window listener.
   const live = useRef({ cmd, sel, ready, busy: false, aborted: false, auto: false, cancelAuto: false, shell: initialShellState() as ShellState });
@@ -197,7 +219,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     live.current.ready = ready;
   });
 
-  const palette = ready && cmd.startsWith("/") && !/\s/.test(cmd);
+  const palette = ready && !mailStep && cmd.startsWith("/") && !/\s/.test(cmd);
   const palMatches = useMemo(() => {
     if (!cmd.startsWith("/")) return [];
     const f = cmd.slice(1).toLowerCase();
@@ -216,6 +238,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       if (o.kind === "text") return { n, k: "out", text: o.text, dim: o.dim, accent: o.accent };
       if (o.kind === "links") return { n, k: "links", items: o.items };
       if (o.kind === "portrait") return { n, k: "portrait" };
+      if (o.kind === "parts") return { n, k: "parts", parts: o.parts };
       if (o.kind === "files") return { n, k: "files", inline: o.inline, items: o.items };
       if (o.kind === "cal") return { n, k: "cal", title: o.title, weeks: o.weeks, today: o.today };
       if (o.kind === "neofetch") return { n, k: "neofetch", rows: o.rows };
@@ -305,6 +328,127 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     } else endPaging();
   };
 
+  const echoAnswer = (label: string, text: string) => append([{ n: ++seq.current, k: "out", text, prompt: true, label }]);
+
+  const endMail = () => {
+    mailRef.current = null;
+    setMailStep(null);
+  };
+  const startMail = () => {
+    mailRef.current = { step: "name", name: "", email: "", lines: [] };
+    setMailStep("name");
+    line("send me a message, right here · Esc cancels", false, true, here());
+  };
+  const abortMail = () => {
+    line("^C mail", false, true, here());
+    endMail();
+    setCmd("");
+  };
+
+  /** Posts the message; the result replaces the `sending …` line. A failed message is printed back so it is not lost. */
+  const sendMail = async (name: string, email: string, message: string) => {
+    const n = ++seq.current;
+    append([{ n, k: "out", text: "sending …", dim: true }]);
+    const patch = (p: Partial<Extract<Entry, { k: "out" }>>) => setEntries((es) => es.map((e) => (e.n === n && e.k === "out" ? { ...e, ...p } : e)));
+    const fail = (why: string) => {
+      patch({ text: why, dim: true });
+      append([{ n: ++seq.current, k: "out", text: "your message was:", dim: true }, ...message.split("\n").map((t): Entry => ({ n: ++seq.current, k: "out", text: t }))]);
+    };
+    try {
+      const res = await fetch("/api/lead", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, email, message, source: "terminal", persona }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (res.ok && j.ok) {
+        patch({ text: `sent · I read these myself · reply lands at ${email}`, dim: false, accent: true });
+        tick("mail");
+      } else fail(j.error ?? `could not send (${res.status})`);
+    } catch {
+      fail("could not reach the server");
+    }
+  };
+
+  /** One Enter in the form: validate the field, move on, or (message) send on an empty line / Ctrl+D. */
+  const mailEnter = (raw: string, send = false) => {
+    const m = mailRef.current;
+    if (!m) return;
+    const val = raw.trim();
+    setCmd("");
+    if (m.step === "name") {
+      echoAnswer(MAIL_LABEL.name, raw);
+      if (!val) return void line("name is required", false, false, here());
+      m.name = val;
+      m.step = "email";
+      setMailStep("email");
+    } else if (m.step === "email") {
+      echoAnswer(MAIL_LABEL.email, raw);
+      if (!EMAIL_RE.test(val)) return void line("that does not look like an email", false, false, here());
+      m.email = val;
+      m.step = "message";
+      setMailStep("message");
+      line("(empty line to send)", false, true, here());
+    } else {
+      if (val) {
+        echoAnswer(MAIL_LABEL.message, raw);
+        m.lines.push(raw);
+        if (!send) return;
+      } else if (!send) echoAnswer(MAIL_LABEL.message, "");
+      const body = m.lines.join("\n").trim();
+      if (body.length < 5) {
+        m.lines = [];
+        return void line("say a little more", false, false, here());
+      }
+      const { name, email } = m;
+      endMail();
+      void sendMail(name, email, body);
+    }
+  };
+
+  /** Types each step into the real prompt and runs it; any key or tap stops the tour. */
+  const startDemo = async () => {
+    if (demoRef.current) return;
+    demoRef.current = true;
+    const fast = via === "normal" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const first = data.projects[0]?.slug;
+    const steps = ["help", "resume", "ls ~/projects", ...(first ? [`cat ~/projects/${first}.md`] : []), "git log --graph -5", "portrait", "contact"];
+    let stopped = false;
+    const stop = (e: Event) => {
+      if (e instanceof KeyboardEvent) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      stopped = true;
+    };
+    window.addEventListener("keydown", stop, true);
+    window.addEventListener("pointerdown", stop, true);
+    const halted = () => stopped || cancelled.current;
+    try {
+      for (const step of steps) {
+        if (halted()) break;
+        for (let i = 1; i <= step.length && !halted(); i++) {
+          setCmd(step.slice(0, i));
+          ambient.key();
+          await wait(fast ? 12 : 28 + Math.random() * 12);
+        }
+        if (halted()) break;
+        await wait(fast ? 60 : 180);
+        if (halted()) break;
+        submit(step);
+        await wait(fast ? 350 : 700);
+      }
+    } finally {
+      window.removeEventListener("keydown", stop, true);
+      window.removeEventListener("pointerdown", stop, true);
+      demoRef.current = false;
+      setCmd("");
+      if (cancelled.current) return;
+      if (stopped) line("^C demo", false, true, here());
+      else line("tour over · type a command, or open stage", false, true, here());
+    }
+  };
+
   /** The views menu, as `ls views/` prints it (the picker). */
   const showViews = () => {
     const r = shell.run("views", { ...live.current.shell, history: [] });
@@ -314,6 +458,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
 
   /** The boot window grows and dissolves; the full-screen terminal opens with the welcome. */
   const swap = () => {
+    markSeen();
     osRef.current = true;
     setOs(true);
     append(toEntries(shell.banner()));
@@ -409,14 +554,16 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     else if (fx.kind === "clear") {
       setEntries([]);
       setMenuN(null);
-    } else if (fx.kind === "pane") togglePane();
+    } else if (fx.kind === "demo") void startDemo();
+    else if (fx.kind === "mail") startMail();
+    else if (fx.kind === "pane") togglePane();
     else toggleFull();
   };
 
   /** Runs one command line: echo, shell, output, effect. */
   const submit = (raw: string) => {
     const c = raw.trim();
-    if (!live.current.ready || !c) return;
+    if (!live.current.ready || !c || mailRef.current) return;
     setCmd("");
     histIdx.current = -1;
     line(c, true, false, here());
@@ -427,7 +574,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     try {
       window.sessionStorage.setItem(histKey(persona), JSON.stringify(r.state.history));
     } catch {}
-    if (r.lines.length > PAGE) {
+    if (r.lines.length > PAGE && !demoRef.current) {
       print(r.lines.slice(0, PAGE));
       pager.current = { rest: r.lines.slice(PAGE) };
       setPaging(true);
@@ -449,7 +596,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
 
   /** Esc, in order: palette, typed text, menu selection; with none of those, exit. (An auto-open call-off is handled while busy.) */
   act.current.esc = () => {
-    if (paging) endPaging();
+    if (mailRef.current) abortMail();
+    else if (paging) endPaging();
     else if (palette || cmd) setCmd("");
     else if (menuN !== null) {
       setMenuN(null);
@@ -477,6 +625,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   };
 
   const tab = () => {
+    if (mailStep) return;
     if (palette) {
       const c = palMatches[palIdx];
       if (c) setCmd(`/${c.name} `);
@@ -505,6 +654,20 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if ((e.key.length === 1 && !e.ctrlKey && !e.metaKey) || e.key === "Backspace" || e.key === "Enter" || e.key === "Tab") ambient.key();
     const menuLive = menu && !cmd;
+    if (mailStep) {
+      // The form owns the prompt: only its keys are special; typing goes to the input as usual.
+      if ((e.ctrlKey && (e.key === "c" || e.key === "C")) || e.key === "Escape") {
+        e.preventDefault();
+        abortMail();
+      } else if (e.ctrlKey && (e.key === "d" || e.key === "D")) {
+        e.preventDefault();
+        if (mailStep === "message") mailEnter(cmd, true);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        mailEnter(cmd);
+      }
+      return;
+    }
     if (e.ctrlKey && !e.altKey && !e.metaKey && (e.key === "c" || e.key === "C" || e.key === "l" || e.key === "L")) {
       e.preventDefault();
       if (e.key.toLowerCase() === "l") {
@@ -569,6 +732,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     const instant = via === "normal" || reduce;
     const fromBack = performance.now() - lastPop < 3000;
     const stopped = () => cancelled.current || live.current.aborted;
+    const firstVisit = !seenBefore();
     const run = async () => {
       setEntries([]);
       setBootEntries([]);
@@ -627,7 +791,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       tick("boot");
       if (!instant) await wait(520);
       if (stopped()) return;
-      line("type help, or / for the menu", false, true);
+      line(firstVisit ? "type help, / for the menu, or demo for a tour" : "type help, or / for the menu", false, true);
       await type("ls views/", 13, instant);
       if (stopped()) return;
       showViews();
@@ -781,7 +945,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const renderEntry = (e: Entry) =>
     e.k === "out" ? (
       <span key={e.n} className={`${e.prompt ? "is-cmd" : "is-out"} ${e.dim ? "is-dim" : ""} ${e.accent ? "is-accent" : ""}`}>
-        {e.prompt ? ps1(e.ps) : ""}
+        {e.prompt ? (e.label ? <code className="ps-user">{e.label}</code> : ps1(e.ps)) : ""}
         {e.tag === "ok" ? <b className="is-ok">[ok] </b> : e.tag === "wait" ? "[..] " : ""}
         {e.text || " "}
       </span>
@@ -819,6 +983,18 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           ))}
         </pre>
       </div>
+    ) : e.k === "parts" ? (
+      <span key={e.n} className="is-cmd">
+        {e.parts.map((p, i) =>
+          p.tone ? (
+            <b key={i} className={`tone-${p.tone}`}>
+              {p.text}
+            </b>
+          ) : (
+            p.text
+          ),
+        )}
+      </span>
     ) : e.k === "files" ? (
       <span key={e.n} className="is-out">
         {e.items.map((it, i) => (
@@ -972,7 +1148,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
             <span className="terminal-root-prompt is-cmd">
               {paging ? null : (
                 <code className="terminal-root-typed" aria-hidden="true">
-                  {ps1(shortPath(cwd))}
+                  {mailStep ? <code className="ps-user">{MAIL_LABEL[mailStep]}</code> : ps1(shortPath(cwd))}
                   {partial !== null ? partial : cmd}
                   <i className="hub-enter-caret" />
                 </code>
@@ -1007,9 +1183,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           <h3>checkpoints</h3>
           <ul role="list" className="terminal-os-checks">
             {CHECKS.map((id) => (
-              <li key={id} className={id === "mail" ? "is-soon" : checks[id] ? "is-done" : ""}>
+              <li key={id} className={checks[id] ? "is-done" : ""}>
                 <b>{checks[id] ? "[x]" : "[ ]"}</b> {id}
-                {id === "mail" ? <i> soon</i> : null}
               </li>
             ))}
           </ul>
@@ -1069,8 +1244,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           >
             /
           </button>
-          <button type="button" onMouseDown={keepFocus} onClick={typeChip(() => submit("ls"))}>
-            ls
+          <button type="button" onMouseDown={keepFocus} onClick={typeChip(() => submit("demo"))}>
+            demo
           </button>
           <button type="button" onMouseDown={keepFocus} onClick={typeChip(() => submit("views"))}>
             views

@@ -5,6 +5,23 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-08 — Engineer round 1g: demo tour, git log, mail; the leads table
+
+**What shipped** — `demo`: a typed tour (help → resume → ls → cat → git log --graph → portrait →
+contact), human speed, any key or tap stops it with `^C demo`; first visit's hint offers it;
+`demo` in the tips box and the phone chips. `git log` from `TIMELINE` (13 commits: Cisco/IBM 2022,
+B.Tech 2024, SLK Oct 2024, SLK Digital Mar 2025, automations, APIs, VMS, CI/CD, API Test Center,
+Altimetrik, OpenAI credentials, Shift Roster v2.0, this terminal) with stable FNV hashes, tags in
+green, `-n`, `--oneline`, `--graph` with three lanes (main accent, side green, learn violet),
+`git status`. `mail`: an inline wizard (name, email, multi-line message), validation, Esc/Ctrl+C
+abort, POST `/api/lead` with `source: terminal`, answers kept out of history. The lead API now
+stores rows in a new `leads` table (migration 0008: RLS on, server-only writes, per-IP guard) —
+**the migration is not applied yet** (apply blocked by the permission classifier; Ratul applies it
+in the SQL editor), so `mail` currently answers 503 (`PGRST205`, table not in schema cache) and
+prints the message back; the happy path and the `mail` tick are untested until then.
+
+**How** — lead ≈20k (timeline data, leads migration + API, verification); Sonnet builder ≈130k.
+
 ## 2026-11-08 — Engineer round 1f: the pane, checkpoints, braille and pixel portraits, shell feel
 
 **Ratul:** took the whole feature list (§6.9); asked whether the portrait could be more detailed and

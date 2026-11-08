@@ -2487,6 +2487,23 @@ em.font-display,
   }
 }
 
+/* Coloured runs (`git log`: lanes, hashes, tags). */
+.terminal-root-body .tone-accent {
+  color: var(--c);
+}
+.terminal-root-body .tone-green {
+  color: #5fbf6a;
+}
+.terminal-root-body .tone-violet {
+  color: #b38ad9;
+}
+.terminal-root-body .tone-dim {
+  color: var(--ink-faint);
+}
+.terminal-root-body b[class^="tone-"] {
+  font-weight: 400;
+}
+
 /* `cal`, and the pager line (reverse video). */
 .terminal-os-cal {
   margin: 4px 0;

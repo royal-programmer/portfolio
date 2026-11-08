@@ -20,7 +20,7 @@ import {
   type EntryKind,
   type FsEntry,
 } from "@/lib/site/terminal-fs";
-import type { TerminalData } from "@/lib/site/terminal-data";
+import type { TermCommit, TerminalData } from "@/lib/site/terminal-data";
 
 export type MenuId = "views" | "projects" | "writing";
 export type MenuRow = { key: string; label: string; line: string };
@@ -28,8 +28,12 @@ export type MenuRow = { key: string; label: string; line: string };
 /** One name in a listing: a button that runs `cat` (files), `cd` (dirs) or `open` (views). */
 export type FileItem = { name: string; type: EntryKind; path: string; meta?: string };
 
+export type Tone = "accent" | "green" | "violet" | "dim";
+
 export type Out =
   | { kind: "text"; text: string; dim?: boolean; accent?: boolean }
+  /** One line of differently coloured runs (`git log`). */
+  | { kind: "parts"; parts: Array<{ text: string; tone?: Tone }> }
   /** Several links on one line, joined by " · ". */
   | { kind: "links"; items: Array<{ label: string; href: string; external?: boolean }> }
   /** A listing: `inline` joins the names on one line (`ls`); otherwise it is one row, `meta` before the name. */
@@ -54,7 +58,10 @@ export type Effect =
   | { kind: "exit" }
   | { kind: "clear" }
   | { kind: "fullscreen" }
-  | { kind: "pane" };
+  | { kind: "pane" }
+  /** The guided tour, and the inline contact form: both run in the UI, which owns the prompt. */
+  | { kind: "demo" }
+  | { kind: "mail" };
 
 export type ShellState = { cwd: string; history: string[]; lastMenu?: MenuId };
 export type RunResult = { lines: Out[]; effect?: Effect; state: ShellState };
@@ -97,6 +104,9 @@ const COMMANDS: CommandDoc[] = [
   { name: "banner", group: "terminal", usage: "banner", desc: "print the welcome again" },
   { name: "history", group: "terminal", usage: "history", desc: "commands typed this session" },
   { name: "clear", group: "terminal", usage: "clear", desc: "empty the screen" },
+  { name: "demo", group: "terminal", usage: "demo", desc: "a guided tour; any key stops it" },
+  { name: "git", group: "read", usage: "git log [--oneline|--graph|-n k]", desc: "the career as a git history" },
+  { name: "mail", group: "open", usage: "mail", desc: "send me a message, right here" },
   { name: "pane", group: "terminal", usage: "pane", desc: "show or hide the side pane" },
   { name: "date", group: "terminal", usage: "date", desc: "the local date and time" },
   { name: "cal", group: "terminal", usage: "cal", desc: "this month, today highlighted" },
@@ -183,6 +193,7 @@ export function createShell(data: TerminalData): Shell {
         ...(data.views[0] ? [{ cmd: `open ${data.views[0].id}`, desc: "enter a view" }] : []),
         { cmd: "projects", desc: "read what I built" },
         { cmd: "resume", desc: "the overview" },
+        { cmd: "demo", desc: "a guided tour" },
       ],
     },
   ];
@@ -240,6 +251,77 @@ export function createShell(data: TerminalData): Shell {
     };
     walk(path, "");
     return out;
+  };
+
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const fmtDate = (iso: string) => {
+    const [y, m, d] = iso.split("-");
+    return `${MONTHS[Number(m) - 1] ?? m} ${d} ${y}`;
+  };
+  /** A stable 7-hex id from date + subject (FNV-1a). */
+  const hashOf = (c: TermCommit) => {
+    let h = 0x811c9dc5;
+    for (const ch of `${c.date}${c.subject}`) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
+    return h.toString(16).padStart(8, "0").slice(0, 7);
+  };
+  const LANE: Record<TermCommit["branch"], number> = { main: 0, side: 1, learn: 2 };
+  const LANE_TONE: Tone[] = ["accent", "green", "violet"];
+
+  /** `git log [--oneline] [--graph] [-n k | -k]`: newest first; `--graph` draws main, side and learn as lanes. */
+  const gitLog = (args: string[]): Out[] => {
+    let limit = Infinity;
+    let oneline = false;
+    let graph = false;
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
+      if (a === "--oneline") oneline = true;
+      else if (a === "--graph") graph = true;
+      else if (a === "-n" && /^\d+$/.test(args[i + 1] ?? "")) limit = Number(args[++i]);
+      else if (/^-\d+$/.test(a)) limit = Number(a.slice(1));
+      else return [text(`fatal: unrecognized argument: ${a}`)];
+    }
+    const list = data.timeline.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, limit);
+    // A side lane is open from its newest commit to its oldest in this list.
+    const first: number[] = [-1, -1, -1];
+    const last: number[] = [-1, -1, -1];
+    list.forEach((c, i) => {
+      const l = LANE[c.branch];
+      if (first[l] < 0) first[l] = i;
+      last[l] = i;
+    });
+    const active = (i: number, skip = -1) => [0, 1, 2].map((l) => l !== skip && (l === 0 || (first[l] >= 0 && first[l] <= i && i <= last[l])));
+    const lanes = (on: boolean[], star = -1): Array<{ text: string; tone?: Tone }> =>
+      [0, 1, 2].map((l) => ({ text: `${star === l ? "*" : on[l] ? "|" : " "} `, tone: LANE_TONE[l] }));
+    const connector = (on: boolean[], lane: number, ch: string): Array<{ text: string; tone?: Tone }> => {
+      const cells = [0, 1, 2].map((l) => (on[l] ? "| " : "  ").split(""));
+      cells[lane - 1][1] = ch;
+      return cells.map((c, l) => ({ text: c.join(""), tone: l === lane - 1 ? LANE_TONE[lane] : LANE_TONE[l] }));
+    };
+    const out: Out[] = [];
+    list.forEach((c, i) => {
+      const l = LANE[c.branch];
+      const hash = hashOf(c);
+      const tag = c.tag ? [{ text: ` (tag: ${c.tag})`, tone: "green" as Tone }] : [];
+      if (graph && l > 0 && first[l] === i) out.push({ kind: "parts", parts: connector(active(i, l), l, "\\") });
+      const g = (star: boolean) => (graph ? lanes(active(i), star ? l : -1) : []);
+      if (oneline) {
+        out.push({ kind: "parts", parts: [...g(true), { text: hash, tone: "accent" }, ...tag, { text: ` ${c.subject}` }] });
+      } else {
+        out.push({ kind: "parts", parts: [...g(true), { text: `commit ${hash}`, tone: "accent" }, ...tag] });
+        const rest = [`Date:   ${fmtDate(c.date)}`, "", `    ${c.subject}`, ...(c.body ?? []).map((b) => `    ${b}`), ""];
+        for (const r of rest) out.push({ kind: "parts", parts: [...g(false), { text: r }] });
+      }
+      if (graph && l > 0 && last[l] === i && i < list.length - 1) out.push({ kind: "parts", parts: connector(active(i + 1, l), l, "/") });
+    });
+    return out;
+  };
+
+  const git = (args: string[]): Out[] => {
+    const sub = args[0];
+    if (sub === "log") return gitLog(args.slice(1));
+    if (sub === "status") return [text("On branch main · nothing to commit, working tree clean")];
+    if (sub) return [text(`git: '${sub}' is not a git command. See 'git'.`)];
+    return texts(["usage: git <command>", "  log [--oneline] [--graph] [-n k]   the career as a git history", "  status                             where things stand"]);
   };
 
   /** `Sun Nov  8 15:04:05 IST 2026`, in the visitor's zone. */
@@ -386,6 +468,12 @@ export function createShell(data: TerminalData): Shell {
         return { lines: cat(["~/uptime"], st) };
       case "contact":
         return { lines: cat(["~/contact"], st) };
+      case "git":
+        return { lines: git(args) };
+      case "demo":
+        return { lines: [], effect: { kind: "demo" } };
+      case "mail":
+        return { lines: [], effect: { kind: "mail" } };
       case "pane":
         return { lines: [], effect: { kind: "pane" } };
       case "date":
@@ -462,6 +550,11 @@ export function createShell(data: TerminalData): Shell {
       if (cmd === "open") {
         const pool = [...viewIds, ...data.projects.map((p) => p.slug), ...data.posts.map((p) => p.slug)];
         return [...pool.filter((n) => n.startsWith(word)), ...completePath(fs, state.cwd, word)].filter((v, i, a) => a.indexOf(v) === i);
+      }
+      if (cmd === "git") {
+        if (head.trim() === "git") return ["log", "status"].filter((n) => n.startsWith(word));
+        if (/^git\s+log\b/.test(head)) return ["--oneline", "--graph", "-n"].filter((n) => n.startsWith(word));
+        return [];
       }
       if (cmd === "cd") return completePath(fs, state.cwd, word).filter((c) => c.endsWith("/"));
       if (cmd === "ls" || cmd === "cat" || cmd === "tree") return completePath(fs, state.cwd, word);
