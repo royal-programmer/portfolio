@@ -98,6 +98,35 @@ export const RESUME: TermResume = {
   education: [{ degree: "B.Tech, Computer Science and Engineering", school: "ITER, Siksha O Anusandhan University", year: "2024", note: "CGPA 7.75/10" }],
 };
 
+export type TermCommit = {
+  /** ISO date, used for ordering and the `Date:` line. */
+  date: string;
+  /** One line, imperative, like a commit subject. */
+  subject: string;
+  /** Optional body lines. */
+  body?: string[];
+  /** Branch for `--graph`: main (career), side (personal projects), learn (certs, education). */
+  branch: "main" | "side" | "learn";
+  tag?: string;
+};
+
+/** The career as a git history, newest first when printed. From the résumé; dates to the month. */
+export const TIMELINE: TermCommit[] = [
+  { date: "2022-07-01", subject: "Complete Python Essentials 1 (Cisco) and the IBM Python for Data Science badge", branch: "learn" },
+  { date: "2024-06-01", subject: "Graduate: B.Tech, Computer Science and Engineering, ITER (SOA University)", branch: "learn", tag: "b.tech", body: ["CGPA 7.75/10"] },
+  { date: "2024-10-01", subject: "Join SLK as Engineer", branch: "main", tag: "slk", body: ["Full stack, APIs, automation, production support."] },
+  { date: "2025-03-28", subject: "Move to SLK Digital", branch: "main" },
+  { date: "2025-06-01", subject: "Take ownership of 11 Python automations and the RabbitMQ integrations", branch: "main", body: ["Finance, project sync, background verification; scheduled and API-triggered."] },
+  { date: "2025-09-01", subject: "Ship the Project and Attendance Process APIs over Oracle EBS and NetSuite", branch: "main", body: ["Python/FastAPI, async fetching, source-side filtering, pooled connections."] },
+  { date: "2025-12-01", subject: "Cut VMS query time from 5–10 minutes to 2–3", branch: "main" },
+  { date: "2026-02-01", subject: "Build the CI/CD template generator; five pipelines for Shift Roster", branch: "main" },
+  { date: "2026-04-01", subject: "Start API Test Center", branch: "side", tag: "apitestcenter", body: ["An API testing tool, in development: apitestcenter.com"] },
+  { date: "2026-06-01", subject: "SLK becomes Altimetrik", branch: "main", tag: "altimetrik" },
+  { date: "2026-07-01", subject: "Earn 7 OpenAI PartnerU credentials", branch: "learn", body: ["API Deployment, Codex Solutions, ChatGPT Deployment and Solutions, Technical, Consultative Solutions, Foundational."] },
+  { date: "2026-09-01", subject: "Release Shift Roster: ASP.NET MVC → React/TypeScript + .NET APIs", branch: "main", tag: "v2.0", body: ["200+ active users, 1,500–2,000 employees, 56K+ shift records in month one.", "Redesigned the database; self-service configuration; Azure AD authorization."] },
+  { date: "2026-11-01", subject: "Build this terminal", branch: "side", body: ["You are reading its output."] },
+];
+
 export type TerminalData = {
   /** One-line identity and the longer `about` text. */
   who: string;
@@ -109,6 +138,7 @@ export type TerminalData = {
   posts: TermPost[];
   views: PersonaView[];
   resume: TermResume;
+  timeline: TermCommit[];
   /** Build id, when the deploy exposes one. */
   commit?: string;
 };
@@ -146,6 +176,7 @@ export function terminalData(persona: Persona | undefined, entries: Entry[], pos
       .map((p) => ({ slug: p.slug, title: p.title, date: p.publishedAt?.slice(0, 10), excerpt: p.excerpt, body: p.body.slice(0, MAX_BODY) })),
     views,
     resume: RESUME,
+    timeline: TIMELINE,
     commit: process.env.NEXT_PUBLIC_COMMIT || undefined,
   };
 }
