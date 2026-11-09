@@ -200,8 +200,8 @@ export function terminalData(persona: Persona | undefined, entries: Entry[], pos
     resume: RESUME,
     timeline: TIMELINE,
     periods: TIMELINE_PERIODS,
-    portrait: { src: "/profile-cartoon-avatar.png", crop: [0.316, 0.1, 0.684, 0.97] },
-    status: "open to work · bengaluru · relocates",
+    portrait: { src: "/portrait.jpg", crop: [0.27, 0.12, 0.75, 0.74] },
+    status: "open to work · relocates",
     commit: process.env.NEXT_PUBLIC_COMMIT || undefined,
   };
 }
