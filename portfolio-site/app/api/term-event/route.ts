@@ -9,7 +9,7 @@ type EventPayload = { command?: string; ok?: boolean; persona?: string; theme?: 
 
 const TOKEN = /^[a-z0-9_:\-.]{1,40}$/i;
 const PERSONAS = new Set(["engineer", "trader", "photographer", "artist", "ride", "gamer"]);
-const THEMES = new Set(["accent", "amber", "green", "paper"]);
+const THEMES = new Set(["accent", "amber", "green", "paper", "dracula", "nord", "gruvbox", "solarized", "monokai", "matrix", "cyberpunk"]);
 const MAX_BODY = 512;
 
 export async function POST(req: Request) {

@@ -23,7 +23,7 @@ import {
 } from "@/lib/site/terminal-fs";
 import type { TermCommit, TerminalData } from "@/lib/site/terminal-data";
 
-export type MenuId = "views" | "projects" | "writing";
+export type MenuId = "views" | "projects" | "writing" | "themes";
 export type MenuRow = { key: string; label: string; line: string };
 
 /** One name in a listing: a button that runs `cat` (files), `cd` (dirs) or `open` (views). */
@@ -37,6 +37,13 @@ export const THEMES = [
   { id: "amber", color: "#ffb000", note: "amber on brown-black" },
   { id: "green", color: "#33ff66", note: "green phosphor" },
   { id: "paper", color: "#cfc8b4", note: "a light terminal" },
+  { id: "dracula", color: "#bd93f9", note: "purple on #282a36" },
+  { id: "nord", color: "#88c0d0", note: "arctic blue on #2e3440" },
+  { id: "gruvbox", color: "#fabd2f", note: "warm yellow on #282828" },
+  { id: "solarized", color: "#268bd2", note: "blue on deep teal" },
+  { id: "monokai", color: "#a6e22e", note: "lime on #272822" },
+  { id: "matrix", color: "#00ff41", note: "bright green on black" },
+  { id: "cyberpunk", color: "#ff2a6d", note: "hot pink and cyan on night violet" },
 ] as const;
 export type ThemeId = (typeof THEMES)[number]["id"];
 
@@ -174,7 +181,7 @@ const COMMANDS: CommandDoc[] = [
   { name: "contact", group: "read", usage: "contact", desc: "mail and github, as links" },
   { name: "curl", group: "read", usage: "curl github", desc: "live: repos, last push, contributions" },
   { name: "qr", group: "open", usage: "qr", desc: "this page as a QR code" },
-  { name: "theme", group: "terminal", usage: "theme [name]", desc: "accent · amber · green · paper" },
+  { name: "theme", group: "terminal", usage: "theme [name|random]", desc: "pick a colour theme; no name opens the menu" },
   { name: "crt", group: "terminal", usage: "crt", desc: "toggle scanlines" },
   { name: "resume", group: "read", usage: "resume [--pdf]", desc: "the overview, like the résumé's first page" },
   { name: "portrait", group: "read", usage: "portrait [mode|list|next]", desc: "me, in characters: pixels · braille · ascii · blocks · matrix" },
@@ -252,7 +259,9 @@ export function createShell(data: TerminalData): Shell {
     const rows: MenuRow[] =
       id === "views"
         ? data.views.map((v) => ({ key: v.id, label: v.id, line: v.line }))
-        : id === "projects"
+        : id === "themes"
+          ? THEMES.map((t) => ({ key: t.id, label: t.id, line: t.note }))
+          : id === "projects"
           ? data.projects.map((p) => ({ key: p.slug, label: p.slug, line: [p.title, p.year].filter(Boolean).join(" · ") }))
           : data.posts.map((p) => ({ key: p.slug, label: p.slug, line: [p.title, p.date].filter(Boolean).join(" · ") }));
     if (!rows.length) return { lines: [text(`no ${id} yet`, true)] };
@@ -693,13 +702,11 @@ export function createShell(data: TerminalData): Shell {
         return { lines: [text(`curl: (6) could not resolve host: ${args[0]}`)] };
       }
       case "theme": {
-        if (!args[0])
-          return {
-            lines: [
-              ...THEMES.map((th): Out => ({ kind: "parts", parts: [{ text: "███ ", color: th.color }, { text: th.id.padEnd(8) }, { text: th.note, tone: "dim" }] })),
-              text("theme <name> to switch", true),
-            ],
-          };
+        if (!args[0]) return menu("themes");
+        if (args[0].toLowerCase() === "random") {
+          const th = THEMES[Math.floor(Math.random() * THEMES.length)];
+          return { lines: [], effect: { kind: "theme", id: th.id } };
+        }
         const th = THEMES.find((x) => x.id === args[0].toLowerCase());
         if (!th) return { lines: [text(`theme: unknown theme '${args[0]}' (${THEMES.map((x) => x.id).join(", ")})`)] };
         return { lines: [], effect: { kind: "theme", id: th.id } };
@@ -759,6 +766,10 @@ export function createShell(data: TerminalData): Shell {
         const v = data.views[n];
         return v ? { lines: [], effect: { kind: "open-view", id: v.id } } : { lines: [text(`no row ${low}`)] };
       }
+      if (st.lastMenu === "themes") {
+        const t = THEMES[n];
+        return t ? { lines: [], effect: { kind: "theme", id: t.id } } : { lines: [text(`no row ${low}`)] };
+      }
       const item = (st.lastMenu === "projects" ? data.projects : data.posts)[n];
       return item ? { lines: cat([`~/${st.lastMenu}/${item.slug}.md`], st) } : { lines: [text(`no row ${low}`)] };
     }
@@ -797,7 +808,7 @@ export function createShell(data: TerminalData): Shell {
         return [...pool.filter((n) => n.startsWith(word)), ...completePath(fs, state.cwd, word)].filter((v, i, a) => a.indexOf(v) === i);
       }
       if (cmd === "view") return viewIds.filter((n) => n.startsWith(word));
-      if (cmd === "theme") return THEMES.map((t) => t.id as string).filter((n) => n.startsWith(word));
+      if (cmd === "theme") return [...THEMES.map((t) => t.id as string), "random"].filter((n) => n.startsWith(word));
       if (cmd === "resume") return ["--pdf"].filter((n) => n.startsWith(word));
       if (cmd === "curl") return ["github"].filter((n) => n.startsWith(word));
       if (cmd === "git") {

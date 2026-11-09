@@ -320,6 +320,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const mailRef = useRef<{ step: MailStep; name: string; email: string; lines: string[] } | null>(null);
   const [theme, setTheme] = useState<ThemeId>("accent");
   const themeRef = useRef<ThemeId>("accent");
+  /** While the `theme` menu is open: the theme to restore on Esc (the menu previews live as the selection moves). */
+  const themeBase = useRef<ThemeId | null>(null);
   const [crt, setCrt] = useState(false);
   /** A `curl github` in flight, and a `sl` crossing the screen: Ctrl+C or Esc ends them. */
   const curlAbort = useRef<AbortController | null>(null);
@@ -389,6 +391,17 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   }, [cmd, shell]);
   const palIdx = Math.min(palSel, Math.max(0, palMatches.length - 1));
   const menu = entries.find((e) => e.k === "menu" && e.n === menuN) as Extract<Entry, { k: "menu" }> | undefined;
+  // The theme menu previews the highlighted row; leaving it any other way than Enter puts the old theme back.
+  useEffect(() => {
+    if (menu?.id === "themes" && menuN === menu.n) {
+      if (themeBase.current === null) themeBase.current = themeRef.current;
+      const k = menu.rows[Math.min(sel, menu.rows.length - 1)]?.key;
+      if (k && THEMES.some((t) => t.id === k)) setTheme(k as ThemeId);
+    } else if (themeBase.current !== null) {
+      setTheme(themeBase.current);
+      themeBase.current = null;
+    }
+  }, [menu, menuN, sel]);
 
   const portraitCfg = useMemo<PortraitConfig>(() => ({ src: data.portrait.src, crop: data.portrait.crop }), [data.portrait]);
   const viewKey = views.map((v) => v.id).join();
@@ -1012,6 +1025,9 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     if (id === "views") {
       setCmd("");
       act.current.open(`/${row.key}`, `open ${row.key}`);
+    } else if (id === "themes") {
+      themeBase.current = null;
+      submit(`theme ${row.key}`);
     } else submit(`cat ~/${id}/${row.key}.md`);
   };
 
