@@ -100,7 +100,7 @@ const HIDDEN_DOCS: CommandDoc[] = [
 /** A `timeline` row: a section head (narrow layout) or an entry; glyph/label/grade belong to the wide bracket column. */
 export type TimelineRow =
   | { head: string }
-  | { year: string; mon: string; subject: string; tag?: string; dim?: boolean; life?: boolean; glyph?: string; label?: string; grade?: string };
+  | { year: string; mon: string; subject: string; tag?: string; grade?: string; dim?: boolean; life?: boolean; glyph?: string; label?: string; periodGrade?: string };
 
 export type Out =
   | { kind: "text"; text: string; dim?: boolean; accent?: boolean }
@@ -378,10 +378,10 @@ export function createShell(data: TerminalData): Shell {
     };
     const inside = (p: (typeof periods)[number], i: number) => i >= ym(p.from).i && (p.to ? i <= ym(p.to).i : true);
 
-    type Row = { i: number; y: number; mon: string; subject: string; tag?: string; branch: TermCommit["branch"] };
+    type Row = { i: number; y: number; mon: string; subject: string; tag?: string; grade?: string; branch: TermCommit["branch"] };
     const rows: Row[] = data.timeline.map((c) => {
       const t = ym(c.date.slice(0, 7));
-      return { i: t.i, y: t.y, mon: MONTHS[t.m - 1], subject: c.subject, tag: c.tag, branch: c.branch };
+      return { i: t.i, y: t.y, mon: MONTHS[t.m - 1], subject: c.subject, tag: c.tag, grade: c.grade, branch: c.branch };
     });
     // A period that no entry marks still starts somewhere: add its first month.
     for (const p of periods) {
@@ -392,7 +392,7 @@ export function createShell(data: TerminalData): Shell {
     // Default view: side and learn entries older than the work period stay out, except the ones that open or close a period.
     const workFrom = ym(periods.find((p) => p.id === "work")?.from ?? periods[periods.length - 1]?.from ?? "2000-01").i;
     const edge = new Set(periods.flatMap((p) => [ym(p.from).i, p.to ? ym(p.to).i : -1]));
-    const shown = all ? rows : rows.filter((r) => r.branch === "main" || r.branch === "life" || r.i >= workFrom || edge.has(r.i));
+    const shown = all ? rows : rows.filter((r) => r.branch === "main" || r.branch === "life" || r.i >= workFrom || edge.has(r.i) || !!r.grade);
 
     const wide = cols >= 80;
     const out: TimelineRow[] = [];
@@ -411,14 +411,14 @@ export function createShell(data: TerminalData): Shell {
           }
         }
       }
-      const row: TimelineRow = { year: r.y !== prevY ? String(r.y) : "", mon: r.mon, subject: r.subject, tag: r.tag, dim: r.branch !== "main", life: r.branch === "life" };
+      const row: TimelineRow = { year: r.y !== prevY ? String(r.y) : "", mon: r.mon, subject: r.subject, tag: r.tag, grade: r.grade, dim: r.branch !== "main", life: r.branch === "life" };
       prevY = r.y;
       const sp = spans.find((s) => s.lo >= 0 && k >= s.lo && k <= s.hi);
       if (wide && sp) {
         row.glyph = sp.lo === sp.hi ? "─" : k === sp.lo ? "┐" : k === sp.hi ? "┘" : "│";
         if (k === Math.floor((sp.lo + sp.hi) / 2)) {
           row.label = `${sp.p.id} · ${dur(sp.p)}`;
-          row.grade = sp.p.grade;
+          row.periodGrade = sp.p.grade;
         }
       }
       out.push(row);

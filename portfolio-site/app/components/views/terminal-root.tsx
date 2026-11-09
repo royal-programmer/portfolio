@@ -1539,6 +1539,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
                   {r.subject}
                 </span>
                 {r.tag ? <b className="tl-tag tone-accent">{e.wide ? r.tag : `  ${r.tag}`}</b> : null}
+                {r.grade ? <b className="tl-grade">{e.wide ? r.grade : `  ${r.grade}`}</b> : null}
               </span>
               {e.wide ? (
                 <>
@@ -1547,7 +1548,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
                   </span>
                   <span className="tl-label">
                     {r.label ? <b className="tone-accent">{r.label}</b> : null}
-                    {r.grade ? <b className="tl-grade">{r.grade}</b> : null}
+                    {r.periodGrade ? <b className="tl-grade">{r.periodGrade}</b> : null}
                   </span>
                 </>
               ) : null}

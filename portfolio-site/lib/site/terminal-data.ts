@@ -108,13 +108,16 @@ export type TermCommit = {
   /** Branch for `--graph`: main (career), side (personal projects), learn (certs, education). */
   branch: "main" | "side" | "learn" | "life";
   tag?: string;
+  /** A result worth highlighting on the entry itself, e.g. `85.66%`. */
+  grade?: string;
 };
 
 /** The career as a git history, newest first when printed. From the résumé; dates to the month. */
 export const TIMELINE: TermCommit[] = [
   { date: "2002-12", subject: "Born", branch: "life" },
   { date: "2004-04", subject: "Start school · Techno India Group Public School", branch: "learn" },
-  { date: "2018-03", subject: "Move to UP Public School for higher secondary (science)", branch: "learn" },
+  { date: "2018-03", subject: "Secondary (class 10) · Techno India Group Public School", branch: "learn", grade: "85.66%", tag: "class 10" },
+  { date: "2020-03", subject: "Higher secondary (class 12, science) · UP Public School", branch: "learn", grade: "79%", tag: "class 12" },
   { date: "2020-08", subject: "Start B.Tech CSE at ITER, SOA University", branch: "learn" },
   { date: "2022-07-01", subject: "Complete Python Essentials 1 (Cisco) and the IBM Python for Data Science badge", branch: "learn" },
   { date: "2022-09-01", subject: "Intern: web application developer (The Sparks Foundation) and cyber security (Coincent.ai)", branch: "learn" },
@@ -146,7 +149,7 @@ export type TermPeriod = {
 };
 
 export const TIMELINE_PERIODS: TermPeriod[] = [
-  { id: "school", label: "school · Techno India Group → UP Public School", from: "2004-04", to: "2020-03", grade: "class 10 · 85.66% · class 12 · 79%" },
+  { id: "school", label: "school · Techno India Group → UP Public School", from: "2004-04", to: "2020-03" },
   { id: "college", label: "B.Tech CSE · ITER, SOA University", from: "2020-08", to: "2024-07", grade: "cgpa 7.75/10" },
   { id: "work", label: "SLK → Altimetrik", from: "2024-10", to: null },
 ];
