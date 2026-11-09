@@ -9,13 +9,13 @@
  */
 import gsap from "gsap";
 import { useRouter } from "next/navigation";
-import { Fragment, memo, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { Fragment, memo, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { BOOT_BAR_STEPS, bootBar, terminalScript } from "@/app/components/hub/exit-sequence";
 import type { LaunchedPersona, PersonaView } from "@/lib/content/types";
 import { ambient } from "@/lib/site/ambient-sound";
 import { hubHref, personaHref, useOrigin } from "@/lib/site/persona-link";
 import { qrLines, qrModules } from "@/lib/site/qr";
-import { PIXEL_INDEX, PORTRAIT_BRAILLE_SMALL, PORTRAIT_PIXELS, type BraillePortrait, type PixelPortrait } from "@/lib/site/terminal-art";
+import { cachedPortrait, generatePortrait, PORTRAIT_COLS, PORTRAIT_MODES, type PortraitArt, type PortraitConfig, type PortraitMode } from "@/lib/site/portrait-gen";
 import type { TerminalData } from "@/lib/site/terminal-data";
 import { HOME, resolvePath, shortPath, USER } from "@/lib/site/terminal-fs";
 import { createShell, HISTORY_CAP, initialShellState, THEMES, type Effect, type FileItem, type MenuId, type MenuRow, type Out, type ShellState, type ThemeId, type Tone } from "@/lib/site/terminal-shell";
@@ -39,9 +39,9 @@ export type TerminalRootProps = {
 type Entry =
   /** `ps`: the path the command was typed at (the OS prompt); absent on the boot script's plain `$ `. */
   | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string; label?: string; tag?: "ok" | "wait" | "bar" }
-  | { n: number; k: "links"; items: Array<{ label: string; href?: string; external?: boolean; cmd?: string }> }
+  | { n: number; k: "links"; items: Array<{ label: string; href?: string; external?: boolean; cmd?: string }>; prefix?: string }
   | { n: number; k: "ghcommit"; label: string; url: string; rest: string }
-  | { n: number; k: "portrait" }
+  | { n: number; k: "portrait"; mode: PortraitMode }
   | { n: number; k: "parts"; parts: Array<{ text: string; tone?: Tone; color?: string }> }
   | { n: number; k: "qr"; lines: string[] }
   | { n: number; k: "art"; text: string }
@@ -184,41 +184,72 @@ function saveChecks(persona: string, v: Checks) {
   } catch {}
 }
 
-/** Braille portrait: one `<pre>`, in the accent. */
-const BrailleView = memo(function BrailleView({ art, className }: { art: BraillePortrait; className: string }) {
+const NL = String.fromCharCode(10);
+const isNarrow =() => typeof window !== "undefined" && window.innerWidth < 600;
+
+/** The generated art, once ready: spans only where a run has its own colour. */
+function ArtLines({ art, className }: { art: PortraitArt; className: string }) {
   return (
-    <pre className={`terminal-os-braille ${className}`} aria-hidden="true">
-      {art.lines.join("\n")}
+    <pre className={`terminal-os-portrait ${className}`} aria-hidden="true" style={{ "--p-cols": art.cols, "--p-rows": art.rows, "--p-adv": art.adv } as CSSProperties}>
+      {art.lines.map((runs, y) => (
+        <Fragment key={y}>
+          {runs.map((r, i) =>
+            r.c || r.b || r.bold ? (
+              <span key={i} style={{ color: r.c, background: r.b, fontWeight: r.bold ? 700 : undefined }}>
+                {r.t}
+              </span>
+            ) : (
+              r.t
+            ),
+          )}
+          {NL}
+        </Fragment>
+      ))}
     </pre>
   );
-});
+}
 
-/** True-colour half-blocks: each `▀` takes the top pixel as text colour, the bottom as background. Built once. */
-const PixelsView = memo(function PixelsView({ art }: { art: PixelPortrait }) {
-  const rows = useMemo(() => {
-    const out: ReactNode[] = [];
-    art.top.forEach((top, y) => {
-      const bot = art.bottom[y] ?? "";
-      let from = 0;
-      for (let x = 1; x <= top.length; x++) {
-        if (x < top.length && top[x] === top[from] && bot[x] === bot[from]) continue;
-        out.push(
-          <span key={`${y}-${from}`} style={{ color: art.palette[PIXEL_INDEX.indexOf(top[from])], background: art.palette[PIXEL_INDEX.indexOf(bot[from] ?? top[from])] }}>
-            {"▀".repeat(x - from)}
-          </span>,
-        );
-        from = x;
-      }
-      out.push("\n");
-    });
-    return out;
-  }, [art]);
+/** Develops the portrait from the photo: `[..] developing…` while it loads, the art when it is ready, one line if it fails. */
+const PortraitView = memo(function PortraitView({ mode, cfg, cols, className, fetchCard, run }: { mode: PortraitMode; cfg: PortraitConfig; cols: number; className: string; fetchCard?: boolean; run?: (cmd: string) => void }) {
+  const [made, setArt] = useState<PortraitArt | undefined>();
+  const art = cachedPortrait(cfg, mode, cols) ?? made;
+  const [failed, setFailed] = useState(false);
+  const end = useRef<HTMLSpanElement>(null);
+  // The art arrives after the line was printed: keep the end of it in view.
+  useEffect(() => {
+    if (art && !fetchCard) end.current?.scrollIntoView({ block: "nearest" });
+  }, [art, fetchCard]);
+  useEffect(() => {
+    let live = true;
+    const hit = cachedPortrait(cfg, mode, cols);
+    if (hit) return;
+    generatePortrait(cfg, mode, cols).then(
+      (a) => live && setArt(a),
+      () => live && setFailed(true),
+    );
+    return () => {
+      live = false;
+    };
+  }, [cfg, mode, cols]);
   return (
     <>
       <span className="sr-only">a portrait of Ratul</span>
-      <pre className="terminal-os-pixels" aria-hidden="true">
-        {rows}
-      </pre>
+      {art ? <ArtLines art={art} className={className} /> : failed ? <span className="is-out is-dim">the portrait did not load · try again</span> : <span className="is-out">[..] developing…</span>}
+      {run && !fetchCard ? (
+        <span className="is-out is-dim terminal-os-modes">
+          {"modes: "}
+          {PORTRAIT_MODES.map((m) => (
+            <Fragment key={m}>
+              <button type="button" className="terminal-root-link" onMouseDown={(e) => e.preventDefault()} onClick={() => run(`portrait ${m}`)}>
+                {m}
+              </button>
+              {" · "}
+            </Fragment>
+          ))}
+          {"portrait <mode>"}
+        </span>
+      ) : null}
+      <span ref={end} />
     </>
   );
 });
@@ -270,14 +301,14 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const [checks, setChecks] = useState<Checks>({});
   const checksRef = useRef<Checks>({});
   const [paneOn, setPaneOn] = useState(true);
+  /** The pane's "live" lines: the GitHub cache (undefined: not looked at yet; null: unavailable, section left out). */
+  const [gh, setGh] = useState<GhCache | null | undefined>(undefined);
   /** Long output waits behind `-- more --`; `rest` is what has not been printed yet. */
   const [paging, setPaging] = useState(false);
   const pager = useRef<{ rest: Out[] } | null>(null);
   /** The `mail` form: which field the prompt is asking for, and what has been typed so far. */
   const [mailStep, setMailStep] = useState<MailStep | null>(null);
   const mailRef = useRef<{ step: MailStep; name: string; email: string; lines: string[] } | null>(null);
-  /** The `demo` tour, while it runs. */
-  const demoRef = useRef<boolean>(false);
   const [theme, setTheme] = useState<ThemeId>("accent");
   const themeRef = useRef<ThemeId>("accent");
   const [crt, setCrt] = useState(false);
@@ -295,6 +326,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const cancelled = useRef(false);
   /** One token per boot run: a run that was replaced (effect re-run, StrictMode) stops appending. */
   const runSeq = useRef(0);
+  /** The portrait mode drawn last, for `portrait next`. */
+  const portraitMode = useRef<PortraitMode>("pixels");
   const timers = useRef<Array<{ id: number; resolve: () => void }>>([]);
   const seq = useRef(0);
   const histIdx = useRef(-1);
@@ -309,7 +342,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       }, ms);
       timers.current.push({ id, resolve });
     });
-  /** Capture-phase "any key stops it" listeners (demo, sl): tracked here so unmount can always remove them. */
+  /** Capture-phase "any key stops it" listeners (sl): tracked here so unmount can always remove them. */
   const guards = useRef<Array<() => void>>([]);
   const guardKeys = (stop: (e: Event) => void) => {
     window.addEventListener("keydown", stop, true);
@@ -325,11 +358,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const sendingRef = useRef(false);
   const crtRef = useRef(false);
   const entriesRef = useRef<Entry[]>([]);
-  const [demoOn, setDemoOn] = useState(false);
-  /** The tour's step, for the status bar. */
-  const [tourStep, setTourStep] = useState<{ i: number; n: number } | null>(null);
 
-  // A programmatic change of `cmd` (history, Tab, chips, the tour) puts the input's cursor at the end; read it back.
+  // A programmatic change of `cmd` (history, Tab, chips) puts the input's cursor at the end; read it back.
   useEffect(() => {
     setCaret(input.current?.selectionStart ?? cmd.length);
   }, [cmd]);
@@ -351,6 +381,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const palIdx = Math.min(palSel, Math.max(0, palMatches.length - 1));
   const menu = entries.find((e) => e.k === "menu" && e.n === menuN) as Extract<Entry, { k: "menu" }> | undefined;
 
+  const portraitCfg = useMemo<PortraitConfig>(() => ({ src: data.portrait.src, crop: data.portrait.crop }), [data.portrait]);
   const viewKey = views.map((v) => v.id).join();
   const itemKey = items.join();
 
@@ -358,8 +389,12 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     lines.map((o): Entry => {
       const n = ++seq.current;
       if (o.kind === "text") return { n, k: "out", text: o.text, dim: o.dim, accent: o.accent };
-      if (o.kind === "links") return { n, k: "links", items: o.items };
-      if (o.kind === "portrait") return { n, k: "portrait" };
+      if (o.kind === "links") return { n, k: "links", items: o.items, prefix: o.prefix };
+      if (o.kind === "portrait") {
+        const mode = o.mode === "next" ? PORTRAIT_MODES[(PORTRAIT_MODES.indexOf(portraitMode.current) + 1) % PORTRAIT_MODES.length] : o.mode;
+        portraitMode.current = mode;
+        return { n, k: "portrait", mode };
+      }
       if (o.kind === "parts") return { n, k: "parts", parts: o.parts };
       if (o.kind === "qr") return { n, k: "qr", lines: o.lines };
       if (o.kind === "files") return { n, k: "files", inline: o.inline, items: o.items };
@@ -553,72 +588,16 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     }
   };
 
-  /** The tour: a dim comment, then the step typed into the real prompt and run. Any key or tap stops it. */
-  const startDemo = async () => {
-    if (demoRef.current) return;
-    demoRef.current = true;
-    beacon("tour_start");
-    const fast = via === "normal" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const steps: Array<[string, string]> = [
-      ["help", "every command, in groups"],
-      ["resume", "the résumé, six files"],
-      ["projects", "what I built"],
-      ["timeline", "school → college → work"],
-      ["portrait", "the face behind it"],
-      ["contact", "say hi"],
-    ];
-    let stopped = false;
-    const stop = (e: Event) => {
-      if (e instanceof KeyboardEvent) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-      stopped = true;
-    };
-    const unguard = guardKeys(stop);
-    setDemoOn(true);
-    const halted = () => stopped || cancelled.current;
-    try {
-      for (let k = 0; k < steps.length; k++) {
-        const [step, note] = steps[k];
-        if (halted()) break;
-        setTourStep({ i: k + 1, n: steps.length });
-        line(`# ${k + 1}/${steps.length} · ${note}`, false, true, here());
-        await wait(fast ? 100 : 450);
-        if (halted()) break;
-        for (let c = 1; c <= step.length && !halted(); c++) {
-          setCmd(step.slice(0, c));
-          ambient.key();
-          await wait(fast ? 12 : 28 + Math.random() * 12);
-        }
-        if (halted()) break;
-        await wait(fast ? 60 : 180);
-        if (halted()) break;
-        submit(step);
-        await wait(fast ? 350 : 700);
-      }
-    } finally {
-      unguard();
-      demoRef.current = false;
-      setDemoOn(false);
-      setTourStep(null);
-      setCmd("");
-      if (!cancelled.current) {
-        if (stopped) {
-          line("^C tour", false, true, here());
-          beacon("tour_stop");
-        } else line("tour over · type a command, or view", false, true, here());
-      }
-    }
-  };
-
   const patchEntry = (n: number, p: Partial<Extract<Entry, { k: "out" }>>) => setEntries((es) => es.map((e) => (e.n === n && e.k === "out" ? { ...e, ...p } : e)));
 
   /** The public GitHub data for `curl github` and `git log`: cached for an hour, validated before use. */
   const loadGithub = async (ac: AbortController): Promise<{ d: GhCache; cached: boolean }> => {
     try {
       const c = JSON.parse(window.localStorage.getItem(GH_KEY) ?? "null") as GhCache | null;
-      if (c && ghValid(c) && Date.now() - c.t < GH_TTL) return { d: c, cached: true };
+      if (c && ghValid(c) && Date.now() - c.t < GH_TTL) {
+        setGh(c);
+        return { d: c, cached: true };
+      }
     } catch {}
     const api = `https://api.github.com/users/${GH_USER}`;
     const rs = await Promise.all([`${api}`, `${api}/repos?sort=pushed&per_page=5`, `${api}/events/public?per_page=100`].map((u) => fetch(u, { signal: ac.signal })));
@@ -630,6 +609,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     try {
       window.localStorage.setItem(GH_KEY, JSON.stringify(d));
     } catch {}
+    setGh(d);
     return { d, cached: false };
   };
 
@@ -749,7 +729,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
 
   /** `sl`: a locomotive crosses the width in about two seconds; any key or tap stops it. */
   const startSl = async () => {
-    if (slStop.current || demoRef.current) return;
+    if (slStop.current) return;
     let stopped = false;
     const stop = (e: Event) => {
       if (e instanceof KeyboardEvent) {
@@ -811,7 +791,6 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     setPartial(null);
     mailRef.current = null;
     setMailStep(null);
-    demoRef.current = false;
     pager.current = null;
     setPaging(false);
     if (!osRef.current) swap();
@@ -979,7 +958,6 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       } else submit(fx.cmd);
     }
     else if (fx.kind === "sl") void startSl();
-    else if (fx.kind === "tour") void startDemo();
     else if (fx.kind === "mail") startMail();
     else if (fx.kind === "pane") togglePane();
     else toggleFull();
@@ -1001,19 +979,18 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     try {
       window.sessionStorage.setItem(histKey(persona), JSON.stringify(r.state.history));
     } catch {}
-    if (r.lines.length > PAGE && !demoRef.current) {
+    if (r.lines.length > PAGE) {
       print(r.lines.slice(0, PAGE));
       pager.current = { rest: r.lines.slice(PAGE) };
       setPaging(true);
       append([{ n: ++seq.current, k: "more" }]);
     } else print(r.lines);
     tickFor(c, cwd0);
-    if (!demoRef.current) {
+    {
       const name = c.split(/\s+/)[0].replace(/^\//, "").toLowerCase();
       const known = shell.commands.some((x) => x.name === name) || EGGS.includes(name);
       const first = r.lines[0];
-      // The tour reports itself as tour_start / tour_stop.
-      if (name !== "tour" && name !== "demo") beacon(known ? name : "unknown", known && !(first?.kind === "text" && first.text.startsWith("command not found")));
+      beacon(known ? name : "unknown", known && !(first?.kind === "text" && first.text.startsWith("command not found")));
     }
     if (r.effect) effect(r.effect);
     if (!window.matchMedia("(pointer: coarse)").matches) input.current?.focus({ preventScroll: true });
@@ -1245,7 +1222,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       tick("boot");
       if (!instant) await wait(520);
       if (stopped()) return;
-      line(firstVisit ? "new here? type tour · hiring? type hire · help lists everything" : "type help, / for the menu · hire for the short version", false, true);
+      line(firstVisit ? "new here? type portfolio · hiring? type hire · help lists everything" : "type help, / for the menu · hire for the short version", false, true);
       await type("ls views/", 13, instant, false, token);
       if (stopped()) return;
       showViews(true);
@@ -1272,12 +1249,10 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       curlAbort.current?.abort();
       slStop.current?.();
       for (const off of [...guards.current]) off();
-      demoRef.current = false;
-      mailRef.current = null;
+        mailRef.current = null;
       pager.current = null;
       setMailStep(null);
       setPaging(false);
-      setDemoOn(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persona, via, itemKey, viewKey, color]);
@@ -1295,7 +1270,29 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         setCrt(true);
       }
     } catch {}
+    // Only read the cache here; the network is not touched on boot.
+    try {
+      const c = JSON.parse(window.localStorage.getItem(GH_KEY) ?? "null") as GhCache | null;
+      if (c && ghValid(c)) setGh(c);
+    } catch {}
   }, [persona]);
+
+  // Once the terminal has been ready and idle for 3 s, look GitHub up once for the pane (unless the connection asks for less data).
+  useEffect(() => {
+    if (!ready || gh !== undefined) return;
+    const nav = navigator as Navigator & { connection?: { saveData?: boolean } };
+    if (nav.connection?.saveData) return void setGh(null);
+    const ac = new AbortController();
+    const id = window.setTimeout(() => {
+      loadGithub(ac).catch(() => {
+        if (!ac.signal.aborted) setGh(null);
+      });
+    }, 3000);
+    return () => {
+      window.clearTimeout(id);
+      ac.abort();
+    };
+  }, [ready, gh, cmd, entries.length]);
 
   useEffect(() => {
     if (via) {
@@ -1430,6 +1427,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     { id: "mail", cmd: "mail", label: "mail", note: "write to me" },
   ];
   const contents = allContents.filter((row) => !emptyIds.includes(row.id));
+  const seen = contents.filter((r) => checks[r.id]).length;
 
   /** A name in a listing: runs `cat` (file), `cd` (dir) or `open` (view). Dirs take the accent, views green. */
   const pathButton = (it: FileItem) => (
@@ -1471,11 +1469,11 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         <Tips tips={e.tips} />
       </div>
     ) : e.k === "portrait" ? (
-      <PixelsView key={e.n} art={PORTRAIT_PIXELS} />
+      <PortraitView key={e.n} mode={e.mode} cfg={portraitCfg} cols={PORTRAIT_COLS[e.mode][isNarrow() ? "narrow" : "wide"]} className={`is-${e.mode}`} run={(c) => submit(c)} />
     ) : e.k === "neofetch" ? (
       <div key={e.n} className="terminal-os-fetch">
         <span className="sr-only">a portrait of Ratul</span>
-        <BrailleView art={PORTRAIT_BRAILLE_SMALL} className="is-fetch" />
+        <PortraitView mode="braille" cfg={portraitCfg} cols={26} className="is-fetch" fetchCard />
         <pre className="terminal-os-fetch-rows">
           <code className="ps-user">{e.rows[0]}</code>
           {`\n${e.rows.slice(1).join("\n")}\n\n`}
@@ -1567,6 +1565,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       </button>
     ) : e.k === "links" ? (
       <span key={e.n} className="is-out">
+        {e.prefix}
         {e.items.map((l, i) => (
           <Fragment key={l.label}>
             {i ? " · " : ""}
@@ -1668,8 +1667,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           }}
         >
           <span className="sr-only">Type commands. help lists them, hire is the short version, / opens the menu, banner prints the welcome again, cls clears the screen, Ctrl+C cancels, Esc or exit returns to the hub.</span>
-          {demoOn ? <span className="sr-only" role="status">tour running, press any key to stop</span> : null}
-          <div role="log" aria-live={demoOn ? "off" : "polite"} aria-relevant="additions">
+          <div role="log" aria-live="polite" aria-relevant="additions">
             {entries.map(renderEntry)}
           </div>
           {palette ? (
@@ -1743,7 +1741,25 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         <aside className="terminal-os-pane" aria-label="Side pane">
           <h3>where</h3>
           <p className="terminal-os-pane-where">{shortPath(cwd)}</p>
+          <h3>who</h3>
+          <p className="terminal-os-pane-name">{data.resume.name.toLowerCase()}</p>
+          <p>{`${(data.resume.title.split(" · ")[0] ?? "").toLowerCase()} · ${data.resume.location.split(",")[0].toLowerCase()}`}</p>
+          <p className="terminal-os-pane-status">
+            <i aria-hidden="true" />
+            {data.status}
+          </p>
+          <div className="terminal-os-pane-actions">
+            {["hire", "resume --pdf", "mail"].map((c) => (
+              <button key={c} type="button" onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit(c)}>
+                {c}
+              </button>
+            ))}
+          </div>
           <h3>contents</h3>
+          <p className="terminal-os-pane-seen">{seen === contents.length ? "all seen · thanks for reading" : `seen ${seen} of ${contents.length}`}</p>
+          <div className="terminal-os-pane-meter" role="progressbar" aria-label="sections seen" aria-valuemin={0} aria-valuemax={contents.length} aria-valuenow={seen}>
+            <i style={{ width: `${contents.length ? (seen / contents.length) * 100 : 0}%` }} />
+          </div>
           <ul role="list" className="terminal-os-contents">
             {contents.map((r) => (
               <li key={r.id}>
@@ -1759,17 +1775,23 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           <button type="button" className="terminal-os-pane-next" onMouseDown={keepFocus} onClick={() => submit(hintCmd)}>
             {nextTry ? `try: ${hintCmd}` : "all done · try: sudo make me a sandwich"}
           </button>
+          {gh !== null ? (
+            <>
+              <h3>live</h3>
+              <p className="terminal-os-pane-live">{gh === undefined ? "github · …" : `github · last push ${gh.repos[0] ? ago(Date.now() - Date.parse(gh.repos[0].pushed_at)) : "unknown"}`}</p>
+              {gh ? <p className="terminal-os-pane-live">{`${Number(gh.user.public_repos) || 0} public repos`}</p> : null}
+            </>
+          ) : null}
           <h3>keys</h3>
           <p className="terminal-os-keys">Tab complete · ↑ history · / menu · cls clear · Ctrl+C cancel · Esc exit</p>
         </aside>
         </div>
         <div className="terminal-os-status">
           <code className="terminal-os-status-l">{`${USER}@code  ${shortPath(cwd)}`}</code>
-          {tourStep ? <code className="terminal-os-status-tour">{`tour ${tourStep.i}/${tourStep.n} · any key stops`}</code> : null}
-          <code className="terminal-os-status-m is-counts" hidden={!!tourStep}>
+          <code className="terminal-os-status-m is-counts">
             {[plural(data.projects.length, "project"), plural(data.posts.length, "post"), plural(data.views.length, "view")].filter((t) => !t.startsWith("0 ")).join(" · ")}
           </code>
-          {nextTry && !tourStep ? (
+          {nextTry ? (
             <button type="button" className="terminal-os-status-hint" onMouseDown={keepFocus} onClick={() => submit(hintCmd)}>
               {`try: ${hintCmd}`}
             </button>
@@ -1812,8 +1834,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           >
             /
           </button>
-          <button type="button" onMouseDown={keepFocus} onClick={typeChip(() => submit("tour"))}>
-            tour
+          <button type="button" onMouseDown={keepFocus} onClick={typeChip(() => submit("portfolio"))}>
+            portfolio
           </button>
           <button type="button" onMouseDown={keepFocus} onClick={typeChip(() => submit("views"))}>
             views

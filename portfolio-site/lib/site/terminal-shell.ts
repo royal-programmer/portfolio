@@ -5,6 +5,7 @@
  */
 import { DISPLAY_ROOT, personaIdentity } from "@/lib/site/brand";
 import { BANNER_ROYAL_PROGRAMMER } from "@/lib/site/terminal-art";
+import { isPortraitMode, PORTRAIT_MODES, type PortraitMode } from "@/lib/site/portrait-gen";
 import {
   buildFs,
   complete as completePath,
@@ -96,13 +97,13 @@ export type Out =
   /** A QR code as text rows (`qr`). */
   | { kind: "qr"; lines: string[] }
   /** Several links on one line, joined by " · ". */
-  | { kind: "links"; items: Array<{ label: string; href?: string; external?: boolean; cmd?: string }> }
+  | { kind: "links"; items: Array<{ label: string; href?: string; external?: boolean; cmd?: string }>; prefix?: string }
   /** A listing: `inline` joins the names on one line (`ls`); otherwise it is one row, `meta` before the name. */
   | { kind: "files"; inline: boolean; items: FileItem[] }
   /** `cal`: weeks of day numbers (null = blank), today highlighted. */
   | { kind: "cal"; title: string; weeks: Array<Array<number | null>>; today: number }
-  /** The pixel portrait (`portrait`). */
-  | { kind: "portrait" }
+  /** The generated portrait (`portrait [mode]`); "next" cycles from the last one drawn. */
+  | { kind: "portrait"; mode: PortraitMode | "next" }
   /** The `neofetch` card: the small portrait on the left, these rows on the right. */
   | { kind: "neofetch"; rows: string[] }
   | { kind: "link"; label: string; href: string; external?: boolean }
@@ -120,8 +121,7 @@ export type Effect =
   | { kind: "clear" }
   | { kind: "fullscreen" }
   | { kind: "pane" }
-  /** The guided tour, and the inline contact form: both run in the UI, which owns the prompt. */
-  | { kind: "tour" }
+  /** The inline contact form runs in the UI, which owns the prompt. */
   /** Run another command line as if typed (a tip's number). */
   | { kind: "run"; cmd: string }
   /** `git log`: the UI fetches the public activity. */
@@ -170,7 +170,7 @@ const COMMANDS: CommandDoc[] = [
   { name: "theme", group: "terminal", usage: "theme [name]", desc: "accent · amber · green · paper" },
   { name: "crt", group: "terminal", usage: "crt", desc: "toggle scanlines" },
   { name: "resume", group: "read", usage: "resume [--pdf]", desc: "the overview, like the résumé's first page" },
-  { name: "portrait", group: "read", usage: "portrait", desc: "me, in characters" },
+  { name: "portrait", group: "read", usage: "portrait [mode|list|next]", desc: "me, in characters: pixels · braille · ascii · blocks · matrix" },
   { name: "whoami", group: "read", usage: "whoami", desc: "one line about me" },
   { name: "neofetch", group: "read", usage: "neofetch", desc: "a stat card for this host" },
   { name: "open", group: "open", usage: "open <view|slug|url>", desc: "open a view, a project or post, or a link" },
@@ -181,7 +181,7 @@ const COMMANDS: CommandDoc[] = [
   { name: "history", group: "terminal", usage: "history", desc: "commands typed this session" },
   { name: "clear", group: "terminal", usage: "clear", desc: "empty the screen", long: "cls does the same." },
   { name: "cls", group: "terminal", usage: "cls", desc: "empty the screen (same as clear)" },
-  { name: "tour", group: "terminal", usage: "tour", desc: "a guided tour; any key stops it" },
+  { name: "portfolio", group: "read", usage: "portfolio", desc: "the whole portfolio on one screen", long: "Every section ends with the command that goes deeper; the → commands are clickable." },
   { name: "hire", group: "read", usage: "hire", desc: "the 20-second version, for recruiters" },
   { name: "timeline", group: "read", usage: "timeline", desc: "school → college → work, as one line" },
   { name: "view", group: "open", usage: "view [id]", desc: "enter a view (no id: pick from the list)" },
@@ -204,7 +204,7 @@ const TIPS = [
   { cmd: "view", desc: "enter a view" },
   { cmd: "projects", desc: "read what I built" },
   { cmd: "resume", desc: "the overview" },
-  { cmd: "tour", desc: "a guided tour" },
+  { cmd: "portfolio", desc: "the whole thing on one screen" },
 ];
 
 const text = (t: string, dim = false): Out => ({ kind: "text", text: t, dim: dim || undefined });
@@ -473,6 +473,50 @@ export function createShell(data: TerminalData): Shell {
     ];
   };
 
+  /** `portfolio`: everything on one screen. Sections with a left rule, each ending in the command that goes deeper. */
+  const portfolio = (cols: number): Out[] => {
+    const r = data.resume;
+    const w = Math.max(30, Math.min(cols, 96));
+    const hw = Math.min(w, 56);
+    const clip = (t: string) => (t.length > w - 2 ? `${t.slice(0, w - 3).replace(/\s+\S*$/, "")}…` : t);
+    const out: Out[] = [];
+    const head = (label: string) => out.push({ kind: "parts", parts: [{ text: `── ${label} ${"─".repeat(Math.max(2, hw - label.length - 4))}`, tone: "dim" }] });
+    const row = (t: string) => out.push(text(`│ ${t}`));
+    const go = (...cmds: string[]) => out.push({ kind: "links", prefix: "│ → ", items: cmds.map((c) => ({ label: c, cmd: c })) });
+    const role = (r.title.split(" · ")[0] ?? "").toLowerCase();
+    const city = r.location.split(",")[0];
+    head("who");
+    row(clip([r.name, role, city, /relocat/i.test(r.location) ? "open to relocation" : ""].filter(Boolean).join(" · ")));
+    row(clip(data.uptime));
+    go("hire", "resume");
+    head("stack");
+    row(clip(data.stack.join(" · ")));
+    go("stack");
+    head("timeline");
+    const line = [...data.periods.map((p) => `${p.from.slice(0, 4)} ${p.id}`), "now"].join(" ─ ");
+    row(clip(line));
+    go("timeline");
+    if (data.projects.length) {
+      head(`projects (${data.projects.length})`);
+      for (const p of data.projects.slice(0, 3)) row(clip(p.summary ? `${p.title} — ${p.summary}` : p.title));
+      go("projects");
+    }
+    if (data.posts.length) {
+      head(`writing (${data.posts.length})`);
+      for (const p of data.posts.slice(0, 3)) row(clip(p.title));
+      go("writing");
+    }
+    if (data.views.length) {
+      head("views");
+      for (const v of data.views) row(clip(`${v.id} — ${v.line}`));
+      go(...data.views.map((v) => `view ${v.id}`));
+    }
+    head("contact");
+    row(clip([...data.contact.map((c) => c.label), "resume --pdf"].join(" · ")));
+    go("contact", "mail");
+    return out;
+  };
+
   /** `Sun Nov  8 15:04:05 IST 2026`, in the visitor's zone. */
   const date = (): Out[] => {
     const d = new Date();
@@ -619,9 +663,8 @@ export function createShell(data: TerminalData): Shell {
         return { lines: cat(["~/contact"], st) };
       case "git":
         return git(args);
-      case "tour":
-      case "demo":
-        return { lines: [], effect: { kind: "tour" } };
+      case "portfolio":
+        return { lines: portfolio(env?.cols ?? 100) };
       case "hire":
         return { lines: hire() };
       case "timeline":
@@ -688,8 +731,14 @@ export function createShell(data: TerminalData): Shell {
       case "nano":
       case "emacs":
         return { lines: [text("no. try cat.")] };
-      case "portrait":
-        return { lines: [{ kind: "portrait" }] };
+      case "portrait": {
+        const a = (args[0] ?? "").toLowerCase();
+        if (!a) return { lines: [{ kind: "portrait", mode: "pixels" }] };
+        if (a === "next") return { lines: [{ kind: "portrait", mode: "next" }] };
+        if (a === "list") return { lines: [text("portrait modes:", true), { kind: "links", prefix: "  ", items: PORTRAIT_MODES.map((m) => ({ label: m, cmd: `portrait ${m}` })) }] };
+        if (isPortraitMode(a)) return { lines: [{ kind: "portrait", mode: a }] };
+        return { lines: [text(`portrait: no mode '${args[0]}' · portrait list`)] };
+      }
       case "open":
         return open(args.join(" ").trim() || undefined, st);
       case "views":

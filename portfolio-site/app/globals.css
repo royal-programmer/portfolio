@@ -2456,33 +2456,36 @@ em.font-display,
   line-height: 1.05;
   color: var(--c);
 }
-/* `neofetch`'s braille portrait (2x4 dots per cell), in the accent. */
-.terminal-os-braille {
-  margin: 0;
+/* The generated portrait: every mode is one grid of cells, sized to the body (cqw) and the viewport height. */
+.terminal-os-portrait {
+  margin: 4px 0;
   font-family: var(--font-geist-mono), monospace;
+  font-size: min(13px, calc(100cqw / var(--p-cols) / var(--p-adv)), calc((100dvh - 190px) / var(--p-rows)));
   line-height: 1;
   letter-spacing: 0;
   white-space: pre;
   overflow: hidden;
   color: var(--c);
+  user-select: none;
+  -webkit-user-select: none;
 }
-.terminal-os-braille.is-fetch {
-  font-size: min(13px, calc((100vw - 2 * var(--os-pad)) / 26 / var(--adv-br)));
+.terminal-os-portrait.is-pixels {
+  font-size: min(10px, calc(100cqw / var(--p-cols) / var(--p-adv)), calc((100dvh - 170px) / var(--p-rows)));
 }
-
-/* `portrait`: true-colour half-blocks, top pixel as text, bottom as background. */
-.terminal-os-pixels {
-  margin: 4px 0;
-  font-family: var(--font-geist-mono), monospace;
-  /* 132 cells across the body (cqw) and 102 rows within the viewport height, at most 10px. */
-  font-size: min(10px, calc(100cqw / 132 / var(--adv-px)), calc((100dvh - 170px) / 102));
-  line-height: 1;
-  letter-spacing: 0;
-  white-space: pre;
-  overflow: hidden;
+.terminal-os-portrait.is-matrix {
+  background: #020a04;
+  width: max-content;
+  max-width: 100%;
 }
-.terminal-os-pixels span {
+.terminal-os-portrait.is-fetch {
+  font-size: min(13px, calc((100vw - 2 * var(--os-pad)) / var(--p-cols) / var(--p-adv)));
+}
+.terminal-os-portrait span {
   display: inline;
+}
+.terminal-os-modes {
+  display: block;
+  margin-top: 2px;
 }
 
 /* Names in a listing and `open ...` lines: buttons that look like text, underlined on hover. */
@@ -2543,11 +2546,6 @@ em.font-display,
 /* git log: the sha is yellow. */
 .terminal-gh-sha {
   --accent-link: var(--term-yellow, #e5c07b);
-}
-
-/* The status bar's tour progress (shown on every width while the tour runs). */
-.terminal-os-status-tour {
-  color: var(--c);
 }
 
 /* `qr`: dark modules as ink on a light tile, so phone scanners see the usual code. `sl`: the locomotive. */
@@ -2649,6 +2647,65 @@ em.font-display,
 }
 .terminal-os-pane-where {
   color: var(--ink);
+}
+.terminal-os-pane-name {
+  font-weight: 700;
+  color: var(--ink);
+}
+.terminal-os-pane-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+.terminal-os-pane-status i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #5fbf6a;
+  box-shadow: 0 0 6px #5fbf6a;
+}
+.terminal-os-pane-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.terminal-os-pane-actions button {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 4px 6px;
+  border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.terminal-os-pane-actions button:hover,
+.terminal-os-pane-actions button:focus-visible {
+  background: color-mix(in srgb, var(--c) 16%, transparent);
+}
+.terminal-os-pane-seen {
+  margin-bottom: 4px;
+  color: var(--ink-faint);
+}
+.terminal-os-pane-meter {
+  height: 3px;
+  margin-bottom: 8px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--c) 18%, transparent);
+  overflow: hidden;
+}
+.terminal-os-pane-meter i {
+  display: block;
+  height: 100%;
+  background: var(--c);
+}
+.terminal-os-pane-live {
+  color: var(--ink-faint);
 }
 /* Contents: one button per part of the portfolio; a check once visited. */
 .terminal-os-contents {

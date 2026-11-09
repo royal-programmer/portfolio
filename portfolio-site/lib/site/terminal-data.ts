@@ -113,7 +113,10 @@ export type TermCommit = {
 /** The career as a git history, newest first when printed. From the résumé; dates to the month. */
 export const TIMELINE: TermCommit[] = [
   { date: "2022-07-01", subject: "Complete Python Essentials 1 (Cisco) and the IBM Python for Data Science badge", branch: "learn" },
-  { date: "2024-06-01", subject: "Graduate: B.Tech, Computer Science and Engineering, ITER (SOA University)", branch: "learn", tag: "b.tech", body: ["CGPA 7.75/10"] },
+  { date: "2022-09-01", subject: "Intern: web application developer (The Sparks Foundation) and cyber security (Coincent.ai)", branch: "learn" },
+  { date: "2023-06-01", subject: "Intern: artificial intelligence (Edunet Foundation, IBM SkillsBuild)", branch: "learn" },
+  { date: "2023-08-01", subject: "Intern: MERN stack developer (Webstack Academy)", branch: "learn" },
+  { date: "2024-07-01", subject: "Graduate: B.Tech, Computer Science and Engineering, ITER (SOA University)", branch: "learn", tag: "b.tech", body: ["CGPA 7.75/10"] },
   { date: "2024-10-01", subject: "Join SLK as Engineer", branch: "main", tag: "slk", body: ["Full stack, APIs, automation, production support."] },
   { date: "2025-03-28", subject: "Move to SLK Digital", branch: "main" },
   { date: "2025-06-01", subject: "Take ownership of 11 Python automations and the RabbitMQ integrations", branch: "main", body: ["Finance, project sync, background verification; scheduled and API-triggered."] },
@@ -131,10 +134,9 @@ export const TIMELINE: TermCommit[] = [
 export type TermPeriod = { id: string; label: string; from: string; to: string | null };
 
 export const TIMELINE_PERIODS: TermPeriod[] = [
-  // Ratul: fill in the school's name and years, then uncomment.
-  // { id: "school", label: "", from: "", to: "" },
-  { id: "college", label: "B.Tech CSE · ITER, SOA University", from: "2020-08", to: "2024-06" },
-  { id: "work", label: "SLK → SLK Digital → Altimetrik", from: "2024-10", to: null },
+  { id: "school", label: "school · Techno India Group → UP Public School", from: "2016-03", to: "2020-03" },
+  { id: "college", label: "B.Tech CSE · ITER, SOA University", from: "2021-10", to: "2024-07" },
+  { id: "work", label: "SLK → Altimetrik", from: "2024-10", to: null },
 ];
 
 export type TerminalData = {
@@ -150,6 +152,10 @@ export type TerminalData = {
   resume: TermResume;
   timeline: TermCommit[];
   periods: TermPeriod[];
+  /** The portrait's source photo and crop (fractions l,t,r,b); every `portrait` mode is generated from it. */
+  portrait: { src: string; crop: [number, number, number, number] };
+  /** The availability line in the side pane. */
+  status: string;
   /** Build id, when the deploy exposes one. */
   commit?: string;
 };
@@ -189,6 +195,8 @@ export function terminalData(persona: Persona | undefined, entries: Entry[], pos
     resume: RESUME,
     timeline: TIMELINE,
     periods: TIMELINE_PERIODS,
+    portrait: { src: "/profile-cartoon-avatar.png", crop: [0.316, 0.1, 0.684, 0.97] },
+    status: "open to work · bengaluru · relocates",
     commit: process.env.NEXT_PUBLIC_COMMIT || undefined,
   };
 }
