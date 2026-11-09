@@ -5,6 +5,15 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-10 — Round 1m: school grades on the timeline, Tab cycling, seamless hub → persona hand-off
+
+- Class 10 and class 12 are timeline entries with their own highlighted grade; the school bracket label no longer carries the combined string.
+- Tab again cycles the completions (Shift+Tab back, Esc restores), highlight moves in place; `portrait`, `timeline`, `ls -l` complete.
+- Hub curtain for the Normal doorway; Speculation Rules prerender of the persona page on hover/press/focus; `Supports-Loading-Mode: credentialed-prerender`
+  header; boot, entry animation and beacon wait for `prerenderingchange`; the terminal is server-rendered with its banner and fades in over 240 ms.
+- Not observed: an actual prerender activation in the automated Chrome (`activationStart` stayed 0); the rules, header and guards are in place.
+  Details in `17-persona-views.md` section 6.14.
+
 ## 2026-11-09 — Round 1l: timeline grid, Tab, eleven themes, Normal-mode doorway, `now`
 
 - `timeline` rebuilt as a CSS grid (straight, uncut bracket column; months-based durations; `--all`); school/college/born data from Ratul.

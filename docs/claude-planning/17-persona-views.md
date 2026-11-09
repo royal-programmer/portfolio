@@ -298,3 +298,26 @@ This round is an honest-placeholder pass, not a rebuild of the other personas (e
 - **Polish:** `portfolio` puts the `→` commands at the right end of each section's last line on wide screens (`links.lead`); the status bar has a
   green `open to work` item that runs `hire`; `now` prints `TerminalData.now`, and the pane's Who block shows its first line.
 - Dev note: after CSS-only edits the dev server sometimes serves a stale stylesheet; a real content change to `globals.css` recompiles it.
+
+### 6.14 Round 1m: school milestones, Tab cycling, a seamless hub → persona hand-off (Ratul + lead recording, 2026-11-10)
+
+- **School milestones carry their grade.** `TermCommit.grade`; `2018-03` Secondary (class 10, 85.66%) and `2020-03` Higher secondary (class 12, 79%)
+  are entries with a green grade after the tag, outside the clipping `.tl-text`. `TimelineRow` has `grade` (entry) and `periodGrade` (bracket label)
+  so they never collide; college keeps `cgpa 7.75/10` on its label. Rows with a grade count like period edges in the default view.
+- **Tab cycles like a shell's menu-complete.** First Tab with 2+ candidates inserts the common prefix and prints one candidate line (an OS entry
+  with an id); each further Tab fills the word with the next candidate and moves a highlight in that same line, Shift+Tab goes back. The cycle dies on
+  any other key, a click, or when the input no longer equals the last step; Esc while cycling restores the typed word. `portrait`, `timeline`
+  and `ls -l` now complete. In `/` palette mode, Tab/Shift+Tab move the highlighted match (a lone match is still picked).
+- **Curtain.** Taking a Normal doorway mounts `.hub-curtain` (`#05060a`, a 1 px hairline in the persona colour sweeping 1.2 s then pulsing, and
+  `opening <host>…`). It fades in from 220 ms into the zoom, so the card dissolves into it, not into a hole; it stays until the page unloads and is
+  removed on a bfcache `pageshow`. Reduced motion: instant, navigation after 80 ms.
+- **Prerender on intent.** `lib/site/speculate.ts` injects one `speculationrules` script (`prerender`, `eagerness: immediate`, `?via=normal`) on hover,
+  press or focus of the chapter button and the display; one persona at a time, skipped on data-saver, `link rel=prefetch` where rules are unsupported.
+  Persona hosts are same-site cross-origin, so every response sends `Supports-Loading-Mode: credentialed-prerender` (`next.config.ts`, chore commit).
+- **No side effects before activation.** `lib/site/prerender.ts` `whenActive` runs the terminal boot and `WorldBoot`'s entry animation on
+  `prerenderingchange` (and sets `<html data-prerendered>`); the usage beacon is skipped while prerendering. Ambient sound and `track` only fire
+  from user gestures, so they cannot run early.
+- **No blank frame.** With `via=normal` the server renders the terminal in os mode with the banner as static markup; the boot effect swaps in the
+  identical banner in the same commit (no double banner) and skips the ssh script. The root fades in over 240 ms (`.is-via-normal`; a prerendered
+  page holds `.is-arriving` until activation). `html:has(.terminal-root)` paints `#05060a` so no white can show between documents (scoped, not
+  global, so the light personas keep their canvas).
