@@ -14,6 +14,14 @@ session) can resume without re-deriving state. Newest first.
 - Not observed: an actual prerender activation in the automated Chrome (`activationStart` stayed 0); the rules, header and guards are in place.
   Details in `17-persona-views.md` section 6.14.
 
+## 2026-11-10 — Round 2: the Series view (branch `claude/series`)
+
+- `/engineer/series` is live behind the registry (`enabled: true`): Who's watching (three profiles), hero with a typed trailer, episode / project / skill rows, season bar, inline episode sheet, To be continued. Data is `lib/site/series-data.ts`; the three profiles are orderings of the terminal's dataset. Details: `17-persona-views.md` §7.
+- Commits on `claude/series`: data, profiles, hero, rows, polish, docs.
+- Verified at 1280x800 and 393x852 touch: no horizontal page scroll, hover growth and synopsis, sheet, trailer typing, terminal picker lists Series and the pick is remembered.
+
+---
+
 ## 2026-11-09 — Round 1l: timeline grid, Tab, eleven themes, Normal-mode doorway, `now`
 
 - `timeline` rebuilt as a CSS grid (straight, uncut bracket column; months-based durations; `--all`); school/college/born data from Ratul.
