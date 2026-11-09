@@ -293,6 +293,14 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const [cmd, setCmd] = useState("");
   /** Where the real input's cursor is, so the drawn caret follows Home, arrows and clicks. */
   const [caret, setCaret] = useState(0);
+  const [bell, setBell] = useState(false);
+  const bellTimer = useRef<number | undefined>(undefined);
+  const ringBell = () => {
+    window.clearTimeout(bellTimer.current);
+    setBell(true);
+    bellTimer.current = window.setTimeout(() => setBell(false), 120);
+  };
+  useEffect(() => () => window.clearTimeout(bellTimer.current), []);
   const [sel, setSel] = useState(0);
   const [palSel, setPalSel] = useState(0);
   /** The menu the arrow keys drive: the latest one shown, until Esc or another command. */
@@ -1119,12 +1127,11 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       else if (menuLive) pick(menu.id, menu.rows[Math.min(sel, menu.rows.length - 1)]);
       else submit(cmd);
     } else if (e.key === "Tab") {
-      // Only take Tab when it completes something; otherwise focus moves on (chips, dots, links).
-      if (e.shiftKey || !cmd) return;
-      const any = palette ? palMatches.length > 0 : shell.complete(cmd, live.current.shell).length > 0;
-      if (!any) return;
+      // Tab never leaves the prompt: it completes, lists the candidates, or rings the bell.
       e.preventDefault();
-      tab();
+      const any = !!cmd && (palette ? palMatches.length > 0 : shell.complete(cmd, live.current.shell).length > 0);
+      if (any) tab();
+      else ringBell();
     } else if (e.key === "Escape") {
       e.preventDefault();
       act.current.esc();
@@ -1740,7 +1747,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
                   ) : (
                     <>
                       {cmd.slice(0, Math.min(caret, cmd.length))}
-                      <i className="hub-enter-caret" />
+                      <i className={`hub-enter-caret${bell ? " terminal-os-bell" : ""}`} />
                       {cmd.slice(Math.min(caret, cmd.length))}
                     </>
                   )}
@@ -1783,7 +1790,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           </p>
           <div className="terminal-os-pane-actions">
             {["hire", "resume --pdf", "mail"].map((c) => (
-              <button key={c} type="button" onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit(c)}>
+              <button key={c} type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit(c)}>
                 {c}
               </button>
             ))}
@@ -1796,7 +1803,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           <ul role="list" className="terminal-os-contents">
             {contents.map((r) => (
               <li key={r.id}>
-                <button type="button" className={`terminal-os-content-row ${checks[r.id] ? "is-done" : ""}`} onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit(r.cmd)}>
+                <button type="button" tabIndex={-1} className={`terminal-os-content-row ${checks[r.id] ? "is-done" : ""}`} onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit(r.cmd)}>
                   <b>{checks[r.id] ? "✓" : " "}</b>
                   <span>{r.label}</span>
                   <i>{r.note}</i>
@@ -1805,7 +1812,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
             ))}
           </ul>
           <h3>next</h3>
-          <button type="button" className="terminal-os-pane-next" onMouseDown={keepFocus} onClick={() => submit(hintCmd)}>
+          <button type="button" tabIndex={-1} className="terminal-os-pane-next" onMouseDown={keepFocus} onClick={() => submit(hintCmd)}>
             {nextTry ? `try: ${hintCmd}` : "all done · try: sudo make me a sandwich"}
           </button>
           {gh !== null ? (
@@ -1825,16 +1832,17 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
             {[plural(data.projects.length, "project"), plural(data.posts.length, "post"), plural(data.views.length, "view")].filter((t) => !t.startsWith("0 ")).join(" · ")}
           </code>
           {nextTry ? (
-            <button type="button" className="terminal-os-status-hint" onMouseDown={keepFocus} onClick={() => submit(hintCmd)}>
+            <button type="button" tabIndex={-1} className="terminal-os-status-hint" onMouseDown={keepFocus} onClick={() => submit(hintCmd)}>
               {`try: ${hintCmd}`}
             </button>
           ) : null}
           <span className="terminal-os-status-r">
-            <button type="button" onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit("help")}>
+            <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit("help")}>
               help
             </button>
             <button
               type="button"
+              tabIndex={-1}
               onMouseDown={keepFocus}
               onClick={() => {
                 setCmd("/");
@@ -1844,20 +1852,21 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
             >
               /
             </button>
-            <button type="button" className="is-pane-btn" onMouseDown={keepFocus} onClick={togglePane}>
+            <button type="button" tabIndex={-1} className="is-pane-btn" onMouseDown={keepFocus} onClick={togglePane}>
               pane
             </button>
-            <button type="button" onMouseDown={keepFocus} onClick={() => act.current.esc()}>
+            <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => act.current.esc()}>
               Esc
             </button>
           </span>
         </div>
         <div className="terminal-root-chips" aria-label="Terminal keys">
-          <button type="button" onMouseDown={keepFocus} onClick={typeChip(() => submit("help"))}>
+          <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={typeChip(() => submit("help"))}>
             help
           </button>
           <button
             type="button"
+            tabIndex={-1}
             onMouseDown={keepFocus}
             onClick={typeChip(() => {
               setCmd("/");
@@ -1867,19 +1876,19 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           >
             /
           </button>
-          <button type="button" onMouseDown={keepFocus} onClick={typeChip(() => submit("portfolio"))}>
+          <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={typeChip(() => submit("portfolio"))}>
             portfolio
           </button>
-          <button type="button" onMouseDown={keepFocus} onClick={typeChip(() => submit("views"))}>
+          <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={typeChip(() => submit("views"))}>
             views
           </button>
-          <button type="button" onMouseDown={keepFocus} onClick={typeChip(() => chipKey("tab"))}>
+          <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={typeChip(() => chipKey("tab"))}>
             Tab
           </button>
-          <button type="button" onMouseDown={keepFocus} onClick={() => chipKey("up")} aria-label="Up">
+          <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => chipKey("up")} aria-label="Up">
             ↑
           </button>
-          <button type="button" onMouseDown={keepFocus} onClick={() => chipKey("esc")}>
+          <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => chipKey("esc")}>
             Esc
           </button>
         </div>

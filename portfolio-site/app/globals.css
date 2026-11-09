@@ -2536,6 +2536,13 @@ em.font-display,
   font-weight: 400;
 }
 
+/* Tab with nothing to complete: the caret flashes once. */
+.hub-enter-caret.terminal-os-bell {
+  animation: none;
+  background: var(--ink, #f3f1ec);
+  opacity: 1;
+}
+
 /* `timeline`: one grid, so the bracket column stays straight and is never cut. */
 .terminal-os-tl {
   display: grid;
