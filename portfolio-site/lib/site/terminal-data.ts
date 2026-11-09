@@ -116,8 +116,8 @@ export type TermCommit = {
 export const TIMELINE: TermCommit[] = [
   { date: "2002-12", subject: "Born", branch: "life" },
   { date: "2004-04", subject: "Start school · Techno India Group Public School", branch: "learn" },
-  { date: "2018-03", subject: "Secondary (class 10) · Techno India Group Public School", branch: "learn", grade: "85.66%", tag: "class 10" },
-  { date: "2020-03", subject: "Higher secondary (class 12, science) · UP Public School", branch: "learn", grade: "79%", tag: "class 12" },
+  { date: "2018-03", subject: "Secondary · Techno India Group Public School", branch: "learn", grade: "85.66%", tag: "class 10" },
+  { date: "2020-03", subject: "Higher secondary, science · UP Public School", branch: "learn", grade: "79%", tag: "class 12" },
   { date: "2020-08", subject: "Start B.Tech CSE at ITER, SOA University", branch: "learn" },
   { date: "2022-07-01", subject: "Complete Python Essentials 1 (Cisco) and the IBM Python for Data Science badge", branch: "learn" },
   { date: "2022-09-01", subject: "Intern: web application developer (The Sparks Foundation) and cyber security (Coincent.ai)", branch: "learn" },
