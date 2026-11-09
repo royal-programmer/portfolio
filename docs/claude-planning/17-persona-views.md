@@ -279,3 +279,22 @@ This round is an honest-placeholder pass, not a rebuild of the other personas (e
 - **Data**: real school/college/work periods and the four internships; five more profile links under `elsewhere` in `contact`.
 - Open: the photo (`R.jpg` is the logo, so the avatar is the source until a real photo is added); hire pill also shows on the
   Engineer stage view (the list says engineer).
+
+### 6.13 Round 1l: timeline grid, Tab, themes, Normal-mode doorway, `now` (Ratul + coordinator, 2026-11-09)
+
+- **`timeline` is a grid.** New `Out` kind `timeline` (`TimelineRow[]`), rendered as `.terminal-os-tl`: `year | mon | subject | tag | bracket | label`
+  (narrow: stacked, same grid minus the bracket columns). The bracket glyphs are cells, so they stay straight and never clip.
+  `dur()` counts months and rounds to years (Aug 2020 → Jul 2024 reads `4 yrs`). Default view hides side/learn rows older than the work
+  period except period edges; `timeline --all` shows everything. `TermPeriod` gained `grade` (own tone) and `note`; `branch: "life"` rows
+  (born, Dec 2002) are dim with a `●`.
+- **Data (Ratul):** school 2004-04 → 2020-03 (class 10 85.66%, class 12 79%), college 2020-08 → 2024-07 (cgpa 7.75/10), work 2024-10 → now.
+- **Tab never leaves the prompt.** It completes, prints the candidates, or flashes the caret (`terminal-os-bell`, 120 ms). Pane buttons and
+  touch chips are `tabIndex={-1}`.
+- **Eleven themes** (accent, amber, green, paper, dracula, nord, gruvbox, solarized, monokai, matrix, cyberpunk). `theme` opens an
+  arrow-key menu (`MenuId` `themes`) that previews live and restores on Esc; `theme <name>` and `theme random` work. Dim text is at least 4.5:1
+  on both backgrounds (computed). The brief said ten but listed eleven; all eleven ship.
+- **Hub → Engineer, Normal mode.** Any `via` (hub or normal) lands on the terminal root; only direct visits resume the remembered view.
+  The doorway click marks the chapter button busy and zooms the display at once (`onWaiting`), reset on a bfcache `pageshow`.
+- **Polish:** `portfolio` puts the `→` commands at the right end of each section's last line on wide screens (`links.lead`); the status bar has a
+  green `open to work` item that runs `hire`; `now` prints `TerminalData.now`, and the pane's Who block shows its first line.
+- Dev note: after CSS-only edits the dev server sometimes serves a stale stylesheet; a real content change to `globals.css` recompiles it.

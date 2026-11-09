@@ -5,6 +5,14 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-09 — Round 1l: timeline grid, Tab, eleven themes, Normal-mode doorway, `now`
+
+- `timeline` rebuilt as a CSS grid (straight, uncut bracket column; months-based durations; `--all`); school/college/born data from Ratul.
+- Tab stays in the prompt; pane buttons out of the tab order. Eleven themes with a live-preview `theme` menu and `theme random`.
+- Hub in Normal mode: arrival via `?via=normal` no longer auto-opens the remembered view; the doorway shows busy and zooms immediately.
+- `portfolio` links inline on wide screens, `open to work` status item, `now` command. Details: `17-persona-views.md` §6.13.
+- Commits: `bb26f9b` timeline, `1055f8f` data addendum, `4bd3725` Tab, `de2922a` themes, `df6f852` hub, `3edf166` polish.
+
 ## 2026-11-09 — Round 1k: terminal fixes, portrait modes, pane, `portfolio`; hub and persona copy
 
 Builder (Sonnet). Commits: 9c47261 (boot token, `cls`), 142cafc (views boot in the terminal), 0ffe3d0 (`portfolio`, generated
