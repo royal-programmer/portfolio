@@ -9,7 +9,7 @@ export const PERSONA_VIEWS: Partial<Record<LaunchedPersona, readonly PersonaView
   engineer: [
     { id: "stage", name: "Stage", line: "The setup in 3D, the projects, the writing.", enabled: true },
     { id: "swarm", name: "Swarm", line: "Agents build the page in front of you.", enabled: false },
-    { id: "series", name: "Series", line: "Pick a profile; the story plays as a series.", enabled: false },
+    { id: "series", name: "Series", line: "Pick a profile; the story plays as a series.", enabled: true },
   ],
 };
 

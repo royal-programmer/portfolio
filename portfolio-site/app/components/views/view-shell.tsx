@@ -6,10 +6,14 @@
  * page's root (the terminal), so the root is default again until the next pick.
  */
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from "react";
 import type { LaunchedPersona } from "@/lib/content/types";
 import { personaHref, useOrigin } from "@/lib/site/persona-link";
 import { forgetView, rememberView } from "@/lib/site/view-memory";
+
+/** The shell's exit, for a view that wants its own "back to the terminal" control. */
+const ExitContext = createContext<(() => void) | null>(null);
+export const useViewExit = () => useContext(ExitContext);
 
 type Props = { persona: LaunchedPersona; view: string; /** Arrived from the terminal (`?via=terminal`): the parameter is taken off the address bar. */ stripVia?: boolean; children: ReactNode };
 
@@ -53,13 +57,13 @@ export function ViewShell({ persona, view, stripVia, children }: Props) {
   }, [exit]);
 
   return (
-    <>
+    <ExitContext.Provider value={exit}>
       {children}
       <div className="view-exit" role="toolbar" aria-label="View">
         <button type="button" onClick={exit} title="Back to the terminal (Esc)">
           <span aria-hidden>←</span> back to terminal
         </button>
       </div>
-    </>
+    </ExitContext.Provider>
   );
 }

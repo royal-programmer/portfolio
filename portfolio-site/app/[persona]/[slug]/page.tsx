@@ -13,6 +13,9 @@ import { placeOnSpectrum } from "@/lib/site/spectrum";
 import { HomePage } from "../../components/home-page";
 import { WorldBoot } from "../../components/world-boot";
 import { ViewShell } from "../../components/views/view-shell";
+import { SERIES_PROFILES, buildSeries, type Series, type SeriesProfileId } from "@/lib/site/series-data";
+import { terminalData } from "@/lib/site/terminal-data";
+import { SeriesView } from "../../components/views/series/series-view";
 import { loadHomeContent } from "../../load-home-content";
 
 type ProjectDetailProps = {
@@ -67,7 +70,7 @@ export default async function PersonaEntryPage({ params, searchParams }: Project
   if (!isLaunchedPersona(persona)) notFound();
 
   const view = getView(persona, slug);
-  if (view) return <PersonaViewPage persona={persona} view={view.id} fromTerminal={via === "terminal"} />;
+  if (view) return <PersonaViewPage persona={persona} view={view.id} fromTerminal={via === "terminal"} via={via} />;
 
   const entry = await getEntryBySlug(persona, slug);
   if (!entry) notFound();
@@ -153,7 +156,7 @@ export default async function PersonaEntryPage({ params, searchParams }: Project
  * that remembers the pick and offers Exit. "stage" is the page as it was — the world's stage in 3D,
  * the projects, the writing — opening on its finished window, as from the hub's Normal display.
  */
-async function PersonaViewPage({ persona, view, fromTerminal }: { persona: LaunchedPersona; view: string; fromTerminal: boolean }) {
+async function PersonaViewPage({ persona, view, fromTerminal, via }: { persona: LaunchedPersona; view: string; fromTerminal: boolean; via?: string }) {
   const { personas, engineerEntries, engineerBlogPosts } = await loadHomeContent();
   const accent = personas.find((p) => p.slug === persona)?.accent ?? "#f3f1ec";
   const ranked = [...personas].sort((a, b) => a.order - b.order).map((p) => p.slug);
@@ -165,6 +168,16 @@ async function PersonaViewPage({ persona, view, fromTerminal }: { persona: Launc
         {/* The terminal already printed this view's boot: no second entry animation. */}
         {fromTerminal ? null : <WorldBoot slug={persona} color={accent} t={t} via="normal" items={items} />}
         <HomePage routePersona={persona} personas={personas} engineerEntries={engineerEntries} engineerBlogPosts={engineerBlogPosts} />
+      </ViewShell>
+    );
+  }
+  if (view === "series") {
+    // One dataset, three orderings: built here, picked on the client ("Who's watching?").
+    const data = terminalData(personas.find((p) => p.slug === persona), engineerEntries, engineerBlogPosts, getViews(persona));
+    const series = Object.fromEntries(SERIES_PROFILES.map((p) => [p.id, buildSeries(p.id, data, engineerEntries, engineerBlogPosts)])) as Record<SeriesProfileId, Series>;
+    return (
+      <ViewShell persona={persona} view={view} stripVia={fromTerminal}>
+        <SeriesView accent={accent} series={series} contact={data.contact} status={data.status} portrait={data.portrait} fast={via === "normal"} />
       </ViewShell>
     );
   }
