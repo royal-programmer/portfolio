@@ -91,7 +91,7 @@ export function buildEpisodes(data: TerminalData, projects: Array<{ slug: string
       tag: c.tag,
       branch: c.branch,
       date: c.date,
-      runtime: months >= 1 ? `${months} mo` : "1 ep",
+      runtime: months >= 24 ? `${Math.round(months / 12)} yr` : months >= 1 ? `${months} mo` : "1 ep",
       grade: c.grade,
       href: c.tag && slugs.has(c.tag) ? `/engineer/${c.tag}` : undefined,
     };

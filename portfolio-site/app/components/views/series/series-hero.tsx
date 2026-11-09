@@ -155,10 +155,9 @@ function Trailer({ lines, fast, onEnd }: { lines: string[]; fast: boolean; onEnd
     return () => window.removeEventListener("keydown", onKey);
   }, [onEnd]);
 
-  let left = chars;
-  const shown = lines.map((l) => {
-    const take = Math.max(0, Math.min(l.length, left));
-    left -= l.length + 1;
+  const shown = lines.map((l, i) => {
+    const before = lines.slice(0, i).reduce((n, x) => n + x.length + 1, 0);
+    const take = Math.max(0, Math.min(l.length, chars - before));
     return { text: l.slice(0, take), done: take >= l.length };
   });
 
