@@ -18,7 +18,7 @@ import { qrLines, qrModules } from "@/lib/site/qr";
 import { cachedPortrait, generatePortrait, PORTRAIT_COLS, PORTRAIT_MODES, type PortraitArt, type PortraitConfig, type PortraitMode } from "@/lib/site/portrait-gen";
 import type { TerminalData } from "@/lib/site/terminal-data";
 import { HOME, resolvePath, shortPath, USER } from "@/lib/site/terminal-fs";
-import { createShell, HISTORY_CAP, initialShellState, THEMES, type Effect, type FileItem, type MenuId, type MenuRow, type Out, type ShellState, type ThemeId, type Tone } from "@/lib/site/terminal-shell";
+import { createShell, HISTORY_CAP, initialShellState, THEMES, type Effect, type FileItem, type MenuId, type MenuRow, type Out, type ShellState, type ThemeId, type TimelineRow, type Tone } from "@/lib/site/terminal-shell";
 import { forgetView, readView } from "@/lib/site/view-memory";
 
 export type TerminalRootProps = {
@@ -44,6 +44,7 @@ type Entry =
   | { n: number; k: "portrait"; mode: PortraitMode }
   | { n: number; k: "parts"; parts: Array<{ text: string; tone?: Tone; color?: string }> }
   | { n: number; k: "qr"; lines: string[] }
+  | { n: number; k: "timeline"; wide: boolean; rows: TimelineRow[] }
   | { n: number; k: "art"; text: string }
   | { n: number; k: "ghrepo"; name: string; url: string; pad: number; rest: string }
   | { n: number; k: "files"; inline: boolean; items: FileItem[] }
@@ -397,6 +398,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       }
       if (o.kind === "parts") return { n, k: "parts", parts: o.parts };
       if (o.kind === "qr") return { n, k: "qr", lines: o.lines };
+      if (o.kind === "timeline") return { n, k: "timeline", wide: o.wide, rows: o.rows };
       if (o.kind === "files") return { n, k: "files", inline: o.inline, items: o.items };
       if (o.kind === "cal") return { n, k: "cal", title: o.title, weeks: o.weeks, today: o.today };
       if (o.kind === "neofetch") return { n, k: "neofetch", rows: o.rows };
@@ -1496,6 +1498,37 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           ),
         )}
       </span>
+    ) : e.k === "timeline" ? (
+      <div key={e.n} className={`terminal-os-tl${e.wide ? " is-wide" : ""}`}>
+        {e.rows.map((r, i) =>
+          "head" in r ? (
+            <span key={i} className="terminal-os-tl-head">
+              {r.head}
+            </span>
+          ) : (
+            <Fragment key={i}>
+              <span className={`tl-year${r.dim ? " is-dim" : ""}`}>{r.year}</span>
+              <span className={`tl-mon${r.dim ? " is-dim" : ""}`}>{r.life ? "●" : r.mon}</span>
+              <span className={`tl-subj${r.dim ? " is-dim" : ""}`}>
+                {r.subject}
+                {!e.wide && r.tag ? <b className="tone-accent">{`  ${r.tag}`}</b> : null}
+              </span>
+              {e.wide ? (
+                <>
+                  <b className="tl-tag tone-accent">{r.tag ?? ""}</b>
+                  <span className="tl-glyph" aria-hidden="true">
+                    {r.glyph ?? ""}
+                  </span>
+                  <span className="tl-label">
+                    {r.label ? <b className="tone-accent">{r.label}</b> : null}
+                    {r.grade ? <b className="tl-grade">{` · ${r.grade}`}</b> : null}
+                  </span>
+                </>
+              ) : null}
+            </Fragment>
+          ),
+        )}
+      </div>
     ) : e.k === "qr" ? (
       // Glyphs are 0.6em wide and 1em tall, two modules per row: stretch rows 1.2x so modules are square.
       <div key={e.n}>

@@ -90,6 +90,11 @@ const HIDDEN_DOCS: CommandDoc[] = [
   { name: "sudo", group: "terminal", usage: "sudo <command>", desc: "nice try", long: "sudo make me a sandwich is the one that works." },
 ];
 
+/** A `timeline` row: a section head (narrow layout) or an entry; glyph/label/grade belong to the wide bracket column. */
+export type TimelineRow =
+  | { head: string }
+  | { year: string; mon: string; subject: string; tag?: string; dim?: boolean; life?: boolean; glyph?: string; label?: string; grade?: string };
+
 export type Out =
   | { kind: "text"; text: string; dim?: boolean; accent?: boolean }
   /** One line of differently coloured runs (`git log`, `theme`); `color` is a CSS colour for a swatch. */
@@ -110,6 +115,8 @@ export type Out =
   /** A line that runs a command when clicked (`open <slug>` at the foot of a project). */
   | { kind: "run"; text: string; cmd: string }
   | { kind: "menu"; id: MenuId; rows: MenuRow[] }
+  /** `timeline`: one grid, so the bracket column stays straight. */
+  | { kind: "timeline"; wide: boolean; rows: TimelineRow[] }
   /** The welcome: block-letter art (88 columns), the welcome line, and the tips box rows. */
   | { kind: "banner"; art: string[]; welcome: string; overview: string[]; tips: Array<{ cmd: string; desc: string }> };
 
@@ -183,7 +190,7 @@ const COMMANDS: CommandDoc[] = [
   { name: "cls", group: "terminal", usage: "cls", desc: "empty the screen (same as clear)" },
   { name: "portfolio", group: "read", usage: "portfolio", desc: "the whole portfolio on one screen", long: "Every section ends with the command that goes deeper; the → commands are clickable." },
   { name: "hire", group: "read", usage: "hire", desc: "the 20-second version, for recruiters" },
-  { name: "timeline", group: "read", usage: "timeline", desc: "school → college → work, as one line" },
+  { name: "timeline", group: "read", usage: "timeline [--all]", desc: "school → college → work, as one line" },
   { name: "view", group: "open", usage: "view [id]", desc: "enter a view (no id: pick from the list)" },
   { name: "git", group: "read", usage: "git log [--oneline] [-n k]", desc: "live: my public commits on github" },
   { name: "mail", group: "open", usage: "mail", desc: "send me a message, right here" },
@@ -342,8 +349,8 @@ export function createShell(data: TerminalData): Shell {
 
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-  /** `timeline`: school, college, work on one line. Wide: year column, rail, period brackets. Narrow: stacked. */
-  const timeline = (cols: number): Out[] => {
+  /** `timeline`: school, college, work. Wide: a grid (year, month, subject, tag, bracket, period label). Narrow: stacked. */
+  const timeline = (cols: number, all: boolean): Out[] => {
     const ym = (iso: string) => {
       const [y, m] = iso.split("-").map(Number);
       return { y, m: m || 1, i: y * 12 + ((m || 1) - 1) };
@@ -351,82 +358,62 @@ export function createShell(data: TerminalData): Shell {
     const periods = data.periods.filter((p) => /^\d{4}-\d{2}$/.test(p.from));
     const now = new Date();
     const nowI = now.getFullYear() * 12 + now.getMonth();
-    const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
     const dur = (p: (typeof periods)[number]) => {
-      if (p.to) {
-        const y = ym(p.to).y - ym(p.from).y;
-        return y >= 1 ? plural(y, "yr") : plural(ym(p.to).i - ym(p.from).i, "mo");
+      const mo = (p.to ? ym(p.to).i : nowI) - ym(p.from).i;
+      if (mo >= 12) {
+        const y = Math.round(mo / 12);
+        return `${y} ${y === 1 ? "yr" : "yrs"}`;
       }
-      const mo = nowI - ym(p.from).i;
-      return [mo >= 12 ? plural(Math.floor(mo / 12), "yr") : "", mo % 12 ? `${mo % 12} mo` : ""].filter(Boolean).join(" ") || "new";
+      return mo < 1 ? "new" : `${mo} mo`;
     };
     const inside = (p: (typeof periods)[number], i: number) => i >= ym(p.from).i && (p.to ? i <= ym(p.to).i : true);
 
     type Row = { i: number; y: number; mon: string; subject: string; tag?: string; branch: TermCommit["branch"] };
     const rows: Row[] = data.timeline.map((c) => {
       const t = ym(c.date.slice(0, 7));
-      return { i: t.i, y: t.y, mon: MONTHS[t.m - 1], subject: c.subject, tag: c.tag, branch: c.branch };
+      return { i: t.i, y: t.y, mon: c.branch === "life" ? "" : MONTHS[t.m - 1], subject: c.subject, tag: c.tag, branch: c.branch };
     });
     // A period that no entry marks still starts somewhere: add its first month.
     for (const p of periods) {
       const t = ym(p.from);
-      if (!rows.some((r) => r.i === t.i)) rows.push({ i: t.i, y: t.y, mon: MONTHS[t.m - 1], subject: `start · ${p.label}`, branch: "learn" });
+      if (!rows.some((r) => r.i === t.i && r.branch !== "life")) rows.push({ i: t.i, y: t.y, mon: MONTHS[t.m - 1], subject: `start · ${p.label}`, branch: "learn" });
     }
     rows.sort((a, b) => a.i - b.i);
+    // Default view: side and learn entries older than the work period stay out, except the ones that open or close a period.
+    const workFrom = ym(periods.find((p) => p.id === "work")?.from ?? periods[periods.length - 1]?.from ?? "2000-01").i;
+    const edge = new Set(periods.flatMap((p) => [ym(p.from).i, p.to ? ym(p.to).i : -1]));
+    const shown = all ? rows : rows.filter((r) => r.branch === "main" || r.branch === "life" || r.i >= workFrom || edge.has(r.i));
 
-    const out: Out[] = [];
-    if (cols >= 80) {
-      const bracket = Math.min(cols - 28, 96);
-      const spans = periods.map((p) => {
-        const idx = rows.map((r, k) => (inside(p, r.i) ? k : -1)).filter((k) => k >= 0);
-        return { p, lo: idx[0] ?? -1, hi: idx[idx.length - 1] ?? -1 };
-      });
-      let prevY = 0;
-      rows.forEach((r, k) => {
-        const dim = r.branch !== "main";
-        const head = `${r.y !== prevY ? String(r.y) : "    "}  `;
-        prevY = r.y;
-        const tag = r.tag ? `  ${r.tag}` : "";
-        const room = bracket - head.length - 3 - 5;
-        const subj = r.subject.length + tag.length > room ? `${r.subject.slice(0, Math.max(8, room - tag.length - 1))}…` : r.subject;
-        const left = `${head}├─ `;
-        const parts: Array<{ text: string; tone?: Tone }> = [
-          { text: left, tone: dim ? "dim" : undefined },
-          { text: `${r.mon}  `, tone: dim ? "dim" : undefined },
-          { text: subj, tone: dim ? "dim" : undefined },
-        ];
-        if (tag) parts.push({ text: tag, tone: "accent" });
-        const used = left.length + 5 + subj.length + tag.length;
-        parts.push({ text: " ".repeat(Math.max(1, bracket - used)) });
-        const sp = spans.find((s) => s.lo >= 0 && k >= s.lo && k <= s.hi);
-        if (sp) {
-          const glyph = sp.lo === sp.hi ? "─" : k === sp.lo ? "┐" : k === sp.hi ? "┘" : "│";
-          parts.push({ text: glyph, tone: "dim" });
-          if (k === Math.floor((sp.lo + sp.hi) / 2)) parts.push({ text: ` ${sp.p.id} · ${dur(sp.p)}`, tone: "accent" });
-        }
-        out.push({ kind: "parts", parts });
-      });
-      return out;
-    }
+    const wide = cols >= 80;
+    const out: TimelineRow[] = [];
+    const spans = periods.map((p) => {
+      const idx = shown.map((r, k) => (r.branch !== "life" && inside(p, r.i) ? k : -1)).filter((k) => k >= 0);
+      return { p, lo: idx[0] ?? -1, hi: idx[idx.length - 1] ?? -1 };
+    });
     let prevY = 0;
     const opened = new Set<string>();
-    for (const r of rows) {
-      for (const p of periods) {
-        if (!opened.has(p.id) && inside(p, r.i)) {
-          opened.add(p.id);
-          out.push({ kind: "parts", parts: [{ text: `── ${p.id} · ${p.from.slice(0, 4)} → ${p.to ? p.to.slice(0, 4) : "now"} ──`, tone: "dim" }] });
+    shown.forEach((r, k) => {
+      if (!wide) {
+        for (const p of periods) {
+          if (!opened.has(p.id) && r.branch !== "life" && inside(p, r.i)) {
+            opened.add(p.id);
+            out.push({ head: `── ${p.id} · ${p.from.slice(0, 4)} → ${p.to ? p.to.slice(0, 4) : "now"} ──` });
+          }
         }
       }
-      if (r.y !== prevY) {
-        out.push({ kind: "parts", parts: [{ text: String(r.y) }] });
-        prevY = r.y;
+      const row: TimelineRow = { year: r.y !== prevY ? String(r.y) : "", mon: r.mon, subject: r.subject, tag: r.tag, dim: r.branch !== "main", life: r.branch === "life" };
+      prevY = r.y;
+      const sp = spans.find((s) => s.lo >= 0 && k >= s.lo && k <= s.hi);
+      if (wide && sp) {
+        row.glyph = sp.lo === sp.hi ? "─" : k === sp.lo ? "┐" : k === sp.hi ? "┘" : "│";
+        if (k === Math.floor((sp.lo + sp.hi) / 2)) {
+          row.label = `${sp.p.id} · ${dur(sp.p)}`;
+          row.grade = sp.p.grade;
+        }
       }
-      const dim = r.branch !== "main";
-      const parts: Array<{ text: string; tone?: Tone }> = [{ text: `  ${r.mon}  `, tone: dim ? "dim" : undefined }, { text: r.subject }];
-      if (r.tag) parts.push({ text: `  ${r.tag}`, tone: "accent" });
-      out.push({ kind: "parts", parts });
-    }
-    return out;
+      out.push(row);
+    });
+    return [{ kind: "timeline", wide, rows: out }, text("periods and entries are data (terminal-data.ts) · timeline --all shows minor entries", true)];
   };
 
   /** `git log [--oneline] [-n k] | -k`: the UI loads the public activity; here only the flags are checked. */
@@ -671,7 +658,7 @@ export function createShell(data: TerminalData): Shell {
       case "hire":
         return { lines: hire() };
       case "timeline":
-        return { lines: timeline(env?.cols ?? 100) };
+        return { lines: timeline(env?.cols ?? 100, args.includes("--all")) };
       case "view":
         return args[0] ? open(args[0], st) : menu("views");
       case "mail":

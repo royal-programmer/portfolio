@@ -2536,6 +2536,53 @@ em.font-display,
   font-weight: 400;
 }
 
+/* `timeline`: one grid, so the bracket column stays straight and is never cut. */
+.terminal-os-tl {
+  display: grid;
+  grid-template-columns: 5ch 4ch minmax(0, 1fr);
+  column-gap: 1ch;
+  margin: 2px 0;
+}
+.terminal-os-tl.is-wide {
+  grid-template-columns: 5ch 4ch minmax(0, 1fr) auto 1ch auto;
+}
+.terminal-os-tl > span,
+.terminal-os-tl > b {
+  min-width: 0;
+}
+.terminal-os-tl .tl-year,
+.terminal-os-tl .tl-mon {
+  white-space: nowrap;
+}
+.terminal-os-tl .tl-subj {
+  overflow-wrap: anywhere;
+}
+.terminal-os-tl.is-wide .tl-subj {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.terminal-os-tl .tl-glyph {
+  color: var(--term-faint, var(--ink-faint));
+}
+.terminal-os-tl .tl-label,
+.terminal-os-tl .tl-tag {
+  white-space: nowrap;
+}
+.terminal-os-tl .tl-grade {
+  color: var(--term-green, #5fbf6a);
+  font-weight: 400;
+}
+.terminal-os-tl .tl-tag,
+.terminal-os-tl .tone-accent {
+  font-weight: 400;
+}
+.terminal-os-tl-head {
+  grid-column: 1 / -1;
+  color: var(--term-faint, var(--ink-faint));
+  margin-top: 4px;
+}
+
 /* The chips carry help, / and Esc on touch screens; the status bar's copies would only duplicate them. */
 @media (pointer: coarse) {
   .terminal-os-status .terminal-os-status-r {
