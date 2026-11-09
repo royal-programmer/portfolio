@@ -112,7 +112,7 @@ export type TermCommit = {
 
 /** The career as a git history, newest first when printed. From the résumé; dates to the month. */
 export const TIMELINE: TermCommit[] = [
-  { date: "2002-01", subject: "Born", branch: "life" },
+  { date: "2002-12", subject: "Born", branch: "life" },
   { date: "2004-04", subject: "Start school · Techno India Group Public School", branch: "learn" },
   { date: "2018-03", subject: "Move to UP Public School for higher secondary (science)", branch: "learn" },
   { date: "2020-08", subject: "Start B.Tech CSE at ITER, SOA University", branch: "learn" },
@@ -146,7 +146,7 @@ export type TermPeriod = {
 };
 
 export const TIMELINE_PERIODS: TermPeriod[] = [
-  { id: "school", label: "school · Techno India Group → UP Public School", from: "2004-04", to: "2020-03" },
+  { id: "school", label: "school · Techno India Group → UP Public School", from: "2004-04", to: "2020-03", grade: "class 10 · 85.66% · class 12 · 79%" },
   { id: "college", label: "B.Tech CSE · ITER, SOA University", from: "2020-08", to: "2024-07", grade: "cgpa 7.75/10" },
   { id: "work", label: "SLK → Altimetrik", from: "2024-10", to: null },
 ];

@@ -380,7 +380,7 @@ export function createShell(data: TerminalData): Shell {
     type Row = { i: number; y: number; mon: string; subject: string; tag?: string; branch: TermCommit["branch"] };
     const rows: Row[] = data.timeline.map((c) => {
       const t = ym(c.date.slice(0, 7));
-      return { i: t.i, y: t.y, mon: c.branch === "life" ? "" : MONTHS[t.m - 1], subject: c.subject, tag: c.tag, branch: c.branch };
+      return { i: t.i, y: t.y, mon: MONTHS[t.m - 1], subject: c.subject, tag: c.tag, branch: c.branch };
     });
     // A period that no entry marks still starts somewhere: add its first month.
     for (const p of periods) {
