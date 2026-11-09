@@ -2271,6 +2271,11 @@ em.font-display,
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.terminal-root-body .tab-hl {
+  background: var(--c, #6aa6ff);
+  color: var(--term-win, #0a0a0f);
+  font-weight: 400;
+}
 .terminal-root-body .is-dim {
   opacity: 1;
   color: var(--term-faint, var(--ink-faint));

@@ -38,7 +38,7 @@ export type TerminalRootProps = {
 
 type Entry =
   /** `ps`: the path the command was typed at (the OS prompt); absent on the boot script's plain `$ `. */
-  | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string; label?: string; tag?: "ok" | "wait" | "bar" }
+  | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string; label?: string; tag?: "ok" | "wait" | "bar"; cands?: string[]; hl?: number }
   | { n: number; k: "links"; items: Array<{ label: string; href?: string; external?: boolean; cmd?: string }>; prefix?: string; lead?: string }
   | { n: number; k: "ghcommit"; label: string; url: string; rest: string }
   | { n: number; k: "portrait"; mode: PortraitMode }
@@ -1064,21 +1064,43 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     setCmd(h[histIdx.current]);
   };
 
-  const tab = () => {
+  /** Tab-cycle state: Tab again steps through the candidates (Shift+Tab back), like a shell's menu-complete. */
+  const cyc = useRef<{ orig: string; base: string; cands: string[]; idx: number; lineId: number; value: string } | null>(null);
+  const markCands = (n: number, hl: number | undefined) => (osRef.current ? setEntries : setBootEntries)((es) => es.map((e) => (e.n === n && e.k === "out" ? { ...e, hl } : e)));
+  const endCycle = () => {
+    const c = cyc.current;
+    if (!c) return;
+    cyc.current = null;
+    markCands(c.lineId, undefined);
+  };
+
+  const tab = (dir: 1 | -1 = 1) => {
     if (mailStep) return;
     if (palette) {
+      if (palMatches.length > 1) return setPalSel((palIdx + dir + palMatches.length) % palMatches.length);
       const c = palMatches[palIdx];
       if (c) setCmd(`/${c.name} `);
       return;
     }
+    const c = cyc.current;
+    if (c && c.value === cmd) {
+      c.idx = c.idx === -1 ? (dir === 1 ? 0 : c.cands.length - 1) : (c.idx + dir + c.cands.length) % c.cands.length;
+      c.value = c.base + c.cands[c.idx];
+      setCmd(c.value);
+      markCands(c.lineId, c.idx);
+      return;
+    }
+    cyc.current = null;
     const cands = shell.complete(cmd, live.current.shell);
-    if (!cands.length) return;
+    if (!cands.length) return ringBell();
     const head = /^(.*?)\S*$/.exec(cmd)?.[1] ?? "";
     if (cands.length === 1) return setCmd(head + cands[0] + (cands[0].endsWith("/") ? "" : " "));
     let prefix = cands[0];
-    for (const c of cands) while (!c.startsWith(prefix)) prefix = prefix.slice(0, -1);
+    for (const x of cands) while (!x.startsWith(prefix)) prefix = prefix.slice(0, -1);
     if (prefix) setCmd(head + prefix);
-    line(cands.join("   "), false, true, here());
+    const n = ++seq.current;
+    append([{ n, k: "out", text: cands.join("   "), prompt: false, dim: true, ps: here(), cands }]);
+    cyc.current = { orig: cmd, base: head, cands, idx: -1, lineId: n, value: head + prefix };
   };
 
   const runPalette = (name: string | undefined) => {
@@ -1096,6 +1118,17 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if ((e.key.length === 1 && !e.ctrlKey && !e.metaKey) || e.key === "Backspace" || e.key === "Enter" || e.key === "Tab") ambient.key();
     const menuLive = menu && !cmd;
+    if (cyc.current && !["Tab", "Shift", "Control", "Alt", "Meta"].includes(e.key)) {
+      if (e.key === "Escape") {
+        // Esc while cycling puts the typed word back and stays at the prompt.
+        e.preventDefault();
+        const c = cyc.current;
+        endCycle();
+        setCmd(c.orig);
+        return;
+      }
+      endCycle();
+    }
     // Ctrl+C with a selection (or Shift) is the browser's copy, not a cancel.
     if (e.ctrlKey && (e.key === "c" || e.key === "C") && (e.shiftKey || !!window.getSelection()?.toString() || e.currentTarget.selectionStart !== e.currentTarget.selectionEnd)) return;
     if (mailStep) {
@@ -1145,8 +1178,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     } else if (e.key === "Tab") {
       // Tab never leaves the prompt: it completes, lists the candidates, or rings the bell.
       e.preventDefault();
-      const any = !!cmd && (palette ? palMatches.length > 0 : shell.complete(cmd, live.current.shell).length > 0);
-      if (any) tab();
+      const any = (!palette && cyc.current?.value === cmd) || (!!cmd && (palette ? palMatches.length > 0 : shell.complete(cmd, live.current.shell).length > 0));
+      if (any) tab(e.shiftKey ? -1 : 1);
       else ringBell();
     } else if (e.key === "Escape") {
       e.preventDefault();
@@ -1474,7 +1507,9 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       <span key={e.n} className={`${e.prompt ? "is-cmd" : "is-out"} ${e.dim ? "is-dim" : ""} ${e.accent ? "is-accent" : ""}`}>
         {e.prompt ? (e.label ? <code className="ps-user">{e.label}</code> : ps1(e.ps)) : ""}
         {e.tag === "ok" ? <b className="is-ok">[ok] </b> : e.tag === "wait" ? "[..] " : ""}
-        {e.text || " "}
+        {e.cands
+          ? e.cands.flatMap((c, i) => [i ? "   " : "", i === e.hl ? <b key={c} className="tab-hl">{c}</b> : c])
+          : e.text || " "}
       </span>
     ) : e.k === "banner" ? (
       <div key={e.n} className="terminal-os-welcome">
@@ -1792,11 +1827,15 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
                   setCmd(e.target.value.slice(0, 200));
                   histIdx.current = -1;
                   setPalSel(0);
+                  endCycle();
                 }}
                 onKeyDown={onInputKey}
                 onKeyUp={syncCaret}
                 onSelect={syncCaret}
-                onClick={syncCaret}
+                onClick={(e) => {
+                  endCycle();
+                  syncCaret(e);
+                }}
               />
             </span>
           ) : null}

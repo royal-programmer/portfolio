@@ -576,7 +576,7 @@ export function createShell(data: TerminalData): Shell {
       out.push(text(g, true));
       for (const c of COMMANDS.filter((x) => x.group === g)) out.push(text(`  ${c.usage.padEnd(w)}${c.desc}`));
     }
-    out.push(text("Tab completes, ↑ recalls, / opens the menu, cls clears, banner shows the welcome, Esc leaves.", true));
+    out.push(text("Tab completes (Tab again cycles), ↑ recalls, / opens the menu, cls clears, banner shows the welcome, Esc leaves.", true));
     return out;
   };
 
@@ -830,6 +830,8 @@ export function createShell(data: TerminalData): Shell {
       }
       if (cmd === "view") return viewIds.filter((n) => n.startsWith(word));
       if (cmd === "theme") return [...THEMES.map((t) => t.id as string), "random"].filter((n) => n.startsWith(word));
+      if (cmd === "portrait") return [...PORTRAIT_MODES, "list", "next"].filter((n) => n.startsWith(word));
+      if (cmd === "timeline") return ["--all"].filter((n) => n.startsWith(word));
       if (cmd === "resume") return ["--pdf"].filter((n) => n.startsWith(word));
       if (cmd === "curl") return ["github"].filter((n) => n.startsWith(word));
       if (cmd === "git") {
@@ -838,6 +840,7 @@ export function createShell(data: TerminalData): Shell {
         return [];
       }
       if (cmd === "cd") return completePath(fs, state.cwd, word).filter((c) => c.endsWith("/"));
+      if (cmd === "ls" && word.startsWith("-")) return ["-l"].filter((n) => n.startsWith(word));
       if (cmd === "ls" || cmd === "cat" || cmd === "tree") return completePath(fs, state.cwd, word);
       return [];
     },
