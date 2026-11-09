@@ -127,6 +127,8 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   const [returning, setReturning] = useState<World | null>(null);
   /** A doorway asked for before its setup has formed: the button waits for the screen, then goes. */
   const [waiting, setWaiting] = useState<string | null>(null);
+  /** Normal mode: the doorway just taken, until the other host answers (the chapter's button shows it). */
+  const [normalWaiting, setNormalWaiting] = useState<string | null>(null);
   /** public/hub/media.json: Ratul's own pictures per persona (the photographer's sequence uses one). */
   const [media, setMedia] = useState<Partial<Record<string, string[]>>>({});
   const router = useRouter();
@@ -1065,7 +1067,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         </section>
 
         {chapters.map((c, i) => (
-          <PersonaChapter key={c.slug} chapter={c} index={i} total={chapters.length} waiting={waiting === c.slug} onEnter={immersiveLive && introDone ? enterWorld : experience === "normal" && !sceneWanted && textLive ? (slug) => normalEnter.current?.(slug) : undefined} />
+          <PersonaChapter key={c.slug} chapter={c} index={i} total={chapters.length} waiting={(waiting ?? normalWaiting) === c.slug} onEnter={immersiveLive && introDone ? enterWorld : experience === "normal" && !sceneWanted && textLive ? (slug) => normalEnter.current?.(slug) : undefined} />
         ))}
 
         {upcoming.length ? (
@@ -1195,7 +1197,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
 
       {ready ? <LightCursor /> : null}
       {decided && !sceneWanted && experience === "normal" && textLive ? (
-        <NormalDisplays worlds={worlds} activeSlug={activeSlug} items={terminalItems} photo={media.photographer?.[0] ? `/hub/photographer/${media.photographer[0]}` : undefined} recedeRef={normalRecede} enterRef={normalEnter} />
+        <NormalDisplays worlds={worlds} activeSlug={activeSlug} items={terminalItems} photo={media.photographer?.[0] ? `/hub/photographer/${media.photographer[0]}` : undefined} recedeRef={normalRecede} enterRef={normalEnter} onWaiting={setNormalWaiting} />
       ) : null}
 
       {struggling ? (

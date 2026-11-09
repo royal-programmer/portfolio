@@ -1225,7 +1225,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         }
       }
       if (stopped()) return;
-      let remembered = via === "hub" ? null : readView(persona);
+      // Any arrival from the hub (immersive or Normal) lands on the terminal root; only a direct visit resumes the last view.
+      let remembered = via ? null : readView(persona);
       if (remembered && !views.some((v) => v.id === remembered)) {
         forgetView(persona);
         remembered = null;
@@ -1531,8 +1532,9 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           ) : (
             <Fragment key={i}>
               <span className={`tl-year${r.dim ? " is-dim" : ""}`}>{r.year}</span>
-              <span className={`tl-mon${r.dim ? " is-dim" : ""}`}>{r.life ? "●" : r.mon}</span>
+              <span className={`tl-mon${r.dim ? " is-dim" : ""}`}>{r.mon}</span>
               <span className={`tl-subj${r.dim ? " is-dim" : ""}`}>
+                {r.life ? "● " : ""}
                 {r.subject}
                 {!e.wide && r.tag ? <b className="tone-accent">{`  ${r.tag}`}</b> : null}
               </span>

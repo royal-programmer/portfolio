@@ -28,9 +28,11 @@ type Props = {
   recedeRef: MutableRefObject<number>;
   /** The chapter button calls this to go through the same doorway. */
   enterRef: MutableRefObject<((slug: string) => void) | null>;
+  /** Told the moment a doorway is taken (the chapter's button shows it is busy), and null if the page comes back from the cache. */
+  onWaiting?: (slug: string | null) => void;
 };
 
-export function NormalDisplays({ worlds, activeSlug, items, photo, recedeRef, enterRef }: Props) {
+export function NormalDisplays({ worlds, activeSlug, items, photo, recedeRef, enterRef, onWaiting }: Props) {
   const router = useRouter();
   const [shown, setShown] = useState<string | null>(null);
   const [played, setPlayed] = useState<Record<string, boolean>>({});
@@ -64,13 +66,26 @@ export function NormalDisplays({ worlds, activeSlug, items, photo, recedeRef, en
         if (target.crossOrigin) window.location.assign(href);
         else router.push(href);
       };
+      // The click is heard at once: the chapter's button turns busy, and the display zooms and stays
+      // zoomed (until the page is hidden) while the other host answers.
+      onWaiting?.(slug);
       if (shown === slug) {
         setZoom(slug);
         window.setTimeout(go, 540);
       } else go();
     },
-    [router, shown],
+    [router, shown, onWaiting],
   );
+  // Coming back from the back/forward cache: the doorway is free again.
+  useEffect(() => {
+    const back = (e: PageTransitionEvent) => {
+      if (!e.persisted) return;
+      setZoom(null);
+      onWaiting?.(null);
+    };
+    window.addEventListener("pageshow", back);
+    return () => window.removeEventListener("pageshow", back);
+  }, [onWaiting]);
   useEffect(() => {
     enterRef.current = enter;
     return () => {
