@@ -166,6 +166,8 @@ export type TerminalData = {
   periods: TermPeriod[];
   /** The portrait's source photo and crop (fractions l,t,r,b); every `portrait` mode is generated from it. */
   portrait: { src: string; crop: [number, number, number, number] };
+  /** `now`: what I am doing this month (data, so the admin console can own it). */
+  now?: { month: string; lines: string[] };
   /** The availability line in the side pane. */
   status: string;
   /** Build id, when the deploy exposes one. */
@@ -213,6 +215,14 @@ export function terminalData(persona: Persona | undefined, entries: Entry[], pos
     timeline: TIMELINE,
     periods: TIMELINE_PERIODS,
     portrait: { src: "/portrait.jpg", crop: [0.27, 0.12, 0.75, 0.74] },
+    now: {
+      month: "2026-11",
+      lines: [
+        "Building this portfolio (Next.js 16, Supabase, free stack)",
+        "Shift Roster v2 in production · supporting 200+ users",
+        "Open to software engineering roles · Bengaluru or relocation",
+      ],
+    },
     status: "open to work · relocates",
     commit: process.env.NEXT_PUBLIC_COMMIT || undefined,
   };

@@ -109,7 +109,7 @@ export type Out =
   /** A QR code as text rows (`qr`). */
   | { kind: "qr"; lines: string[] }
   /** Several links on one line, joined by " · ". */
-  | { kind: "links"; items: Array<{ label: string; href?: string; external?: boolean; cmd?: string }>; prefix?: string }
+  | { kind: "links"; items: Array<{ label: string; href?: string; external?: boolean; cmd?: string }>; prefix?: string; /** Wide `portfolio`: text on the left (clipped), the links at the right end of the same line. */ lead?: string }
   /** A listing: `inline` joins the names on one line (`ls`); otherwise it is one row, `meta` before the name. */
   | { kind: "files"; inline: boolean; items: FileItem[] }
   /** `cal`: weeks of day numbers (null = blank), today highlighted. */
@@ -196,6 +196,7 @@ const COMMANDS: CommandDoc[] = [
   { name: "clear", group: "terminal", usage: "clear", desc: "empty the screen", long: "cls does the same." },
   { name: "cls", group: "terminal", usage: "cls", desc: "empty the screen (same as clear)" },
   { name: "portfolio", group: "read", usage: "portfolio", desc: "the whole portfolio on one screen", long: "Every section ends with the command that goes deeper; the → commands are clickable." },
+  { name: "now", group: "read", usage: "now", desc: "what I am doing this month" },
   { name: "hire", group: "read", usage: "hire", desc: "the 20-second version, for recruiters" },
   { name: "timeline", group: "read", usage: "timeline [--all]", desc: "school → college → work, as one line" },
   { name: "view", group: "open", usage: "view [id]", desc: "enter a view (no id: pick from the list)" },
@@ -451,6 +452,13 @@ export function createShell(data: TerminalData): Shell {
   };
 
   /** The 20-second version for recruiters, from the résumé only. */
+  /** `now`: what I am doing this month, from `data.now`. */
+  const now = (): Out[] => {
+    if (!data.now?.lines.length) return [text("nothing posted for this month yet", true)];
+    const [y, m] = data.now.month.split("-").map(Number);
+    return [text(`now · ${MONTHS[(m || 1) - 1]} ${y}`, true), ...data.now.lines.map((l) => text(`  • ${l}`))];
+  };
+
   const hire = (): Out[] => {
     const r = data.resume;
     const role = r.title.split(" · ");
@@ -481,7 +489,15 @@ export function createShell(data: TerminalData): Shell {
     const out: Out[] = [];
     const head = (label: string) => out.push({ kind: "parts", parts: [{ text: `── ${label} ${"─".repeat(Math.max(2, hw - label.length - 4))}`, tone: "dim" }] });
     const row = (t: string) => out.push(text(`│ ${t}`));
-    const go = (...cmds: string[]) => out.push({ kind: "links", prefix: "│ → ", items: cmds.map((c) => ({ label: c, cmd: c })) });
+    const go = (...cmds: string[]) => {
+      const items = cmds.map((c) => ({ label: c, cmd: c }));
+      const last = out[out.length - 1];
+      // Wide: the → commands share the section's last line (a 1fr | auto grid); narrow keeps them on their own line.
+      if (cols >= 80 && last?.kind === "text" && last.text.startsWith("│ ")) {
+        out.pop();
+        out.push({ kind: "links", prefix: "→ ", items, lead: last.text });
+      } else out.push({ kind: "links", prefix: "│ → ", items });
+    };
     const role = (r.title.split(" · ")[0] ?? "").toLowerCase();
     const city = r.location.split(",")[0];
     head("who");
@@ -666,6 +682,8 @@ export function createShell(data: TerminalData): Shell {
         return { lines: portfolio(env?.cols ?? 100) };
       case "hire":
         return { lines: hire() };
+      case "now":
+        return { lines: now() };
       case "timeline":
         return { lines: timeline(env?.cols ?? 100, args.includes("--all")) };
       case "view":

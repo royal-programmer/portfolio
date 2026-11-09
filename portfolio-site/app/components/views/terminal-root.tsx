@@ -39,7 +39,7 @@ export type TerminalRootProps = {
 type Entry =
   /** `ps`: the path the command was typed at (the OS prompt); absent on the boot script's plain `$ `. */
   | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string; label?: string; tag?: "ok" | "wait" | "bar" }
-  | { n: number; k: "links"; items: Array<{ label: string; href?: string; external?: boolean; cmd?: string }>; prefix?: string }
+  | { n: number; k: "links"; items: Array<{ label: string; href?: string; external?: boolean; cmd?: string }>; prefix?: string; lead?: string }
   | { n: number; k: "ghcommit"; label: string; url: string; rest: string }
   | { n: number; k: "portrait"; mode: PortraitMode }
   | { n: number; k: "parts"; parts: Array<{ text: string; tone?: Tone; color?: string }> }
@@ -411,7 +411,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     lines.map((o): Entry => {
       const n = ++seq.current;
       if (o.kind === "text") return { n, k: "out", text: o.text, dim: o.dim, accent: o.accent };
-      if (o.kind === "links") return { n, k: "links", items: o.items, prefix: o.prefix };
+      if (o.kind === "links") return { n, k: "links", items: o.items, prefix: o.prefix, lead: o.lead };
       if (o.kind === "portrait") {
         const mode = o.mode === "next" ? PORTRAIT_MODES[(PORTRAIT_MODES.indexOf(portraitMode.current) + 1) % PORTRAIT_MODES.length] : o.mode;
         portraitMode.current = mode;
@@ -1622,22 +1622,25 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         -- more (space / ↓ next, q quit) --
       </button>
     ) : e.k === "links" ? (
-      <span key={e.n} className="is-out">
-        {e.prefix}
-        {e.items.map((l, i) => (
-          <Fragment key={l.label}>
-            {i ? " · " : ""}
-            {l.cmd ? (
-              <button type="button" className="terminal-root-link" onMouseDown={keepFocus} onClick={() => submit(l.cmd!)}>
-                {l.label}
-              </button>
-            ) : (
-              <a className="terminal-root-link" href={l.href} {...(l.external ? { target: "_blank", rel: "noreferrer" } : {})}>
-                {l.label}
-              </a>
-            )}
-          </Fragment>
-        ))}
+      <span key={e.n} className={`is-out${e.lead ? " terminal-os-rowgo" : ""}`}>
+        {e.lead ? <span className="rg-l">{e.lead}</span> : null}
+        <span className={e.lead ? "rg-r" : undefined}>
+          {e.prefix}
+          {e.items.map((l, i) => (
+            <Fragment key={l.label}>
+              {i ? " · " : ""}
+              {l.cmd ? (
+                <button type="button" className="terminal-root-link" onMouseDown={keepFocus} onClick={() => submit(l.cmd!)}>
+                  {l.label}
+                </button>
+              ) : (
+                <a className="terminal-root-link" href={l.href} {...(l.external ? { target: "_blank", rel: "noreferrer" } : {})}>
+                  {l.label}
+                </a>
+              )}
+            </Fragment>
+          ))}
+        </span>
       </span>
     ) : e.k === "link" ? (
       <span key={e.n} className="is-out">
@@ -1806,6 +1809,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
             <i aria-hidden="true" />
             {data.status}
           </p>
+          {data.now?.lines[0] ? <p className="terminal-os-pane-now">{`now · ${data.now.lines[0]}`}</p> : null}
           <div className="terminal-os-pane-actions">
             {["hire", "resume --pdf", "mail"].map((c) => (
               <button key={c} type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit(c)}>
@@ -1845,7 +1849,13 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         </aside>
         </div>
         <div className="terminal-os-status">
-          <code className="terminal-os-status-l">{`${USER}@code  ${shortPath(cwd)}`}</code>
+          <span className="terminal-os-status-lw">
+            <code className="terminal-os-status-l">{`${USER}@code  ${shortPath(cwd)}`}</code>
+            <button type="button" tabIndex={-1} className="terminal-os-status-work" onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit("hire")}>
+              <i aria-hidden="true" />
+              open to work
+            </button>
+          </span>
           <code className="terminal-os-status-m is-counts">
             {[plural(data.projects.length, "project"), plural(data.posts.length, "post"), plural(data.views.length, "view")].filter((t) => !t.startsWith("0 ")).join(" · ")}
           </code>

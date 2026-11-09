@@ -3028,8 +3028,60 @@ em.font-display,
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.terminal-os-status-lw {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.terminal-os-status-work {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.terminal-os-status-work i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok, var(--term-green, #3fb950));
+}
+.terminal-os-status-work:hover {
+  color: var(--ink);
+}
+@media (pointer: coarse) {
+  .terminal-os-status-work {
+    min-height: 44px;
+    padding-inline: 8px;
+  }
+}
 .terminal-os-status-m {
   color: var(--ink-faint);
+}
+.terminal-os-pane-now {
+  color: var(--term-faint, var(--ink-faint));
+  font-size: 12px;
+}
+/* `portfolio`, wide: each section's → commands sit at the right end of its last line. */
+.terminal-root-body .terminal-os-rowgo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 2ch;
+}
+.terminal-os-rowgo .rg-l {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.terminal-os-rowgo .rg-r {
+  white-space: nowrap;
 }
 .terminal-os-status-r {
   display: flex;
