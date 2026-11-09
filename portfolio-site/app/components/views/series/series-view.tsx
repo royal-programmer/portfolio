@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./series.css";
+import { SeriesHero } from "./series-hero";
 import { SERIES_PROFILES, isSeriesProfile, type Series, type SeriesProfileId } from "@/lib/site/series-data";
 import type { TermLink, TerminalData } from "@/lib/site/terminal-data";
 
@@ -131,15 +132,13 @@ function ProfileGate({ onPick }: { onPick: (id: SeriesProfileId) => void }) {
   );
 }
 
-function SeriesBody({ series, profile, onSwitch }: Omit<SeriesViewProps, "series"> & { series: Series; profile: SeriesProfileId; onSwitch: () => void }) {
-  const name = SERIES_PROFILES.find((p) => p.id === profile)?.name;
+function SeriesBody({ series, profile, status, portrait, fast, onSwitch }: Omit<SeriesViewProps, "series"> & { series: Series; profile: SeriesProfileId; onSwitch: () => void }) {
   return (
-    <main className="sr-page">
+    <>
       <button type="button" className="sr-switch" onClick={onSwitch}>
         Switch profile
       </button>
-      <h1>{series.title}</h1>
-      <p>{name}</p>
-    </main>
+      <SeriesHero series={series} profile={profile} status={status} portrait={portrait} fast={fast} firstRowId={series.rows[0]?.id} />
+    </>
   );
 }
