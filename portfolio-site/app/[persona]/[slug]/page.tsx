@@ -17,6 +17,7 @@ import { loadHomeContent } from "../../load-home-content";
 
 type ProjectDetailProps = {
   params: Promise<{ persona: string; slug: string }>;
+  searchParams: Promise<{ via?: string }>;
 };
 
 export async function generateStaticParams() {
@@ -60,13 +61,13 @@ export async function generateMetadata({ params }: ProjectDetailProps): Promise<
   };
 }
 
-export default async function PersonaEntryPage({ params }: ProjectDetailProps) {
-  const { persona, slug } = await params;
+export default async function PersonaEntryPage({ params, searchParams }: ProjectDetailProps) {
+  const [{ persona, slug }, { via }] = await Promise.all([params, searchParams]);
 
   if (!isLaunchedPersona(persona)) notFound();
 
   const view = getView(persona, slug);
-  if (view) return <PersonaViewPage persona={persona} view={view.id} />;
+  if (view) return <PersonaViewPage persona={persona} view={view.id} fromTerminal={via === "terminal"} />;
 
   const entry = await getEntryBySlug(persona, slug);
   if (!entry) notFound();
@@ -152,7 +153,7 @@ export default async function PersonaEntryPage({ params }: ProjectDetailProps) {
  * that remembers the pick and offers Exit. "stage" is the page as it was — the world's stage in 3D,
  * the projects, the writing — opening on its finished window, as from the hub's Normal display.
  */
-async function PersonaViewPage({ persona, view }: { persona: LaunchedPersona; view: string }) {
+async function PersonaViewPage({ persona, view, fromTerminal }: { persona: LaunchedPersona; view: string; fromTerminal: boolean }) {
   const { personas, engineerEntries, engineerBlogPosts } = await loadHomeContent();
   const accent = personas.find((p) => p.slug === persona)?.accent ?? "#f3f1ec";
   const ranked = [...personas].sort((a, b) => a.order - b.order).map((p) => p.slug);
@@ -160,8 +161,9 @@ async function PersonaViewPage({ persona, view }: { persona: LaunchedPersona; vi
   const items = engineerEntries.filter((e) => e.visibility === "public").map((e) => e.slug);
   if (view === "stage") {
     return (
-      <ViewShell persona={persona} view={view}>
-        <WorldBoot slug={persona} color={accent} t={t} via="normal" items={items} />
+      <ViewShell persona={persona} view={view} stripVia={fromTerminal}>
+        {/* The terminal already printed this view's boot: no second entry animation. */}
+        {fromTerminal ? null : <WorldBoot slug={persona} color={accent} t={t} via="normal" items={items} />}
         <HomePage routePersona={persona} personas={personas} engineerEntries={engineerEntries} engineerBlogPosts={engineerBlogPosts} />
       </ViewShell>
     );

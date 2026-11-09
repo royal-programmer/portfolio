@@ -821,9 +821,43 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     setReady(true);
   };
 
-  const go = async (dest: Dest): Promise<boolean> => {
+  /** A view's boot, printed here in the transcript (about 700 ms; instant when motion is off), so the view itself opens without a second entry animation. */
+  const bootView = async (id: string): Promise<boolean> => {
+    const fast = via === "normal" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const aborted = () => cancelled.current || live.current.cancelAuto;
+    const row = (text: string, tag?: "wait" | "ok") => {
+      const n = ++seq.current;
+      append([{ n, k: "out", text, tag }]);
+      return n;
+    };
+    const patch = (n: number, p: Partial<Extract<Entry, { k: "out" }>>) => (osRef.current ? setEntries : setBootEntries)((es) => es.map((e) => (e.n === n && e.k === "out" ? { ...e, ...p } : e)));
+    if (fast) {
+      row(`mounting ${id}`, "ok");
+      row(bootBar(BOOT_BAR_STEPS), undefined);
+      row("handing over · Esc comes back", "ok");
+      return true;
+    }
+    const a = row(`mounting ${id}`, "wait");
+    await wait(160);
+    if (aborted()) return false;
+    patch(a, { tag: "ok" });
+    const b = row(bootBar(0));
+    for (let f = 1; f <= BOOT_BAR_STEPS; f++) {
+      await wait(30);
+      if (aborted()) return false;
+      patch(b, { text: bootBar(f) });
+      ambient.key();
+    }
+    await wait(60);
+    if (aborted()) return false;
+    row("handing over · Esc comes back", "ok");
+    await wait(140);
+    return !aborted();
+  };
+
+  const go = async (dest: Dest, hold = 420): Promise<boolean> => {
     setOpening(true);
-    await wait(420);
+    await wait(hold);
     if (cancelled.current) return false;
     if (live.current.cancelAuto) {
       restore();
@@ -852,6 +886,16 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     setReady(false);
     if (label && !(await type(label, 12, false, true))) {
       if (live.current.cancelAuto && !cancelled.current) restore();
+      return;
+    }
+    const isView = views.some((v) => `/${v.id}` === path);
+    if (isView) {
+      if (!(await bootView(path.slice(1)))) {
+        if (live.current.cancelAuto && !cancelled.current) restore();
+        return;
+      }
+      const d = personaHref(origin, persona, path);
+      await go({ ...d, href: `${d.href}?via=terminal` }, 60);
       return;
     }
     await go(personaHref(origin, persona, path));

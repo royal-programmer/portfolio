@@ -11,9 +11,9 @@ import type { LaunchedPersona } from "@/lib/content/types";
 import { personaHref, useOrigin } from "@/lib/site/persona-link";
 import { forgetView, rememberView } from "@/lib/site/view-memory";
 
-type Props = { persona: LaunchedPersona; view: string; children: ReactNode };
+type Props = { persona: LaunchedPersona; view: string; /** Arrived from the terminal (`?via=terminal`): the parameter is taken off the address bar. */ stripVia?: boolean; children: ReactNode };
 
-export function ViewShell({ persona, view, children }: Props) {
+export function ViewShell({ persona, view, stripVia, children }: Props) {
   const router = useRouter();
   const origin = useOrigin();
   const root = useMemo(() => personaHref(origin, persona, "/"), [origin, persona]);
@@ -21,6 +21,17 @@ export function ViewShell({ persona, view, children }: Props) {
   useEffect(() => {
     rememberView(persona, view);
   }, [persona, view]);
+
+  useEffect(() => {
+    if (!stripVia) return;
+    try {
+      const u = new URL(window.location.href);
+      if (u.searchParams.has("via")) {
+        u.searchParams.delete("via");
+        window.history.replaceState(window.history.state, "", u);
+      }
+    } catch {}
+  }, [stripVia]);
 
   const exit = useCallback(() => {
     forgetView(persona);
@@ -46,7 +57,7 @@ export function ViewShell({ persona, view, children }: Props) {
       {children}
       <div className="view-exit" role="toolbar" aria-label="View">
         <button type="button" onClick={exit} title="Back to the terminal (Esc)">
-          <span aria-hidden>⌂</span> exit
+          <span aria-hidden>←</span> back to terminal
         </button>
       </div>
     </>
