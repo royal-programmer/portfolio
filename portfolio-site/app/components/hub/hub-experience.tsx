@@ -36,6 +36,7 @@ import { BootFrame, ExitFrame } from "./exit-sequence";
 import { GateSkeleton, HeadsetGate, type LoadStatus } from "./headset-gate";
 import { printCredits } from "@/lib/site/credits";
 import { LightCursor } from "./light-cursor";
+import { speculate } from "@/lib/site/speculate";
 import { NormalDisplays } from "./normal-displays";
 import { NormalJourney } from "./normal-journey";
 import { RefractionPoster } from "./refraction-poster";
@@ -1067,7 +1068,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         </section>
 
         {chapters.map((c, i) => (
-          <PersonaChapter key={c.slug} chapter={c} index={i} total={chapters.length} waiting={(waiting ?? normalWaiting) === c.slug} onEnter={immersiveLive && introDone ? enterWorld : experience === "normal" && !sceneWanted && textLive ? (slug) => normalEnter.current?.(slug) : undefined} />
+          <PersonaChapter key={c.slug} chapter={c} index={i} total={chapters.length} waiting={(waiting ?? normalWaiting) === c.slug} warm={experience === "normal" && !sceneWanted && textLive} onEnter={immersiveLive && introDone ? enterWorld : experience === "normal" && !sceneWanted && textLive ? (slug) => normalEnter.current?.(slug) : undefined} />
         ))}
 
         {upcoming.length ? (
@@ -1243,7 +1244,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   );
 }
 
-function PersonaChapter({ chapter, index, total, onEnter, waiting }: { chapter: HubChapter; index: number; total: number; /** The doorway heard the tap and waits for its setup to form. */ waiting?: boolean; /** Immersive: the button goes through the same doorway as the setup (the camera flies into its screen). */ onEnter?: (slug: string) => void }) {
+function PersonaChapter({ chapter, index, total, onEnter, waiting, warm }: { chapter: HubChapter; /** Normal mode: warm the destination on intent (Speculation Rules). */ warm?: boolean; index: number; total: number; /** The doorway heard the tap and waits for its setup to form. */ waiting?: boolean; /** Immersive: the button goes through the same doorway as the setup (the camera flies into its screen). */ onEnter?: (slug: string) => void }) {
   const id = personaIdentity(chapter.slug);
   const color = spectrumColor(chapter.t);
   return (
@@ -1297,6 +1298,9 @@ function PersonaChapter({ chapter, index, total, onEnter, waiting }: { chapter: 
                 onEnter(chapter.slug);
               }}
               data-cursor-color={color}
+              onPointerEnter={warm ? () => speculate(chapter.slug) : undefined}
+              onPointerDown={warm ? () => speculate(chapter.slug) : undefined}
+              onFocus={warm ? () => speculate(chapter.slug) : undefined}
               aria-busy={waiting || undefined}
               className={`hub-cta mt-10 inline-flex min-h-12 items-center gap-3 rounded-full border px-6 text-sm font-medium backdrop-blur-md ${waiting ? "is-waiting" : ""}`}
               style={{ "--c": color } as CSSProperties}

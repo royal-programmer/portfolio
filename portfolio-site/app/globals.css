@@ -256,6 +256,11 @@ body:has(.hub-v3) {
   background: var(--void);
 }
 
+/* The terminal's dark is the document's from the first paint: no white flash between hub and terminal. */
+html:has(.terminal-root) {
+  background: #05060a;
+}
+
 /* Messenger-style typing indicator: staggered vertical bounce, two waves (123 × 2) */
 @keyframes chat-dot-jump {
   0%,
@@ -1882,6 +1887,44 @@ em.font-display,
   opacity: 0;
   transition: transform 560ms var(--ease-in), opacity 260ms var(--ease-in) 300ms;
 }
+/* The curtain: the zoomed card dissolves into the terminal's own dark, never into a hole. */
+.hub-curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: grid;
+  place-items: center;
+  background: #05060a;
+  color: #8a8f9c;
+  font: 400 13px/1.4 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  letter-spacing: 0.02em;
+  animation: hub-curtain-in 320ms ease-out 220ms both;
+}
+.hub-curtain-line {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: var(--c);
+  transform-origin: left;
+  animation:
+    hub-curtain-sweep 1200ms cubic-bezier(0.2, 0.7, 0.2, 1) 220ms both,
+    hub-curtain-pulse 1400ms ease-in-out 1420ms infinite;
+}
+@keyframes hub-curtain-in {
+  from { opacity: 0; }
+}
+@keyframes hub-curtain-sweep {
+  from { transform: scaleX(0); }
+}
+@keyframes hub-curtain-pulse {
+  50% { opacity: 0.35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hub-curtain,
+  .hub-curtain-line {
+    animation: none;
+  }
+}
 @keyframes normal-display-in {
   from { opacity: 0; transform: translate(-60px, 36px) rotate(-5deg) scale(0.9); }
 }
@@ -2253,6 +2296,25 @@ em.font-display,
   transform: scale(1.6);
   opacity: 0;
   transition-duration: 650ms;
+}
+/* Arriving from the Normal doorway: the terminal fades in over 240 ms so nothing pops. */
+.terminal-root.is-via-normal {
+  animation: terminal-arrive 240ms ease-out both;
+}
+.terminal-root.is-arriving {
+  opacity: 0;
+  animation: none;
+}
+@keyframes terminal-arrive {
+  from { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-root.is-via-normal {
+    animation: none;
+  }
+  .terminal-root.is-arriving {
+    opacity: 1;
+  }
 }
 .terminal-root.is-direct .terminal-root-frame {
   animation: world-boot-in 700ms var(--ease-out) both;

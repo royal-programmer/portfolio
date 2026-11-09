@@ -19,6 +19,7 @@ import { cachedPortrait, generatePortrait, PORTRAIT_COLS, PORTRAIT_MODES, type P
 import type { TerminalData } from "@/lib/site/terminal-data";
 import { HOME, resolvePath, shortPath, USER } from "@/lib/site/terminal-fs";
 import { createShell, HISTORY_CAP, initialShellState, THEMES, type Effect, type FileItem, type MenuId, type MenuRow, type Out, type ShellState, type ThemeId, type TimelineRow, type Tone } from "@/lib/site/terminal-shell";
+import { isPrerendering, whenActive } from "@/lib/site/prerender";
 import { forgetView, readView } from "@/lib/site/view-memory";
 
 export type TerminalRootProps = {
@@ -286,8 +287,12 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   /** The boot window's script, and (after the swap) the full-screen terminal's transcript. */
   const [bootEntries, setBootEntries] = useState<Entry[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
-  const [os, setOs] = useState(false);
-  const osRef = useRef(false);
+  // Through the Normal doorway the terminal is the first frame: os mode from the server render on, with the banner as static markup until the boot effect takes over.
+  const [os, setOs] = useState(via === "normal");
+  const osRef = useRef(via === "normal");
+  const [hydrated, setHydrated] = useState(false);
+  /** A prerendered page waits, invisible, and fades in when the visitor arrives. */
+  const [arriving, setArriving] = useState(false);
   const [cwd, setCwd] = useState(HOME);
   const [partial, setPartial] = useState<string | null>("");
   const [cmd, setCmd] = useState("");
@@ -468,7 +473,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   /** Anonymous usage: the command name only, never arguments. Fire and forget; nothing identifies the visitor. */
   const beacon = (command: string, ok = true) => {
     try {
-      if (typeof navigator === "undefined" || !navigator.sendBeacon) return;
+      if (typeof navigator === "undefined" || !navigator.sendBeacon || isPrerendering()) return;
       navigator.sendBeacon("/api/term-event", JSON.stringify({ command, ok, persona, theme: themeRef.current, viewport: window.innerWidth < 768 ? "phone" : "desktop" }));
     } catch {}
   };
@@ -794,11 +799,11 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   };
 
   /** The boot window grows and dissolves; the full-screen terminal opens with the welcome. */
-  const swap = () => {
+  const swap = (banner = true) => {
     markSeen();
     osRef.current = true;
     setOs(true);
-    append(toEntries(shell.banner()));
+    if (banner) append(toEntries(shell.banner()));
   };
 
   /** Back to the waiting prompt (Back from a bfcache page, or a cancelled auto-open). */
@@ -1201,8 +1206,9 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     live.current.auto = false;
     live.current.cancelAuto = false;
     live.current.shell = initialShellState(loadHistory(persona));
-    osRef.current = false;
-    setOs(false);
+    const direct = via === "normal";
+    osRef.current = direct;
+    setOs(direct);
     setCwd(HOME);
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const instant = via === "normal" || reduce;
@@ -1222,15 +1228,17 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       }
     } catch {}
     const run = async () => {
-      setEntries([]);
+      // The banner replaces the static one in the same commit: no gap, no second banner.
+      setEntries(direct ? toEntries(shell.banner()) : []);
       setBootEntries([]);
       setMenuN(null);
       setPartial("");
-      await wait(via === "hub" ? 150 : 100);
+      setHydrated(true);
+      if (!direct) await wait(via === "hub" ? 150 : 100);
       if (stopped()) return;
       setBooting(false);
       const script = terminalScript({ projects: items.length, posts: data.posts.length, views: views.length }, !firstVisit);
-      for (const l of script) {
+      for (const l of direct ? [] : script) {
         if (stopped()) return;
         if (l.typed && !instant) await type(l.text, 13, false, false, token);
         else if (l.tag === "ok" && !instant) {
@@ -1277,7 +1285,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       }
       // Connected: the window takes the world's light, then dissolves into the terminal.
       if (win.current && !instant) gsap.to(win.current, { boxShadow: `0 0 80px -10px ${color}`, duration: 0.4 });
-      swap();
+      swap(!direct);
       tick("boot");
       if (!instant) await wait(520);
       if (stopped()) return;
@@ -1296,8 +1304,15 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       }
       setPartial(null);
     };
-    void run();
+    // A prerendered page holds the whole boot until the visitor arrives (it plays on activation, not before).
+    const wasPrerendered = isPrerendering();
+    if (wasPrerendered && direct) setArriving(true);
+    const off = whenActive(() => {
+      if (wasPrerendered && direct) window.requestAnimationFrame(() => setArriving(false));
+      void run();
+    });
     return () => {
+      off();
       cancelled.current = true;
       runs.current++;
       for (const t of timers.current) {
@@ -1727,7 +1742,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   return (
     <div
       ref={root}
-      className={`terminal-root ${via === "hub" ? "is-via-hub" : "is-direct"} ${opening ? "is-opening" : ""} ${os ? "is-os" : ""} ${crt ? "has-crt" : ""}`}
+      className={`terminal-root ${via === "hub" ? "is-via-hub" : "is-direct"} ${via === "normal" ? "is-via-normal" : ""} ${arriving ? "is-arriving" : ""} ${opening ? "is-opening" : ""} ${os ? "is-os" : ""} ${crt ? "has-crt" : ""}`}
       style={{ "--persona-c": color } as CSSProperties}
       data-theme={theme}
       role="region"
@@ -1766,6 +1781,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         >
           <span className="sr-only">Type commands. help lists them, hire is the short version, / opens the menu, banner prints the welcome again, cls clears the screen, Ctrl+C cancels, Esc or exit returns to the hub.</span>
           <div role="log" aria-live="polite" aria-relevant="additions">
+            {via === "normal" && !hydrated ? renderEntry(toEntries(shell.banner())[0]) : null}
             {entries.map(renderEntry)}
           </div>
           {palette ? (
