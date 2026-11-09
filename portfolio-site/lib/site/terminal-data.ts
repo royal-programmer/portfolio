@@ -24,7 +24,7 @@ export type TermPost = {
   body: string;
 };
 
-export type TermLink = { label: string; href: string };
+export type TermLink = { label: string; href: string; /** "elsewhere": printed as a second group by `contact`, left out of the short lists. */ group?: "elsewhere" };
 
 export type TermRole = {
   role: string;
@@ -173,6 +173,11 @@ export function terminalData(persona: Persona | undefined, entries: Entry[], pos
       { label: "mail", href: `mailto:${HUB_COPY.email}` },
       { label: "github", href: `https://github.com/${handle}` },
       { label: "linkedin", href: `https://www.linkedin.com/in/${handle}` },
+      { label: "holopin", href: "https://www.holopin.io/@royalprogrammer", group: "elsewhere" },
+      { label: "stack overflow", href: "https://stackoverflow.com/users/22394141/royal-programmer", group: "elsewhere" },
+      { label: "g.dev", href: "https://g.dev/royalprogrammer", group: "elsewhere" },
+      { label: "google skills", href: "https://www.skills.google/public_profiles/369b718d-7bea-4e4b-9741-63c8d2250b64", group: "elsewhere" },
+      { label: "geeksforgeeks", href: "https://www.geeksforgeeks.org/profile/royal_programmer", group: "elsewhere" },
     ],
     projects: entries
       .filter((e): e is Extract<Entry, { type: "project" }> => e.type === "project" && e.visibility === "public")

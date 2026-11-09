@@ -5,6 +5,19 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-09 — Round 1k: terminal fixes, portrait modes, pane, `portfolio`; hub and persona copy
+
+Builder (Sonnet). Commits: 9c47261 (boot token, `cls`), 142cafc (views boot in the terminal), 0ffe3d0 (`portfolio`, generated
+portraits, pane, real dates; also LF line endings restored after the first two commits picked up CRLF), 2b09ab3 (hire pill by
+persona, hub copy, persona phrases), plus the closing commit (alternating character lines, `elsewhere` contact links, docs).
+Verified in the browser (dev, chrome-devtools): one banner after `view stage` + Esc and after reload; stage opens with no
+WorldBoot and `?via=terminal` is stripped; `?run=portfolio` at 1280 and 393; all five portrait modes at 1280, neofetch at 393, no
+horizontal scroll; pane at 1280 (live lines from the GitHub cache). tsc and eslint clean. Not verified: StrictMode double-effect
+on a cold dev load (covered by the token), pointer-level checks of every pane button.
+Open questions: a real photo for the portrait (R.jpg is the logo); whether the hire pill should hide on the Engineer stage view.
+
+---
+
 ## 2026-11-09 — Round 1j: honest placeholders, `Hire me` everywhere, real 404, phone hero
 
 Builder (Sonnet, ≈110k tokens incl. verification), after a Sonnet audit of the live site. Removed the

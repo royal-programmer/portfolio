@@ -256,12 +256,15 @@ export function createShell(data: TerminalData): Shell {
   const render = (path: string, lines: string[]): Out[] => {
     if (path === `${HOME}/contact`) {
       const w = Math.max(...data.contact.map((x) => x.label.length));
-      return data.contact.map((c): Out => {
+      const row = (c: (typeof data.contact)[number]): Out => {
         const label = `${c.label.padEnd(w)}  ${c.href.replace(/^mailto:/i, "")}`;
         if (/^https?:\/\//i.test(c.href)) return { kind: "link", label, href: c.href, external: true };
         if (/^mailto:/i.test(c.href)) return { kind: "link", label, href: c.href };
         return text(label);
-      });
+      };
+      const main = data.contact.filter((c) => !c.group);
+      const more = data.contact.filter((c) => c.group === "elsewhere");
+      return [...main.map(row), ...(more.length ? [text(""), text("elsewhere", true), ...more.map(row)] : [])];
     }
     return lines.map((l): Out => {
       const link = /^(?:repo|live) ↗ (\S+)$/.exec(l);
@@ -512,7 +515,7 @@ export function createShell(data: TerminalData): Shell {
       go(...data.views.map((v) => `view ${v.id}`));
     }
     head("contact");
-    row(clip([...data.contact.map((c) => c.label), "resume --pdf"].join(" · ")));
+    row(clip([...data.contact.filter((c) => !c.group).map((c) => c.label), "resume --pdf"].join(" · ")));
     go("contact", "mail");
     return out;
   };
@@ -585,7 +588,7 @@ export function createShell(data: TerminalData): Shell {
   /** The résumé's first page: name, title, links, summary, then a line or two per section. */
   const resume = (): Out[] => {
     const r = data.resume;
-    const links = data.contact.map((c) => ({
+    const links = data.contact.filter((c) => !c.group).map((c) => ({
       label: c.label,
       href: c.href,
       external: /^https?:\/\//i.test(c.href),

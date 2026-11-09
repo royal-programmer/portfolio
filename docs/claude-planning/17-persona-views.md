@@ -256,3 +256,26 @@ This round is an honest-placeholder pass, not a rebuild of the other personas (e
   mode pills, sound, quality, chapter dots, Top/End, the HUD buttons, the gate's "proceed" link) without
   changing how anything looks. The HUD gets a dark plate so it holds up over bright warp streaks.
 
+### 6.12 Round 1k: fixes, portrait modes, the pane, `portfolio` (Ratul + coordinator, 2026-11-09)
+
+- **One boot at a time.** The boot effect now carries a per-run token (`runSeq`); a replaced run (StrictMode
+  double effect, a re-run after a push back) stops appending, so the banner and tips box print once.
+- **`cls`** joins `clear`; Ctrl+L is the browser's again. Keys line: `Tab complete · ↑ history · / menu · cls clear · Ctrl+C cancel · Esc exit`.
+- **Views boot in the terminal.** Opening a view prints `[ok] mounting <id>`, a progress bar and
+  `[ok] handing over · Esc comes back` (about 700 ms; instant with reduced motion or `via=normal`), then navigates with
+  `?via=terminal`. The view page reads it and renders no `WorldBoot`; the shell strips the parameter. Direct loads keep
+  the old arrival. The view's button reads `← back to terminal`.
+- **`portfolio` replaces `tour`/`demo`**: the whole portfolio on one screen, instant, sections with a left rule, each ending
+  in clickable `→ command` tokens. Built from `TerminalData` only; `?run=portfolio` works; tips row 7 and the boot hint say so.
+- **Portrait is generated** (`lib/site/portrait-gen.ts`): the image and crop live in `TerminalData.portrait`; modes `pixels`
+  (true-colour half-blocks), `braille` (Floyd-Steinberg), `ascii`, `blocks`, `matrix`; `portrait list|next|<mode>`, a clickable
+  modes line under every render, `neofetch` uses braille at 26 cols. Luminance is stretched and flipped for light backdrops.
+  The baked arrays are gone from `terminal-art.ts`.
+- **Pane**: who (name, role, `TerminalData.status`), quick actions (`hire`, `resume --pdf`, `mail`), contents with a
+  `seen n of m` meter, next, live (GitHub cache; one lazy fetch after 3 s idle, never on boot, skipped on save-data), keys.
+- **Hub and personas**: `HIRE_PERSONAS` in `brand.ts` decides which personas mount the hire pill (the hub has none); the hub line
+  is two alternating character lines (`HUB_COPY.character`); each persona has three phrases (`phrases`), cycled lap by lap and
+  reused by the persona pages ("I build systems that stay up").
+- **Data**: real school/college/work periods and the four internships; five more profile links under `elsewhere` in `contact`.
+- Open: the photo (`R.jpg` is the logo, so the avatar is the source until a real photo is added); hire pill also shows on the
+  Engineer stage view (the list says engineer).

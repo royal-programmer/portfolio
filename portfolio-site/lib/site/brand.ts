@@ -24,8 +24,11 @@ export const HUB_COPY = {
   closingBody:
     "Each colour is a part of me with its own world. Together they’re the whole picture — and the picture keeps growing.",
   email: "ratul.arya.roy@gmail.com",
-  /** One line under the hero: character, not the job (Ratul will rewrite it). */
-  pitch: "Curious by default. Disciplined when it counts. Always making something.",
+  /** Lines under the hero, one at a time: character, not the job (Ratul will rewrite them). */
+  character: [
+    "Curious by default. Disciplined when it counts. Always making something.",
+    "Says it plainly. Notices the small things. Won’t call it done until it feels right.",
+  ] as readonly string[],
 } as const;
 
 export type PersonaIdentity = {

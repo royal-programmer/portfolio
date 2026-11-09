@@ -1052,7 +1052,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
               {HUB_COPY.intro} <CyclingPhrase chapters={chapters} />
             </p>
             <p data-hero-item className="mt-3 font-mono text-[11px] leading-relaxed tracking-[0.06em] text-[var(--ink-faint)] sm:text-xs">
-              {HUB_COPY.pitch}
+              <CyclingLine lines={HUB_COPY.character} />
             </p>
           </div>
         </section>
@@ -1314,6 +1314,29 @@ function PersonaChapter({ chapter, index, total, onEnter, waiting }: { chapter: 
         <div id={`${chapter.slug}-display`} className="normal-display-slot" aria-hidden />
       </div>
     </section>
+  );
+}
+
+/** The character lines, one at a time, every 6 s (the first only, with reduced motion; both for screen readers). */
+function CyclingLine({ lines }: { lines: readonly string[] }) {
+  const [tick, setTick] = useState(0);
+  const [cycling, setCycling] = useState(false);
+
+  useEffect(() => {
+    if (lines.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    queueMicrotask(() => setCycling(true));
+    const id = window.setInterval(() => setTick((n) => n + 1), 6000);
+    return () => window.clearInterval(id);
+  }, [lines.length]);
+
+  if (!cycling) return <>{lines[0]}</>;
+  return (
+    <>
+      <span className="sr-only">{lines.join(" ")}</span>
+      <span aria-hidden key={tick} className="hub-phrase inline-block">
+        {lines[tick % lines.length]}
+      </span>
+    </>
   );
 }
 
