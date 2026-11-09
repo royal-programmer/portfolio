@@ -16,6 +16,17 @@ horizontal scroll; pane at 1280 (live lines from the GitHub cache). tsc and esli
 on a cold dev load (covered by the token), pointer-level checks of every pane button.
 Open questions: a real photo for the portrait (R.jpg is the logo); whether the hire pill should hide on the Engineer stage view.
 
+**Lead verification (Fable), 574d129.** The portrait now reads the real photo: `public/portrait.jpg` (640px, from the
+photo used for the earlier baked art) with the original crop, instead of the cartoon avatar; the pane status line is
+`open to work · relocates` (the city already sits on the line above). Checked in the browser: hub at 1280 has no hire
+pill and both character lines are present (sr-only carries both); `/stage` at 393 shows the `Hire me` pill bottom-left
+and `← back to terminal` bottom-right with no overlap (the round "N" that sits over the pill in dev is Next.js's dev
+indicator, absent in production); `portrait ascii` at 393 and `portrait` (pixels, 9.7k spans) at 1280 render with one
+banner and no horizontal scroll. Decision: the pill stays on the Engineer stage view — `hire` is a terminal command and a
+recruiter who lands on the stage has no other way to the résumé. Profile facts came from Ratul's LinkedIn (he signed in
+to the Playwright browser): B.Tech Oct 2021 → Jul 2024, school years, internships, five `elsewhere` links. Builder
+≈254k tokens; lead ≈120k this round.
+
 ---
 
 ## 2026-11-09 — Round 1j: honest placeholders, `Hire me` everywhere, real 404, phone hero
