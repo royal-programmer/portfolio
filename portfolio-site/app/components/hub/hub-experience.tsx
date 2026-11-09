@@ -33,7 +33,6 @@ import { spectrumColor } from "@/lib/site/spectrum";
 import { useExperience } from "../../experience-provider";
 import { ModeSwitch, QualityMenu, QUALITY_LABEL, SoundToggle } from "../experience-controls";
 import { BootFrame, ExitFrame } from "./exit-sequence";
-import { HirePill } from "../hire-pill";
 import { GateSkeleton, HeadsetGate, type LoadStatus } from "./headset-gate";
 import { printCredits } from "@/lib/site/credits";
 import { LightCursor } from "./light-cursor";
@@ -1144,7 +1143,6 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         onEnd={() => jump("end")}
       />
 
-      <HirePill hub on={ready && gate === null && !inIntro && !entering && !returning && !rewinding} />
 
       {/* ---------- Intro overlays ---------- */}
       {/* Before any script runs the page IS the loader: the gate's still parts, server-rendered.
@@ -1319,27 +1317,30 @@ function PersonaChapter({ chapter, index, total, onEnter, waiting }: { chapter: 
   );
 }
 
-/** "I build systems" → "I read markets" → … (static sentence with reduced motion). */
+/** "I build systems that stay up" → "I read markets, not rumours" → … Each lap of the personas advances the phrase, so a visitor who stays hears them all (the first of each, joined, with reduced motion). */
 function CyclingPhrase({ chapters }: { chapters: HubChapter[] }) {
-  const [i, setI] = useState(0);
+  const [tick, setTick] = useState(0);
   const [cycling, setCycling] = useState(false);
-  const phrases = chapters.map((c) => ({ text: personaIdentity(c.slug).phrase, color: spectrumColor(c.t) }));
+  const ids = chapters.map((c) => ({ id: personaIdentity(c.slug), color: spectrumColor(c.t) }));
+  const count = ids.length;
 
   useEffect(() => {
-    if (phrases.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (count < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     queueMicrotask(() => setCycling(true));
-    const id = window.setInterval(() => setI((n) => (n + 1) % phrases.length), 2600);
+    const id = window.setInterval(() => setTick((n) => n + 1), 2600);
     return () => window.clearInterval(id);
-  }, [phrases.length]);
+  }, [count]);
 
-  const list = phrases.map((p) => p.text);
+  const list = ids.map((p) => p.id.phrases[0]);
   const sentence = list.length > 1 ? `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}` : list[0];
+  const cur = count ? ids[tick % count] : undefined;
+  const text = cur ? cur.id.phrases[Math.floor(tick / count) % cur.id.phrases.length] : "";
   if (!cycling) return <span className="text-[var(--ink)]">{sentence}.</span>;
   return (
     <>
       <span className="sr-only">{sentence}.</span>
-      <span aria-hidden key={i} className="hub-phrase inline-block" style={{ color: phrases[i].color }}>
-        {phrases[i].text}.
+      <span aria-hidden key={tick} className="hub-phrase inline-block" style={{ color: cur?.color }}>
+        {text}.
       </span>
     </>
   );

@@ -4,6 +4,7 @@ import { Sparkles } from "lucide-react";
 import { forwardRef } from "react";
 import type { BlogPost, Entry } from "@/lib/content";
 import { PersonaLink } from "@/lib/site/persona-link";
+import { HIRE_PERSONAS } from "@/lib/site/brand";
 import { HirePill } from "./hire-pill";
 import type { Persona } from "../persona-provider";
 import type { PersonaContent } from "./site-content";
@@ -125,8 +126,8 @@ export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, Perso
             </PersonaMotionSlot>
           </section>
         )}
-        {/* A way to reach me from every world but the Engineer's (its terminal has `hire`). */}
-        {persona !== "engineer" ? <HirePill /> : null}
+        {/* A way to reach me, on the worlds listed in HIRE_PERSONAS (the Engineer's terminal has `hire`). */}
+        {HIRE_PERSONAS.includes(persona) ? <HirePill /> : null}
       </PersonaMotionOrchestrator>
     );
   },

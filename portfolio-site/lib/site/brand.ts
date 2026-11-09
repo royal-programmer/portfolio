@@ -24,8 +24,8 @@ export const HUB_COPY = {
   closingBody:
     "Each colour is a part of me with its own world. Together they’re the whole picture — and the picture keeps growing.",
   email: "ratul.arya.roy@gmail.com",
-  /** One line under the hero, from the résumé (2 years, Bengaluru, relocation). */
-  pitch: "Software engineer · 2 years in production · Bengaluru, open to relocation",
+  /** One line under the hero: character, not the job (Ratul will rewrite it). */
+  pitch: "Curious by default. Disciplined when it counts. Always making something.",
 } as const;
 
 export type PersonaIdentity = {
@@ -33,7 +33,9 @@ export type PersonaIdentity = {
   role: string;
   /** The name this world goes by (its headline), when it has one. */
   handle?: string;
-  /** Verb phrase for the cycling line: "I build systems". */
+  /** Verb phrases for the cycling line ("I build systems that stay up"); the hub and the world's own page say the same ones. */
+  phrases: readonly string[];
+  /** The first phrase, for callers that want one. */
   phrase: string;
   /** World-specific call to action. */
   cta: string;
@@ -41,15 +43,21 @@ export type PersonaIdentity = {
   subdomain: string;
 };
 
-const IDENTITY: Record<PersonaSlug, Omit<PersonaIdentity, "subdomain">> = {
-  engineer: { role: "Engineer", handle: "royal-programmer", phrase: "build systems", cta: "Step into the code" },
-  trader: { role: "Trader", handle: "royal-trades", phrase: "read markets", cta: "Open the trading desk" },
-  photographer: { role: "Photographer", handle: "royal-frames", phrase: "frame stories", cta: "Look through my lens" },
-  ride: { role: "Rider", phrase: "chase horizons", cta: "Hit the road" },
-  artist: { role: "Artist", phrase: "paint dreams", cta: "Walk into the studio" },
-  gamer: { role: "Gamer", handle: "lucifer", phrase: "master games", cta: "Press start" },
+/** Personas whose pages carry the quiet "Hire me" pill. The Engineer's page is the terminal, which has `hire`; add a slug here to give another world one. */
+export const HIRE_PERSONAS: readonly PersonaSlug[] = ["engineer"];
+
+type IdentitySource = Omit<PersonaIdentity, "subdomain" | "phrase">;
+
+const IDENTITY: Record<PersonaSlug, IdentitySource> = {
+  engineer: { role: "Engineer", handle: "royal-programmer", phrases: ["build systems that stay up", "ship code that earns its keep", "automate the boring parts"], cta: "Step into the code" },
+  trader: { role: "Trader", handle: "royal-trades", phrases: ["read markets, not rumours", "size the risk before the reward", "wait for the setup"], cta: "Open the trading desk" },
+  photographer: { role: "Photographer", handle: "royal-frames", phrases: ["frame the moment before it passes", "chase light, not likes", "tell a story in one frame"], cta: "Look through my lens" },
+  ride: { role: "Rider", phrases: ["chase horizons on two wheels", "take the long road home", "ride for the view"], cta: "Hit the road" },
+  artist: { role: "Artist", phrases: ["paint what words miss", "draw to think", "turn blank pages into worlds"], cta: "Walk into the studio" },
+  gamer: { role: "Gamer", handle: "lucifer", phrases: ["master the game, then the meta", "play to learn the system", "grind for mastery, not loot"], cta: "Press start" },
 };
 
 export function personaIdentity(slug: PersonaSlug): PersonaIdentity {
-  return { ...IDENTITY[slug], subdomain: SUBDOMAIN_BY_PERSONA[slug] };
+  const base = IDENTITY[slug];
+  return { ...base, phrase: base.phrases[0], subdomain: SUBDOMAIN_BY_PERSONA[slug] };
 }
