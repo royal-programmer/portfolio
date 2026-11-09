@@ -298,3 +298,35 @@ This round is an honest-placeholder pass, not a rebuild of the other personas (e
 - **Polish:** `portfolio` puts the `→` commands at the right end of each section's last line on wide screens (`links.lead`); the status bar has a
   green `open to work` item that runs `hire`; `now` prints `TerminalData.now`, and the pane's Who block shows its first line.
 - Dev note: after CSS-only edits the dev server sometimes serves a stale stylesheet; a real content change to `globals.css` recompiles it.
+
+## 7. Series view (round 2)
+
+Route `/engineer/series`, wrapped in `ViewShell` (remembered as `xp-view:engineer`, Esc returns to the terminal). The
+registry entry is `enabled: true`, so `view series`, the pane row and the picker list it. Code: `lib/site/series-data.ts`
+(pure), `app/components/views/series/` (`series-view`, `series-hero`, `series-rows`, two stylesheets).
+
+- **Who's watching.** Three tiles (Recruiter in the persona accent, Developer teal, Full story amber), each a `<button>`;
+  arrows move, Enter picks. The pick is remembered in `localStorage` `xp-series-profile`; a remembered profile skips the
+  screen and shows a `Switch profile` chip. `?profile=recruiter|developer|story` deep-links and is stripped from the URL.
+- **Profiles are orderings of one dataset** (`buildSeries`), not different data:
+  - Recruiter: Work seasons (main branch, newest first), Projects, Skills, Certifications (learn-branch episodes from
+    college on), To be continued. No school seasons.
+  - Developer: Projects, Stack (résumé skills, `data.stack` first), Side quests, Work seasons, Writing (only when there
+    are posts), To be continued.
+  - Full story: one row per year with episodes, `Season 2002 · Born` to `Season 2026`, school and college included with
+    grades, then To be continued. The sticky bar lists the seasons here and the rows in the other two.
+- **Hero.** Key art is the generated portrait (`blocks`, 160 columns, accent at 18%) drawn after `requestIdleCallback`,
+  so the title is the LCP. Kicker, title, tagline (the engineer's first phrase), the résumé summary clamped to two lines,
+  three fact pills, `open to work` in `--ok`, Play and View résumé.
+- **Play is the trailer.** A teleprompter in the hero: eight lines from the hero facts, the two newest main episodes
+  and the status line, typed over about 14 s with a progress bar and `skip`. Esc, skip or a click ends it and scrolls to
+  the first row. Reduced motion or `via=normal`: all lines at once, a 2 s hold.
+- **Rows.** Episodes (16:9, branch-tone gradient, `S2026 E3`), project posters (2:3, stretched title link, Live/Code),
+  skill tiles. Wheel scrolls a row sideways only when it overflows and the gesture is sideways or shift; edge buttons on
+  hover; scroll snap; cards peek on phones. Hover grows an episode card 1.08 after 180 ms and shows its synopsis. Cards
+  without a link open one inline sheet under the row (focus trapped, restored on close, Esc or x).
+- **Data vs. labels.** Episodes, projects, skills, posts, facts, contact and the status all come from `terminalData`
+  (timeline, résumé, content layer). Only the row titles, profile names and the footer line are literals. Episode `href`
+  is set when a commit's tag equals a project slug.
+- **Not done / notes.** Posts have no page yet, so they open the sheet. Trailer is silent by design. Dev needs
+  `next dev --webpack` inside a git worktree (Turbopack rejects a `node_modules` junction that points outside the root).
