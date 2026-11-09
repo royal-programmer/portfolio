@@ -179,7 +179,8 @@ const COMMANDS: CommandDoc[] = [
   { name: "writing", group: "open", usage: "writing", desc: "pick a post to read" },
   { name: "banner", group: "terminal", usage: "banner", desc: "print the welcome again" },
   { name: "history", group: "terminal", usage: "history", desc: "commands typed this session" },
-  { name: "clear", group: "terminal", usage: "clear", desc: "empty the screen" },
+  { name: "clear", group: "terminal", usage: "clear", desc: "empty the screen", long: "cls does the same." },
+  { name: "cls", group: "terminal", usage: "cls", desc: "empty the screen (same as clear)" },
   { name: "tour", group: "terminal", usage: "tour", desc: "a guided tour; any key stops it" },
   { name: "hire", group: "read", usage: "hire", desc: "the 20-second version, for recruiters" },
   { name: "timeline", group: "read", usage: "timeline", desc: "school → college → work, as one line" },
@@ -513,7 +514,7 @@ export function createShell(data: TerminalData): Shell {
       out.push(text(g, true));
       for (const c of COMMANDS.filter((x) => x.group === g)) out.push(text(`  ${c.usage.padEnd(w)}${c.desc}`));
     }
-    out.push(text("Tab completes, ↑ recalls, / opens the menu, banner shows the welcome, Esc leaves.", true));
+    out.push(text("Tab completes, ↑ recalls, / opens the menu, cls clears, banner shows the welcome, Esc leaves.", true));
     return out;
   };
 
@@ -700,6 +701,7 @@ export function createShell(data: TerminalData): Shell {
       case "history":
         return { lines: texts(st.history.map((h, i) => `${String(i + 1).padStart(4)}  ${h}`)) };
       case "clear":
+      case "cls":
         return { lines: [], effect: { kind: "clear" } };
       case "fullscreen":
         return { lines: [], effect: { kind: "fullscreen" } };

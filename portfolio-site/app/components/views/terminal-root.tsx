@@ -293,6 +293,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     esc: () => void;
   }>({ open: () => {}, exit: () => {}, esc: () => {} });
   const cancelled = useRef(false);
+  /** One token per boot run: a run that was replaced (effect re-run, StrictMode) stops appending. */
+  const runSeq = useRef(0);
   const timers = useRef<Array<{ id: number; resolve: () => void }>>([]);
   const seq = useRef(0);
   const histIdx = useRef(-1);
@@ -385,8 +387,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   };
 
   /** Types into the transcript. `own`: an open/exit's typing (keeps going after an abort). Returns false if it stopped early. */
-  const type = async (text: string, ms: number, instant: boolean, own = false): Promise<boolean> => {
-    const stopped = () => cancelled.current || (own ? live.current.cancelAuto : live.current.aborted);
+  const type = async (text: string, ms: number, instant: boolean, own = false, tok?: number): Promise<boolean> => {
+    const stopped = () => cancelled.current || (tok !== undefined && tok !== runSeq.current) || (own ? live.current.cancelAuto : live.current.aborted);
     if (!instant) {
       for (let i = 1; i <= text.length; i++) {
         if (stopped()) return false;
@@ -1063,13 +1065,9 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       }
       return;
     }
-    if (e.ctrlKey && !e.altKey && !e.metaKey && (e.key === "c" || e.key === "C" || e.key === "l" || e.key === "L")) {
+    if (e.ctrlKey && !e.altKey && !e.metaKey && (e.key === "c" || e.key === "C")) {
       e.preventDefault();
-      if (e.key.toLowerCase() === "l") {
-        if (paging) endPaging();
-        setEntries([]);
-        setMenuN(null);
-      } else if (curlAbort.current || slStop.current) {
+      if (curlAbort.current || slStop.current) {
         curlAbort.current?.abort();
         slStop.current?.();
       } else {
@@ -1117,6 +1115,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   // The script, then the hint and the views menu (or the remembered pick).
   useEffect(() => {
     cancelled.current = false;
+    const runs = runSeq;
+    const token = ++runs.current;
     live.current.busy = false;
     live.current.aborted = false;
     live.current.auto = false;
@@ -1128,7 +1128,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const instant = via === "normal" || reduce;
     const fromBack = performance.now() - lastPop < 3000;
-    const stopped = () => cancelled.current || live.current.aborted;
+    const stopped = () => token !== runs.current || cancelled.current || live.current.aborted;
     const firstVisit = !seenBefore();
     // `?run=<command>` (from a link) runs once after boot; the parameter is stripped so a reload does not repeat it.
     let runCmd: string | null = null;
@@ -1153,7 +1153,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       const script = terminalScript({ projects: items.length, posts: data.posts.length, views: views.length }, !firstVisit);
       for (const l of script) {
         if (stopped()) return;
-        if (l.typed && !instant) await type(l.text, 13, false);
+        if (l.typed && !instant) await type(l.text, 13, false, false, token);
         else if (l.tag === "ok" && !instant) {
           // `[..]` for a beat, then it resolves to `[ok]`.
           await wait(firstVisit ? 140 : 40);
@@ -1202,13 +1202,13 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       if (!instant) await wait(520);
       if (stopped()) return;
       line(firstVisit ? "new here? type tour · hiring? type hire · help lists everything" : "type help, / for the menu · hire for the short version", false, true);
-      await type("ls views/", 13, instant);
+      await type("ls views/", 13, instant, false, token);
       if (stopped()) return;
       showViews(true);
       setReady(true);
       live.current.ready = true;
       if (runCmd) {
-        await type(runCmd, 13, instant);
+        await type(runCmd, 13, instant, false, token);
         if (stopped()) return;
         setPartial(null);
         submit(runCmd, false);
@@ -1219,6 +1219,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     void run();
     return () => {
       cancelled.current = true;
+      runs.current++;
       for (const t of timers.current) {
         window.clearTimeout(t.id);
         t.resolve();
@@ -1622,7 +1623,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
             input.current?.focus({ preventScroll: true });
           }}
         >
-          <span className="sr-only">Type commands. help lists them, hire is the short version, / opens the menu, banner prints the welcome again, Esc or exit returns to the hub.</span>
+          <span className="sr-only">Type commands. help lists them, hire is the short version, / opens the menu, banner prints the welcome again, cls clears the screen, Ctrl+C cancels, Esc or exit returns to the hub.</span>
           {demoOn ? <span className="sr-only" role="status">tour running, press any key to stop</span> : null}
           <div role="log" aria-live={demoOn ? "off" : "polite"} aria-relevant="additions">
             {entries.map(renderEntry)}
@@ -1715,7 +1716,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
             {nextTry ? `try: ${hintCmd}` : "all done · try: sudo make me a sandwich"}
           </button>
           <h3>keys</h3>
-          <p className="terminal-os-keys">Tab complete · ↑ history · / menu · Ctrl+L clear · Ctrl+C cancel · Esc exit</p>
+          <p className="terminal-os-keys">Tab complete · ↑ history · / menu · cls clear · Ctrl+C cancel · Esc exit</p>
         </aside>
         </div>
         <div className="terminal-os-status">
