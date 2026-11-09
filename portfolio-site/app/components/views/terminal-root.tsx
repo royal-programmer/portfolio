@@ -1534,19 +1534,20 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
               <span className={`tl-year${r.dim ? " is-dim" : ""}`}>{r.year}</span>
               <span className={`tl-mon${r.dim ? " is-dim" : ""}`}>{r.mon}</span>
               <span className={`tl-subj${r.dim ? " is-dim" : ""}`}>
-                {r.life ? "● " : ""}
-                {r.subject}
-                {!e.wide && r.tag ? <b className="tone-accent">{`  ${r.tag}`}</b> : null}
+                <span className="tl-text">
+                  {r.life ? "● " : ""}
+                  {r.subject}
+                </span>
+                {r.tag ? <b className="tl-tag tone-accent">{e.wide ? r.tag : `  ${r.tag}`}</b> : null}
               </span>
               {e.wide ? (
                 <>
-                  <b className="tl-tag tone-accent">{r.tag ?? ""}</b>
                   <span className="tl-glyph" aria-hidden="true">
                     {r.glyph ?? ""}
                   </span>
                   <span className="tl-label">
                     {r.label ? <b className="tone-accent">{r.label}</b> : null}
-                    {r.grade ? <b className="tl-grade">{` · ${r.grade}`}</b> : null}
+                    {r.grade ? <b className="tl-grade">{r.grade}</b> : null}
                   </span>
                 </>
               ) : null}

@@ -13,6 +13,14 @@ session) can resume without re-deriving state. Newest first.
 - `portfolio` links inline on wide screens, `open to work` status item, `now` command. Details: `17-persona-views.md` §6.13.
 - Commits: `bb26f9b` timeline, `1055f8f` data addendum, `4bd3725` Tab, `de2922a` themes, `df6f852` hub, `3edf166` polish.
 
+**Lead verification (Fable).** Reviewed the builder's screenshots and checked the parts it skipped: the phone `portfolio`
+card clipped every line with `…` (the clip was meant for the wide layout) — narrow now wraps and drops the `│` rule; the
+wide timeline gave the subjects ~320px because the tag column and the period-label column were both `auto` — the tag now
+rides inside the subject cell and the label column is capped at 24ch with the grade on its own line, so subjects get
+~560px and only the longest four still end in `…`. Phone status item `● open to work` is 44px and runs `hire`. Builder
+≈400k tokens (slow repo-wide lint), lead ≈110k. Open: dev-only data hiccup — one load showed no projects (Supabase fetch),
+worth a fallback check in the next round.
+
 ## 2026-11-09 — Round 1k: terminal fixes, portrait modes, pane, `portfolio`; hub and persona copy
 
 Builder (Sonnet). Commits: 9c47261 (boot token, `cls`), 142cafc (views boot in the terminal), 0ffe3d0 (`portfolio`, generated

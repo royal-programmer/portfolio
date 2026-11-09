@@ -2629,7 +2629,8 @@ em.font-display,
   margin: 2px 0;
 }
 .terminal-os-tl.is-wide {
-  grid-template-columns: 5ch 4ch minmax(0, 1fr) auto 1ch auto;
+  /* The period label is capped so a long grade line cannot squeeze the subjects; the grade wraps under it. */
+  grid-template-columns: 5ch 4ch minmax(0, 1fr) 1ch minmax(0, 24ch);
 }
 .terminal-os-tl > span,
 .terminal-os-tl > b {
@@ -2642,10 +2643,17 @@ em.font-display,
 .terminal-os-tl .tl-subj {
   overflow-wrap: anywhere;
 }
+/* The tag rides with its subject (one cell), so a long tag on one row does not shrink every subject. */
 .terminal-os-tl.is-wide .tl-subj {
+  display: flex;
+  gap: 1ch;
+  min-width: 0;
+  white-space: nowrap;
+}
+.terminal-os-tl.is-wide .tl-subj .tl-text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .terminal-os-tl .tl-glyph {
   color: var(--term-faint, var(--ink-faint));
@@ -2657,6 +2665,12 @@ em.font-display,
 .terminal-os-tl .tl-grade {
   color: var(--term-green, #5fbf6a);
   font-weight: 400;
+}
+.terminal-os-tl.is-wide .tl-label {
+  white-space: normal;
+}
+.terminal-os-tl.is-wide .tl-label .tl-grade {
+  display: block;
 }
 .terminal-os-tl .tl-tag,
 .terminal-os-tl .tone-accent {
@@ -3237,3 +3251,5 @@ em.font-display,
     transition: none;
   }
 }
+
+

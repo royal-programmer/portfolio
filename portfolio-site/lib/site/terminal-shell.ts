@@ -485,18 +485,21 @@ export function createShell(data: TerminalData): Shell {
     const r = data.resume;
     const w = Math.max(30, Math.min(cols, 96));
     const hw = Math.min(w, 56);
-    const clip = (t: string) => (t.length > w - 2 ? `${t.slice(0, w - 3).replace(/\s+\S*$/, "")}…` : t);
+    const wide = cols >= 80;
+    // Wide: one line per row, cut on a word with `…`. Narrow: lines wrap, so nothing is cut and the rule is left out.
+    const clip = (t: string) => (wide && t.length > w - 2 ? `${t.slice(0, w - 3).replace(/\s+\S*$/, "")}…` : t);
+    const bar = wide ? "│ " : "  ";
     const out: Out[] = [];
     const head = (label: string) => out.push({ kind: "parts", parts: [{ text: `── ${label} ${"─".repeat(Math.max(2, hw - label.length - 4))}`, tone: "dim" }] });
-    const row = (t: string) => out.push(text(`│ ${t}`));
+    const row = (t: string) => out.push(text(`${bar}${t}`));
     const go = (...cmds: string[]) => {
       const items = cmds.map((c) => ({ label: c, cmd: c }));
       const last = out[out.length - 1];
       // Wide: the → commands share the section's last line (a 1fr | auto grid); narrow keeps them on their own line.
-      if (cols >= 80 && last?.kind === "text" && last.text.startsWith("│ ")) {
+      if (wide && last?.kind === "text" && last.text.startsWith(bar)) {
         out.pop();
         out.push({ kind: "links", prefix: "→ ", items, lead: last.text });
-      } else out.push({ kind: "links", prefix: "│ → ", items });
+      } else out.push({ kind: "links", prefix: `${bar}→ `, items });
     };
     const role = (r.title.split(" · ")[0] ?? "").toLowerCase();
     const city = r.location.split(",")[0];
