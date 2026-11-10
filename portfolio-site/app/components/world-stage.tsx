@@ -6,9 +6,10 @@
  * drawing itself in. Everything under it is the same page in both modes.
  */
 import dynamic from "next/dynamic";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BlogPost, Entry } from "@/lib/content";
 import type { PersonaSlug } from "@/lib/content/types";
+import { StageSilhouette } from "./stage/silhouette";
 import { STAGE_PROPS } from "@/lib/site/stage-data";
 import { spectrumColor } from "@/lib/site/spectrum";
 import { useExperience } from "../experience-provider";
@@ -110,6 +111,7 @@ function StageLines({ slug, t }: { slug: PersonaSlug; t: number }) {
 export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: number; entries?: Entry[]; posts?: BlogPost[] }) {
   const { experience, ready } = useExperience();
   const c = spectrumColor(t, 60);
+  const [framed, setFramed] = useState(false);
   const props = ready && experience === "immersive" && slug === "engineer";
   const send = (name: string, detail: unknown) => window.dispatchEvent(new CustomEvent(name, { detail }));
   return (
@@ -123,7 +125,9 @@ export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: 
         }}
         aria-hidden
       >
-        {!ready ? null : experience === "immersive" ? <WorldStage3D slug={slug} t={t} entries={entries} posts={posts} /> : <StageLines slug={slug} t={t} />}
+        {/* Server-rendered first paint: the desk's outline, until the first WebGL frame (or the line drawing) takes over. */}
+        {slug === "engineer" ? <StageSilhouette color={c} gone={framed || (ready && experience !== "immersive")} /> : null}
+        {!ready ? null : experience === "immersive" ? <WorldStage3D slug={slug} t={t} entries={entries} posts={posts} onFirstFrame={() => setFramed(true)} /> : <StageLines slug={slug} t={t} />}
       </div>
       {/* The desk's props as text buttons, so keyboard and screen-reader users reach them; focus lights the prop. */}
       {props ? (

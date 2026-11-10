@@ -26,7 +26,7 @@ const OPEN_ANGLE = THREE.MathUtils.degToRad(104);
 const SCREEN_W = LAP_W * 0.93;
 const SCREEN_H = LAP_D * 0.98 * 0.88;
 
-export function EngineerAssembly({ world, screenSrc, liveScreen, onScreenGo, look, extra }: { world: World; /** Ratul's own screenshot for the laptop, if there is one. */ screenSrc?: string; /** The Stage's live terminal texture: it replaces the screenshot once it has drawn. */ liveScreen?: THREE.Texture | null; /** Click or tap on the screen (the Stage zooms in and opens the terminal). */ onScreenGo?: () => void; /** The Stage: the desk, the lamp and the window, lit by the hour (omit on the hub). */ look?: MutableRefObject<StageLook>; /** Stage props standing on the desk (they follow the assembly). */ extra?: ReactNode }) {
+export function EngineerAssembly({ world, screenSrc, liveScreen, onScreenGo, look, extra, flat }: { world: World; /** Ratul's own screenshot for the laptop, if there is one. */ screenSrc?: string; /** The Stage's live terminal texture: it replaces the screenshot once it has drawn. */ liveScreen?: THREE.Texture | null; /** Click or tap on the screen (the Stage zooms in and opens the terminal). */ onScreenGo?: () => void; /** The Stage: the desk, the lamp and the window, lit by the hour (omit on the hub). */ look?: MutableRefObject<StageLook>; /** Stage props standing on the desk (they follow the assembly). */ extra?: ReactNode; /** First paint: flat accent-coloured parts until the studio's reflections are ready (the Stage swaps them in). */ flat?: boolean }) {
   const root = useRef<THREE.Group>(null);
   const baseRef = useRef<THREE.Group>(null);
   const lidPivot = useRef<THREE.Group>(null);
@@ -80,13 +80,15 @@ export function EngineerAssembly({ world, screenSrc, liveScreen, onScreenGo, loo
   const deskMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#17120f", roughness: 0.78, metalness: 0.05 }), []);
   useEffect(() => () => deskMat.dispose(), [deskMat]);
   const extras = useRef<THREE.Group>(null);
+  const flatMat = useMemo(() => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.25, depthWrite: true }), []);
+  useEffect(() => () => flatMat.dispose(), [flatMat]);
   const hov = useRef(0);
   const hovTarget = useRef(0);
 
   const tmp = useMemo(() => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), e: new THREE.Euler(), s: new THREE.Vector3(1, 1, 1), o: new THREE.Object3D() }), []);
   const screens = useMemo(() => [screenRef], []);
 
-  const { mats } = useAssembly({
+  const { mats, tint } = useAssembly({
     world,
     root,
     screens,
@@ -117,24 +119,27 @@ export function EngineerAssembly({ world, screenSrc, liveScreen, onScreenGo, loo
       }
     },
   });
+  useEffect(() => {
+    flatMat.color.copy(tint);
+  }, [flatMat, tint]);
 
   return (
     <group ref={root}>
       {look ? (
         <group ref={extras}>
-          <StageDesk look={look} deskMat={deskMat} />
-          {extra}
+          <StageDesk look={look} deskMat={flat ? flatMat : deskMat} />
+          {flat ? null : extra}
         </group>
       ) : null}
       <group ref={baseRef}>
-        <mesh geometry={geo.base} material={mats.shell} />
+        <mesh geometry={geo.base} material={flat ? flatMat : mats.shell} />
       </group>
-      <mesh ref={padRef} geometry={geo.pad} material={mats.glass} />
-      <instancedMesh ref={keysRef} args={[geo.key, mats.glow, KEY_COLS * KEY_ROWS]} frustumCulled={false} />
+      <mesh ref={padRef} geometry={geo.pad} material={flat ? flatMat : mats.glass} />
+      <instancedMesh ref={keysRef} args={[geo.key, undefined, KEY_COLS * KEY_ROWS]} material={flat ? flatMat : mats.glow} frustumCulled={false} />
       {/* The lid pivots on the back edge of the base. */}
       <group ref={lidPivot}>
         <group ref={lidRef}>
-          <mesh geometry={geo.lid} material={mats.shell} position={[0, LAP_T / 2 + LID_T / 2, LAP_D * 0.49]} />
+          <mesh geometry={geo.lid} material={flat ? flatMat : mats.shell} position={[0, LAP_T / 2 + LID_T / 2, LAP_D * 0.49]} />
           {/* Screen on the lid's inner face: it looks down at the keys when closed, at you when open. */}
           <mesh
             ref={screenRef}

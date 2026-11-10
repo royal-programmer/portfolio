@@ -49,7 +49,7 @@ const PLACE: Record<PersonaSlug, { fwd: number; right: number; up: number }> = {
 
 type HubMedia = Partial<Record<string, string[]>>;
 
-function StudioEnvironment() {
+function StudioEnvironment({ onReady }: { onReady: () => void }) {
   const get = useThree((s) => s.get);
   useEffect(() => {
     const { gl, scene } = get();
@@ -57,11 +57,12 @@ function StudioEnvironment() {
     const tex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = tex;
     pmrem.dispose();
+    onReady();
     return () => {
       scene.environment = null;
       tex.dispose();
     };
-  }, [get]);
+  }, [get, onReady]);
   return null;
 }
 
@@ -202,14 +203,23 @@ function driveStage(k: VrClock, s: VrState, tmp: Scratch, pose: Pose, place: { f
 }
 
 /** Drives the clock and stands the camera in front of the setup; the pointer turns it a little. */
-function Rig({ slug, zoomRef, onFrame, onZoomDone }: { slug: PersonaSlug; zoomRef: MutableRefObject<Scratch["zoom"] | null>; onFrame?: (t: number) => void; onZoomDone?: () => void }) {
+function Rig({ slug, zoomRef, onFrame, onZoomDone, onFirstFrame }: { slug: PersonaSlug; zoomRef: MutableRefObject<Scratch["zoom"] | null>; onFrame?: (t: number) => void; onZoomDone?: () => void; onFirstFrame?: () => void }) {
   const { clock, state } = useVr();
   const size = useThree((s) => s.size);
   // Per-frame scratch (a ref: it is written every frame).
   const scratch = useRef<Scratch>({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0, handle: false, box: new THREE.Box3(), boxAt: -1, corner: new THREE.Vector3(), fit: 1, zoom: { on: false, t0: 0, dur: 0.7, e: 0, fired: false }, screen: null, sp: new THREE.Vector3(), sn: new THREE.Vector3(), sq: new THREE.Quaternion(), ss: new THREE.Vector3(), eye: new THREE.Vector3(), pitch0: slug === "engineer" ? 0.4 : 0.1 });
   const pose = useMemo(() => climbPose(C), []);
+  const framed = useRef(false);
   useFrame(({ camera, scene }, rawDt) => {
     const tmp = scratch.current;
+    if (!framed.current) {
+      framed.current = true;
+      // The first frame is drawn right after this callback returns: mark it on the next animation frame.
+      window.requestAnimationFrame(() => {
+        mark("stage:first-frame");
+        onFirstFrame?.();
+      });
+    }
     zoomRef.current = tmp.zoom;
     if (!tmp.handle) {
       tmp.handle = true;
@@ -222,12 +232,12 @@ function Rig({ slug, zoomRef, onFrame, onZoomDone }: { slug: PersonaSlug; zoomRe
   return null;
 }
 
-type StageHooks = { liveScreen: THREE.Texture | null; onScreenGo: () => void; look: MutableRefObject<StageLook>; extra?: ReactNode };
+type StageHooks = { liveScreen: THREE.Texture | null; onScreenGo: () => void; look: MutableRefObject<StageLook>; extra?: ReactNode; flat: boolean };
 
 function Setup({ slug, world, media, stage }: { slug: PersonaSlug; world: World; media: HubMedia; stage: StageHooks }) {
   switch (slug) {
     case "engineer":
-      return <EngineerAssembly world={world} screenSrc={media.engineer?.[0] ? `/hub/engineer/${media.engineer[0]}` : undefined} liveScreen={stage.liveScreen} onScreenGo={stage.onScreenGo} look={stage.look} extra={stage.extra} />;
+      return <EngineerAssembly world={world} screenSrc={media.engineer?.[0] ? `/hub/engineer/${media.engineer[0]}` : undefined} liveScreen={stage.liveScreen} onScreenGo={stage.onScreenGo} look={stage.look} extra={stage.extra} flat={stage.flat} />;
     case "trader":
       return <TraderAssembly world={world} />;
     case "photographer":
@@ -242,6 +252,13 @@ function Setup({ slug, world, media, stage }: { slug: PersonaSlug; world: World;
 }
 
 const THEME_KEY = "xp-term-theme";
+
+/** A performance mark, once (the first call wins), for measuring the stage's opening. */
+function mark(name: string) {
+  try {
+    if (performance.getEntriesByName(name).length === 0) performance.mark(name);
+  } catch {}
+}
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** The terminal theme the screen shows: the visitor's saved pick wins (same rule as the terminal), else the band's. */
@@ -253,7 +270,7 @@ function screenTheme(bandTheme: string): string {
   }
 }
 
-export default function WorldStage3D({ slug, t, entries, posts }: { slug: PersonaSlug; t: number; entries?: Entry[]; posts?: BlogPost[] }) {
+export default function WorldStage3D({ slug, t, entries, posts, onFirstFrame }: { slug: PersonaSlug; t: number; entries?: Entry[]; posts?: BlogPost[]; onFirstFrame?: () => void }) {
   const router = useRouter();
   const clock = useRef<VrClock>(createClock());
   const state = useRef<VrState>(createVrState());
@@ -261,6 +278,20 @@ export default function WorldStage3D({ slug, t, entries, posts }: { slug: Person
   const world = useMemo<World>(() => ({ slug, t, c: C }), [slug, t]);
   const [media, setMedia] = useState<HubMedia>({});
   const [liveScreen, setLiveScreen] = useState<THREE.Texture | null>(null);
+  // Flat accent parts until the studio's reflections exist; then the real materials (S8).
+  const [envReady, setEnvReady] = useState(false);
+  const onEnvReady = useCallback(() => setEnvReady(true), []);
+  useEffect(() => {
+    if (!envReady) return;
+    const id = window.requestAnimationFrame(() => window.requestAnimationFrame(() => mark("stage:materials")));
+    return () => window.cancelAnimationFrame(id);
+  }, [envReady]);
+  const screenMarked = useRef(false);
+  const liveScreenBound = useRef(false);
+  useEffect(() => {
+    // Effects of the assembly (which bind the texture) run before this one on the same commit.
+    liveScreenBound.current = liveScreen !== null;
+  }, [liveScreen]);
   // The visitor's part of the day (round 9's bands); checked again every minute.
   const [band, setBand] = useState(() => bandFor(CLOCK, new Date().getHours()));
   const bandRef = useRef(band);
@@ -418,7 +449,7 @@ export default function WorldStage3D({ slug, t, entries, posts }: { slug: Person
       window.clearTimeout(tapTimer.current);
     };
   }, [runProp]);
-  const stage = useMemo<StageHooks>(() => ({ liveScreen, onScreenGo: go, look, extra: slug === "engineer" ? <StageProps items={STAGE_PROPS} accent={accent} focusId={focusId} soundOn={soundOn} onRun={runProp} tapId={tapId} onTap={onTap} /> : undefined }), [liveScreen, go, look, slug, accent, focusId, soundOn, runProp, tapId, onTap]);
+  const stage = useMemo<StageHooks>(() => ({ liveScreen, flat: !envReady, onScreenGo: go, look, extra: slug === "engineer" ? <StageProps items={STAGE_PROPS} accent={accent} focusId={focusId} soundOn={soundOn} onRun={runProp} tapId={tapId} onTap={onTap} /> : undefined }), [liveScreen, envReady, go, look, slug, accent, focusId, soundOn, runProp, tapId, onTap]);
 
   return (
     <Canvas
@@ -438,18 +469,24 @@ export default function WorldStage3D({ slug, t, entries, posts }: { slug: Person
       style={{ background: "transparent" }}
     >
       <VrContext.Provider value={ctx}>
-        <StudioEnvironment />
+        <StudioEnvironment onReady={onEnvReady} />
         <StageLights band={band.id} look={look} instant={reducedMotion()} />
         <Rig
           slug={slug}
           zoomRef={zoomRef}
           onFrame={() => {
             screenRef.current?.tick(reducedMotion() ? 99 : clock.current.t, performance.now());
+            // The live texture is on the glass once it has been drawn and a frame has gone by with it bound.
+            if (!screenMarked.current && screenRef.current?.drawn() && liveScreenBound.current) {
+              screenMarked.current = true;
+              window.requestAnimationFrame(() => mark("stage:screen-live"));
+            }
             const z = zoomRef.current;
             const el = overlayRef.current;
             if (z && el && z.on) el.style.opacity = String(Math.max(0, Math.min(1, (z.e - 0.55) / 0.45)));
           }}
           onZoomDone={navigate}
+          onFirstFrame={onFirstFrame}
         />
         <Setup slug={slug} world={world} media={media} stage={stage} />
       </VrContext.Provider>
