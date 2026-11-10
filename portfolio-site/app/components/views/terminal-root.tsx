@@ -25,6 +25,7 @@ import type { TerminalData } from "@/lib/site/terminal-data";
 import { HOME, resolvePath, shortPath, USER } from "@/lib/site/terminal-fs";
 import { createShell, HISTORY_CAP, initialShellState, THEMES, type Effect, type FileItem, type LinkItem, type MenuId, type MenuRow, type Out, type ShellState, type ThemeId, type TimelineRow, type Tone } from "@/lib/site/terminal-shell";
 import { isPrerendering, whenActive } from "@/lib/site/prerender";
+import { bandFor, clockCopy, hmIn, say, THEME_AUTO_KEY } from "@/lib/site/terminal-clock";
 import { isLang, LANG_HINTS, STRINGS, type Lang, type TerminalStrings } from "@/lib/site/terminal-strings";
 import { usePresence } from "@/lib/site/terminal-presence";
 import { ghostFor } from "@/lib/site/terminal-suggest";
@@ -370,6 +371,13 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   const [mailStep, setMailStep] = useState<MailStep | null>(null);
   const mailRef = useRef<{ step: MailStep; name: string; email: string; lines: string[]; seed?: string; source?: string } | null>(null);
   const [theme, setTheme] = useState<ThemeId>("accent");
+  /** The visitor's clock for the pane line: null on the server and until mount, then refreshed every 20 s (it prints minutes only). */
+  const [clockNow, setClockNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setClockNow(new Date());
+    const id = window.setInterval(() => setClockNow(new Date()), 20000);
+    return () => window.clearInterval(id);
+  }, []);
   const themeRef = useRef<ThemeId>("accent");
   /** While the `theme` menu is open: the theme to restore on Esc (the menu previews live as the selection moves). */
   const themeBase = useRef<ThemeId | null>(null);
@@ -459,7 +467,8 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     if (menu?.id === "themes" && menuN === menu.n) {
       if (themeBase.current === null) themeBase.current = themeRef.current;
       const k = menu.rows[Math.min(sel, menu.rows.length - 1)]?.key;
-      if (k && THEMES.some((t) => t.id === k)) setTheme(k as ThemeId);
+      if (k === "auto") setTheme(bandFor(data.clock, new Date().getHours()).theme as ThemeId);
+      else if (k && THEMES.some((t) => t.id === k)) setTheme(k as ThemeId);
     } else if (themeBase.current !== null) {
       setTheme(themeBase.current);
       themeBase.current = null;
@@ -1144,8 +1153,16 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       setTheme(fx.id);
       try {
         window.localStorage.setItem(THEME_KEY, fx.id);
+        window.localStorage.removeItem(THEME_AUTO_KEY);
       } catch {}
       line(T()["fx.theme"](fx.id), false, true, here());
+    } else if (fx.kind === "theme-auto") {
+      setTheme(bandFor(data.clock, new Date().getHours()).theme as ThemeId);
+      try {
+        window.localStorage.removeItem(THEME_KEY);
+        window.localStorage.setItem(THEME_AUTO_KEY, "1");
+      } catch {}
+      line(T()["fx.theme.auto"], false, true, here());
     } else if (fx.kind === "lang") {
       applyLang(fx.lang, true);
     } else if (fx.kind === "crt") {
@@ -1522,7 +1539,12 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       tick("boot");
       if (!instant) await wait(520);
       if (stopped()) return;
-      line(firstVisit ? STRINGS[startLang]["hint.new"] : STRINGS[startLang]["hint.back"], false, true);
+      {
+        // The greeting for the visitor's hour leads the hint; a weekend swaps the hint too. Returning visitors keep their own hint.
+        const cc = clockCopy(data.clock, new Date(), startLang, STRINGS[startLang]);
+        const isWe = new Date().getDay() % 6 === 0;
+        line(`${cc.greet} ${firstVisit || isWe ? cc.hint : STRINGS[startLang]["hint.back"]}`, false, true);
+      }
       // A browser that lists Bengali or Hindi, and no choice saved yet: one extra dim line, in that language.
       const offered = savedLang === null && urlLang === null ? (navigator.languages ?? []).map((l) => l.toLowerCase().split("-")[0]).find((l) => l === "bn" || l === "hi") : undefined;
       if (offered === "bn" || offered === "hi") line(LANG_HINTS[offered], false, true);
@@ -1574,7 +1596,12 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     try {
       if (window.localStorage.getItem(PANE_KEY) === "0") setPaneOn(false);
       const th = window.localStorage.getItem(THEME_KEY);
+      // The clock only fills the gap: a saved pick wins, and the band's theme is never written down.
       if (THEMES.some((t) => t.id === th)) setTheme(th as ThemeId);
+      else {
+        const bt = bandFor(data.clock, new Date().getHours()).theme;
+        if (THEMES.some((t) => t.id === bt)) setTheme(bt as ThemeId);
+      }
       if (window.localStorage.getItem(CRT_KEY) === "1") {
         crtRef.current = true;
         setCrt(true);
@@ -2267,6 +2294,9 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
           <h3>{S["pane.where"]}</h3>
           <p className="terminal-os-pane-where">{shortPath(cwd)}</p>
           <h3>{S["pane.who"]}</h3>
+          <p className="terminal-os-pane-clock" suppressHydrationWarning>
+            {clockNow ? S["clock.pane"](say(S, lang, clockNow.getHours(), clockNow.getMinutes()), say(S, lang, hmIn(clockNow, data.clock.myTz).h, hmIn(clockNow, data.clock.myTz).m)) : " "}
+          </p>
           <p className="terminal-os-pane-name">{data.resume.name.toLowerCase()}</p>
           <p>{S["pane.role"](data.i18n?.[lang as "bn" | "hi"]?.role ?? (data.resume.title.split(" · ")[0] ?? "").toLowerCase(), data.i18n?.[lang as "bn" | "hi"]?.city ?? data.resume.location.split(",")[0].toLowerCase())}</p>
           <p className="terminal-os-pane-status">

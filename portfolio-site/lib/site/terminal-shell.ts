@@ -26,6 +26,7 @@ import { layoutArch, type ArchRun } from "@/lib/site/terminal-arch";
 import { didYouMean } from "@/lib/site/terminal-suggest";
 import type { TermCommit, TerminalData } from "@/lib/site/terminal-data";
 import { LANG_NAMES, LANGS, STRINGS, type Lang, type StringKey, type TerminalStrings } from "@/lib/site/terminal-strings";
+import { clockCopy, say } from "@/lib/site/terminal-clock";
 
 export type MenuId = "views" | "projects" | "writing" | "themes" | "langs";
 export type MenuRow = { key: string; label: string; line: string };
@@ -138,6 +139,8 @@ export type Effect =
   | { kind: "git-log"; oneline: boolean; limit: number }
   | { kind: "window"; url: string }
   | { kind: "theme"; id: ThemeId }
+  /** `theme auto`: forget the saved pick; the UI follows the visitor's clock again. */
+  | { kind: "theme-auto" }
   /** `lang <code>`: the UI switches the terminal's language and remembers it. */
   | { kind: "lang"; lang: Lang }
   | { kind: "crt" }
@@ -195,7 +198,7 @@ const COMMANDS: CommandDef[] = [
   { name: "install", group: "read", usage: "install", long: true },
   { name: "curl", group: "read", usage: "curl github" },
   { name: "qr", group: "open", usage: "qr" },
-  { name: "theme", group: "terminal", usage: "theme [name|random]" },
+  { name: "theme", group: "terminal", usage: "theme [name|auto|random]", long: true },
   { name: "crt", group: "terminal", usage: "crt" },
   { name: "resume", group: "read", usage: "resume [--pdf]" },
   { name: "portrait", group: "read", usage: "portrait [mode|list|next]" },
@@ -300,7 +303,7 @@ export function createShell(data: TerminalData): Shell {
         : id === "langs"
           ? LANGS.map((l) => ({ key: l, label: l, line: `${LANG_NAMES[l]}${l === L ? `  · ${S["lang.current"]}` : ""}` }))
         : id === "themes"
-          ? THEMES.map((t) => ({ key: t.id, label: t.id, line: describe(t.id) }))
+          ? [{ key: "auto", label: "auto", line: S["clock.auto.row"](clockCopy(data.clock, new Date(), L, S).band.id) }, ...THEMES.map((t) => ({ key: t.id, label: t.id, line: describe(t.id) }))]
           : id === "projects"
           ? data.projects.map((p) => ({ key: p.slug, label: p.slug, line: [p.title, p.year].filter(Boolean).join(" · ") }))
           : data.posts.map((p) => ({ key: p.slug, label: p.slug, line: [p.title, p.date].filter(Boolean).join(" · ") }));
@@ -495,10 +498,15 @@ export function createShell(data: TerminalData): Shell {
 
   /** The 20-second version for recruiters, from the résumé only. */
   /** `now`: what I am doing this month, from `data.now`. */
+  /** The first line of `now`: the greeting for the visitor's hour and the time where they are. */
+  const clockLine = (): Out => {
+    const d = new Date();
+    return text(S["clock.now"](clockCopy(data.clock, d, L, S).greet, say(S, L, d.getHours(), d.getMinutes())));
+  };
   const now = (): Out[] => {
-    if (!data.now?.lines.length) return [text(S["now.none"], true)];
+    if (!data.now?.lines.length) return [clockLine(), text(S["now.none"], true)];
     const [y, m] = data.now.month.split("-").map(Number);
-    return [text(S["now.head"](MONTHS[(m || 1) - 1], y), true), ...(loc()?.now ?? data.now.lines).map((l) => text(`  • ${l}`))];
+    return [clockLine(), text(S["now.head"](MONTHS[(m || 1) - 1], y), true), ...(loc()?.now ?? data.now.lines).map((l) => text(`  • ${l}`))];
   };
 
   /** `fit`: the overlap card for a pasted job description. */
@@ -938,6 +946,7 @@ export function createShell(data: TerminalData): Shell {
       }
       case "theme": {
         if (!args[0]) return menu("themes");
+        if (args[0].toLowerCase() === "auto") return { lines: [], effect: { kind: "theme-auto" } };
         if (args[0].toLowerCase() === "random") {
           const th = THEMES[Math.floor(Math.random() * THEMES.length)];
           return { lines: [], effect: { kind: "theme", id: th.id } };
@@ -1004,7 +1013,8 @@ export function createShell(data: TerminalData): Shell {
         return v ? { lines: [], effect: { kind: "open-view", id: v.id } } : { lines: [text(S["err.norow"](low))] };
       }
       if (st.lastMenu === "themes") {
-        const t = THEMES[n];
+        if (n === 0) return { lines: [], effect: { kind: "theme-auto" } };
+        const t = THEMES[n - 1];
         return t ? { lines: [], effect: { kind: "theme", id: t.id } } : { lines: [text(S["err.norow"](low))] };
       }
       if (st.lastMenu === "langs") {
@@ -1064,7 +1074,7 @@ export function createShell(data: TerminalData): Shell {
         return [...pool.filter((n) => n.startsWith(word)), ...completePath(fs, state.cwd, word)].filter((v, i, a) => a.indexOf(v) === i);
       }
       if (cmd === "view") return viewIds.filter((n) => n.startsWith(word));
-      if (cmd === "theme") return [...THEMES.map((t) => t.id as string), "random"].filter((n) => n.startsWith(word));
+      if (cmd === "theme") return [...THEMES.map((t) => t.id as string), "auto", "random"].filter((n) => n.startsWith(word));
       if (cmd === "portrait") return [...PORTRAIT_MODES, "list", "next"].filter((n) => n.startsWith(word));
       if (cmd === "fit") return [];
       if (cmd === "screensaver") return ["off", "on"].filter((n) => n.startsWith(word));

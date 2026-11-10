@@ -1,13 +1,11 @@
 "use client";
 
 import { Fragment, useEffect, useState, type CSSProperties } from "react";
+import { hhmm } from "@/lib/site/terminal-clock";
 import { portraitSampler, renderPortrait, type PortraitArt, type PortraitConfig } from "@/lib/site/portrait-gen";
 
 const NL = String.fromCharCode(10);
-const clock = () => {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-};
+const clock = () => hhmm(new Date());
 
 /**
  * The screensaver: the portrait in matrix mode, its brightness threshold drifting slowly so it breathes,

@@ -339,6 +339,22 @@ export const I18N: Record<"bn" | "hi", TermI18n> = {
   },
 };
 
+/** One part of the visitor's day: local hours `from` (inclusive) to `to` (exclusive). `theme` applies only while they have picked none. */
+export type TermClockBand = { id: string; from: number; to: number; theme: string; greet: string; hint: string };
+export type TermClock = { bands: TermClockBand[]; weekend: { greet: string; hint: string }; myTz: string };
+
+const CLOCK: TermClock = {
+  bands: [
+    { id: "night", from: 0, to: 5, theme: "matrix", greet: "late night?", hint: "the short version is portfolio · hire if you are recruiting" },
+    { id: "dawn", from: 5, to: 9, theme: "solarized", greet: "early.", hint: "coffee first · then timeline" },
+    { id: "day", from: 9, to: 17, theme: "accent", greet: "hello.", hint: "new here? type portfolio · hiring? type hire" },
+    { id: "evening", from: 17, to: 21, theme: "gruvbox", greet: "good evening.", hint: "ten minutes? portfolio · two? hire" },
+    { id: "late", from: 21, to: 24, theme: "dracula", greet: "still up.", hint: "portrait is the fun one · stats is the proud one" },
+  ],
+  weekend: { greet: "weekend mode.", hint: "no rush · timeline reads well" },
+  myTz: "Asia/Kolkata",
+};
+
 export type TerminalData = {
   arch: ArchDiagram[];
   projectArch: Record<string, string>;
@@ -359,6 +375,8 @@ export type TerminalData = {
   portrait: { src: string; crop: [number, number, number, number] };
   /** `now`: what I am doing this month (data, so the admin console can own it). */
   now?: { month: string; lines: string[] };
+  /** The visitor's-clock bands: theme, greeting and hint by local hour. */
+  clock: TermClock;
   /** The availability line in the side pane. */
   status: string;
   /** Build id, when the deploy exposes one. */
@@ -419,6 +437,7 @@ export function terminalData(persona: Persona | undefined, entries: Entry[], pos
         "Open to software engineering roles · Bengaluru or relocation",
       ],
     },
+    clock: CLOCK,
     status: "open to work · relocates",
     commit: process.env.NEXT_PUBLIC_COMMIT || undefined,
     i18n: I18N,

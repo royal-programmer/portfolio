@@ -2842,6 +2842,10 @@ em.font-display,
 .terminal-os-pane-where {
   color: var(--ink);
 }
+.terminal-os-pane-clock {
+  color: var(--dim);
+  min-height: 1.4em;
+}
 .terminal-os-pane-name {
   font-weight: 700;
   color: var(--ink);
