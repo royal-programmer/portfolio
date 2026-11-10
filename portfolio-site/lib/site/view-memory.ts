@@ -6,7 +6,8 @@ const key = (persona: string) => `xp-view:${persona}`;
 
 export function readView(persona: string): string | null {
   try {
-    return window.localStorage.getItem(key(persona));
+    const v = window.localStorage.getItem(key(persona));
+    return v === "series" ? "netflix" : v;
   } catch {
     return null;
   }

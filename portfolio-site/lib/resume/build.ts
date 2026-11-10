@@ -1,5 +1,5 @@
 /**
- * The PDF résumé's document, built from the same data as the terminal and the Series view
+ * The PDF résumé's document, built from the same data as the terminal and the Netflix view
  * (`lib/site/terminal-data.ts`). No phone number: it is not in the data and is never added.
  */
 import type { Entry, Persona } from "@/lib/content/types";

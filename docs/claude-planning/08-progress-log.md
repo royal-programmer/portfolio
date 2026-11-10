@@ -5,6 +5,21 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-10 — Round 11: the Series view becomes Netflix (branch `claude/netflix`)
+
+- **Rename.** View id `netflix` (name "Netflix"), route `/engineer/netflix`; `/engineer/series` redirects; a remembered
+  `xp-view:engineer = series` reads as `netflix`. Code moved to `app/components/views/netflix/`, `lib/site/netflix-data.ts`,
+  CSS prefix `nf-`. No logo, wordmark or red N: our `R` mark stays.
+- **Detail modal.** Any card (episode, project, skill, post) opens it; FLIP from the card's rectangle, `?title=<id>` deep link,
+  focus trap, Esc/backdrop/x, focus back to the card, phone sheet with swipe-down. Billboard with Play (six-second teleprompter;
+  a project's Play opens its live URL), My List, thumbs-up, sound; meta row, adjectives, season episodes list (arrow keys, season
+  select), More like this, About.
+- **Real feel.** Fixed top bar with expanding instant search, Top 10 badge on Shift Roster, More info, trailer auto-plays after
+  3 idle seconds (silent, Skip pill), Continue watching and My List rows (`xp-nf-progress`, `xp-nf-list`), hover controls row,
+  WebAudio chime/tick (default muted, `xp-nf-sound`), Manage Profiles toast, staggered gate, skeleton rows.
+- Not done: hover controls only on episode cards (posters and skills open the modal on click); "match %" replaced by `New`/season
+  as the brief allowed.
+
 ## 2026-11-10 — Round 12: the terminal, bolder
 
 - Ghost suggestions, did-you-mean tokens, `fit` (job description vs my stack), `arch` (four system diagrams), screensaver, and Realtime presence. Details: 17-persona-views.md section 16.

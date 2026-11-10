@@ -322,14 +322,14 @@ This round is an honest-placeholder pass, not a rebuild of the other personas (e
   page holds `.is-arriving` until activation). `html:has(.terminal-root)` paints `#05060a` so no white can show between documents (scoped, not
   global, so the light personas keep their canvas).
 
-## 7. Series view (round 2)
+## 7. Netflix view (round 2, renamed round 11)
 
-Route `/engineer/series`, wrapped in `ViewShell` (remembered as `xp-view:engineer`, Esc returns to the terminal). The
-registry entry is `enabled: true`, so `view series`, the pane row and the picker list it. Code: `lib/site/series-data.ts`
-(pure), `app/components/views/series/` (`series-view`, `series-hero`, `series-rows`, two stylesheets).
+Route `/engineer/netflix` (`/engineer/series` redirects; a remembered `series` reads as `netflix`), wrapped in `ViewShell` (remembered as `xp-view:engineer`, Esc returns to the terminal). The
+registry entry is `enabled: true`, so `view netflix`, the pane row and the picker list it. Code: `lib/site/netflix-data.ts`
+(pure), `app/components/views/netflix/` (`netflix-view`, `-hero`, `-rows`, `-modal`, `-topbar`, `-store`, `-sound`, three stylesheets, class prefix `nf-`).
 
 - **Who's watching.** Three tiles (Recruiter in the persona accent, Developer teal, Full story amber), each a `<button>`;
-  arrows move, Enter picks. The pick is remembered in `localStorage` `xp-series-profile`; a remembered profile skips the
+  arrows move, Enter picks. The pick is remembered in `localStorage` `xp-nf-profile` (the old `xp-series-profile` is still read); a remembered profile skips the
   screen and shows a `Switch profile` chip. `?profile=recruiter|developer|story` deep-links and is stripped from the URL.
 - **Profiles are orderings of one dataset** (`buildSeries`), not different data:
   - Recruiter: Work seasons (main branch, newest first), Projects, Skills, Certifications (learn-branch episodes from
@@ -351,12 +351,25 @@ registry entry is `enabled: true`, so `view series`, the pane row and the picker
 - **Data vs. labels.** Episodes, projects, skills, posts, facts, contact and the status all come from `terminalData`
   (timeline, résumé, content layer). Only the row titles, profile names and the footer line are literals. Episode `href`
   is set when a commit's tag equals a project slug.
-- **Not done / notes.** Posts have no page yet, so they open the sheet. Trailer is silent by design. Dev needs
-  `next dev --webpack` inside a git worktree (Turbopack rejects a `node_modules` junction that points outside the root).
+- **Round 11: the Netflix feel.** Brand rule: the name and the layout follow the product; no logo, wordmark or red N (our `R`).
+  - *Detail modal* (`netflix-modal.tsx`): any card opens it, FLIP from the card rect (380 ms), `?title=<id>` deep link (stripped on
+    close), dialog + focus trap + Esc/backdrop/x, body scroll locked, focus back to the card; phones get a full-screen sheet with a
+    pull handle and swipe-down. Billboard (portrait at low opacity, big letter for projects/skills/posts), Play (six-second
+    teleprompter; a project's Play opens its live URL), My List (`xp-nf-list`), thumbs-up (`xp-nf-likes`, local only), sound toggle
+    (`xp-nf-sound`, default muted; WebAudio two-note chime on open). Meta row (`New` for episodes under 90 days, `S<year>`,
+    `E<n>`, runtime, grade, branch), Branch / Tags / "This series is" adjectives (`NF_ADJECTIVES`), the season's episodes (click or
+    arrows swap in place, season select), More like this (6, same branch / stack / group), About.
+  - *Chrome*: fixed top bar (transparent, black after 80 px; Home, Series, My List, Profiles, expanding instant search that
+    replaces the rows with a grid, Esc clears; profile tile). Hero: More info, trailer auto-plays after 3 idle seconds (silent,
+    Skip pill, not under reduced motion). `Top 10` badge on Shift Roster v2.0. Continue watching (`xp-nf-progress`) and My List rows
+    first when non-empty. Hover panel on desktop episode cards: play, add, like, more; soft tick when unmuted. Who's watching:
+    staggered fade-in, Manage Profiles (pencil overlays, toast). Skeleton rows until the portrait is drawn.
+  - *Not done*: hover controls only on episode cards; the "match %" is replaced by `New` / season (no fake score).
+  - Dev needs `next dev --webpack` inside a git worktree (Turbopack rejects a `node_modules` junction that points outside the root).
 
 ## 8. Generated résumé (round 3)
 
-`/resume.pdf` is built from the same data as the terminal and the Series view (`RESUME`, `TIMELINE`, `TIMELINE_PERIODS`, contact links, public projects), so editing one place updates all three. One A4 page, ATS-friendly (real text, no tables, no icons, no fills), Inter, a thin persona-accent rule. The résumé-worthy bullets are listed in `RESUME.pdfBullets`. No phone number, ever. The hand-made `public/Ratul_Roy_Resume.pdf` stays until Ratul has compared the two.
+`/resume.pdf` is built from the same data as the terminal and the Netflix view (`RESUME`, `TIMELINE`, `TIMELINE_PERIODS`, contact links, public projects), so editing one place updates all three. One A4 page, ATS-friendly (real text, no tables, no icons, no fills), Inter, a thin persona-accent rule. The résumé-worthy bullets are listed in `RESUME.pdfBullets`. No phone number, ever. The hand-made `public/Ratul_Roy_Resume.pdf` stays until Ratul has compared the two.
 
 ## 9. stats (round 4)
 

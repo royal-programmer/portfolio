@@ -41,9 +41,9 @@ const HEADERS = {
 /**
  * `next/og` rasterises with the copy of sharp that ships inside next. A second sharp (the app's own, for media)
  * loaded into the same process breaks it ("colourspace: parameter space not set"), so the portrait sampler
- * borrows next's copy too. (Pin the app's sharp to next's version to dedupe them for good.)
+ * borrows next's copy too; the app's sharp is pinned to next's range so npm keeps one copy.
  */
-function nextSharp(): typeof import("sharp").default {
+function nextSharp(): typeof import("sharp") {
   const app = createRequire(path.join(process.cwd(), "package.json"));
   try {
     return createRequire(app.resolve("next/package.json"))("sharp");
