@@ -63,7 +63,7 @@ export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, Perso
         {/* The world's hero: the hub's setup (Immersive) or its line drawing (Normal), the same page under it. */}
         <section className={`${SITE_SHELL} pb-6 pt-2 md:pb-8`}>
           <PersonaMotionSlot id={`${persona}-stage`} dir="down" exitOrder={0} enterOrder={0}>
-            <WorldStage slug={persona} t={spectrumT} />
+            <WorldStage slug={persona} t={spectrumT} entries={engineerEntries} posts={engineerBlogPosts} />
           </PersonaMotionSlot>
         </section>
         {persona === "engineer" && (

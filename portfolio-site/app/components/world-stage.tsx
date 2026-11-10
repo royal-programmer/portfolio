@@ -7,6 +7,7 @@
  */
 import dynamic from "next/dynamic";
 import { useEffect, useRef } from "react";
+import type { BlogPost, Entry } from "@/lib/content";
 import type { PersonaSlug } from "@/lib/content/types";
 import { spectrumColor } from "@/lib/site/spectrum";
 import { useExperience } from "../experience-provider";
@@ -105,7 +106,7 @@ function StageLines({ slug, t }: { slug: PersonaSlug; t: number }) {
   return <canvas ref={ref} aria-hidden className="h-full w-full" />;
 }
 
-export function WorldStage({ slug, t }: { slug: PersonaSlug; t: number }) {
+export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: number; entries?: Entry[]; posts?: BlogPost[] }) {
   const { experience, ready } = useExperience();
   const c = spectrumColor(t, 60);
   return (
@@ -118,7 +119,7 @@ export function WorldStage({ slug, t }: { slug: PersonaSlug; t: number }) {
       }}
       aria-hidden
     >
-      {!ready ? null : experience === "immersive" ? <WorldStage3D slug={slug} t={t} /> : <StageLines slug={slug} t={t} />}
+      {!ready ? null : experience === "immersive" ? <WorldStage3D slug={slug} t={t} entries={entries} posts={posts} /> : <StageLines slug={slug} t={t} />}
     </div>
   );
 }

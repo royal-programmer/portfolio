@@ -23,7 +23,7 @@ const OPEN_ANGLE = THREE.MathUtils.degToRad(104);
 const SCREEN_W = LAP_W * 0.93;
 const SCREEN_H = LAP_D * 0.98 * 0.88;
 
-export function EngineerAssembly({ world, screenSrc }: { world: World; /** Ratul's own screenshot for the laptop, if there is one. */ screenSrc?: string }) {
+export function EngineerAssembly({ world, screenSrc, liveScreen, onScreenGo }: { world: World; /** Ratul's own screenshot for the laptop, if there is one. */ screenSrc?: string; /** The Stage's live terminal texture: it replaces the screenshot once it has drawn. */ liveScreen?: THREE.Texture | null; /** Click or tap on the screen (the Stage zooms in and opens the terminal). */ onScreenGo?: () => void }) {
   const root = useRef<THREE.Group>(null);
   const baseRef = useRef<THREE.Group>(null);
   const lidPivot = useRef<THREE.Group>(null);
@@ -71,6 +71,12 @@ export function EngineerAssembly({ world, screenSrc }: { world: World; /** Ratul
     };
   }, [screenMat, screenSrc]);
 
+  useEffect(() => {
+    if (liveScreen) screenMat.uniforms.tScreen.value = liveScreen;
+  }, [screenMat, liveScreen]);
+  const hov = useRef(0);
+  const hovTarget = useRef(0);
+
   const tmp = useMemo(() => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), e: new THREE.Euler(), s: new THREE.Vector3(1, 1, 1), o: new THREE.Object3D() }), []);
   const screens = useMemo(() => [screenRef], []);
 
@@ -82,6 +88,9 @@ export function EngineerAssembly({ world, screenSrc }: { world: World; /** Ratul
     screenMats,
     view: { back: 2.8, up: 0.3 },
     onFrame: (L, place) => {
+      // On the Stage the screen is a button: a soft glow while the pointer is on it.
+      hov.current += (hovTarget.current - hov.current) * 0.2;
+      if (onScreenGo) screenMat.uniforms.uHover.value = Math.max(screenMat.uniforms.uHover.value as number, hov.current * 0.9);
       if (baseRef.current) place(baseRef.current, 0);
       if (padRef.current) place(padRef.current, 2);
       if (lidPivot.current) {
@@ -113,7 +122,39 @@ export function EngineerAssembly({ world, screenSrc }: { world: World; /** Ratul
         <group ref={lidRef}>
           <mesh geometry={geo.lid} material={mats.shell} position={[0, LAP_T / 2 + LID_T / 2, LAP_D * 0.49]} />
           {/* Screen on the lid's inner face: it looks down at the keys when closed, at you when open. */}
-          <mesh ref={screenRef} geometry={geo.screen} material={screenMat} position={[0, LAP_T / 2 - 0.003, LAP_D * 0.49 + 0.02]} rotation-x={Math.PI / 2} />
+          <mesh
+            ref={screenRef}
+            name="stage-screen"
+            geometry={geo.screen}
+            material={screenMat}
+            position={[0, LAP_T / 2 - 0.003, LAP_D * 0.49 + 0.02]}
+            rotation-x={Math.PI / 2}
+            onPointerOver={
+              onScreenGo
+                ? (e) => {
+                    e.stopPropagation();
+                    hovTarget.current = 1;
+                    (e.nativeEvent.target as HTMLElement).style.cursor = "pointer";
+                  }
+                : undefined
+            }
+            onPointerOut={
+              onScreenGo
+                ? (e) => {
+                    hovTarget.current = 0;
+                    (e.nativeEvent.target as HTMLElement).style.cursor = "";
+                  }
+                : undefined
+            }
+            onClick={
+              onScreenGo
+                ? (e) => {
+                    e.stopPropagation();
+                    onScreenGo();
+                  }
+                : undefined
+            }
+          />
           <mesh geometry={geo.bezel} material={mats.bezel} position={[0, LAP_T / 2 - 0.004, LAP_D * 0.49 + 0.02]} rotation-x={Math.PI / 2} />
           <Halo width={SCREEN_W} height={SCREEN_H} material={mats.halo} position={[0, LAP_T / 2 + LID_T + 0.01, LAP_D * 0.49 + 0.02]} rotation={[Math.PI / 2, 0, 0]} />
         </group>

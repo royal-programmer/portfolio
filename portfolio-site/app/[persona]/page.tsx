@@ -93,7 +93,8 @@ export default async function PersonaPage({ params, searchParams }: PersonaPageP
   const photo = media.photographer?.[0] ? `/hub/photographer/${media.photographer[0]}` : undefined;
   // ?via=pwa: opened from the home screen. A direct arrival (no hub hand-off) that says so in the boot.
   const pwa = via === "pwa";
-  const viaKind = via === "hub" ? "hub" : via === "normal" ? "normal" : null;
+  // ?via=stage (the Stage zoomed into the laptop) lands like ?via=normal: instant boot, fade in, no remembered view.
+  const viaKind = via === "hub" ? "hub" : via === "normal" || via === "stage" ? "normal" : null;
   // The Engineer page is one dataset with many views; its root is the terminal, which lists them
   // (17-persona-views.md). The other personas keep their page until their own rounds.
   if (launched === "engineer") {

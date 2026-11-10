@@ -8,10 +8,18 @@
  * canvas only provides the clock, the state and a camera standing where the climb's would.
  */
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { useRouter } from "next/navigation";
+import type { BlogPost, Entry } from "@/lib/content";
 import type { PersonaSlug } from "@/lib/content/types";
+import { getViews } from "@/lib/content/views";
+import { ogLines } from "@/lib/site/og-lines";
+import { personaHref } from "@/lib/site/persona-link";
+import { terminalData } from "@/lib/site/terminal-data";
+import { paletteFor } from "@/lib/site/terminal-themes";
+import { createTerminalScreen, type TerminalScreen } from "./stage/terminal-screen";
 import { personaIdentity } from "@/lib/site/brand";
 import { VrContext, createClock, useVr, type VrClock } from "./hub/vr/clock";
 import { createVrState, type VrState, type World } from "./hub/vr/state";
@@ -67,6 +75,14 @@ type Scratch = {
   corner: THREE.Vector3;
   /** The camera's distance multiplier that fits the bounds in view; eased, so the frame never jumps. */
   fit: number;
+  /** The zoom into the laptop screen (S1): `t0` is the clock time it began, `dur` seconds, `e` the eased progress 0…1. */
+  zoom: { on: boolean; t0: number; dur: number; e: number; fired: boolean };
+  screen: THREE.Object3D | null;
+  sp: THREE.Vector3;
+  sn: THREE.Vector3;
+  sq: THREE.Quaternion;
+  ss: THREE.Vector3;
+  eye: THREE.Vector3;
 };
 
 /** How much of the frame the setup may fill (NDC half-extent); the rest is air. */
@@ -93,7 +109,7 @@ function measureSetup(scene: THREE.Scene, box: THREE.Box3, tmp: THREE.Vector3) {
 type Pose = ReturnType<typeof climbPose>;
 
 /** One frame of the stage: advance the clock, keep the state at the chapter, stand the camera. */
-function driveStage(k: VrClock, s: VrState, tmp: Scratch, pose: Pose, place: { fwd: number; right: number; up: number }, size: { width: number; height: number }, camera: THREE.Camera, scene: THREE.Scene, rawDt: number) {
+function driveStage(k: VrClock, s: VrState, tmp: Scratch, pose: Pose, place: { fwd: number; right: number; up: number }, size: { width: number; height: number }, camera: THREE.PerspectiveCamera, scene: THREE.Scene, rawDt: number, onZoomDone?: () => void) {
   const dt = Math.min(rawDt, 0.1);
   k.dt = dt;
   k.t += dt;
@@ -152,31 +168,60 @@ function driveStage(k: VrClock, s: VrState, tmp: Scratch, pose: Pose, place: { f
       tmp.fit += (want - tmp.fit) * Math.min(1, dt * 6);
     }
   }
+  // Zoom into the screen: the camera glides from where the stage put it to an eye point in front of
+  // the screen that makes the screen cover the frame; the page's overlay takes over for the last stretch.
+  const z = tmp.zoom;
+  if (z.on) {
+    const screen = (tmp.screen ??= scene.getObjectByName("stage-screen") ?? null);
+    if (screen) {
+      const p = Math.min(1, (k.t - z.t0) / z.dur);
+      z.e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+      screen.updateWorldMatrix(true, false);
+      screen.matrixWorld.decompose(tmp.sp, tmp.sq, tmp.ss);
+      tmp.sn.set(0, 0, 1).applyQuaternion(tmp.sq);
+      const wide = size.width / Math.max(1, size.height);
+      const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+      // The screen plane is 1.77 x 1.08 units (see engineer.tsx), scaled by the setup.
+      const dist = Math.min((1.08 * tmp.ss.x) / (2 * tanH), (1.77 * tmp.ss.x) / (2 * tanH * wide)) * 1.02;
+      tmp.eye.copy(tmp.sp).addScaledVector(tmp.sn, dist);
+      camera.position.lerp(tmp.eye, z.e);
+      tmp.look.lerp(tmp.sp, z.e);
+      camera.lookAt(tmp.look);
+      if (p >= 1 && !z.fired) {
+        z.fired = true;
+        onZoomDone?.();
+      }
+    }
+  }
 }
 
 /** Drives the clock and stands the camera in front of the setup; the pointer turns it a little. */
-function Rig({ slug }: { slug: PersonaSlug }) {
+function Rig({ slug, zoomRef, onFrame, onZoomDone }: { slug: PersonaSlug; zoomRef: MutableRefObject<Scratch["zoom"] | null>; onFrame?: (t: number) => void; onZoomDone?: () => void }) {
   const { clock, state } = useVr();
   const size = useThree((s) => s.size);
   // Per-frame scratch (a ref: it is written every frame).
-  const scratch = useRef<Scratch>({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0, handle: false, box: new THREE.Box3(), boxAt: -1, corner: new THREE.Vector3(), fit: 1 });
+  const scratch = useRef<Scratch>({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0, handle: false, box: new THREE.Box3(), boxAt: -1, corner: new THREE.Vector3(), fit: 1, zoom: { on: false, t0: 0, dur: 0.7, e: 0, fired: false }, screen: null, sp: new THREE.Vector3(), sn: new THREE.Vector3(), sq: new THREE.Quaternion(), ss: new THREE.Vector3(), eye: new THREE.Vector3() });
   const pose = useMemo(() => climbPose(C), []);
   useFrame(({ camera, scene }, rawDt) => {
     const tmp = scratch.current;
+    zoomRef.current = tmp.zoom;
     if (!tmp.handle) {
       tmp.handle = true;
       // Dev-only handle for tests.
       if (process.env.NODE_ENV !== "production") (window as unknown as { __stage?: unknown }).__stage = { scene, camera, clock, state };
     }
-    driveStage(clock.current, state.current, tmp, pose, PLACE[slug], size, camera, scene, rawDt);
+    driveStage(clock.current, state.current, tmp, pose, PLACE[slug], size, camera as THREE.PerspectiveCamera, scene, rawDt, onZoomDone);
+    onFrame?.(clock.current.t);
   });
   return null;
 }
 
-function Setup({ slug, world, media }: { slug: PersonaSlug; world: World; media: HubMedia }) {
+type StageHooks = { liveScreen: THREE.Texture | null; onScreenGo: () => void };
+
+function Setup({ slug, world, media, stage }: { slug: PersonaSlug; world: World; media: HubMedia; stage: StageHooks }) {
   switch (slug) {
     case "engineer":
-      return <EngineerAssembly world={world} screenSrc={media.engineer?.[0] ? `/hub/engineer/${media.engineer[0]}` : undefined} />;
+      return <EngineerAssembly world={world} screenSrc={media.engineer?.[0] ? `/hub/engineer/${media.engineer[0]}` : undefined} liveScreen={stage.liveScreen} onScreenGo={stage.onScreenGo} />;
     case "trader":
       return <TraderAssembly world={world} />;
     case "photographer":
@@ -190,12 +235,29 @@ function Setup({ slug, world, media }: { slug: PersonaSlug; world: World; media:
   }
 }
 
-export default function WorldStage3D({ slug, t }: { slug: PersonaSlug; t: number }) {
+const THEME_KEY = "xp-term-theme";
+const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** The terminal theme the screen shows: the visitor's saved pick wins (same rule as the terminal), else the default. */
+function screenTheme(): string {
+  try {
+    return window.localStorage.getItem(THEME_KEY) || "accent";
+  } catch {
+    return "accent";
+  }
+}
+
+export default function WorldStage3D({ slug, t, entries, posts }: { slug: PersonaSlug; t: number; entries?: Entry[]; posts?: BlogPost[] }) {
+  const router = useRouter();
   const clock = useRef<VrClock>(createClock());
   const state = useRef<VrState>(createVrState());
   const ctx = useMemo(() => ({ clock, state }), []);
   const world = useMemo<World>(() => ({ slug, t, c: C }), [slug, t]);
   const [media, setMedia] = useState<HubMedia>({});
+  const [liveScreen, setLiveScreen] = useState<THREE.Texture | null>(null);
+  const zoomRef = useRef<Scratch["zoom"] | null>(null);
+  const screenRef = useRef<TerminalScreen | null>(null);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     let live = true;
     fetch("/hub/media.json", { cache: "no-cache" })
@@ -206,6 +268,80 @@ export default function WorldStage3D({ slug, t }: { slug: PersonaSlug; t: number
       live = false;
     };
   }, []);
+
+  // The laptop's live terminal (engineer only): drawn at once, then kept current by the rig's frame.
+  useEffect(() => {
+    if (slug !== "engineer") return;
+    let screen: TerminalScreen | null = null;
+    try {
+      const data = terminalData(undefined, entries ?? [], posts ?? [], getViews("engineer"));
+      screen = createTerminalScreen({
+        banner: ogLines(data, "banner"),
+        output: ogLines(data, "portfolio"),
+        palette: paletteFor(screenTheme()),
+        host: "ratulroy ~ portfolio",
+      });
+      screenRef.current = screen;
+      screen.tick(reducedMotion() ? 99 : 0, performance.now());
+      const tex = screen.texture;
+      queueMicrotask(() => setLiveScreen(tex));
+    } catch {
+      // No texture: the screenshot / drawn editor stays on the screen.
+    }
+    return () => {
+      screenRef.current = null;
+      setLiveScreen(null);
+      screen?.dispose();
+    };
+  }, [slug, entries, posts]);
+
+  // The overlay that takes over for the zoom's last stretch (a plain element on the body: the stage's own box clips and transforms).
+  useEffect(() => {
+    const el = document.createElement("div");
+    el.setAttribute("aria-hidden", "true");
+    el.style.cssText = "position:fixed;inset:0;z-index:80;pointer-events:none;opacity:0;";
+    document.body.appendChild(el);
+    overlayRef.current = el;
+    const reset = () => {
+      el.style.opacity = "0";
+      const z = zoomRef.current;
+      if (z) {
+        z.on = false;
+        z.fired = false;
+        z.e = 0;
+      }
+    };
+    window.addEventListener("pageshow", reset);
+    return () => {
+      window.removeEventListener("pageshow", reset);
+      el.remove();
+      overlayRef.current = null;
+    };
+  }, []);
+
+  const navigate = useCallback(
+    (cmd?: string) => {
+    const dest = personaHref(window.location.origin, slug, "/");
+    const q = (cmd ? `run=${encodeURIComponent(cmd)}&` : "") + "via=stage";
+    const href = `${dest.href}${dest.href.includes("?") ? "&" : "?"}${q}`;
+    if (dest.crossOrigin) window.location.assign(href);
+    else router.push(href);
+    },
+    [router, slug],
+  );
+  const go = useCallback(() => {
+    const z = zoomRef.current;
+    if (!z || z.on) return;
+    if (reducedMotion()) return navigate();
+    z.on = true;
+    z.t0 = clock.current.t;
+    z.dur = window.matchMedia("(max-width: 767px)").matches ? 0.45 : 0.7;
+    z.fired = false;
+    const el = overlayRef.current;
+    if (el) el.style.background = paletteFor(screenTheme()).bg;
+  }, [navigate]);
+  const stage = useMemo<StageHooks>(() => ({ liveScreen, onScreenGo: go }), [liveScreen, go]);
+
   return (
     <Canvas
       dpr={[1, 1.75]}
@@ -225,8 +361,18 @@ export default function WorldStage3D({ slug, t }: { slug: PersonaSlug; t: number
     >
       <VrContext.Provider value={ctx}>
         <StudioEnvironment />
-        <Rig slug={slug} />
-        <Setup slug={slug} world={world} media={media} />
+        <Rig
+          slug={slug}
+          zoomRef={zoomRef}
+          onFrame={() => {
+            screenRef.current?.tick(reducedMotion() ? 99 : clock.current.t, performance.now());
+            const z = zoomRef.current;
+            const el = overlayRef.current;
+            if (z && el && z.on) el.style.opacity = String(Math.max(0, Math.min(1, (z.e - 0.55) / 0.45)));
+          }}
+          onZoomDone={navigate}
+        />
+        <Setup slug={slug} world={world} media={media} stage={stage} />
       </VrContext.Provider>
     </Canvas>
   );
