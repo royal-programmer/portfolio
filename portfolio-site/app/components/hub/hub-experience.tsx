@@ -811,6 +811,9 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     if (scrollFree) lenisRef.current?.start();
     else lenisRef.current?.stop();
   }, [scrollFree]);
+  // Leaving the hub (a view opens in the same document) must not leave `html { overflow: hidden }` behind: that froze
+  // every page-scrolling view (Netflix, Stage ...) on a phone, where the hand-off is a client navigation.
+  useEffect(() => () => document.documentElement.classList.remove("scroll-locked"), []);
 
   // ---- Pointer: parallax always; drag to look, hold to slow, tap to start ----
   useEffect(() => {

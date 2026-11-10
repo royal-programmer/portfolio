@@ -367,6 +367,8 @@ const en = {
   "more": "-- more (space / ↓ next, q quit) --",
   "chips.aria": "Terminal keys",
   "chip.up": "Up",
+  "menu.hint.touch": "tap a row · or type its number · Esc closes",
+  "chip.down": "Down",
   "saver.line": (total: number | null) => `press any key · ${total === null ? "type portfolio" : `${total} contributions this year`}`,
   "pane.aria": "Side pane",
   "pane.where": "where",

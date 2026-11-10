@@ -3635,3 +3635,24 @@ em.font-display,
 .terminal-os-profile .terminal-root-link {
   margin-left: auto;
 }
+
+/* Touch: the transcript pans vertically and never hands the gesture to the page behind it. */
+.terminal-root-body {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+.terminal-root-menu-hint {
+  display: block;
+  padding: 4px 6px 0;
+}
+/* The Netflix row and top-bar chips pan sideways by touch (the page still pans up and down). */
+.nf-scroller,
+.nf-bar-nav {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+}
+.nf-bar-nav {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}

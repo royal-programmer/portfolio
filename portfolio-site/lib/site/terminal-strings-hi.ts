@@ -343,6 +343,8 @@ export const hi: TerminalStrings = {
   more: "-- और (space / ↓ अगला, q बंद) --",
   "chips.aria": "टर्मिनल की keys",
   "chip.up": "ऊपर",
+  "menu.hint.touch": "किसी पंक्ति पर टैप करें · या उसका नंबर लिखें · Esc बंद करता है",
+  "chip.down": "नीचे",
   "saver.line": (total) => `कोई भी key दबाएँ · ${total === null ? "portfolio लिखें" : `इस साल ${total} contributions`}`,
   "pane.aria": "बगल का pane",
   "pane.where": "कहाँ",

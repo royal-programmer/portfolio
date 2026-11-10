@@ -22,6 +22,11 @@ export function ViewShell({ persona, view, stripVia, children }: Props) {
   const origin = useOrigin();
   const root = useMemo(() => personaHref(origin, persona, "/"), [origin, persona]);
 
+  // A view always scrolls: drop any lock the hub left on the document (see hub-experience's scroll-locked effect).
+  useEffect(() => {
+    document.documentElement.classList.remove("scroll-locked");
+  }, []);
+
   useEffect(() => {
     rememberView(persona, view);
   }, [persona, view]);

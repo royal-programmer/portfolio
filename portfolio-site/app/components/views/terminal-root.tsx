@@ -356,6 +356,11 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   const [palSel, setPalSel] = useState(0);
   /** The menu the arrow keys drive: the latest one shown, until Esc or another command. */
   const [menuN, setMenuN] = useState<number | null>(null);
+  /** A touch screen (coarse pointer): menus say "tap a row". Read after mount, so hydration matches. */
+  const [coarse, setCoarse] = useState(false);
+  useEffect(() => {
+    setCoarse(window.matchMedia("(pointer: coarse)").matches);
+  }, []);
   const [ready, setReady] = useState(false);
   const [opening, setOpening] = useState(false);
   const [checks, setChecks] = useState<Checks>({});
@@ -2048,12 +2053,14 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     line(T()["fx.mailfirst"], false, true, here());
     return true;
   };
-  const chipKey = (k: "tab" | "up" | "esc") => {
+  const chipKey = (k: "tab" | "up" | "down" | "esc") => {
     input.current?.focus({ preventScroll: true });
     if (k !== "esc" && mailBlocks()) return;
     if (k === "tab") tab();
     else if (k === "esc") act.current.esc();
-    else if (menu && !cmd) setSel((i) => (i + menu.rows.length - 1) % menu.rows.length);
+    else if (k === "down") {
+      if (menu && !cmd) setSel((i) => (i + 1) % menu.rows.length);
+    } else if (menu && !cmd) setSel((i) => (i + menu.rows.length - 1) % menu.rows.length);
     else walkHistory(-1);
   };
 
@@ -2355,7 +2362,8 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         </button>
       </span>
     ) : (
-      <ul key={e.n} role="list" className={`terminal-root-picker ${e.n === menuN ? "" : "is-inert"}`}>
+      <Fragment key={e.n}>
+      <ul role="list" className={`terminal-root-picker ${e.n === menuN ? "" : "is-inert"}`}>
         {e.rows.map((r, n) => {
           const on = e.n === menuN && n === sel;
           return (
@@ -2379,6 +2387,9 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
           );
         })}
       </ul>
+      {/* On a touch screen the highlight reads as keyboard-only, so say how the rows work. */}
+      {coarse && e.n === menuN ? <span className="is-out is-dim terminal-root-menu-hint">{S["menu.hint.touch"]}</span> : null}
+      </Fragment>
     );
 
   const typeChip = (run: () => void) => () => {
@@ -2696,9 +2707,16 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
           <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={typeChip(() => chipKey("tab"))}>
             Tab
           </button>
-          <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => chipKey("up")} aria-label={S["chip.up"]}>
-            ↑
-          </button>
+          {menu && !cmd ? (
+            <>
+              <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => chipKey("up")} aria-label={S["chip.up"]}>
+                ↑
+              </button>
+              <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => chipKey("down")} aria-label={S["chip.down"]}>
+                ↓
+              </button>
+            </>
+          ) : null}
           <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => chipKey("esc")}>
             Esc
           </button>

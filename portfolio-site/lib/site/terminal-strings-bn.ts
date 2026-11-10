@@ -343,6 +343,8 @@ export const bn: TerminalStrings = {
   more: "-- আরও (space / ↓ পরেরটা, q বন্ধ) --",
   "chips.aria": "টার্মিনালের key",
   "chip.up": "ওপরে",
+  "menu.hint.touch": "একটি সারিতে ট্যাপ করুন · বা তার নম্বর লিখুন · Esc বন্ধ করে",
+  "chip.down": "নিচে",
   "saver.line": (total) => `যেকোনো key চাপুন · ${total === null ? "portfolio লিখুন" : `এ বছর ${total}টি contribution`}`,
   "pane.aria": "পাশের pane",
   "pane.where": "কোথায়",
