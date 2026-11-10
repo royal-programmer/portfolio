@@ -9,6 +9,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useRef } from "react";
 import type { BlogPost, Entry } from "@/lib/content";
 import type { PersonaSlug } from "@/lib/content/types";
+import { STAGE_PROPS } from "@/lib/site/stage-data";
 import { spectrumColor } from "@/lib/site/spectrum";
 import { useExperience } from "../experience-provider";
 import { CONSTELLATIONS, strokeObject, strokesLength } from "./hub/constellations";
@@ -109,17 +110,45 @@ function StageLines({ slug, t }: { slug: PersonaSlug; t: number }) {
 export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: number; entries?: Entry[]; posts?: BlogPost[] }) {
   const { experience, ready } = useExperience();
   const c = spectrumColor(t, 60);
+  const props = ready && experience === "immersive" && slug === "engineer";
+  const send = (name: string, detail: unknown) => window.dispatchEvent(new CustomEvent(name, { detail }));
   return (
-    <div
-      className="world-stage relative h-[46svh] min-h-[260px] w-full overflow-hidden rounded-3xl border"
-      style={{
-        borderColor: "var(--surface-border)",
-        background: `radial-gradient(ellipse at 50% 60%, color-mix(in srgb, ${c} 18%, #07070a), #07070a 72%)`,
-        boxShadow: `0 30px 80px -30px color-mix(in srgb, ${c} 45%, transparent), var(--panel-shadow)`,
-      }}
-      aria-hidden
-    >
-      {!ready ? null : experience === "immersive" ? <WorldStage3D slug={slug} t={t} entries={entries} posts={posts} /> : <StageLines slug={slug} t={t} />}
-    </div>
+    <>
+      <div
+        className="world-stage relative h-[46svh] min-h-[260px] w-full overflow-hidden rounded-3xl border"
+        style={{
+          borderColor: "var(--surface-border)",
+          background: `radial-gradient(ellipse at 50% 60%, color-mix(in srgb, ${c} 18%, #07070a), #07070a 72%)`,
+          boxShadow: `0 30px 80px -30px color-mix(in srgb, ${c} 45%, transparent), var(--panel-shadow)`,
+        }}
+        aria-hidden
+      >
+        {!ready ? null : experience === "immersive" ? <WorldStage3D slug={slug} t={t} entries={entries} posts={posts} /> : <StageLines slug={slug} t={t} />}
+      </div>
+      {/* The desk's props as text buttons, so keyboard and screen-reader users reach them; focus lights the prop. */}
+      {props ? (
+        <div className="stage-hud" style={{ ["--stage-c" as string]: c }} role="group" aria-label="On the desk: run a command">
+          {STAGE_PROPS.map((p, i) => (
+            <span key={p.id} className="inline-flex items-center">
+              {i ? (
+                <span aria-hidden className="mr-2.5">
+                  ·
+                </span>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => send("stage:run", p.id)}
+                onFocus={() => send("stage:focus", p.id)}
+                onBlur={() => send("stage:focus", null)}
+                onPointerEnter={() => send("stage:focus", p.id)}
+                onPointerLeave={() => send("stage:focus", null)}
+              >
+                {p.label}
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </>
   );
 }

@@ -5,7 +5,7 @@
  * The engineer's laptop (D38 round B): base, lid, 70 keys and a trackpad fly
  * together, the lid unfolds toward you and the screen boots into the editor.
  */
-import { useEffect, useMemo, useRef, type MutableRefObject } from "react";
+import { useEffect, useMemo, useRef, type MutableRefObject, type ReactNode } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { Halo, makeScreenMaterial, useAssembly } from "../assembly";
@@ -26,7 +26,7 @@ const OPEN_ANGLE = THREE.MathUtils.degToRad(104);
 const SCREEN_W = LAP_W * 0.93;
 const SCREEN_H = LAP_D * 0.98 * 0.88;
 
-export function EngineerAssembly({ world, screenSrc, liveScreen, onScreenGo, look }: { world: World; /** Ratul's own screenshot for the laptop, if there is one. */ screenSrc?: string; /** The Stage's live terminal texture: it replaces the screenshot once it has drawn. */ liveScreen?: THREE.Texture | null; /** Click or tap on the screen (the Stage zooms in and opens the terminal). */ onScreenGo?: () => void; /** The Stage: the desk, the lamp and the window, lit by the hour (omit on the hub). */ look?: MutableRefObject<StageLook> }) {
+export function EngineerAssembly({ world, screenSrc, liveScreen, onScreenGo, look, extra }: { world: World; /** Ratul's own screenshot for the laptop, if there is one. */ screenSrc?: string; /** The Stage's live terminal texture: it replaces the screenshot once it has drawn. */ liveScreen?: THREE.Texture | null; /** Click or tap on the screen (the Stage zooms in and opens the terminal). */ onScreenGo?: () => void; /** The Stage: the desk, the lamp and the window, lit by the hour (omit on the hub). */ look?: MutableRefObject<StageLook>; /** Stage props standing on the desk (they follow the assembly). */ extra?: ReactNode }) {
   const root = useRef<THREE.Group>(null);
   const baseRef = useRef<THREE.Group>(null);
   const lidPivot = useRef<THREE.Group>(null);
@@ -123,6 +123,7 @@ export function EngineerAssembly({ world, screenSrc, liveScreen, onScreenGo, loo
       {look ? (
         <group ref={extras}>
           <StageDesk look={look} deskMat={deskMat} />
+          {extra}
         </group>
       ) : null}
       <group ref={baseRef}>

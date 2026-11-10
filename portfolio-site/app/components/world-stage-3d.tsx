@@ -8,7 +8,7 @@
  * canvas only provides the clock, the state and a camera standing where the climb's would.
  */
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { useRouter } from "next/navigation";
@@ -17,9 +17,11 @@ import type { PersonaSlug } from "@/lib/content/types";
 import { getViews } from "@/lib/content/views";
 import { ogLines } from "@/lib/site/og-lines";
 import { personaHref } from "@/lib/site/persona-link";
+import { STAGE_PROPS, type StageProp } from "@/lib/site/stage-data";
 import { bandFor } from "@/lib/site/terminal-clock";
 import { CLOCK, terminalData } from "@/lib/site/terminal-data";
 import { paletteFor } from "@/lib/site/terminal-themes";
+import { StageProps } from "./stage/props";
 import { createLook, StageLights, type StageLook } from "./stage/stage-look";
 import { createTerminalScreen, type TerminalScreen } from "./stage/terminal-screen";
 import { personaIdentity } from "@/lib/site/brand";
@@ -85,6 +87,8 @@ type Scratch = {
   sq: THREE.Quaternion;
   ss: THREE.Vector3;
   eye: THREE.Vector3;
+  /** The camera's resting pitch above the setup (radians): the desk wants a higher eye than a lone object. */
+  pitch0: number;
 };
 
 /** How much of the frame the setup may fill (NDC half-extent); the rest is air. */
@@ -202,7 +206,7 @@ function Rig({ slug, zoomRef, onFrame, onZoomDone }: { slug: PersonaSlug; zoomRe
   const { clock, state } = useVr();
   const size = useThree((s) => s.size);
   // Per-frame scratch (a ref: it is written every frame).
-  const scratch = useRef<Scratch>({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0, handle: false, box: new THREE.Box3(), boxAt: -1, corner: new THREE.Vector3(), fit: 1, zoom: { on: false, t0: 0, dur: 0.7, e: 0, fired: false }, screen: null, sp: new THREE.Vector3(), sn: new THREE.Vector3(), sq: new THREE.Quaternion(), ss: new THREE.Vector3(), eye: new THREE.Vector3() });
+  const scratch = useRef<Scratch>({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0, handle: false, box: new THREE.Box3(), boxAt: -1, corner: new THREE.Vector3(), fit: 1, zoom: { on: false, t0: 0, dur: 0.7, e: 0, fired: false }, screen: null, sp: new THREE.Vector3(), sn: new THREE.Vector3(), sq: new THREE.Quaternion(), ss: new THREE.Vector3(), eye: new THREE.Vector3(), pitch0: slug === "engineer" ? 0.4 : 0.1 });
   const pose = useMemo(() => climbPose(C), []);
   useFrame(({ camera, scene }, rawDt) => {
     const tmp = scratch.current;
@@ -218,12 +222,12 @@ function Rig({ slug, zoomRef, onFrame, onZoomDone }: { slug: PersonaSlug; zoomRe
   return null;
 }
 
-type StageHooks = { liveScreen: THREE.Texture | null; onScreenGo: () => void; look: MutableRefObject<StageLook> };
+type StageHooks = { liveScreen: THREE.Texture | null; onScreenGo: () => void; look: MutableRefObject<StageLook>; extra?: ReactNode };
 
 function Setup({ slug, world, media, stage }: { slug: PersonaSlug; world: World; media: HubMedia; stage: StageHooks }) {
   switch (slug) {
     case "engineer":
-      return <EngineerAssembly world={world} screenSrc={media.engineer?.[0] ? `/hub/engineer/${media.engineer[0]}` : undefined} liveScreen={stage.liveScreen} onScreenGo={stage.onScreenGo} look={stage.look} />;
+      return <EngineerAssembly world={world} screenSrc={media.engineer?.[0] ? `/hub/engineer/${media.engineer[0]}` : undefined} liveScreen={stage.liveScreen} onScreenGo={stage.onScreenGo} look={stage.look} extra={stage.extra} />;
     case "trader":
       return <TraderAssembly world={world} />;
     case "photographer":
@@ -345,7 +349,8 @@ export default function WorldStage3D({ slug, t, entries, posts }: { slug: Person
     const dest = personaHref(window.location.origin, slug, "/");
     const q = (cmd ? `run=${encodeURIComponent(cmd)}&` : "") + "via=stage";
     const href = `${dest.href}${dest.href.includes("?") ? "&" : "?"}${q}`;
-    if (dest.crossOrigin) window.location.assign(href);
+    // A command rides in the URL, which the terminal reads on mount: a client-side push updates the address after the terminal has mounted, so a command takes a full load.
+    if (dest.crossOrigin || cmd) window.location.assign(href);
     else router.push(href);
     },
     [router, slug],
@@ -359,9 +364,61 @@ export default function WorldStage3D({ slug, t, entries, posts }: { slug: Person
     z.dur = window.matchMedia("(max-width: 767px)").matches ? 0.45 : 0.7;
     z.fired = false;
     const el = overlayRef.current;
-    if (el) el.style.background = paletteFor(screenTheme(bandRef.current.theme)).bg;
+    if (el) {
+      el.style.transition = "none";
+      el.style.background = paletteFor(screenTheme(bandRef.current.theme)).bg;
+    }
   }, [navigate]);
-  const stage = useMemo<StageHooks>(() => ({ liveScreen, onScreenGo: go, look }), [liveScreen, go, look]);
+
+  // The desk's props: hover / HUD focus light one, a click (or the HUD button) runs its command.
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const [tapId, setTapId] = useState<string | null>(null);
+  const [soundOn, setSoundOn] = useState(false);
+  const tapTimer = useRef(0);
+  const accent = useMemo(() => new THREE.Color().setHSL((((t * 285 - 15) / 360) % 1 + 1) % 1, 0.9, 0.62), [t]);
+  const runProp = useCallback(
+    (prop: StageProp) => {
+      if (prop.cmd === "sound") {
+        window.dispatchEvent(new Event("stage:sound-toggle"));
+        return;
+      }
+      const el = overlayRef.current;
+      if (reducedMotion() || !el) return navigate(prop.cmd);
+      el.style.background = paletteFor(screenTheme(bandRef.current.theme)).bg;
+      el.style.transition = "opacity 180ms ease-out";
+      el.style.opacity = "1";
+      window.setTimeout(() => navigate(prop.cmd), 190);
+    },
+    [navigate],
+  );
+  const onTap = useCallback((id: string) => {
+    setTapId(id);
+    window.clearTimeout(tapTimer.current);
+    tapTimer.current = window.setTimeout(() => setTapId(null), 1500);
+  }, []);
+  useEffect(() => {
+    const byId = (id: string) => STAGE_PROPS.find((x) => x.id === id);
+    const onFocus = (e: Event) => setFocusId((e as CustomEvent<string | null>).detail ?? null);
+    const onRun = (e: Event) => {
+      const prop = byId((e as CustomEvent<string>).detail);
+      if (prop) runProp(prop);
+    };
+    const onSound = (e: Event) => setSoundOn(Boolean((e as CustomEvent<boolean>).detail));
+    window.addEventListener("stage:focus", onFocus);
+    window.addEventListener("stage:run", onRun);
+    window.addEventListener("site:sound", onSound);
+    try {
+      const saved = window.localStorage.getItem("sound-enabled") === "true";
+      queueMicrotask(() => setSoundOn(saved));
+    } catch {}
+    return () => {
+      window.removeEventListener("stage:focus", onFocus);
+      window.removeEventListener("stage:run", onRun);
+      window.removeEventListener("site:sound", onSound);
+      window.clearTimeout(tapTimer.current);
+    };
+  }, [runProp]);
+  const stage = useMemo<StageHooks>(() => ({ liveScreen, onScreenGo: go, look, extra: slug === "engineer" ? <StageProps items={STAGE_PROPS} accent={accent} focusId={focusId} soundOn={soundOn} onRun={runProp} tapId={tapId} onTap={onTap} /> : undefined }), [liveScreen, go, look, slug, accent, focusId, soundOn, runProp, tapId, onTap]);
 
   return (
     <Canvas

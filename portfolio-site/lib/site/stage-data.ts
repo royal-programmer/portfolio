@@ -48,7 +48,7 @@ export const STAGE_LIGHTING: Record<string, StageLighting> = {
     ambient: { color: "#ffffff", intensity: 0.35 },
     screenGlow: 0.8,
     lampOn: false,
-    windowLight: { color: "#dfe9ff", intensity: 1 },
+    windowLight: { color: "#dfe9ff", intensity: 0.5 },
   },
   evening: {
     key: { color: "#ffab5c", intensity: 1.3, position: [3, 2, 4] },
@@ -72,3 +72,14 @@ export const STAGE_LIGHTING: Record<string, StageLighting> = {
 
 /** The preset for a band id (an unknown id gets the day's). */
 export const lightingFor = (bandId: string): StageLighting => STAGE_LIGHTING[bandId] ?? STAGE_LIGHTING.day;
+
+/** A command-prop on the desk (S3): hover shows `label`, a click runs `cmd` in the terminal (`sound` toggles the site setting instead). */
+export type StageProp = { id: string; label: string; cmd: string; kind: "mug" | "notebook" | "phone" | "headphones" | "sticky" };
+
+export const STAGE_PROPS: StageProp[] = [
+  { id: "mug", label: "now", cmd: "now", kind: "mug" },
+  { id: "notebook", label: "timeline", cmd: "timeline", kind: "notebook" },
+  { id: "phone", label: "contact", cmd: "contact", kind: "phone" },
+  { id: "headphones", label: "sound", cmd: "sound", kind: "headphones" },
+  { id: "sticky", label: "hire", cmd: "hire", kind: "sticky" },
+];

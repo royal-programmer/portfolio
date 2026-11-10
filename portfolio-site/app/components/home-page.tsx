@@ -150,7 +150,16 @@ export function HomePage({
 
   useEffect(() => {
     window.localStorage.setItem("sound-enabled", soundEnabled ? "true" : "false");
+    // The Stage's headphones glow with the site setting.
+    window.dispatchEvent(new CustomEvent("site:sound", { detail: soundEnabled }));
   }, [soundEnabled]);
+
+  // The Stage's headphones toggle the same setting the preferences panel does.
+  useEffect(() => {
+    const toggle = () => setSoundEnabled((v) => !v);
+    window.addEventListener("stage:sound-toggle", toggle);
+    return () => window.removeEventListener("stage:sound-toggle", toggle);
+  }, []);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent | TouchEvent) => {
