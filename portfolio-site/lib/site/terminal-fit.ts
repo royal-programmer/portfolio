@@ -3,7 +3,8 @@
  * matched against an alias table. Every entry says honestly whether I have the skill (it must also be in
  * the résumé's lists), have used something close (adjacent), or do not have it yet.
  */
-import type { TerminalData } from "@/lib/site/terminal-data";
+/** What the matcher needs from the résumé: its skill lists and the stack. `TerminalData` fits. */
+export type FitPool = { stack: readonly string[]; resume: { skills: ReadonlyArray<{ items: readonly string[] }> } };
 
 export const FIT_MAX = 8 * 1024;
 
@@ -111,18 +112,45 @@ function has(text: string, orig: string, alias: string, exact?: boolean): boolea
   }
 }
 
-export function fitMatch(raw: string, data: TerminalData): FitResult {
-  const truncated = raw.length > FIT_MAX;
-  const orig = raw.slice(0, FIT_MAX);
+/** The skills a text mentions ("sql" is implied by a more specific database; the most specific line only). */
+function findSkills(orig: string): Map<string, Skill> {
   const text = orig.toLowerCase();
-  // What the résumé and stack really list, lower-cased: a "have" entry only counts when it is in here.
-  const pool = new Set([...data.resume.skills.flatMap((g) => g.items), ...data.stack].map((x) => x.toLowerCase()));
   const found = new Map<string, Skill>();
   for (const s of SKILLS) {
     if (s.aliases.some((a) => has(text, orig, a, s.exact))) found.set(s.id, s);
   }
-  // "sql" is implied by a more specific database; keep the most specific line only.
   if (found.has("SQL Server") && found.has("SQL")) found.delete("SQL");
+  return found;
+}
+
+/** What the résumé and stack really list, lower-cased: a "have" entry only counts when it is in here. */
+const poolOf = (data: FitPool) => new Set([...data.resume.skills.flatMap((g) => g.items), ...data.stack].map((x) => x.toLowerCase()));
+
+/** A skill I have (the résumé lists it) counts 1, something close counts half, something I do not have counts 0. */
+const weightOf = (s: Skill, pool: Set<string>) => (s.status === "have" && s.via && pool.has(s.via.toLowerCase()) ? 1 : s.status === "not" ? 0 : 0.5);
+
+export type JdWanted = { total: number; matched: number; wants: Array<{ skill: Skill; weight: number }> };
+
+/** The skills a pasted job description asks for, each weighed against what I have (for per-card ratings in the Netflix view). */
+export function jdWanted(raw: string, data: FitPool): JdWanted {
+  const pool = poolOf(data);
+  const wants = [...findSkills(raw.slice(0, FIT_MAX)).values()].map((skill) => ({ skill, weight: weightOf(skill, pool) }));
+  return { total: wants.length, matched: wants.filter((w) => w.weight === 1).length, wants };
+}
+
+/** How much of what the description wants one piece of text (a card) shows: the weighed skills it mentions over at most four; null when none. */
+export function textFit(wanted: JdWanted, text: string): number | null {
+  const hit = wanted.wants.filter((w) => w.weight > 0 && w.skill.aliases.some((a) => has(text.toLowerCase(), text, a, w.skill.exact)));
+  if (!hit.length) return null;
+  const score = hit.reduce((n, w) => n + w.weight, 0);
+  return Math.min(100, Math.round((score / Math.min(wanted.total, 4)) * 100));
+}
+
+export function fitMatch(raw: string, data: FitPool): FitResult {
+  const truncated = raw.length > FIT_MAX;
+  const orig = raw.slice(0, FIT_MAX);
+  const pool = poolOf(data);
+  const found = findSkills(orig);
   const matched: string[] = [];
   const adjacent: FitResult["adjacent"] = [];
   const notYet: string[] = [];
