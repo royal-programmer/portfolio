@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { PersonaLink } from "@/lib/site/persona-link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   getEntryBySlug,
   getPersona,
@@ -13,9 +13,9 @@ import { placeOnSpectrum } from "@/lib/site/spectrum";
 import { HomePage } from "../../components/home-page";
 import { WorldBoot } from "../../components/world-boot";
 import { ViewShell } from "../../components/views/view-shell";
-import { SERIES_PROFILES, buildSeries, type Series, type SeriesProfileId } from "@/lib/site/series-data";
+import { NETFLIX_PROFILES, buildNetflix, type NetflixShow, type NetflixProfileId } from "@/lib/site/netflix-data";
 import { terminalData } from "@/lib/site/terminal-data";
-import { SeriesView } from "../../components/views/series/series-view";
+import { NetflixView } from "../../components/views/netflix/netflix-view";
 import { loadHomeContent } from "../../load-home-content";
 import { shareMetadata, siteOrigin } from "@/lib/site/share-meta";
 import { SUBDOMAIN_BY_PERSONA } from "@/lib/site/hosts";
@@ -71,6 +71,8 @@ export default async function PersonaEntryPage({ params, searchParams }: Project
   const [{ persona, slug }, { via }] = await Promise.all([params, searchParams]);
 
   if (!isLaunchedPersona(persona)) notFound();
+
+  if (slug === "series") redirect(`/${persona}/netflix`);
 
   const view = getView(persona, slug);
   if (view) return <PersonaViewPage persona={persona} view={view.id} fromTerminal={via === "terminal"} via={via} />;
@@ -174,13 +176,13 @@ async function PersonaViewPage({ persona, view, fromTerminal, via }: { persona: 
       </ViewShell>
     );
   }
-  if (view === "series") {
+  if (view === "netflix") {
     // One dataset, three orderings: built here, picked on the client ("Who's watching?").
     const data = terminalData(personas.find((p) => p.slug === persona), engineerEntries, engineerBlogPosts, getViews(persona));
-    const series = Object.fromEntries(SERIES_PROFILES.map((p) => [p.id, buildSeries(p.id, data, engineerEntries, engineerBlogPosts)])) as Record<SeriesProfileId, Series>;
+    const series = Object.fromEntries(NETFLIX_PROFILES.map((p) => [p.id, buildNetflix(p.id, data, engineerEntries, engineerBlogPosts)])) as Record<NetflixProfileId, NetflixShow>;
     return (
       <ViewShell persona={persona} view={view} stripVia={fromTerminal}>
-        <SeriesView accent={accent} series={series} contact={data.contact} status={data.status} portrait={data.portrait} fast={via === "normal"} />
+        <NetflixView accent={accent} series={series} contact={data.contact} status={data.status} portrait={data.portrait} fast={via === "normal"} />
       </ViewShell>
     );
   }
