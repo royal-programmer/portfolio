@@ -368,7 +368,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   const pager = useRef<{ rest: Out[] } | null>(null);
   /** The `mail` form: which field the prompt is asking for, and what has been typed so far. */
   const [mailStep, setMailStep] = useState<MailStep | null>(null);
-  const mailRef = useRef<{ step: MailStep; name: string; email: string; lines: string[] } | null>(null);
+  const mailRef = useRef<{ step: MailStep; name: string; email: string; lines: string[]; seed?: string; source?: string } | null>(null);
   const [theme, setTheme] = useState<ThemeId>("accent");
   const themeRef = useRef<ThemeId>("accent");
   /** While the `theme` menu is open: the theme to restore on Esc (the menu previews live as the selection moves). */
@@ -599,8 +599,8 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     mailRef.current = null;
     setMailStep(null);
   };
-  const startMail = () => {
-    mailRef.current = { step: "name", name: "", email: "", lines: [] };
+  const startMail = (seed?: string, source?: string) => {
+    mailRef.current = { step: "name", name: "", email: "", lines: [], seed, source };
     setMailStep("name");
     line(T()["mail.start"], false, true, here());
   };
@@ -611,7 +611,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   };
 
   /** Posts the message; the result replaces the `sending …` line. A failed message is printed back so it is not lost. */
-  const sendMail = async (name: string, email: string, message: string) => {
+  const sendMail = async (name: string, email: string, message: string, source = "terminal") => {
     sendingRef.current = true;
     const n = ++seq.current;
     append([{ n, k: "out", text: T()["mail.sending"], dim: true }]);
@@ -625,7 +625,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         method: "POST",
         keepalive: true,
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, email, message, source: "terminal", persona }),
+        body: JSON.stringify({ name, email, message, source, persona }),
       });
       const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (cancelled.current) return;
@@ -664,6 +664,8 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       m.step = "message";
       setMailStep("message");
       line(T()["mail.empty"], false, true, here());
+      // `mail --fit`: the message starts as the seed; the visitor edits it, Enter keeps it, an empty line sends.
+      if (m.seed) setCmd(m.seed);
     } else {
       if (val) {
         echoAnswer(T()["mail.message"], raw);
@@ -675,9 +677,9 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         m.lines = [];
         return void line(T()["mail.more"], false, false, here());
       }
-      const { name, email } = m;
+      const { name, email, source } = m;
       endMail();
-      void sendMail(name, email, body);
+      void sendMail(name, email, body, source);
     }
   };
 
@@ -1186,7 +1188,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         line(fx.mode === "off" ? T()["fx.saver.off"] : T()["fx.saver.on"], false, true, here());
       }
     }
-    else if (fx.kind === "mail") startMail();
+    else if (fx.kind === "mail") startMail(fx.seed, fx.source);
     else if (fx.kind === "pane") togglePane();
     else toggleFull();
   };
@@ -2274,7 +2276,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
           {data.now?.lines[0] ? <p className="terminal-os-pane-now">{S["pane.now"](data.i18n?.[lang as "bn" | "hi"]?.now[0] ?? data.now.lines[0])}</p> : null}
           <div className="terminal-os-pane-actions">
             {["hire", "resume --pdf", "mail"].map((c) => (
-              <button key={c} type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit(c)}>
+              <button key={c} type="button" tabIndex={-1} title={c === "hire" ? S["hb.tip"] : undefined} onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit(c)}>
                 {c}
               </button>
             ))}

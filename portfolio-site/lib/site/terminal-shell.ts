@@ -152,7 +152,8 @@ export type Effect =
   | { kind: "fit-box" }
   /** `screensaver [on|off]`: start it now, or switch it off / on for this device. */
   | { kind: "saver"; mode: "now" | "off" | "on" }
-  | { kind: "mail" };
+  /** `mail`: the form; `--fit` seeds the message and tags the lead (`source`). */
+  | { kind: "mail"; seed?: string; source?: string };
 
 export type ShellState = { cwd: string; history: string[]; lastMenu?: MenuId };
 export type RunResult = { lines: Out[]; effect?: Effect; state: ShellState };
@@ -257,6 +258,20 @@ const HELP_GROUPS: Array<{ key: StringKey; names: string[] }> = [
   { key: "group.live", names: ["stats", "git", "curl", "fit"] },
   { key: "group.terminal", names: ["theme", "lang", "pane", "clear", "exit"] },
 ];
+
+/** Word-wraps `t` to `width` columns (a word longer than that stays whole). */
+function wrapText(t: string, width: number): string[] {
+  const rows: string[] = [];
+  let cur = "";
+  for (const word of t.split(/\s+/).filter(Boolean)) {
+    if (cur && cur.length + 1 + word.length > width) {
+      rows.push(cur);
+      cur = word;
+    } else cur = cur ? `${cur} ${word}` : word;
+  }
+  if (cur) rows.push(cur);
+  return rows.length ? rows : [""];
+}
 
 const text = (t: string, dim = false): Out => ({ kind: "text", text: t, dim: dim || undefined });
 const texts = (ls: string[]): Out[] => ls.map((l) => text(l));
@@ -535,7 +550,80 @@ export function createShell(data: TerminalData): Shell {
         kind: "links",
         items: [{ label: "resume --pdf", cmd: "resume --pdf" }, { label: "mail", cmd: "mail" }, ...(linkedin ? [{ label: "linkedin", href: linkedin.href, external: true }] : [])],
       },
+          text(S["hb.hint"], true),
     ];
+  };
+
+  /** `hire --brief`: the one-screen fit sheet, from `data.hiring`; `copy` puts the same sheet on the clipboard as 72-column text. */
+  const hireBrief = (cols: number): Out[] => {
+    const h = data.hiring;
+    const d = new Date();
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const title = S["hb.title"](data.resume.name, ym);
+    const wide = cols >= 60;
+    const w = Math.max(30, Math.min(cols, 96));
+    const hw = Math.min(w, 56);
+    const bar = wide ? "│ " : "  ";
+    const ask = (v: string) => /·\s*ask$/i.test(v);
+    const url = (kind: string) => data.contact.find((c) => c.label === kind && /^https:\/\//i.test(c.href))?.href;
+    const linkedin = url("linkedin");
+    const github = url("github");
+    const email = data.contact.find((c) => c.label === "mail")?.href.replace(/^mailto:/i, "");
+    const resumeUrl = `https://${host}${h.links.resume}`;
+    type Row = { t: string; dim?: boolean; label?: string };
+    const where = [h.location.base, h.location.modes.join(" / "), ...(h.location.relocate ? [S["hb.reloc"]] : [])].join(" · ");
+    const secs: Array<{ label: string; rows: Row[] }> = [
+      { label: S["hb.roles"], rows: [...h.roles.map((t) => ({ t })), { t: h.level, dim: true }] },
+      { label: S["hb.stack"], rows: [{ t: h.stack.core.join(" · ") }, { t: h.stack.plus.join(" · "), dim: true }] },
+      { label: S["hb.where"], rows: [{ t: where }, { t: h.visa, dim: true }] },
+      {
+        label: S["hb.when"],
+        rows: [
+          { label: S["hb.avail"], t: h.availability, dim: ask(h.availability) },
+          { label: S["hb.comp"], t: h.compensation, dim: ask(h.compensation) },
+        ],
+      },
+      { label: S["hb.proof"], rows: h.proof.map((t) => ({ t })) },
+    ];
+    // The copy: plain text, 72 columns, links as full URLs.
+    const plain: string[] = [title, ""];
+    for (const sec of secs) {
+      plain.push(sec.label);
+      for (const r of sec.rows) plain.push(...wrapText(r.label ? `${r.label}: ${r.t}` : r.t, 70).map((l, i) => `${i ? "    " : "  "}${l}`));
+    }
+    plain.push(S["hb.reach"]);
+    for (const [k, v] of [["mail", email], ["linkedin", linkedin], ["github", github], ["resume", resumeUrl], ["site", h.links.site]] as const) if (v) plain.push(`  ${k.padEnd(9)}${v}`);
+    const sheet = plain.join("\n");
+    const link = `https://${host}/?run=${encodeURIComponent("hire --brief")}`;
+
+    const out: Out[] = [{ kind: "text", text: title, accent: true }];
+    const head = (label: string) => out.push({ kind: "parts", parts: [{ text: `── ${label} ${"─".repeat(Math.max(2, hw - label.length - 4))}`, tone: "dim" }] });
+    for (const sec of secs) {
+      head(sec.label);
+      for (const r of sec.rows) {
+        const lead = r.label ? `${r.label}  ` : "";
+        wrapText(r.t, w - 2 - lead.length).forEach((l, i) => {
+          if (r.label && i === 0) out.push({ kind: "parts", parts: [{ text: `${bar}${lead}` }, { text: l, tone: r.dim ? "dim" : undefined }] });
+          else out.push(text(`${bar}${" ".repeat(lead.length)}${l}`, r.dim));
+        });
+      }
+    }
+    head(S["hb.reach"]);
+    const tokens: LinkItem[] = [
+      { label: "mail", cmd: "mail --fit" },
+      ...(linkedin ? [{ label: "linkedin", href: linkedin, external: true }] : []),
+      ...(github ? [{ label: "github", href: github, external: true }] : []),
+      { label: "resume --pdf", cmd: "resume --pdf" },
+      { label: S["share.copy"], act: "copy" as const, url: sheet },
+      { label: S["share.share"], act: "share" as const, url: link, title: `$ hire --brief · ${data.resume.name}` },
+    ];
+    if (wide) out.push({ kind: "links", prefix: `${bar}→ `, items: tokens });
+    else {
+      out.push({ kind: "links", prefix: `${bar}→ `, items: tokens.slice(0, 3) });
+      out.push({ kind: "links", prefix: `${bar}→ `, items: tokens.slice(3) });
+    }
+    for (const l of wrapText(S["hb.foot"], w - 2)) out.push(text(`${bar}${l}`, true));
+    return out;
   };
 
   /** `portfolio`: everything on one screen. Sections with a left rule, each ending in the command that goes deeper. */
@@ -789,7 +877,7 @@ export function createShell(data: TerminalData): Shell {
       case "portfolio":
         return { lines: portfolio(env?.cols ?? 100) };
       case "hire":
-        return { lines: hire() };
+        return { lines: /^(--)?brief$/i.test(args[0] ?? "") ? hireBrief(env?.cols ?? 100) : hire() };
       case "now":
         return { lines: now() };
       case "timeline":
@@ -809,8 +897,11 @@ export function createShell(data: TerminalData): Shell {
       }
       case "arch":
         return { lines: arch(args[0], env?.cols ?? 100) };
-      case "mail":
-        return { lines: [], effect: { kind: "mail" } };
+      case "mail": {
+        const h = data.hiring;
+        const seed = /^(--)?fit$/i.test(args[0] ?? "") ? S["hb.seed"](h.roles[0] ?? "", h.stack.core.slice(0, 5).join(", ")) : undefined;
+        return { lines: [], effect: seed ? { kind: "mail", seed, source: "hire-brief" } : { kind: "mail" } };
+      }
       case "pane":
         return { lines: [], effect: { kind: "pane" } };
       case "date":

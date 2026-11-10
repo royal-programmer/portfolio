@@ -17,7 +17,7 @@ type LeadPayload = {
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const SOURCES = new Set(["site", "terminal"]);
+const SOURCES = new Set(["site", "terminal", "hire-brief"]);
 
 const MAX_BODY = 8_192;
 
