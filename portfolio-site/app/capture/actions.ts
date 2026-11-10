@@ -6,6 +6,7 @@
  * work goes through the cookie-bound client so RLS (`is_admin()`) is enforced.
  */
 import { revalidatePath } from "next/cache";
+import { safeNext } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getServerClient, isAdmin } from "@/lib/db/server";
 import { ingestImage } from "@/lib/media/pipeline";
@@ -24,7 +25,7 @@ export async function signIn(_prev: ActionState, formData: FormData): Promise<Ac
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: error.message };
 
-  redirect("/capture/admin");
+  redirect(safeNext(String(formData.get("next") ?? "")) ?? "/capture/admin");
 }
 
 export async function signOut(): Promise<void> {
