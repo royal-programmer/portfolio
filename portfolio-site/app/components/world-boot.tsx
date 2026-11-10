@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import type { PersonaSlug } from "@/lib/content/types";
+import { whenActive } from "@/lib/site/prerender";
 import { ExitFrame, ExitSequence } from "./hub/exit-sequence";
 
 type Props = { slug: PersonaSlug; color: string; t: number; /** "hub": the camera flew into this window, play on from its first frame. "normal": the display already played on the hub — open on the finished window and lift. */ via: "hub" | "normal" | null; items: string[]; photo?: string };
@@ -46,6 +47,16 @@ export function WorldBoot({ slug, color, t, via, items, photo }: Props) {
   }, [via]);
 
   useEffect(() => {
+    let cancel = () => {};
+    // A prerendered page keeps its entry animation for activation.
+    const off = whenActive(() => {
+      cancel = start();
+    });
+    return () => {
+      off();
+      cancel();
+    };
+    function start(): () => void {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let seen = false;
     try {
@@ -60,6 +71,8 @@ export function WorldBoot({ slug, color, t, via, items, photo }: Props) {
       // away — after a short hold when arriving on the finished window, so the cut reads.
       const id = window.setTimeout(lift, finished && !reduce ? 160 : 0);
       return () => window.clearTimeout(id);
+    }
+    return () => {};
     }
   }, [viaHub, finished, slug, lift]);
 

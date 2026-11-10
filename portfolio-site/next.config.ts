@@ -24,6 +24,11 @@ const nextConfig: NextConfig = {
   // Persona subdomains in dev (code.ratulroy.localhost:3000 etc. — see proxy.ts / D31).
   allowedDevOrigins: ["ratulroy.localhost", "*.ratulroy.localhost"],
   env: { NEXT_PUBLIC_COMMIT: commitLine() },
+  // Persona hosts are same-site, cross-origin: the hub may prerender them (Speculation Rules) only
+  // if they opt in to a credentialed prerender.
+  async headers() {
+    return [{ source: "/:path*", headers: [{ key: "Supports-Loading-Mode", value: "credentialed-prerender" }] }];
+  },
 };
 
 export default nextConfig;

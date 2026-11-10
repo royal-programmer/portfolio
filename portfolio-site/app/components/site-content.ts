@@ -1,5 +1,6 @@
 import { Monitor, Moon, Sun } from "lucide-react";
 import type { Persona as PersonaRecord } from "@/lib/content";
+import { personaIdentity } from "@/lib/site/brand";
 import type { Persona } from "../persona-provider";
 
 export type UiTheme = "system" | "light" | "dark";
@@ -51,38 +52,10 @@ export const makeTypeSequence = (words: string[], pauseMs: number): Array<string
   return seq;
 };
 
-const ENGINEER_WORDS = [
-  "UI/UX Designer",
-  "React Developer",
-  "TypeScript",
-  "Node.js",
-  "Next.js",
-  "Cloud Specialist",
-  "API Builder",
-];
-
-const TRADER_WORDS = [
-  "Price Action",
-  "Risk Management",
-  "Trading Systems",
-  "Probabilistic Thinking",
-  "Backtesting",
-  "Execution Discipline",
-  "Quant Mindset",
-];
-
-const PHOTOGRAPHER_WORDS = [
-  "Photographer",
-  "Portrait Lighting",
-  "Street Photography",
-  "Camera & Composition",
-  "Color Grading",
-  "Storytelling Frames",
-];
-
-export const ENGINEER_SEQUENCE = makeTypeSequence(ENGINEER_WORDS, 1400);
-export const TRADER_SEQUENCE = makeTypeSequence(TRADER_WORDS, 1400);
-export const PHOTOGRAPHER_SEQUENCE = makeTypeSequence(PHOTOGRAPHER_WORDS, 1400);
+/** The hub and the world's own page say the same phrases (lib/site/brand.ts). */
+export const ENGINEER_SEQUENCE = makeTypeSequence([...personaIdentity("engineer").phrases], 1400);
+export const TRADER_SEQUENCE = makeTypeSequence([...personaIdentity("trader").phrases], 1400);
+export const PHOTOGRAPHER_SEQUENCE = makeTypeSequence([...personaIdentity("photographer").phrases], 1400);
 
 export const QUICK_STACK_EXIT_MS = 140;
 

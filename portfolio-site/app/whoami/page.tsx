@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import { ALL_PERSONAS, listEntries, listPersonas } from "@/lib/content";
 import { HUB_COPY } from "@/lib/site/brand";
+import { shareMetadata, siteOrigin } from "@/lib/site/share-meta";
 import { placeOnSpectrum } from "@/lib/site/spectrum";
 import { HubExperience, type HubChapter, type HubUpcoming } from "../components/hub/hub-experience";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = shareMetadata({
   title: `Ratul Roy — ${HUB_COPY.headline}`,
-  description:
-    "Engineer, trader, photographer — and more perspectives on the way. Follow the light into each world.",
-};
+  description: "Engineer, trader, photographer — and more perspectives on the way. Follow the light into each world.",
+  cmd: "portfolio",
+  origin: siteOrigin(null),
+});
 
 /**
  * The hub (served at the bare root domain by proxy.ts, and at /whoami on hosts

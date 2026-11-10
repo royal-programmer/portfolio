@@ -20,13 +20,14 @@
 import gsap from "gsap";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ambient } from "@/lib/site/ambient-sound";
-import { DISPLAY_ROOT, personaIdentity } from "@/lib/site/brand";
 import { spectrumColor } from "@/lib/site/spectrum";
 import type { PersonaSlug } from "@/lib/content/types";
+import { getViews } from "@/lib/content/views";
 import { CanvasExit, DashExit, MonitorExit } from "./exit-sequence-worlds";
 import { BootScreen, useOnce, useSkip } from "./exit-shared";
 import { optimized } from "./vr/screens";
 import type { World } from "./vr/state";
+import type { TerminalStrings } from "@/lib/site/terminal-strings";
 
 type Props = {
   world: World;
@@ -47,11 +48,7 @@ type Props = {
   boot?: boolean;
 };
 
-const HOST = `${personaIdentity("engineer").subdomain}.${DISPLAY_ROOT}`;
-// From the résumé — true things, in a terminal's voice.
-const WHO = "ratul · software engineer · bengaluru";
-const STACK = "c# · .net · react · typescript · python · fastapi · sql server · postgresql · rabbitmq";
-const UPTIME = "2 years in production · 200+ users on the last rebuild · 11 automations kept alive";
+const TERM_TITLE = "ratulroy@code — royal-programmer";
 
 export function ExitSequence(props: Props) {
   const slug = props.world.slug as PersonaSlug;
@@ -80,31 +77,41 @@ function LightExit({ world, onDone, delay = 0 }: Props) {
 // ---------------------------------------------------------------------------
 // Terminal
 // ---------------------------------------------------------------------------
-type Line = { text: string; typed: boolean; prompt?: boolean };
+/**
+ * `tag: "ok"` is a `[ok]` row, `"bar"` the progress line (`fill` of 10 steps; absent = full).
+ * The Engineer terminal animates the rows and the bar; the hub's windows show them finished.
+ */
+export type Line = { text: string; typed: boolean; prompt?: boolean; tag?: "ok" | "bar" };
 
-/** The terminal's lines: true things, typed. */
-export function terminalScript(items: string[]): Line[] {
-  const out: Line[] = [
-    { text: `ssh ratul@${HOST}`, typed: true, prompt: true },
-    { text: "resolving host … ok", typed: false },
-    { text: "authenticating … ok", typed: false },
-    { text: "whoami", typed: true, prompt: true },
-    { text: WHO, typed: false },
-    { text: "cat stack", typed: true, prompt: true },
-    { text: STACK, typed: false },
-    { text: "uptime", typed: true, prompt: true },
-    { text: UPTIME, typed: false },
+export const BOOT_BAR_STEPS = 10;
+export const bootBar = (fill: number) =>
+  `[${"█".repeat(fill)}${"░".repeat(BOOT_BAR_STEPS - fill)}] ${fill * 10}%${fill === BOOT_BAR_STEPS ? "  ready" : ""}`;
+
+/** The profile tool starting up: one function for the hub's exit window and the Engineer terminal's boot. */
+/** The boot script's own words. English lives here, not in terminal-strings.ts, so the hub does not carry the Bengali and Hindi tables; the terminal passes its language's. */
+export type BootStrings = Pick<TerminalStrings, "boot.tool" | "boot.cached" | "boot.sound" | "unit.project" | "unit.file" | "unit.view">;
+const BOOT_EN: BootStrings = {
+  "boot.tool": "the profile tool of Ratul Roy",
+  "boot.cached": "cached profile",
+  "boot.sound": "key clicks follow the site setting",
+  "unit.project": (n) => `${n} project${n === 1 ? "" : "s"}`,
+  "unit.file": (n) => `${n} file${n === 1 ? "" : "s"}`,
+  "unit.view": (n) => `${n} view${n === 1 ? "" : "s"}`,
+};
+
+export function terminalScript(n: { projects: number; posts: number; views: number }, cached = false, S: BootStrings = BOOT_EN): Line[] {
+  const row = (label: string, text: string): Line => ({ text: `${label.padEnd(18)}${text}`, typed: false, tag: "ok" });
+  return [
+    { text: "royal-programmer --boot", typed: true, prompt: true },
+    { text: `royal-programmer v1 · ${S["boot.tool"]}${cached ? ` · ${S["boot.cached"]}` : ""}`, typed: false },
+    row("profile", "ratulroy · software engineer · bengaluru"),
+    row("mount ~/projects", S["unit.project"](n.projects)),
+    row("mount ~/resume", S["unit.file"](6)),
+    row("mount ~/views", S["unit.view"](n.views)),
+    row("link github", "github.com/royal-programmer"),
+    row("sound", S["boot.sound"]),
+    { text: bootBar(BOOT_BAR_STEPS), typed: false, tag: "bar" },
   ];
-  if (process.env.NEXT_PUBLIC_COMMIT) {
-    out.push({ text: "git log --oneline -1", typed: true, prompt: true });
-    out.push({ text: process.env.NEXT_PUBLIC_COMMIT, typed: false });
-  }
-  if (items.length) {
-    out.push({ text: "ls /engineer", typed: true, prompt: true });
-    out.push({ text: items.join("   "), typed: false });
-  }
-  out.push({ text: `open ${personaIdentity("engineer").handle ?? "engineer"}`, typed: true, prompt: true });
-  return out;
 }
 
 function TerminalLines({ lines, partial }: { lines: Line[]; partial: string | null }) {
@@ -113,6 +120,7 @@ function TerminalLines({ lines, partial }: { lines: Line[]; partial: string | nu
       {lines.map((l, i) => (
         <span key={i} className={l.prompt ? "is-cmd" : "is-out"}>
           {l.prompt ? "$ " : ""}
+          {l.tag === "ok" ? <b className="is-ok">[ok] </b> : null}
           {l.text}
         </span>
       ))}
@@ -134,7 +142,7 @@ function TerminalExit({ world, items, onDone, delay = 0, boot }: Props) {
   const [booting, setBooting] = useState(!!boot);
   const [lines, setLines] = useState<Line[]>([]);
   const [partial, setPartial] = useState<string | null>("");
-  const script = useMemo<Line[]>(() => terminalScript(items), [items]);
+  const script = useMemo<Line[]>(() => terminalScript({ projects: items.length, posts: 0, views: getViews("engineer").length }), [items]);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,7 +183,7 @@ function TerminalExit({ world, items, onDone, delay = 0, boot }: Props) {
     <div ref={root} className={`hub-exit hub-exit-term ${booting ? "is-boot" : ""}`} style={{ "--c": c } as CSSProperties} role="presentation">
       <div className="hub-exit-bar">
         <span /> <span /> <span />
-        <b>ratul@{HOST} — zsh</b>
+        <b>{TERM_TITLE}</b>
       </div>
       <TerminalLines lines={lines} partial={partial} />
     </div>
@@ -434,7 +442,7 @@ export function BootFrame({ slug, t, items, photo }: { slug: PersonaSlug; t: num
       <div className="hub-exit hub-exit-term is-boot" style={{ "--c": c } as CSSProperties} role="presentation">
         <div className="hub-exit-bar">
           <span /> <span /> <span />
-          <b>ratul@{HOST} — zsh</b>
+          <b>{TERM_TITLE}</b>
         </div>
         <TerminalLines lines={[]} partial="" />
       </div>
@@ -475,9 +483,9 @@ export function ExitFrame({ slug, t, items, photo }: { slug: PersonaSlug; t: num
       <div className="hub-exit hub-exit-term" style={{ "--c": c, boxShadow: `0 0 80px -10px ${c}` } as CSSProperties} role="presentation">
         <div className="hub-exit-bar">
           <span /> <span /> <span />
-          <b>ratul@{HOST} — zsh</b>
+          <b>{TERM_TITLE}</b>
         </div>
-        <TerminalLines lines={terminalScript(items)} partial={null} />
+        <TerminalLines lines={terminalScript({ projects: items.length, posts: 0, views: getViews("engineer").length })} partial={null} />
       </div>
     );
   }

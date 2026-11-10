@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { TypeAnimation } from "react-type-animation";
 import { ArrowRight } from "lucide-react";
 import type { Persona } from "../persona-provider";
+import { personaIdentity } from "@/lib/site/brand";
 import type { PersonaContent } from "./site-content";
 import { useMemo } from "react";
 import {
@@ -28,8 +29,8 @@ export function HomeHero({
           ? TRADER_SEQUENCE
           : persona === "photographer"
             ? PHOTOGRAPHER_SEQUENCE
-            : makeTypeSequence(content.points.length ? content.points : [content.label], 1400),
-    [persona, content.points, content.label],
+            : makeTypeSequence([...personaIdentity(persona).phrases], 1400),
+    [persona],
   );
   return (
     <motion.div
@@ -46,7 +47,8 @@ export function HomeHero({
     >
       <p className="text-xs uppercase tracking-[0.2em] text-[var(--accent)] sm:text-sm">{content.eyebrow}</p>
       <p className="text-base text-[var(--muted)] sm:text-lg md:text-2xl">
-        I am a{" "}
+        {/* Every world's phrases are verb phrases: "I build systems that stay up". */}
+        <>I </>
         <span className="font-semibold text-[var(--accent)]">
           <TypeAnimation
             key={persona}

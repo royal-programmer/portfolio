@@ -5,6 +5,395 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-10 — Round 8: `hire --brief`
+
+Forwardable one-screen fit sheet from a new `hiring` data block; `copy` token puts the sheet on the clipboard (72 cols); `mail --fit` pre-fills the message and tags the lead `hire-brief`. Details: 17-persona-views.md section 13. Availability and compensation are `· ask` placeholders until Ratul fills them. Not done: Series view and hub unchanged; the sheet's role/stack/proof lines stay English in bn and hi.
+
+## 2026-11-10 — Round 7: `lang bn` and `lang hi`
+
+- All terminal prose moved to `lib/site/terminal-strings.ts` (en, bn, hi); English output unchanged except `help` (four short groups, `help --all` for the full list) and the new `lang` command. `?lang=` and `xp-term-lang` persist the choice; Noto Bengali/Devanagari fonts after Geist Mono. Series view and hub stay English. Details: `17-persona-views.md` §12.
+
+## 2026-11-10 — Round 6: the terminal as an installable, offline-capable PWA
+
+- Manifest per host, generated icons, `?via=pwa` arrival; hand-written `public/sw.js` with a build-time precache list; status-bar connectivity item, offline command lines, `install` command, tips row 9. Details: `17-persona-views.md` §11.
+- Verified in Chrome (isolated context) in dev with `xp-sw-dev=1`: controller set, precache filled, offline status bar and offline lines at 1280 and 393, update-ready item. **Not verified**: a cold offline reload hydrating the terminal under `next dev` (the cached HTML shell and every chunk load, but React did not hydrate; probably Turbopack dev needing its HMR socket), and the production precache list (`sw-manifest.mjs` was only run against a fixture, no `next build` was run). Check both on the next preview deploy. Lighthouse in the MCP no longer has a PWA category, so no installability score.
+
+## 2026-11-10 — Round 11: the Series view becomes Netflix (branch `claude/netflix`)
+
+- **Rename.** View id `netflix` (name "Netflix"), route `/engineer/netflix`; `/engineer/series` redirects; a remembered
+  `xp-view:engineer = series` reads as `netflix`. Code moved to `app/components/views/netflix/`, `lib/site/netflix-data.ts`,
+  CSS prefix `nf-`. No logo, wordmark or red N: our `R` mark stays.
+- **Detail modal.** Any card (episode, project, skill, post) opens it; FLIP from the card's rectangle, `?title=<id>` deep link,
+  focus trap, Esc/backdrop/x, focus back to the card, phone sheet with swipe-down. Billboard with Play (six-second teleprompter;
+  a project's Play opens its live URL), My List, thumbs-up, sound; meta row, adjectives, season episodes list (arrow keys, season
+  select), More like this, About.
+- **Real feel.** Fixed top bar with expanding instant search, Top 10 badge on Shift Roster, More info, trailer auto-plays after
+  3 idle seconds (silent, Skip pill), Continue watching and My List rows (`xp-nf-progress`, `xp-nf-list`), hover controls row,
+  WebAudio chime/tick (default muted, `xp-nf-sound`), Manage Profiles toast, staggered gate, skeleton rows.
+- Not done: hover controls only on episode cards (posters and skills open the modal on click); "match %" replaced by `New`/season
+  as the brief allowed.
+
+## 2026-11-10 — Round 12: the terminal, bolder
+
+- Ghost suggestions, did-you-mean tokens, `fit` (job description vs my stack), `arch` (four system diagrams), screensaver, and Realtime presence. Details: 17-persona-views.md section 16.
+- Commits: a7381b3 (ghost + did-you-mean + fit), b0850fa (arch), 00e71cf (screensaver + presence), plus follow-up fixes.
+- Caught by a node harness before the browser: `arch` layout read `top` before it was defined; `fit` skipped `Go` after a colon.
+- Open: `tsc` reports one error in `app/og/route.tsx` (`sharp` types) after the node_modules reinstall, not from this round (see the sharp trap in section 10). Browser verification waited on the dev server, which stopped answering during the reinstall.
+
+## 2026-11-10 — Round 5: `share` deep links and generated previews
+
+- `/og?cmd=<command>&theme=<id>` draws the real terminal output as a 1200x630 PNG; metadata on the Engineer page (`?run=`), views and hub points at it; `share [cmd]` prints the link, image URL, copy and share tokens. Details: 17-persona-views.md section 10.
+- Theme palettes moved to `lib/site/terminal-themes.ts` (CSS generated from it).
+- Open: sharp version clash (two copies in one process break `next/og`); pin app sharp to next's 0.34.5. The dev server had both loaded during testing, so `/og` was verified in a clean Node harness, not over HTTP.
+
+## 2026-11-10 — Round 4: `stats`, the GitHub year as a heatmap
+
+- `/api/github/contributions` (GraphQL with `GITHUB_TOKEN`, else the public contributions HTML) and the `stats [year|langs]` command: heatmap, streaks, language bar; cached on-device 6 h; pane Live line. Design and caveats in `17-persona-views.md` §9.
+- Exercised source 2 (no token in `.env.local`); source 1 is written but untested. Node's fetch hung on this machine's IPv6 route until the route set IPv4-first; the upstream also answered 502 once in a few tries (the terminal shows the dim "did not answer" line).
+
+## 2026-11-10 — Round 3: the résumé PDF is generated from the data
+
+- `/resume.pdf` (route `app/resume.pdf/route.ts`, `@react-pdf/renderer`, Node runtime, `force-static`) renders one A4 page from `RESUME`, `TIMELINE`, contact links and the content-layer projects; no phone number. Builder: `lib/resume/build.ts`; renderer: `lib/resume/render.tsx`; Inter (subset, OFL) in `public/fonts/`.
+- Which bullets make the PDF: `RESUME.pdfBullets` (indices into the role's bullets).
+- Wired to `resume --pdf`, the `resume` text (dim last line), Hire pill, hub, Series hero, pane quick action.
+- `public/Ratul_Roy_Resume.pdf` is kept for now; Ratul deletes it after comparing the two.
+- Note: `force-static` ignores the query string, so `?download=1` may not switch to `attachment` once built; if it matters, drop `force-static` for `revalidate`.
+
+## 2026-11-10 — Round 1m: school grades on the timeline, Tab cycling, seamless hub → persona hand-off
+
+- Class 10 and class 12 are timeline entries with their own highlighted grade; the school bracket label no longer carries the combined string.
+- Tab again cycles the completions (Shift+Tab back, Esc restores), highlight moves in place; `portrait`, `timeline`, `ls -l` complete.
+- Hub curtain for the Normal doorway; Speculation Rules prerender of the persona page on hover/press/focus; `Supports-Loading-Mode: credentialed-prerender`
+  header; boot, entry animation and beacon wait for `prerenderingchange`; the terminal is server-rendered with its banner and fades in over 240 ms.
+- Not observed: an actual prerender activation in the automated Chrome (`activationStart` stayed 0); the rules, header and guards are in place.
+  Details in `17-persona-views.md` section 6.14.
+
+## 2026-11-10 — Round 2: the Series view (branch `claude/series`)
+
+- `/engineer/series` is live behind the registry (`enabled: true`): Who's watching (three profiles), hero with a typed trailer, episode / project / skill rows, season bar, inline episode sheet, To be continued. Data is `lib/site/series-data.ts`; the three profiles are orderings of the terminal's dataset. Details: `17-persona-views.md` §7.
+- Commits on `claude/series`: data, profiles, hero, rows, polish, docs.
+- Verified at 1280x800 and 393x852 touch: no horizontal page scroll, hover growth and synopsis, sheet, trailer typing, terminal picker lists Series and the pick is remembered.
+
+---
+
+## 2026-11-09 — Round 1l: timeline grid, Tab, eleven themes, Normal-mode doorway, `now`
+
+- `timeline` rebuilt as a CSS grid (straight, uncut bracket column; months-based durations; `--all`); school/college/born data from Ratul.
+- Tab stays in the prompt; pane buttons out of the tab order. Eleven themes with a live-preview `theme` menu and `theme random`.
+- Hub in Normal mode: arrival via `?via=normal` no longer auto-opens the remembered view; the doorway shows busy and zooms immediately.
+- `portfolio` links inline on wide screens, `open to work` status item, `now` command. Details: `17-persona-views.md` §6.13.
+- Commits: `bb26f9b` timeline, `1055f8f` data addendum, `4bd3725` Tab, `de2922a` themes, `df6f852` hub, `3edf166` polish.
+
+**Lead verification (Fable).** Reviewed the builder's screenshots and checked the parts it skipped: the phone `portfolio`
+card clipped every line with `…` (the clip was meant for the wide layout) — narrow now wraps and drops the `│` rule; the
+wide timeline gave the subjects ~320px because the tag column and the period-label column were both `auto` — the tag now
+rides inside the subject cell and the label column is capped at 24ch with the grade on its own line, so subjects get
+~560px and only the longest four still end in `…`. Phone status item `● open to work` is 44px and runs `hire`. Builder
+≈400k tokens (slow repo-wide lint), lead ≈110k. Open: dev-only data hiccup — one load showed no projects (Supabase fetch),
+worth a fallback check in the next round.
+
+## 2026-11-09 — Round 1k: terminal fixes, portrait modes, pane, `portfolio`; hub and persona copy
+
+Builder (Sonnet). Commits: 9c47261 (boot token, `cls`), 142cafc (views boot in the terminal), 0ffe3d0 (`portfolio`, generated
+portraits, pane, real dates; also LF line endings restored after the first two commits picked up CRLF), 2b09ab3 (hire pill by
+persona, hub copy, persona phrases), plus the closing commit (alternating character lines, `elsewhere` contact links, docs).
+Verified in the browser (dev, chrome-devtools): one banner after `view stage` + Esc and after reload; stage opens with no
+WorldBoot and `?via=terminal` is stripped; `?run=portfolio` at 1280 and 393; all five portrait modes at 1280, neofetch at 393, no
+horizontal scroll; pane at 1280 (live lines from the GitHub cache). tsc and eslint clean. Not verified: StrictMode double-effect
+on a cold dev load (covered by the token), pointer-level checks of every pane button.
+Open questions: a real photo for the portrait (R.jpg is the logo); whether the hire pill should hide on the Engineer stage view.
+
+**Lead verification (Fable), 574d129.** The portrait now reads the real photo: `public/portrait.jpg` (640px, from the
+photo used for the earlier baked art) with the original crop, instead of the cartoon avatar; the pane status line is
+`open to work · relocates` (the city already sits on the line above). Checked in the browser: hub at 1280 has no hire
+pill and both character lines are present (sr-only carries both); `/stage` at 393 shows the `Hire me` pill bottom-left
+and `← back to terminal` bottom-right with no overlap (the round "N" that sits over the pill in dev is Next.js's dev
+indicator, absent in production); `portrait ascii` at 393 and `portrait` (pixels, 9.7k spans) at 1280 render with one
+banner and no horizontal scroll. Decision: the pill stays on the Engineer stage view — `hire` is a terminal command and a
+recruiter who lands on the stage has no other way to the résumé. Profile facts came from Ratul's LinkedIn (he signed in
+to the Playwright browser): B.Tech Oct 2021 → Jul 2024, school years, internships, five `elsewhere` links. Builder
+≈254k tokens; lead ≈120k this round.
+
+---
+
+## 2026-11-09 — Round 1j: honest placeholders, `Hire me` everywhere, real 404, phone hero
+
+Builder (Sonnet, ≈110k tokens incl. verification), after a Sonnet audit of the live site. Removed the
+fake and debug copy (identity panel, trader/photographer sample cards, "I am a Storytelling Frames");
+one `ComingUpCard` instead; `Hire me` pill with a PDF/email/terminal popover on the hub and the
+non-engineer pages; hub hero reserves the HUD's height and carries a résumé pitch line; unknown
+personas return a real 404 with the same friendly page; tap targets ≥ 44px on coarse pointers; opaque
+persona chips and a dark plate behind the HUD. Verified at 1280 and 393 touch: hub Normal first screen,
+the pill on hub, lens and trade (open, Esc, outside tap, hrefs), no "sample / Week view / Recent frames /
+Identity Shift / Konami" on lens and trade, `curl` 404 for `/nope`, typed hero line, console clean. Not
+verified: the pill on the hub while the headset gate is open (by construction it is hidden).
+
+---
+
+## 2026-11-09 — Engineer terminal round 1i: contents pane, `timeline`, real `git log`, `hire`
+
+Builder (Sonnet, ≈190k tokens incl. verification). Caret follows the input's cursor; the portrait
+is command-only (132x102 pixel art, fits width and height); `timeline` (wide and stacked) replaces
+the career `git log`, which now shows the latest public pushes of royal-programmer (head commit per
+push, message looked up once per sha, `xp-gh-msgs`); ghost suggestions removed; `view` command and
+new tips wording; `demo` → `tour` (hidden alias) with narrated steps and a status-bar counter; pane =
+clickable portfolio contents with done marks (achievement on the eight non-mail rows); `hire`,
+`?run=`, numbered tips, faster repeat boot. Verified at 1280x720 and 393x852 touch: hire, timeline,
+git log (+ `--oneline -n 3`), tour to the end, portrait fit, quick pick `2`, `?run=hire`, Home-key caret,
+pane row clicks; console clean. Not verified: a `school` period (unknown), rate-limited GitHub.
+
+**Lead verification (Fable) and nits:** `hire` no longer says "willing to relocate" twice; `git log`
+messages cut at a word boundary with `…` instead of mid-word; sections with nothing in them
+(`writing · 0 posts` today) are left out of the contents pane, the status counts, the next-hint and
+the achievement. Site-wide audit by a Sonnet reviewer (≈115k): hub and non-Engineer persona pages
+still show pre-redesign placeholders (debug "Identity Shift Panel" copy, "Performance (sample)",
+empty "Recent frames", "I am a Storytelling Frames"), no contact path off the Engineer host, phone
+hero under the guide HUD, soft 404 — queued as round 1j.
+
+---
+
+## 2026-11-08 — Engineer terminal: cold review of rounds 1c–1h and the fix pass
+
+**Reviewer (Sonnet, ≈100k)** found 10: (1) demo/`sl`/`curl` outlived the component — cleanup
+cleared timers so `await wait()` never resolved and capture-phase key listeners stayed on
+`window`, eating keys on the next page; (2) beacons sent any typed first token, not only commands;
+(3) paper theme dim text ≈2.7:1; (4) two `curl`s in flight broke Esc; (5) GitHub `html_url` and the
+cache unvalidated; (6) Ctrl+C swallowed copy; (7) mail fetch without `keepalive`; (8) in-memory
+rate limit useless on serverless, PII in logs, no body caps; (9) small (`-n abc` blame, chips
+during mail, `pageshow` double menu, stale `crt`, duplicate phone controls); (10) banner/art in the
+live region, demo steps announced.
+
+**Fixed** — builder (Sonnet, ≈60k): tracked listeners removed in cleanup, cancellable `wait`,
+abort/stop/reset on unmount; beacons allowlisted to known commands + eggs, else `unknown`,
+`view_open` only for real ids, no double `demo`; per-theme `--term-faint` (paper 5.6:1); curl
+in-flight guard and owner-checked abort; GitHub URL protocol check, cache shape validation, NaN
+dates → `unknown`; Ctrl+C yields to copy; `keepalive`, Esc/exit held while sending; `-n abc`
+message; chips answer during mail; `pageshow` reuses the last menu; `crt` via ref; status-bar
+buttons hidden on coarse pointers; art `aria-hidden` with sr-only text; live region off during
+the demo. Lead: body caps on both routes, theme allowlist, hashed email in logs, **migration
+0010** — DB triggers capping `leads` at 60/h and `term_events` at 5000/h (replaces the in-memory
+limiter). Lead verified: a demo interrupted by Back leaves no capture listener behind; phone
+status bar shows no duplicate buttons; tsc + eslint clean.
+
+**Pending on Ratul** — migrations 0008, 0009, 0010 in the SQL editor; then `mail` and the
+beacons go live. Then checkpoint #4.
+
+## 2026-11-08 — Engineer round 1h: live GitHub, themes, the PDF, QR, eggs, ghost text, analytics
+
+**What shipped** — `curl github` (public API, no token; repos, followers, last push, five repos with
+links, a 12-week contribution strip; cached an hour in `xp-gh-cache`); `theme accent|amber|green|
+paper` through CSS variables (remembered), `crt` scanlines (off under reduced motion); `resume
+--pdf` opens `/Ratul_Roy_Resume.pdf` (generated with reportlab from the résumé text, no phone
+number); `qr` — an in-house QR encoder (`lib/site/qr.ts`, byte mode, level M, versions 1–6,
+Reed–Solomon, 8 masks scored), drawn dark-on-white with a quiet zone, decoded by jsQR from a
+screenshot; eggs `sl`, `cowsay`, `fortune` (12 lines), `sudo` (`nice try`; the sandwich gets the
+cow), `rm -rf /`, `vim`/`nano`/`emacs`; fish-style ghost suggestions (→ or End accepts); anonymous
+analytics — one `sendBeacon` per visitor command to `/api/term-event` (first token only, plus
+`view_open:<id>`, `demo_*`, `achievement`; no ids, no IP, no arguments) into `term_events`
+(migration 0009, **not applied yet** — same as 0008).
+
+**How** — lead ≈20k (PDF, migration + route, verification); Sonnet builder ≈150k. A cold review
+of rounds 1c–1h follows as one pass before the checkpoint.
+
+## 2026-11-08 — Engineer round 1g: demo tour, git log, mail; the leads table
+
+**What shipped** — `demo`: a typed tour (help → resume → ls → cat → git log --graph → portrait →
+contact), human speed, any key or tap stops it with `^C demo`; first visit's hint offers it;
+`demo` in the tips box and the phone chips. `git log` from `TIMELINE` (13 commits: Cisco/IBM 2022,
+B.Tech 2024, SLK Oct 2024, SLK Digital Mar 2025, automations, APIs, VMS, CI/CD, API Test Center,
+Altimetrik, OpenAI credentials, Shift Roster v2.0, this terminal) with stable FNV hashes, tags in
+green, `-n`, `--oneline`, `--graph` with three lanes (main accent, side green, learn violet),
+`git status`. `mail`: an inline wizard (name, email, multi-line message), validation, Esc/Ctrl+C
+abort, POST `/api/lead` with `source: terminal`, answers kept out of history. The lead API now
+stores rows in a new `leads` table (migration 0008: RLS on, server-only writes, per-IP guard) —
+**the migration is not applied yet** (apply blocked by the permission classifier; Ratul applies it
+in the SQL editor), so `mail` currently answers 503 (`PGRST205`, table not in schema cache) and
+prints the message back; the happy path and the `mail` tick are untested until then.
+
+**How** — lead ≈20k (timeline data, leads migration + API, verification); Sonnet builder ≈130k.
+
+## 2026-11-08 — Engineer round 1f: the pane, checkpoints, braille and pixel portraits, shell feel
+
+**Ratul:** took the whole feature list (§6.9); asked whether the portrait could be more detailed and
+whether a 3/4 + 1/4 layout with hints would be better — lead recommended the pane, he agreed.
+
+**What shipped** — at ≥1024px a tmux-style split: terminal 3fr, pane `clamp(280px, 25%, 380px)`
+with the braille portrait, *where* (cwd), *checkpoints* (boot · help · resume · projects · views ·
+portrait · contact · mail-soon; ticked in the accent, stored in `xp-term-checks:engineer`; all
+seven → `achievement unlocked · explorer` printed once, `sudo` answers `nice try`), *next* (the
+first unticked, tappable) and *keys*. `pane` toggles it (remembered); phones show the next hint in
+the status bar. Portraits: braille (2×4 dots per cell, backdrop masked by hue, face crop) in the
+pane / phone header / neofetch; `portrait` is a true-colour half-block photo (84×65 cells,
+64-colour palette, 3,797 merged spans) — unmistakably him. Header hides its portrait when the
+pane shows it. Shell feel: coloured `ls` (dirs accent, views green), clickable names (`cat`/`cd`/
+`open`), `less`-style paging over 40 lines, Ctrl+L, Ctrl+C, `date`, `cal`.
+
+**Verified (lead)** — pane at 1280 with one portrait, phone header at 393 with no horizontal
+scroll, console clean, tsc + eslint clean. Builder verified checkpoints persist, achievement once,
+paging, Ctrl keys, clicked path.
+
+**How** — lead ≈30k (spec, three braille generations, verification); Sonnet builder ≈135k.
+Braille glyphs fall back to a system font (advance 0.76em vs 0.6em), so braille width varies a
+little by machine; the pixel portrait does not.
+
+## 2026-11-08 — Engineer round 1e: boot as the profile tool, the Linux box, the header with the portrait
+
+**Ratul's answers:** prompt stays Ubuntu-shaped, user `ratulroy@code`; overview in the `whoami`
+voice; boot should look like *running the profile tool*, with progress. Spec: `17-persona-views.md` §6.8.
+
+**What shipped** — the boot window types `royal-programmer --boot`, prints the tool line and six
+`[..]`→`[ok]` rows (profile, mount ~/projects, ~/resume, ~/views, link github, sound), then a
+10-step progress bar to `100%  ready`, then the swap. The hub's exit window shares the script.
+Header after the swap: portrait left; banner `ROYAL / PROGRAMMER` (no hyphen), `royal-programmer
+v1 · code.ratulroy.me`, and the three overview lines (who · stack · uptime) right; phones stack
+the portrait above. The machine is a Linux box: home `/home/ratulroy`, `pwd` real, `/engineer`
+gone, `cd /` shows `home/`, `exit` the only way to the hub, `whoami` → `ratulroy`. Selection on
+desktop output only. Tips box drawn with CSS (fieldset + legend) so borders align; dim text raised
+to 4.9:1; portrait skin/shirt brightened. Builder found and fixed a `//home` join bug at `/`.
+
+**Verified (lead)** — boot rows and bar observed mid-flight at 1280; header at 1280 and 393;
+remembered view still auto-opens to `/stage`; tsc + eslint clean. The hub's Normal display was
+not driven to the engineer window this round (shared code, type-checked).
+
+**How** — lead ≈15k (spec, banner regen, verification); Sonnet builder ≈110k.
+
+## 2026-11-08 — Engineer round 1d: royal-programmer banner, the résumé in the terminal, the ASCII portrait
+
+**Ratul's asks:** the banner spells `royal-programmer`; an overview like the résumé; a detailed
+ASCII portrait from his headshot. Spec: `17-persona-views.md` §6.7.
+
+**What shipped** — banner is figlet ANSI Shadow `ROYAL-` over `PROGRAMMER` (88 columns, sized to
+fit any width; 6.8px on a 393 phone, no horizontal scroll). `~/resume/` with `summary experience
+skills projects certifications education` and the `resume` card (name, title, location, links,
+summary, experience line, skills groups, education, certifications, footer) from
+`Ratul_Roy_Resume.pdf` typed into `terminal-data.ts` (no phone number). `portrait` prints the
+84-column headshot in a 70-step ramp, coloured per tone run (backdrop blue, skin, hair/jacket,
+shirt) as 467 memoized spans; `neofetch` shows the 38-column portrait beside the stats with a
+colour strip, stacked under 640px. `contact` gains LinkedIn. Tips box has a `resume` row and is
+88 columns from 780px up, 44 on phones.
+
+**How** — lead (Fable): résumé extraction (pypdf), art generation (pyfiglet + Pillow), data module,
+spec, fix of the banner wrap (pyfiglet had split the handle at 80 columns), verification ≈25k.
+Sonnet builder ≈90k. Generation script lives in this session's scratchpad `portrait/`.
+
+**Known** — the portrait's face reads dark on dark; a contrast pass on the generator would help.
+
+## 2026-11-08 — Engineer round 1c: the terminal as a full-screen OS
+
+**Ratul's references:** Claude Code's welcome, katoolin, vulnx on a phone. His asks: full-screen
+terminal look, typing sounds, the path in the prompt (`projects$`), the ssh window only as a boot
+screen. Spec: `17-persona-views.md` §6.6.
+
+**What shipped** — the ssh window types the script, then grows and dissolves into `.terminal-os`,
+the whole viewport: a block-letter `RATUL` banner in the accent, `Welcome to code.ratulroy.me ·
+v1`, a boxed *Tips for getting started*, the views as a numbered list, then the prompt
+`ratul@code:~$` (`~$` on phones) whose path follows `cd` on each transcript line. A tmux-like
+status bar (`ratul@code ~/projects │ 1 project · 0 posts · 1 view │ help / Esc`) sits at the
+bottom, above the phone chips. Every keystroke plays the hub's key click through `ambient.key()`
+(respects the site sound setting). `banner` reprints the welcome; `fullscreen` asks the browser's
+Fullscreen API; the title dots and `xp-term-full` are gone. Remembered view still opens from the
+boot window before the swap. Verified at 1280 and 393×852 touch: no horizontal scroll, banner
+8px on phones, status bar 767–795, chips 44px below it, console clean, tsc + eslint clean.
+
+**How** — lead (Fable) spec + brief + verification ≈15k; Sonnet builder ≈70k. No separate review
+this round (1b's reviewer findings all still hold; a 1c review goes with the Swarm round).
+
+## 2026-11-08 — Engineer round 1b: the terminal in full — a real shell, not an entry animation
+
+**Ratul's correction** after round 1 (screenshot: his own `ls /engineer` answered `command not found`):
+the root should be a full terminal, like Claude Code or a Linux TUI — every command, `/help`,
+menus chosen with the arrows, full screen. Spec: `17-persona-views.md` §6.
+
+**What shipped (on `development`)**
+- `lib/site/terminal-data.ts` — what the terminal knows, built on the server from the content
+  layer (who, about, stack, uptime, contact, projects, posts, views, commit).
+- `lib/site/terminal-fs.ts` — a virtual file system: `~` = `/engineer`, `about stack uptime
+  contact`, `projects/<slug>.md`, `writing/<slug>.md`, `views/<id>*`; `..`/`~`/trailing slashes
+  resolve; shell-voice errors.
+- `lib/site/terminal-shell.ts` — the interpreter: `help` (grouped) `man` `ls [-l]` `cd` `pwd` `cat`
+  `tree` `open <view|slug|url>` `views` `projects` `writing` (select lists) `whoami` `stack` `uptime`
+  `about` `contact` `neofetch` `history` `clear` `fullscreen` `echo` `exit`; Tab completion;
+  did-you-mean for 3+ letter typos; `javascript:` and non-http links refused.
+- `terminal-root.tsx` — hidden real input (phones raise the keyboard; 16px so iOS does not zoom),
+  `/` command palette filtered as you type, menus with ▸ / arrows / digits / taps, stale menus
+  dimmed, ↑/↓ history (session storage), full screen via the green dot or `fullscreen`
+  (remembered), yellow clears, red exits, phone chip strip (`help / ls views Tab ↑ Esc`),
+  `visualViewport` fitting, `role=log` transcript, Esc order palette → text → menu → auto-open →
+  hub. Every round-1 behaviour kept (boot script, remembered view, Back, bfcache, reduced motion).
+
+**How it was built** — lead (Fable): spec, data module, route plumbing, two browser passes
+(1280 and 393×852 touch), ≈25k tokens. Sonnet builder: fs + shell + UI + CSS, ≈142k; fix pass
+≈158k cumulative. Sonnet reviewer: 13 findings (menu pick from a subdirectory broke, Tab keyboard
+trap, Esc order, unchecked hrefs from content, did-you-mean on one letter, `/cd` ran bare,
+stale menus looked live, aria-live noise, 24px dots on phones, impure setState, boot deps, no
+navigation recovery), ≈97k. All 13 fixed and the first six re-verified by the lead.
+
+**Known** — the palette rows wrap on phones (usable); the caret sits at the end of the text;
+sample project links are placeholders from the data, not the code.
+
+## 2026-11-08 — Engineer round 1: the terminal is the page's root, views are branches — built through the split
+
+Ratul's model (`17-persona-views.md`): one dataset, many selectable views; the terminal is the
+Engineer page's root and every view is a branch with its own route; a pick is remembered until
+Exit, which returns to the terminal. First two views to come: Swarm, then Series (Netflix-shaped,
+no Netflix marks).
+
+**Shipped.** `PersonaView` in the content contract; the registry `lib/content/views.ts` (`stage`
+enabled; `swarm`, `series` registered, disabled); `lib/site/view-memory.ts`; `/engineer` renders
+`TerminalRoot` (the other personas keep their pages); `/engineer/<view>` renders the view inside
+`ViewShell` (remembers the pick; Esc and an `exit` pill return to the root and forget it); `stage`
+= the page as it was, opening on its finished window. The terminal types the existing script, then
+`ls views/` and the picker: arrows/Enter/digits, tap on phones, a live prompt that takes `open`,
+`ls`, `help`, `exit`/`cd ..` (to the hub). `via=normal` prints instantly; `via=hub` ignores the
+memory. A view id shadows an entry slug and `generateStaticParams` logs it. Verified on 393 × 852
+touch and 1280: typing, picker, tap → `/stage`, remembered auto-open, Esc → root with the picker,
+Back from a view → the picker (no re-open), exit pill clear of the page's corner control, no
+console warnings beyond the slow Supabase reads.
+
+**How it was built.** Haiku scout surveyed the routes and content layer (71k tokens); the lead
+wrote the design doc, the contract type, the registry, the memory helper, `ViewShell` and the
+route wiring; a Sonnet builder wrote `terminal-root.tsx` + CSS from a brief (100k), a Sonnet
+reviewer read it cold and found ten real issues (69k) — Esc mid-script interleaving two typers,
+a Back-button re-open loop, the memory written before the view exists, Esc stealing from open
+panels, bfcache restore, reduced motion, listbox misuse, AltGr/IME, touch target, re-subscribing
+listeners — all fixed by the builder in a second pass (127k). Lead spend ≈ 30k across briefs,
+review and verification. Lesson: the reviewer leg paid for itself; keep it for interaction-heavy
+pieces.
+
+---
+
+## 2026-11-08 — Checkpoint #3 to production; Round H (part 2c): the phone display's type scales with its frame — the first task run through the model split
+
+**Checkpoint.** PR #3 (`development` → `main`, merge commit `6480e51`) carried Round H parts 1a–2b
+plus the docs index link. Vercel redeploys production from `main`.
+
+**The display's type (phones, Normal mode).** The chapter's display window (`.hub-exit` inside
+`.normal-display`) was sized for an 1100 px window, so on a 361 px frame (a 393 px phone) only
+about seven lines fit and the bar shrank. `.normal-display-frame` is now a size container and,
+under 1024 px, every fixed size inside the window (bar, body type and padding, the trader's list
+column, the viewfinder corners, the dash numbers and gauge, the game HUD, the canvas padding) is a
+`clamp(min, Ncqw, desktop)` so the window reads like a smaller desktop window, type never below
+9 px. Desktop and the full-size world loader are untouched (the rules are scoped to
+`.normal-display` and the phone media query). Verified: 393 × 852 body 9.75 px, bar 22 px, nine
+lines fit, no horizontal scroll; 360 × 780 floors at 9 px; 1280 unchanged; the Rider dash checked
+by the lead.
+
+**How it was built (the split, first run).** The lead (Fable) wrote a brief (goal, the two files,
+the approach, the verification steps, what to report) and handed it to a Sonnet builder, which
+did the CSS, screenshots and computed-style checks in one pass. Cost: the builder used
+~86k tokens over 52 tool calls in ~18 minutes; the lead spent roughly 6k tokens on the brief,
+the diff review and one screenshot sweep. Two lead-side catches: the builder saved
+`globals.css` with CRLF line endings (converted back to LF before the commit), and it skipped the
+loader and the non-Engineer displays, so the lead checked the dash. Lesson for the brief
+template: state the line-ending rule and name every variant to screenshot.
+
+**Keel smoke test (Ratul's session).** `/plugin marketplace add praxikit/keel` failed with
+`EBUSY` while renaming the marketplace cache folder; the folder was gone afterwards, so the fix is
+to retry. Decision: real apps (the trading journal) live in Ratul's personal GitHub, the
+`praxikit` org holds skills and kits only.
+
+---
+
 ## 2026-11-07 — Round H (part 2b): every drawn object redrawn in detail, one stroke per object
 
 Ratul's call: "make all graffiti detailed to look like real but in 2D, no matter the strokes."
@@ -999,3 +1388,11 @@ stripped service_role's table grants).
 - ⚠️ Build logs show `NODE_TLS_REJECT_UNAUTHORIZED=0` set in the environment
   (disables TLS cert verification). Track down its source and remove — real security
   risk. Not blocking Phase 0.
+
+### Round 9 - the terminal follows the visitor's clock (2026-11-10)
+
+- `terminal-clock.ts`, `TerminalData.clock`, theme bands (unpersisted, saved pick wins), greeting prefix on the boot hint, weekend variant, `theme auto`, `now` greeting line, pane clock line, bn/hi strings. Verified at stubbed hours 2, 7, 13, 19, 23 and a Saturday; `theme amber` survives reload at hour 2, `theme auto` gives matrix. Details: 17-persona-views.md section 14.
+
+### Round 10 - the other worlds in the terminal (2026-11-10)
+
+- `lib/worlds/` pulse providers + `/api/worlds/pulse`; pane Live gets two rotating world lines; `worlds` command and a `worlds` line on `portfolio`; bn/hi strings. All five other worlds are stubs today (no content entries). Details: 17-persona-views.md section 15.

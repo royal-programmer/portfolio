@@ -51,7 +51,7 @@ export function QualitySlider({
             type="button"
             tabIndex={-1}
             onClick={() => onChange(q)}
-            className={`${k === 0 ? "text-left" : k === 1 ? "text-center" : "text-right"} transition-colors ${
+            className={`hit ${k === 0 ? "text-left" : k === 1 ? "text-center" : "text-right"} transition-colors ${
               q === value ? "text-[var(--ink)]" : "text-[var(--ink-faint)] hover:text-[var(--ink-dim)]"
             }`}
           >
@@ -81,7 +81,7 @@ export function ModeSwitch({ className = "" }: { className?: string }) {
             role="radio"
             aria-checked={on}
             onClick={() => setExperience(o.v)}
-            className={`min-h-8 rounded-full px-3.5 font-mono text-[10px] tracking-[0.16em] uppercase transition-colors duration-[var(--dur-1)] ${
+            className={`hit min-h-8 rounded-full px-3.5 font-mono text-[10px] tracking-[0.16em] uppercase transition-colors duration-[var(--dur-1)] ${
               on ? "bg-[var(--ink)] text-[var(--void)]" : "text-[var(--ink-dim)] hover:text-[var(--ink)]"
             }`}
           >
@@ -130,7 +130,7 @@ export function SoundToggle({ className = "", compact = false }: { className?: s
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((v) => !v)}
-        className="group inline-flex min-h-8 items-center gap-2 font-mono text-[10px] tracking-[0.16em] text-[var(--ink-dim)] uppercase transition-colors hover:text-[var(--ink)]"
+        className="hit group inline-flex min-h-8 items-center gap-2 font-mono text-[10px] tracking-[0.16em] text-[var(--ink-dim)] uppercase transition-colors hover:text-[var(--ink)]"
       >
         <span aria-hidden className={`sound-bars ${sound ? "is-on" : ""}`}>
           <i />
@@ -191,7 +191,7 @@ export function QualityMenu({ value, className = "" }: { value: Quality; classNa
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex min-h-8 items-center gap-2 font-mono text-[10px] tracking-[0.16em] text-[var(--ink-dim)] uppercase transition-colors hover:text-[var(--ink)]"
+        className="hit inline-flex min-h-8 items-center gap-2 font-mono text-[10px] tracking-[0.16em] text-[var(--ink-dim)] uppercase transition-colors hover:text-[var(--ink)]"
       >
         Graphics · {QUALITY_LABEL[value]}
       </button>

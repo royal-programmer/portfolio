@@ -1,0 +1,329 @@
+"use client";
+
+/**
+ * The rows (17-persona-views.md §7): horizontal rows of episode, project and skill cards, the sticky season
+ * bar, the instant-search grid and the "To be continued" card with the footer. Any card opens the detail modal
+ * (netflix-modal.tsx); desktop episode cards also grow on hover with play, add, like and more under the title.
+ */
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Episode, NetflixShow, NfItem, ProjectCard, SkillCard } from "@/lib/site/netflix-data";
+import type { TermLink } from "@/lib/site/terminal-data";
+import { useViewExit } from "../view-shell";
+import { tick } from "./netflix-sound";
+
+const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const behavior = (): ScrollBehavior => (reducedMotion() ? "auto" : "smooth");
+
+export type DisplayRow = { id: string; title: string; items: NfItem[] } | { id: string; title: string; contact: true };
+
+/** What every card needs from the view: open the modal, the local lists, the rank badge, the sound. */
+export type CardEnv = {
+  open: (item: NfItem, el: HTMLElement | null, play?: boolean) => void;
+  inList: (id: string) => boolean;
+  liked: (id: string) => boolean;
+  toggleList: (id: string) => void;
+  toggleLike: (id: string) => void;
+  progress: Record<string, number>;
+  topId: string | null;
+  soundOn: boolean;
+};
+
+type Props = { show: NetflixShow; rows: DisplayRow[]; contact: TermLink[]; env: CardEnv };
+
+export function NetflixRows({ show, rows, contact, env }: Props) {
+  return (
+    <>
+      <SeasonBar show={show} />
+      <div className="nf-rows">
+        {rows.map((row) => ("contact" in row ? <ContinuedRow key={row.id} row={row} contact={contact} /> : <Row key={row.id} row={row} env={env} />))}
+      </div>
+      <footer className="nf-footer">Every row is data &middot; views are picked in the terminal &middot; &copy; 2026 Ratul Roy</footer>
+    </>
+  );
+}
+
+/* ---------- Season bar ---------- */
+
+function SeasonBar({ show }: { show: NetflixShow }) {
+  const [active, setActive] = useState<string | null>(null);
+  const bar = useRef<HTMLDivElement>(null);
+  const ids = show.nav.map((n) => n.id).join("|");
+
+  useEffect(() => {
+    const els = ids
+      .split("|")
+      .map((id) => document.getElementById(`nf-row-${id}`))
+      .filter((e): e is HTMLElement => !!e);
+    if (!els.length) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const en of entries) if (en.isIntersecting) setActive(en.target.id.replace("nf-row-", ""));
+      },
+      { rootMargin: "-45% 0px -50% 0px" },
+    );
+    els.forEach((e) => io.observe(e));
+    return () => io.disconnect();
+  }, [ids]);
+
+  // Keep the active chip visible inside the bar (phones scroll it sideways).
+  useEffect(() => {
+    const b = bar.current;
+    const chip = b?.querySelector<HTMLElement>('[aria-current="true"]');
+    if (!b || !chip) return;
+    b.scrollTo({ left: chip.offsetLeft - b.clientWidth / 2 + chip.clientWidth / 2, behavior: behavior() });
+  }, [active]);
+
+  return (
+    <nav className="nf-seasons" aria-label="Seasons">
+      <div className="nf-chips" ref={bar}>
+        {show.nav.map((n) => (
+          <button
+            key={n.id}
+            type="button"
+            className="nf-chip"
+            aria-current={active === n.id ? "true" : undefined}
+            onClick={() => document.getElementById(`nf-row-${n.id}`)?.scrollIntoView({ behavior: behavior(), block: "start" })}
+          >
+            {n.label}
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+/* ---------- A row ---------- */
+
+function Row({ row, env }: { row: Extract<DisplayRow, { items: NfItem[] }>; env: CardEnv }) {
+  const scroller = useRef<HTMLUListElement>(null);
+  const [edge, setEdge] = useState({ l: false, r: false });
+
+  const measure = useCallback(() => {
+    const el = scroller.current;
+    if (!el) return;
+    setEdge({ l: el.scrollLeft > 4, r: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+  }, []);
+
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    // The wheel scrolls the row only when it can and the gesture is sideways (or shift): the page keeps its own scroll.
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return;
+      const sideways = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+      if (!sideways && !e.shiftKey) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaX || e.deltaY;
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("wheel", onWheel);
+    };
+  }, [measure]);
+
+  const by = (dir: 1 | -1) => scroller.current?.scrollBy({ left: dir * scroller.current.clientWidth * 0.8, behavior: behavior() });
+  const hasEpisodes = row.items.some((i) => i.kind === "episode");
+
+  return (
+    <section className="nf-row" id={`nf-row-${row.id}`} aria-labelledby={`nf-h-${row.id}`} data-ep={hasEpisodes ? "" : undefined}>
+      <h2 className="nf-row-title" id={`nf-h-${row.id}`}>
+        {row.title} <span className="nf-count">&middot; {row.items.length}</span>
+      </h2>
+      <div className="nf-row-body">
+        {edge.l ? (
+          <button type="button" className="nf-edge nf-edge-l" aria-label={`${row.title}: earlier`} onClick={() => by(-1)}>
+            ◀
+          </button>
+        ) : null}
+        <ul className="nf-scroller" role="list" ref={scroller} onScroll={measure}>
+          {row.items.map((it) => (
+            <Card key={it.id} item={it} env={env} />
+          ))}
+        </ul>
+        {edge.r ? (
+          <button type="button" className="nf-edge nf-edge-r" aria-label={`${row.title}: later`} onClick={() => by(1)}>
+            ▶
+          </button>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+/** The instant-search results: every match as a card in a grid, replacing the rows. */
+export function NetflixGrid({ items, env, query }: { items: NfItem[]; env: CardEnv; query: string }) {
+  return (
+    <section className="nf-search" aria-label="Search results">
+      <h2 className="nf-row-title">
+        {items.length ? `Results for “${query}”` : `Nothing matches “${query}”`} <span className="nf-count">&middot; {items.length}</span>
+      </h2>
+      {items.length ? (
+        <ul className="nf-grid" role="list">
+          {items.map((it) => (
+            <Card key={it.id} item={it} env={env} />
+          ))}
+        </ul>
+      ) : (
+        <p className="nf-empty">Try a year, a tool, or a word from a title.</p>
+      )}
+    </section>
+  );
+}
+
+function Card({ item, env }: { item: NfItem; env: CardEnv }) {
+  if (item.kind === "episode") return <EpisodeCard e={item.e} item={item} env={env} />;
+  if (item.kind === "skill") return <SkillTile s={item.s} item={item} env={env} />;
+  return <PosterCard c={item.c} item={item} env={env} />;
+}
+
+const Bar = ({ value }: { value?: number }) =>
+  value ? (
+    <span className="nf-prog" aria-hidden>
+      <span style={{ width: `${Math.round(value * 100)}%` }} />
+    </span>
+  ) : null;
+
+function EpisodeCard({ e, item, env }: { e: Episode; item: NfItem; env: CardEnv }) {
+  const li = useRef<HTMLLIElement>(null);
+  const timer = useRef(0);
+  const main = () => li.current?.querySelector<HTMLElement>("[data-nf-card]") ?? null;
+  const inList = env.inList(item.id);
+  const liked = env.liked(item.id);
+  const top = env.topId === item.id;
+
+  // A soft tick as the card expands (desktop, unmuted).
+  const enter = (ev: React.PointerEvent) => {
+    if (ev.pointerType !== "mouse" || !env.soundOn) return;
+    timer.current = window.setTimeout(tick, 180);
+  };
+  const leave = () => window.clearTimeout(timer.current);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  return (
+    <li className="nf-ep" ref={li} data-branch={e.branch} onPointerEnter={enter} onPointerLeave={leave}>
+      <button type="button" className="nf-card" data-nf-card={item.id} aria-label={`${e.title}, season ${e.season} episode ${e.n}${top ? ", Top 10" : ""}`} onClick={(ev) => env.open(item, ev.currentTarget)}>
+        {top ? (
+          <span className="nf-top" aria-hidden>
+            <span>TOP</span>
+            <b>10</b>
+          </span>
+        ) : null}
+        <span className="nf-num" aria-hidden>
+          S{e.season} E{e.n}
+        </span>
+        <span className="nf-card-title">{e.title}</span>
+        <span className="nf-card-strip">{[e.runtime, e.tag, e.grade].filter(Boolean).join(" · ")}</span>
+        <Bar value={env.progress[item.id]} />
+      </button>
+      <div className="nf-panel">
+        <div className="nf-mini" role="group" aria-label={`${e.title}: actions`}>
+          <button type="button" className="nf-round nf-round-s" aria-label="Play" title="Play" onClick={() => env.open(item, main(), true)}>
+            <span aria-hidden>▶</span>
+          </button>
+          <button type="button" className="nf-round nf-round-s" aria-label={inList ? "Remove from My List" : "Add to My List"} aria-pressed={inList} title={inList ? "Remove from My List" : "Add to My List"} onClick={() => env.toggleList(item.id)}>
+            <span aria-hidden>{inList ? "✓" : "＋"}</span>
+          </button>
+          <button type="button" className="nf-round nf-round-s" aria-label={liked ? "Remove your thumbs-up" : "I like this"} aria-pressed={liked} title="I like this" onClick={() => env.toggleLike(item.id)}>
+            <span aria-hidden>👍</span>
+          </button>
+          <button type="button" className="nf-round nf-round-s nf-mini-more" aria-label="More info" title="More info" onClick={() => env.open(item, main())}>
+            <span aria-hidden>⌄</span>
+          </button>
+        </div>
+        <p>{e.synopsis ?? e.title}</p>
+      </div>
+    </li>
+  );
+}
+
+function PosterCard({ c, item, env }: { c: ProjectCard; item: NfItem; env: CardEnv }) {
+  return (
+    <li className="nf-poster">
+      <button type="button" className="nf-poster-title nf-stretch" data-nf-card={item.id} onClick={(ev) => env.open(item, ev.currentTarget)}>
+        {c.title}
+      </button>
+      {c.summary ? <p className="nf-poster-sum">{c.summary}</p> : null}
+      {c.stack.length ? (
+        <ul className="nf-chips-mini" role="list">
+          {c.stack.slice(0, 3).map((t) => (
+            <li key={t}>{t}</li>
+          ))}
+        </ul>
+      ) : null}
+      {c.live || c.repo ? (
+        <div className="nf-poster-links">
+          {c.live ? (
+            <a href={c.live} target="_blank" rel="noreferrer">
+              Live
+            </a>
+          ) : null}
+          {c.repo ? (
+            <a href={c.repo} target="_blank" rel="noreferrer">
+              Code
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+      <Bar value={env.progress[item.id]} />
+    </li>
+  );
+}
+
+function SkillTile({ s, item, env }: { s: SkillCard; item: NfItem; env: CardEnv }) {
+  return (
+    <li className="nf-skill-li">
+      <button type="button" className="nf-skill" data-nf-card={item.id} title={s.group} onClick={(ev) => env.open(item, ev.currentTarget)}>
+        <span className="nf-skill-name">{s.name}</span>
+        <span className="nf-skill-group">{s.group}</span>
+        <Bar value={env.progress[item.id]} />
+      </button>
+    </li>
+  );
+}
+
+/* ---------- To be continued ---------- */
+
+function ContinuedRow({ row, contact }: { row: { id: string; title: string }; contact: TermLink[] }) {
+  const exit = useViewExit();
+  const link = (label: string) => contact.find((c) => c.label === label)?.href;
+  const mail = link("mail");
+  const linkedin = link("linkedin");
+  const github = link("github");
+  return (
+    <section className="nf-row" id={`nf-row-${row.id}`} aria-labelledby={`nf-h-${row.id}`} data-kind="contact">
+      <h2 className="nf-visually-hidden" id={`nf-h-${row.id}`}>
+        {row.title}
+      </h2>
+      <div className="nf-tbc">
+        <p className="nf-tbc-title">To be continued&hellip;</p>
+        <p className="nf-tbc-sub">Next episode: your team?</p>
+        <div className="nf-tbc-actions">
+          {mail ? (
+            <a className="nf-btn nf-btn-play" href={mail}>
+              Say hello
+            </a>
+          ) : null}
+          {linkedin ? (
+            <a className="nf-btn nf-btn-glass" href={linkedin} target="_blank" rel="noreferrer">
+              LinkedIn
+            </a>
+          ) : null}
+          {github ? (
+            <a className="nf-btn nf-btn-glass" href={github} target="_blank" rel="noreferrer">
+              GitHub
+            </a>
+          ) : null}
+          {exit ? (
+            <button type="button" className="nf-btn nf-btn-glass" onClick={exit}>
+              Back to the terminal
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}

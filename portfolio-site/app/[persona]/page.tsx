@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import {
   getPersona,
   isLaunchedPersona,
@@ -8,6 +9,9 @@ import {
 import { placeOnSpectrum } from "@/lib/site/spectrum";
 import { HomePage } from "../components/home-page";
 import { WorldBoot } from "../components/world-boot";
+import { TerminalRoot } from "../components/views/terminal-root";
+import { getViews } from "@/lib/content/views";
+import { terminalData } from "@/lib/site/terminal-data";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -20,7 +24,11 @@ async function hubMedia(): Promise<Partial<Record<string, string[]>>> {
   }
 }
 import { loadHomeContent } from "../load-home-content";
-import { InvalidPersonaView } from "./invalid-persona-view";
+import { loadEngineerTerminalData } from "../load-terminal-data";
+import { ogDescription } from "@/lib/site/og-lines";
+import { runParam, shareMetadata, siteOrigin } from "@/lib/site/share-meta";
+import { SUBDOMAIN_BY_PERSONA } from "@/lib/site/hosts";
+import { createShell } from "@/lib/site/terminal-shell";
 
 type PersonaPageProps = {
   params: Promise<{ persona: string }>;
@@ -31,8 +39,8 @@ export function generateStaticParams() {
   return LAUNCHED_PERSONAS.map((persona) => ({ persona }));
 }
 
-export async function generateMetadata({ params }: PersonaPageProps): Promise<Metadata> {
-  const { persona } = await params;
+export async function generateMetadata({ params, searchParams }: PersonaPageProps): Promise<Metadata> {
+  const [{ persona }, { run }] = await Promise.all([params, searchParams]);
   if (!isLaunchedPersona(persona)) {
     return {
       title: "Persona not found | Ratul Roy",
@@ -49,17 +57,30 @@ export async function generateMetadata({ params }: PersonaPageProps): Promise<Me
     };
   }
 
-  return {
-    title: `${record.label} | Ratul Roy`,
-    description: record.body,
-  };
+  const title = `${record.label} | Ratul Roy`;
+  if (persona !== "engineer") return { title, description: record.body };
+
+  // The Engineer's page is a terminal: a link with ?run=<command> previews that command's output (/og).
+  const origin = siteOrigin(SUBDOMAIN_BY_PERSONA[persona]);
+  const cmd = runParam(run);
+  if (cmd) {
+    try {
+      const data = await loadEngineerTerminalData();
+      const known = createShell(data).commands.some((c) => c.name === cmd.split(/\s+/)[0].toLowerCase());
+      if (known) return shareMetadata({ title: `$ ${cmd} · Ratul Roy`, description: ogDescription(data, cmd), cmd, origin, url: `${origin}/?run=${encodeURIComponent(cmd)}` });
+    } catch {
+      // The plain page metadata below still stands.
+    }
+  }
+  return shareMetadata({ title, description: record.body, cmd: "portfolio", origin });
 }
 
 export default async function PersonaPage({ params, searchParams }: PersonaPageProps) {
   const [{ persona }, { via }] = await Promise.all([params, searchParams]);
 
   if (!isLaunchedPersona(persona)) {
-    return <InvalidPersonaView attempted={persona} />;
+    // The friendly page lives in ./not-found.tsx; calling notFound() makes the status a real 404.
+    notFound();
   }
 
   const [{ personas, engineerEntries, engineerBlogPosts }, media] = await Promise.all([loadHomeContent(), hubMedia()]);
@@ -70,10 +91,20 @@ export default async function PersonaPage({ params, searchParams }: PersonaPageP
   const t = placeOnSpectrum(ranked).find((p) => p.slug === launched)?.t ?? 0.5;
   const items = engineerEntries.filter((e) => e.visibility === "public").map((e) => e.slug);
   const photo = media.photographer?.[0] ? `/hub/photographer/${media.photographer[0]}` : undefined;
+  // ?via=pwa: opened from the home screen. A direct arrival (no hub hand-off) that says so in the boot.
+  const pwa = via === "pwa";
+  const viaKind = via === "hub" ? "hub" : via === "normal" ? "normal" : null;
+  // The Engineer page is one dataset with many views; its root is the terminal, which lists them
+  // (17-persona-views.md). The other personas keep their page until their own rounds.
+  if (launched === "engineer") {
+    const views = getViews(launched);
+    const data = terminalData(personas.find((p) => p.slug === launched), engineerEntries, engineerBlogPosts, views);
+    return <TerminalRoot persona={launched} t={t} color={accent} via={viaKind} pwa={pwa} items={items} views={views} data={data} />;
+  }
   return (
     <>
       {/* Opens dark, like the doorway that led here; lifts once the page has drawn. */}
-      <WorldBoot slug={launched} color={accent} t={t} via={via === "hub" ? "hub" : via === "normal" ? "normal" : null} items={items} photo={photo} />
+      <WorldBoot slug={launched} color={accent} t={t} via={viaKind} items={items} photo={photo} />
       <HomePage
         routePersona={launched}
         personas={personas}

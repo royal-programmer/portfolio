@@ -36,6 +36,7 @@ import { BootFrame, ExitFrame } from "./exit-sequence";
 import { GateSkeleton, HeadsetGate, type LoadStatus } from "./headset-gate";
 import { printCredits } from "@/lib/site/credits";
 import { LightCursor } from "./light-cursor";
+import { speculate } from "@/lib/site/speculate";
 import { NormalDisplays } from "./normal-displays";
 import { NormalJourney } from "./normal-journey";
 import { RefractionPoster } from "./refraction-poster";
@@ -127,6 +128,8 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   const [returning, setReturning] = useState<World | null>(null);
   /** A doorway asked for before its setup has formed: the button waits for the screen, then goes. */
   const [waiting, setWaiting] = useState<string | null>(null);
+  /** Normal mode: the doorway just taken, until the other host answers (the chapter's button shows it). */
+  const [normalWaiting, setNormalWaiting] = useState<string | null>(null);
   /** public/hub/media.json: Ratul's own pictures per persona (the photographer's sequence uses one). */
   const [media, setMedia] = useState<Partial<Record<string, string[]>>>({});
   const router = useRouter();
@@ -982,7 +985,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         <button
           type="button"
           onClick={() => jump("hero")}
-          className="font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase transition-colors hover:text-[var(--ink)]"
+          className="hit font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase transition-colors hover:text-[var(--ink)]"
         >
           {DISPLAY_ROOT}
         </button>
@@ -1023,7 +1026,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
                   aria-label={`${id.role} chapter`}
                   aria-current={on ? "true" : undefined}
                   data-cursor-color={color}
-                  className="group flex items-center justify-end gap-3"
+                  className="group hit flex items-center justify-end gap-3"
                 >
                   <span className={`hub-rail-label font-mono text-[10px] tracking-[0.14em] text-[var(--ink-dim)] uppercase transition-opacity duration-[var(--dur-2)] max-lg:hidden ${on ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                     {id.role}
@@ -1042,7 +1045,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
 
       <main className="relative z-10">
         {/* ---------- Hero ---------- */}
-        <section id="hero" data-section className="flex min-h-[100svh] items-end px-4 pb-14 sm:px-8 lg:items-center lg:px-12 lg:pb-0">
+        <section id="hero" data-section className="flex min-h-[100svh] items-end px-4 pb-[calc(11rem+env(safe-area-inset-bottom))] sm:px-8 md:pb-14 lg:items-center lg:px-12 lg:pb-0">
           <div className="max-w-3xl">
             <h1 data-hero-title className="font-display text-[length:clamp(2.9rem,1rem+5.4vw,7rem)] leading-[0.96] tracking-[-0.02em] text-balance">
               <span className="block">One mind.</span>
@@ -1050,6 +1053,9 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
             </h1>
             <p data-hero-item className="mt-7 text-[length:var(--step-1)] text-[var(--ink-dim)]">
               {HUB_COPY.intro} <CyclingPhrase chapters={chapters} />
+            </p>
+            <p data-hero-item className="mt-3 font-mono text-[11px] leading-relaxed tracking-[0.06em] text-[var(--ink-faint)] sm:text-xs">
+              <CyclingLine lines={HUB_COPY.character} />
             </p>
           </div>
         </section>
@@ -1062,7 +1068,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         </section>
 
         {chapters.map((c, i) => (
-          <PersonaChapter key={c.slug} chapter={c} index={i} total={chapters.length} waiting={waiting === c.slug} onEnter={immersiveLive && introDone ? enterWorld : experience === "normal" && !sceneWanted && textLive ? (slug) => normalEnter.current?.(slug) : undefined} />
+          <PersonaChapter key={c.slug} chapter={c} index={i} total={chapters.length} waiting={(waiting ?? normalWaiting) === c.slug} warm={experience === "normal" && !sceneWanted && textLive} onEnter={immersiveLive && introDone ? enterWorld : experience === "normal" && !sceneWanted && textLive ? (slug) => normalEnter.current?.(slug) : undefined} />
         ))}
 
         {upcoming.length ? (
@@ -1103,6 +1109,14 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
                 >
                   Say hello <span aria-hidden>→</span>
                 </a>
+                <a
+                  href="/resume.pdf"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hit ml-3 inline-flex min-h-12 items-center rounded-full border border-[var(--line)] px-6 text-sm text-[var(--ink-dim)] transition-colors hover:text-[var(--ink)]"
+                >
+                  Résumé (PDF)
+                </a>
                 <p className="mt-4 font-mono text-xs text-[var(--ink-faint)]">{HUB_COPY.email}</p>
                 {immersiveLive && introDone ? (
                   // The one line in the empty sky (D38): click it and the journey rewinds to the headset.
@@ -1131,6 +1145,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         onTop={() => jump("hero")}
         onEnd={() => jump("end")}
       />
+
 
       {/* ---------- Intro overlays ---------- */}
       {/* Before any script runs the page IS the loader: the gate's still parts, server-rendered.
@@ -1183,7 +1198,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
 
       {ready ? <LightCursor /> : null}
       {decided && !sceneWanted && experience === "normal" && textLive ? (
-        <NormalDisplays worlds={worlds} activeSlug={activeSlug} items={terminalItems} photo={media.photographer?.[0] ? `/hub/photographer/${media.photographer[0]}` : undefined} recedeRef={normalRecede} enterRef={normalEnter} />
+        <NormalDisplays worlds={worlds} activeSlug={activeSlug} items={terminalItems} photo={media.photographer?.[0] ? `/hub/photographer/${media.photographer[0]}` : undefined} recedeRef={normalRecede} enterRef={normalEnter} onWaiting={setNormalWaiting} />
       ) : null}
 
       {struggling ? (
@@ -1229,7 +1244,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   );
 }
 
-function PersonaChapter({ chapter, index, total, onEnter, waiting }: { chapter: HubChapter; index: number; total: number; /** The doorway heard the tap and waits for its setup to form. */ waiting?: boolean; /** Immersive: the button goes through the same doorway as the setup (the camera flies into its screen). */ onEnter?: (slug: string) => void }) {
+function PersonaChapter({ chapter, index, total, onEnter, waiting, warm }: { chapter: HubChapter; /** Normal mode: warm the destination on intent (Speculation Rules). */ warm?: boolean; index: number; total: number; /** The doorway heard the tap and waits for its setup to form. */ waiting?: boolean; /** Immersive: the button goes through the same doorway as the setup (the camera flies into its screen). */ onEnter?: (slug: string) => void }) {
   const id = personaIdentity(chapter.slug);
   const color = spectrumColor(chapter.t);
   return (
@@ -1283,6 +1298,9 @@ function PersonaChapter({ chapter, index, total, onEnter, waiting }: { chapter: 
                 onEnter(chapter.slug);
               }}
               data-cursor-color={color}
+              onPointerEnter={warm ? () => speculate(chapter.slug) : undefined}
+              onPointerDown={warm ? () => speculate(chapter.slug) : undefined}
+              onFocus={warm ? () => speculate(chapter.slug) : undefined}
               aria-busy={waiting || undefined}
               className={`hub-cta mt-10 inline-flex min-h-12 items-center gap-3 rounded-full border px-6 text-sm font-medium backdrop-blur-md ${waiting ? "is-waiting" : ""}`}
               style={{ "--c": color } as CSSProperties}
@@ -1305,27 +1323,53 @@ function PersonaChapter({ chapter, index, total, onEnter, waiting }: { chapter: 
   );
 }
 
-/** "I build systems" → "I read markets" → … (static sentence with reduced motion). */
-function CyclingPhrase({ chapters }: { chapters: HubChapter[] }) {
-  const [i, setI] = useState(0);
+/** The character lines, one at a time, every 6 s (the first only, with reduced motion; both for screen readers). */
+function CyclingLine({ lines }: { lines: readonly string[] }) {
+  const [tick, setTick] = useState(0);
   const [cycling, setCycling] = useState(false);
-  const phrases = chapters.map((c) => ({ text: personaIdentity(c.slug).phrase, color: spectrumColor(c.t) }));
 
   useEffect(() => {
-    if (phrases.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (lines.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     queueMicrotask(() => setCycling(true));
-    const id = window.setInterval(() => setI((n) => (n + 1) % phrases.length), 2600);
+    const id = window.setInterval(() => setTick((n) => n + 1), 6000);
     return () => window.clearInterval(id);
-  }, [phrases.length]);
+  }, [lines.length]);
 
-  const list = phrases.map((p) => p.text);
+  if (!cycling) return <>{lines[0]}</>;
+  return (
+    <>
+      <span className="sr-only">{lines.join(" ")}</span>
+      <span aria-hidden key={tick} className="hub-phrase inline-block">
+        {lines[tick % lines.length]}
+      </span>
+    </>
+  );
+}
+
+/** "I build systems that stay up" → "I read markets, not rumours" → … Each lap of the personas advances the phrase, so a visitor who stays hears them all (the first of each, joined, with reduced motion). */
+function CyclingPhrase({ chapters }: { chapters: HubChapter[] }) {
+  const [tick, setTick] = useState(0);
+  const [cycling, setCycling] = useState(false);
+  const ids = chapters.map((c) => ({ id: personaIdentity(c.slug), color: spectrumColor(c.t) }));
+  const count = ids.length;
+
+  useEffect(() => {
+    if (count < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    queueMicrotask(() => setCycling(true));
+    const id = window.setInterval(() => setTick((n) => n + 1), 2600);
+    return () => window.clearInterval(id);
+  }, [count]);
+
+  const list = ids.map((p) => p.id.phrases[0]);
   const sentence = list.length > 1 ? `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}` : list[0];
+  const cur = count ? ids[tick % count] : undefined;
+  const text = cur ? cur.id.phrases[Math.floor(tick / count) % cur.id.phrases.length] : "";
   if (!cycling) return <span className="text-[var(--ink)]">{sentence}.</span>;
   return (
     <>
       <span className="sr-only">{sentence}.</span>
-      <span aria-hidden key={i} className="hub-phrase inline-block" style={{ color: phrases[i].color }}>
-        {phrases[i].text}.
+      <span aria-hidden key={tick} className="hub-phrase inline-block" style={{ color: cur?.color }}>
+        {text}.
       </span>
     </>
   );

@@ -1,2 +1,5 @@
 # Local agent tooling output (Playwright MCP snapshots/console logs)
 .playwright-mcp/
+
+# Development scratch (LinkedIn dump, drafts); delete after the build
+/tmp/

@@ -256,6 +256,11 @@ body:has(.hub-v3) {
   background: var(--void);
 }
 
+/* The terminal's dark is the document's from the first paint: no white flash between hub and terminal. */
+html:has(.terminal-root) {
+  background: #05060a;
+}
+
 /* Messenger-style typing indicator: staggered vertical bounce, two waves (123 × 2) */
 @keyframes chat-dot-jump {
   0%,
@@ -492,6 +497,10 @@ html.is-dragging * {
   align-items: flex-end;
   gap: 0.55rem;
   padding: 0.7rem 0.85rem 0.65rem;
+  /* A dark plate so the readout holds up against bright warp streaks. */
+  background: color-mix(in srgb, var(--void, #07070a) 62%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   pointer-events: none;
   opacity: 0;
   transform: translateY(6px);
@@ -848,7 +857,7 @@ html.is-portal-hover .light-cursor-ring::before {
 /* The code world's boot: a small terminal, lines typed in turn, a block cursor that waits. */
 .hub-enter-term {
   margin: 0;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 12px;
   line-height: 1.9;
   letter-spacing: 0.04em;
@@ -1073,7 +1082,7 @@ html.is-holding .light-cursor-ring::before {
   top: 50%;
   transform: translateY(-50%) translateX(-4px);
   white-space: nowrap;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 11px;
   letter-spacing: 0.04em;
   color: var(--ink);
@@ -1173,7 +1182,7 @@ em.font-display,
   height: 38px;
   padding: 0 14px;
   border-bottom: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 11px;
   letter-spacing: 0.06em;
   color: var(--ink-faint);
@@ -1204,7 +1213,7 @@ em.font-display,
   flex: 1;
   margin: 0;
   padding: 18px 20px;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 13px;
   line-height: 2;
   letter-spacing: 0.03em;
@@ -1219,6 +1228,10 @@ em.font-display,
 }
 .hub-exit-body .is-out {
   color: var(--ink-faint);
+}
+.hub-exit-body .is-ok {
+  font-weight: 400;
+  color: var(--c);
 }
 .hub-exit-term .hub-enter-caret {
   background: var(--c);
@@ -1236,7 +1249,7 @@ em.font-display,
   padding: 14px 0;
   list-style: none;
   border-right: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1322,7 +1335,7 @@ em.font-display,
 .vf-read {
   position: absolute;
   margin: 0;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 13px;
   letter-spacing: 0.06em;
   color: rgba(243, 241, 236, 0.85);
@@ -1422,7 +1435,7 @@ em.font-display,
   gap: 10px;
   margin-top: -6%;
   padding-left: 6%;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
 }
 .dash-speed b {
   font-weight: 500;
@@ -1444,7 +1457,7 @@ em.font-display,
   right: 18px;
   bottom: 16px;
   text-align: center;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
 }
 .dash-gear span {
   display: block;
@@ -1469,7 +1482,7 @@ em.font-display,
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--ink-faint);
@@ -1488,7 +1501,7 @@ em.font-display,
   left: 50%;
   top: 50%;
   translate: -50% -50%;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-weight: 600;
   font-size: clamp(30px, 7vh, 56px);
   line-height: 1;
@@ -1512,7 +1525,7 @@ em.font-display,
   left: 50%;
   top: 50%;
   translate: -50% -52%;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-weight: 500;
   font-size: clamp(46px, 11vh, 84px);
   line-height: 1;
@@ -1526,7 +1539,7 @@ em.font-display,
   flex: 0 0 auto;
   gap: 8px;
   margin-left: auto;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 9px;
   letter-spacing: 0.1em;
 }
@@ -1587,7 +1600,7 @@ em.font-display,
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 11px;
   letter-spacing: 0.14em;
   color: var(--ink-dim);
@@ -1647,7 +1660,7 @@ em.font-display,
   bottom: 9%;
   translate: -50% 0;
   margin: 0;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 12px;
   letter-spacing: 0.12em;
   color: var(--c);
@@ -1715,6 +1728,7 @@ em.font-display,
   position: relative;
   width: 100%;
   aspect-ratio: 1100 / 680;
+  container-type: inline-size;
   transition: transform 520ms var(--ease-out), filter 520ms var(--ease-out);
   filter: drop-shadow(0 40px 60px rgba(0, 0, 0, 0.6));
 }
@@ -1739,6 +1753,119 @@ em.font-display,
   max-height: none;
   aspect-ratio: auto;
 }
+/* The window's type and spacing scale with the frame (container units), so a small display reads
+   like a smaller desktop window. Phones and tablets only (the desktop display keeps its sizes). Scoped here: the full-size loader keeps its own sizes. */
+@media (max-width: 1023px) {
+  .normal-display .hub-exit-bar {
+    height: clamp(22px, 3.5cqw, 38px);
+    flex-shrink: 0;
+    gap: clamp(5px, 0.75cqw, 8px);
+    padding: 0 clamp(8px, 1.3cqw, 14px);
+    font-size: clamp(9px, 2.3cqw, 11px);
+  }
+  .normal-display .hub-exit-bar span {
+    width: clamp(6px, 0.9cqw, 10px);
+    height: clamp(6px, 0.9cqw, 10px);
+  }
+  .normal-display .hub-exit-bar b {
+    margin-left: clamp(4px, 0.9cqw, 10px);
+  }
+  .normal-display .hub-exit-bar em {
+    margin-left: clamp(8px, 1.6cqw, 18px);
+  }
+  .normal-display .hub-exit-body {
+    padding: clamp(8px, 1.6cqw, 18px) clamp(10px, 1.8cqw, 20px);
+    font-size: clamp(9px, 2.7cqw, 13px);
+    line-height: 2;
+  }
+  @container (max-width: 400px) {
+    .normal-display .hub-exit-body {
+      line-height: 1.6;
+    }
+  }
+  .normal-display .hub-exit-trade-grid {
+    grid-template-columns: clamp(90px, 13.6cqw, 150px) 1fr;
+  }
+  .normal-display .hub-exit-list {
+    padding: clamp(6px, 1.3cqw, 14px) 0;
+    font-size: clamp(9px, 1cqw, 11px);
+  }
+  .normal-display .hub-exit-list li {
+    gap: clamp(6px, 0.9cqw, 10px);
+    padding: clamp(4px, 0.7cqw, 8px) clamp(8px, 1.45cqw, 16px);
+  }
+  @media (max-width: 640px) {
+    .normal-display .hub-exit-trade-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .normal-display .vf-corner {
+    width: clamp(16px, 3.1cqw, 34px);
+    height: clamp(16px, 3.1cqw, 34px);
+    border-width: clamp(1px, 0.2cqw, 2px);
+  }
+  /* Dash, monitor, canvas */
+  .normal-display .dash-left,
+  .normal-display .dash-right {
+    padding: clamp(6px, 1.3cqw, 14px) clamp(8px, 1.6cqw, 18px);
+  }
+  .normal-display .dash-speed {
+    gap: clamp(5px, 0.9cqw, 10px);
+  }
+  .normal-display .dash-speed b {
+    font-size: clamp(24px, 7.6cqw, 84px);
+  }
+  .normal-display .dash-speed i,
+  .normal-display .dash-meta,
+  .normal-display .game-hud,
+  .normal-display .game-start {
+    font-size: clamp(9px, 1cqw, 12px);
+  }
+  .normal-display .dash-gear {
+    right: clamp(8px, 1.6cqw, 18px);
+    bottom: clamp(6px, 1.4cqw, 16px);
+  }
+  .normal-display .dash-gear span {
+    font-size: clamp(20px, 5cqw, 54px);
+  }
+  .normal-display .dash-gear em {
+    font-size: clamp(9px, 0.9cqw, 10px);
+  }
+  .normal-display .dash-meta {
+    gap: clamp(6px, 1.1cqw, 12px);
+  }
+  .normal-display .dash-ign-word {
+    font-size: clamp(18px, 5.1cqw, 56px);
+  }
+  .normal-display .dash-ign-gauge {
+    width: clamp(110px, 22.7cqw, 250px);
+    height: clamp(110px, 22.7cqw, 250px);
+  }
+  .normal-display .dash-ign-num {
+    font-size: clamp(30px, 7.6cqw, 84px);
+  }
+  .normal-display .game-body {
+    padding: clamp(6px, 1.3cqw, 14px);
+  }
+  .normal-display .game-hud {
+    gap: clamp(3px, 0.55cqw, 6px);
+  }
+  .normal-display .game-hud-br b {
+    font-size: clamp(16px, 3.5cqw, 38px);
+  }
+  .normal-display .game-hp {
+    width: clamp(80px, 20cqw, 220px);
+  }
+  .normal-display .game-map {
+    width: clamp(44px, 10cqw, 110px);
+  }
+  .normal-display .game-cross {
+    width: clamp(48px, 10.9cqw, 120px);
+  }
+  .normal-display .art-body {
+    padding: clamp(6px, 1.6cqw, 18px);
+  }
+}
 .normal-display-hit {
   position: absolute;
   inset: 0;
@@ -1759,6 +1886,44 @@ em.font-display,
   transform: scale(2.4);
   opacity: 0;
   transition: transform 560ms var(--ease-in), opacity 260ms var(--ease-in) 300ms;
+}
+/* The curtain: the zoomed card dissolves into the terminal's own dark, never into a hole. */
+.hub-curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: grid;
+  place-items: center;
+  background: #05060a;
+  color: #8a8f9c;
+  font: 400 13px/1.4 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  letter-spacing: 0.02em;
+  animation: hub-curtain-in 320ms ease-out 220ms both;
+}
+.hub-curtain-line {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: var(--c);
+  transform-origin: left;
+  animation:
+    hub-curtain-sweep 1200ms cubic-bezier(0.2, 0.7, 0.2, 1) 220ms both,
+    hub-curtain-pulse 1400ms ease-in-out 1420ms infinite;
+}
+@keyframes hub-curtain-in {
+  from { opacity: 0; }
+}
+@keyframes hub-curtain-sweep {
+  from { transform: scaleX(0); }
+}
+@keyframes hub-curtain-pulse {
+  50% { opacity: 0.35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hub-curtain,
+  .hub-curtain-line {
+    animation: none;
+  }
 }
 @keyframes normal-display-in {
   from { opacity: 0; transform: translate(-60px, 36px) rotate(-5deg) scale(0.9); }
@@ -1931,3 +2096,1522 @@ em.font-display,
   opacity: 0;
   pointer-events: none;
 }
+
+
+/* A view's way back (view-shell): the "exit" action in the corner, in the HUD strip's voice. */
+.view-exit {
+  position: fixed;
+  right: 1.25rem;
+  /* Above the page's round control in the same corner (fixed bottom-5 right-5, 48px). */
+  bottom: max(5.5rem, calc(4.25rem + env(safe-area-inset-bottom)));
+  z-index: 60;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
+  text-transform: uppercase;
+}
+.view-exit button {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-height: 1.6rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--void, #07070a) 70%, transparent);
+  backdrop-filter: blur(8px);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: var(--ink-dim, #a9a7a1);
+  transition: color var(--dur-2, 320ms) var(--ease-out, ease);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+@media (pointer: coarse) {
+  .view-exit button {
+    min-height: 44px;
+    padding-inline: 14px;
+  }
+}
+.view-exit button:hover,
+.view-exit button:focus-visible {
+  color: var(--ink, #f3f1ec);
+}
+.view-exit button > span {
+  font-size: 10px;
+  color: var(--ink-faint, #6d6b67);
+}
+
+/* Themes: every terminal colour goes through these variables, so one attribute re-skins boot window,
+   menus, palette, tips box, pane and status bar. `--persona-c` is the page's own accent. */
+.terminal-root {
+  --c: var(--persona-c);
+}
+/* The ten named themes are generated from lib/site/terminal-themes.ts (themeCss(), rendered by the terminal). */
+.terminal-root .hub-exit {
+  background: var(--term-win, #0a0a0f);
+}
+
+/* CRT: scanlines and a soft vignette over everything; off under reduced motion. */
+.terminal-root.has-crt::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.06) 0, rgba(0, 0, 0, 0.06) 1px, transparent 1px, transparent 2px),
+    radial-gradient(ellipse at center, transparent 62%, rgba(0, 0, 0, 0.28) 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-root.has-crt::after {
+    display: none;
+  }
+}
+
+/* The Engineer page's root (views/terminal-root): the terminal window on a dark stage, picker inside. */
+.terminal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--void, #050507);
+}
+.terminal-root-frame {
+  transform: scale(1);
+  transition: transform 800ms var(--ease-in-out), opacity 650ms var(--ease-in-out);
+}
+.terminal-root.is-opening .terminal-root-frame {
+  transform: scale(1.6);
+  opacity: 0;
+  transition-duration: 650ms;
+}
+/* Arriving from the Normal doorway: the terminal fades in over 240 ms so nothing pops. */
+.terminal-root.is-via-normal {
+  animation: terminal-arrive 240ms ease-out both;
+}
+.terminal-root.is-arriving {
+  opacity: 0;
+  animation: none;
+}
+@keyframes terminal-arrive {
+  from { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-root.is-via-normal {
+    animation: none;
+  }
+  .terminal-root.is-arriving {
+    opacity: 1;
+  }
+}
+.terminal-root.is-direct .terminal-root-frame {
+  animation: world-boot-in 700ms var(--ease-out) both;
+}
+.terminal-root-body {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent;
+  cursor: text;
+}
+.terminal-root-body .is-cmd,
+.terminal-root-body .is-out {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.terminal-root-body .tab-hl {
+  background: var(--c, #6aa6ff);
+  color: var(--term-win, #0a0a0f);
+  font-weight: 400;
+}
+.terminal-root-body .is-dim {
+  opacity: 1;
+  color: var(--term-faint, var(--ink-faint));
+}
+.terminal-root-picker {
+  display: block;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.terminal-root-picker li {
+  display: block;
+}
+/* A menu that is no longer the one the keys drive: still clickable, but it reads as history. */
+.terminal-root-picker.is-inert {
+  opacity: 0.55;
+}
+.terminal-root-row {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  width: 100%;
+  min-height: 32px;
+  margin: 0;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.terminal-root-row em {
+  width: 1ch;
+  font-style: normal;
+  color: var(--c);
+}
+.terminal-root-row b {
+  font-weight: 400;
+}
+.terminal-root-row i {
+  font-style: normal;
+  min-width: 0;
+}
+.terminal-root-row.is-sel {
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+}
+@media (pointer: coarse) {
+  .terminal-root-row {
+    min-height: 44px;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 0;
+    line-height: 1.5;
+    padding-block: 6px;
+  }
+}
+/* Output selects on desktop (copy, like a terminal); on touch nothing does. The prompt, menus, palette,
+   chips and status bar never do. */
+.terminal-root-row,
+.terminal-root-prompt,
+.terminal-root-picker,
+.terminal-root-palette,
+.terminal-root-chips,
+.terminal-os-status {
+  user-select: none;
+  -webkit-user-select: none;
+}
+@media (pointer: coarse) {
+  .terminal-root {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+}
+
+/* The prompt: what you see is a span; the real input sits over it, invisible, and takes the keys. */
+.terminal-root-prompt {
+  position: relative;
+}
+.terminal-root-typed {
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.terminal-root-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  opacity: 0;
+  /* 16px: anything smaller makes iOS zoom the page on focus. */
+  font-size: 16px;
+}
+
+/* Output links: the accent, underlined. `open <slug>` is a button that looks the same. */
+.terminal-root-link {
+  --accent-link: var(--link, var(--c));
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--accent-link);
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.terminal-root-link:hover,
+.terminal-root-link:focus-visible {
+  color: var(--ink);
+}
+@media (pointer: coarse) {
+  .terminal-root-link {
+    padding-block: 10px;
+  }
+}
+
+/* The command palette, above the prompt: at most eight rows, then it scrolls. */
+.terminal-root-palette {
+  display: block;
+  max-height: calc(8 * 32px + 8px);
+  margin: 4px 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent;
+  border: 1px solid color-mix(in srgb, var(--c) 28%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--c) 5%, var(--term-win, #0a0a0f));
+}
+.terminal-root-palette li {
+  display: block;
+}
+.terminal-root-palette-none {
+  padding: 0 6px;
+}
+
+/* Phone key strip, above the keyboard: the keys a glass keyboard hides. Coarse pointers only. */
+.terminal-root-chips {
+  display: none;
+}
+@media (pointer: coarse) {
+  .terminal-root-chips {
+    flex: none;
+    display: flex;
+    gap: 6px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    overflow-x: auto;
+    border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  }
+  .terminal-root-chips button {
+    flex: 1 0 auto;
+    min-width: 44px;
+    height: 44px;
+    padding: 0 12px;
+    border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+    border-radius: 8px;
+    background: transparent;
+    font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .terminal-root-chips button:active {
+    background: color-mix(in srgb, var(--c) 14%, transparent);
+  }
+}
+
+/* The full-screen terminal: the ssh window (frame) grows and dissolves into it. --vvh/--vvt follow the on-screen keyboard. */
+.terminal-os {
+  position: fixed;
+  inset: var(--vvt, 0px) 0 auto 0;
+  height: var(--vvh, 100dvh);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--void, #050507);
+  visibility: hidden;
+  opacity: 0;
+  transform: scale(1);
+  transition: opacity 500ms var(--ease-in-out), transform 650ms var(--ease-in-out), visibility 0s 500ms;
+}
+.terminal-root-frame {
+  position: relative;
+  z-index: 2;
+}
+.terminal-root.is-os .terminal-os {
+  visibility: visible;
+  opacity: 1;
+  transition-delay: 0s;
+}
+.terminal-root.is-os .terminal-root-frame {
+  transform: scale(1.08);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 500ms var(--ease-out), opacity 500ms var(--ease-out), visibility 0s 500ms;
+}
+.terminal-root.is-os.is-opening .terminal-os {
+  transform: scale(1.12);
+  opacity: 0;
+  transition: opacity 500ms var(--ease-in-out), transform 650ms var(--ease-in-out);
+}
+.terminal-os {
+  /* One gutter for the body and for the art that must fit inside it. --adv: Geist Mono's advance, in em. */
+  --os-pad: clamp(16px, 4vw, 48px);
+  --adv: 0.6;
+  /* Advances of the braille and half-block glyphs (the system font draws them), in em. */
+  --adv-br: 0.76;
+  --adv-px: 0.6;
+  /* Dim text one step lighter than the site's caption grey: 4.9:1 on #050507 (the site token is 3.8:1). */
+  --ink-faint: var(--term-faint, #7f7d79);
+}
+.terminal-os-body {
+  container-type: inline-size;
+  min-height: 0;
+  padding: 20px var(--os-pad) 28px;
+}
+.terminal-root-body .is-accent {
+  color: var(--c);
+}
+
+/* The header: banner, version line and the three-line overview. One blank-line rhythm below it. */
+.terminal-os-welcome {
+  margin-bottom: 8px;
+}
+.terminal-os-header {
+  margin-bottom: 16px;
+}
+.terminal-os-header-text {
+  min-width: 0;
+  /* The banner sizes against this column (cqw), not the viewport. */
+  container-type: inline-size;
+}
+.terminal-os-banner {
+  margin: 0 0 8px;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
+  white-space: pre;
+  overflow: hidden;
+  letter-spacing: 0;
+  /* 88 columns across the column, at most 13px. */
+  font-size: min(13px, calc(100cqw / 88 / var(--adv)));
+  line-height: 1.05;
+  color: var(--c);
+}
+/* The generated portrait: every mode is one grid of cells, sized to the body (cqw) and the viewport height. */
+.terminal-os-portrait {
+  margin: 4px 0;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
+  font-size: min(13px, calc(100cqw / var(--p-cols) / var(--p-adv)), calc((100dvh - 190px) / var(--p-rows)));
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: pre;
+  overflow: hidden;
+  color: var(--c);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.terminal-os-portrait.is-pixels {
+  font-size: min(10px, calc(100cqw / var(--p-cols) / var(--p-adv)), calc((100dvh - 170px) / var(--p-rows)));
+}
+.terminal-os-portrait.is-matrix {
+  background: #020a04;
+  width: max-content;
+  max-width: 100%;
+}
+.terminal-os-portrait.is-fetch {
+  font-size: min(13px, calc((100vw - 2 * var(--os-pad)) / var(--p-cols) / var(--p-adv)));
+}
+.terminal-os-portrait span {
+  display: inline;
+}
+.terminal-os-modes {
+  display: block;
+  margin-top: 2px;
+}
+
+/* Names in a listing and `open ...` lines: buttons that look like text, underlined on hover. */
+.terminal-root-path {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--ink);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.terminal-root-path:hover,
+.terminal-root-path:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.terminal-root-path[data-kind="dir"] {
+  color: var(--c);
+}
+.terminal-root-path[data-kind="exec"] {
+  color: var(--term-green, #5fbf6a);
+}
+@media (pointer: coarse) {
+  .terminal-root-path {
+    padding-block: 8px;
+  }
+}
+
+/* Coloured runs (`git log`: lanes, hashes, tags). */
+.terminal-root-body .tone-accent {
+  color: var(--c);
+}
+.terminal-root-body .tone-green {
+  color: var(--term-green, #5fbf6a);
+}
+.terminal-root-body .tone-violet {
+  color: var(--term-violet, #b38ad9);
+}
+.terminal-root-body .tone-dim {
+  color: var(--ink-faint);
+}
+.terminal-root-body b[class^="tone-"] {
+  font-weight: 400;
+}
+
+/* Tab with nothing to complete: the caret flashes once. */
+.hub-enter-caret.terminal-os-bell {
+  animation: none;
+  background: var(--ink, #f3f1ec);
+  opacity: 1;
+}
+
+/* `timeline`: one grid, so the bracket column stays straight and is never cut. */
+.terminal-os-tl {
+  display: grid;
+  grid-template-columns: 5ch 4ch minmax(0, 1fr);
+  column-gap: 1ch;
+  margin: 2px 0;
+}
+.terminal-os-tl.is-wide {
+  /* The period label is capped so a long grade line cannot squeeze the subjects; the grade wraps under it. */
+  grid-template-columns: 5ch 4ch minmax(0, 1fr) 1ch minmax(0, 24ch);
+}
+.terminal-os-tl > span,
+.terminal-os-tl > b {
+  min-width: 0;
+}
+.terminal-os-tl .tl-year,
+.terminal-os-tl .tl-mon {
+  white-space: nowrap;
+}
+.terminal-os-tl .tl-subj {
+  overflow-wrap: anywhere;
+}
+/* The tag rides with its subject (one cell), so a long tag on one row does not shrink every subject. */
+.terminal-os-tl.is-wide .tl-subj {
+  display: flex;
+  gap: 1ch;
+  min-width: 0;
+  white-space: nowrap;
+}
+.terminal-os-tl.is-wide .tl-subj .tl-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.terminal-os-tl .tl-glyph {
+  color: var(--term-faint, var(--ink-faint));
+}
+.terminal-os-tl .tl-label,
+.terminal-os-tl .tl-tag {
+  white-space: nowrap;
+}
+.terminal-os-tl .tl-grade {
+  color: var(--term-green, #5fbf6a);
+  font-weight: 400;
+}
+.terminal-os-tl.is-wide .tl-label {
+  white-space: normal;
+}
+.terminal-os-tl.is-wide .tl-label .tl-grade {
+  display: block;
+}
+.terminal-os-tl .tl-tag,
+.terminal-os-tl .tone-accent {
+  font-weight: 400;
+}
+.terminal-os-tl-head {
+  grid-column: 1 / -1;
+  color: var(--term-faint, var(--ink-faint));
+  margin-top: 4px;
+}
+
+/* The chips carry help, / and Esc on touch screens; the status bar's copies would only duplicate them. */
+@media (pointer: coarse) {
+  .terminal-os-status .terminal-os-status-r {
+    display: none;
+  }
+}
+
+/* git log: the sha is yellow. */
+.terminal-gh-sha {
+  --accent-link: var(--term-yellow, #e5c07b);
+}
+
+/* `qr`: dark modules as ink on a light tile, so phone scanners see the usual code. `sl`: the locomotive. */
+.terminal-os-qr {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin: 8px 0;
+  overflow: hidden;
+  background: #fff;
+  color: #000;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: pre;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.terminal-os-sl {
+  margin: 4px 0;
+  overflow: hidden;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: pre;
+  color: var(--ink);
+}
+
+/* `cal`, and the pager line (reverse video). */
+.terminal-os-cal {
+  margin: 4px 0;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+.terminal-os-cal b {
+  font-weight: 400;
+}
+.terminal-os-cal .is-accent {
+  background: var(--c);
+  color: var(--void, #050507);
+}
+/* `stats`: the contribution heatmap and the language bar. Shades are mixes of the theme accent over the
+   window colour, so every theme re-skins them; override --hm-0..4 on a theme if a shade does not read. */
+.terminal-hm {
+  --hm-0: color-mix(in srgb, var(--ink-faint) 30%, var(--term-win, #050507));
+  --hm-1: color-mix(in srgb, var(--c) 30%, var(--term-win, #050507));
+  --hm-2: color-mix(in srgb, var(--c) 55%, var(--term-win, #050507));
+  --hm-3: color-mix(in srgb, var(--c) 80%, var(--term-win, #050507));
+  --hm-4: var(--c);
+  margin: 6px 0;
+  width: min(100%, calc(var(--hm-n) * var(--hm-w) + 1.4ch));
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ink-dim);
+}
+.terminal-root[data-theme="paper"] .terminal-hm {
+  --hm-0: color-mix(in srgb, var(--ink-faint) 22%, var(--term-win));
+  --hm-1: color-mix(in srgb, var(--c) 42%, var(--term-win));
+  --hm-2: color-mix(in srgb, var(--c) 65%, var(--term-win));
+  --hm-3: color-mix(in srgb, var(--c) 85%, var(--term-win));
+}
+.terminal-hm-grid {
+  display: grid;
+  gap: 2px;
+}
+.terminal-hm-mon,
+.terminal-hm-wd {
+  white-space: nowrap;
+  color: var(--ink-faint);
+}
+.terminal-hm-wd {
+  align-self: center;
+  font-size: 9px;
+  line-height: 1;
+}
+.terminal-hm-c {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: var(--hm-0);
+  animation: terminal-hm-in 160ms ease-out both;
+}
+.terminal-hm-c[data-l="1"] {
+  background: var(--hm-1);
+}
+.terminal-hm-c[data-l="2"] {
+  background: var(--hm-2);
+}
+.terminal-hm-c[data-l="3"] {
+  background: var(--hm-3);
+}
+.terminal-hm-c[data-l="4"] {
+  background: var(--hm-4);
+}
+.terminal-hm-status {
+  margin-top: 4px;
+  min-height: 1.4em;
+  color: var(--ink-faint);
+}
+@keyframes terminal-hm-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-hm-c {
+    animation: none;
+  }
+}
+.terminal-lb {
+  margin: 6px 0;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.terminal-lb span {
+  display: inline;
+}
+.terminal-lb-bar {
+  white-space: nowrap;
+  overflow: hidden;
+  color: var(--c);
+}
+.terminal-lb-bar .is-alt,
+.terminal-lb-labels .is-alt {
+  opacity: 0.55;
+}
+.terminal-lb-labels {
+  color: var(--ink-dim);
+}
+.terminal-lb-labels b {
+  font-weight: 400;
+  color: var(--c);
+}
+.terminal-root-more {
+  display: block;
+  margin: 0;
+  padding: 0 8px;
+  border: 0;
+  background: var(--ink);
+  color: var(--void, #050507);
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* The split: terminal on the left, the pane on the right from 1024px (tmux-style). */
+.terminal-os-split {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.terminal-os-pane {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .terminal-os.has-pane .terminal-os-split {
+    grid-template-columns: minmax(0, 3fr) clamp(280px, 25%, 380px);
+  }
+  .terminal-os.has-pane .terminal-os-pane {
+    display: block;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 16px;
+    border-left: 1px solid color-mix(in srgb, var(--c) 25%, transparent);
+    font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--ink-dim);
+    user-select: none;
+    -webkit-user-select: none;
+    scrollbar-width: thin;
+  }
+}
+.terminal-os-pane h3 {
+  margin: 18px 0 6px;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.terminal-os-pane p {
+  margin: 0;
+}
+.terminal-os-pane-where {
+  color: var(--ink);
+}
+.terminal-os-pane-clock {
+  color: var(--dim);
+  min-height: 2.8em;
+}
+.terminal-os-pane-name {
+  font-weight: 700;
+  color: var(--ink);
+}
+.terminal-os-pane-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+.terminal-os-pane-status i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #5fbf6a;
+  box-shadow: 0 0 6px #5fbf6a;
+}
+.terminal-os-pane-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.terminal-os-pane-actions button {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 4px 6px;
+  border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.terminal-os-pane-actions button:hover,
+.terminal-os-pane-actions button:focus-visible {
+  background: color-mix(in srgb, var(--c) 16%, transparent);
+}
+.terminal-os-pane-seen {
+  margin-bottom: 4px;
+  color: var(--ink-faint);
+}
+.terminal-os-pane-meter {
+  height: 3px;
+  margin-bottom: 8px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--c) 18%, transparent);
+  overflow: hidden;
+}
+.terminal-os-pane-meter i {
+  display: block;
+  height: 100%;
+  background: var(--c);
+}
+.terminal-os-pane-live {
+  color: var(--ink-faint);
+}
+/* Contents: one button per part of the portfolio; a check once visited. */
+.terminal-os-contents {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.terminal-os-content-row {
+  display: grid;
+  grid-template-columns: 2ch 9ch minmax(0, 1fr);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  line-height: 1.7;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.terminal-os-content-row b {
+  font-weight: 400;
+  color: var(--c);
+}
+.terminal-os-content-row i {
+  font-style: normal;
+  color: var(--ink-faint);
+}
+.terminal-os-content-row:hover span,
+.terminal-os-content-row:focus-visible span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.terminal-os-content-row.is-done {
+  color: var(--ink-faint);
+}
+@media (pointer: coarse) {
+  .terminal-os-content-row {
+    min-height: 32px;
+    align-items: center;
+  }
+}
+.terminal-os-pane-next,
+.terminal-os-status-hint {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--c);
+  text-align: left;
+  cursor: pointer;
+}
+.terminal-os-pane-next:hover,
+.terminal-os-status-hint:hover {
+  text-decoration: underline;
+}
+.terminal-os-keys {
+  color: var(--ink-faint);
+}
+.terminal-os-status-hint {
+  display: none;
+}
+.terminal-os-status .is-pane-btn {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .terminal-os-status .is-pane-btn {
+    display: inline;
+  }
+}
+@media (max-width: 639px) {
+  .terminal-os-status-hint {
+    display: inline;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 4px 6px;
+  }
+}
+
+/* The tips box: borders drawn in CSS, the title in the top border. */
+.terminal-os-tips {
+  min-width: 0;
+  max-width: 88ch;
+  margin: 0 0 16px;
+  padding: 6px 14px 8px;
+  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.terminal-os-tips legend {
+  margin-left: 8px;
+  padding: 0 8px;
+  color: var(--ink-dim);
+}
+.terminal-os-tip {
+  display: grid;
+  grid-template-columns: 2ch 12ch minmax(0, 1fr);
+  gap: 0 1ch;
+}
+.terminal-os-tip em {
+  font-style: normal;
+  color: var(--c);
+}
+.terminal-os-tip b {
+  font-weight: 400;
+  color: var(--ink);
+}
+.terminal-os-tip i {
+  font-style: normal;
+  color: var(--ink-faint);
+}
+@media (max-width: 639px) {
+  .terminal-os-tip {
+    grid-template-columns: 2ch 10ch minmax(0, 1fr);
+  }
+}
+
+.terminal-os-fetch {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 3ch;
+  align-items: start;
+  margin: 4px 0;
+}
+.terminal-os-fetch-rows {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+.terminal-os-fetch-rows b {
+  font-weight: 400;
+}
+@media (max-width: 639px) {
+  .terminal-os-fetch {
+    grid-template-columns: 1fr;
+    row-gap: 8px;
+  }
+}
+
+/* The prompt, like a Linux PS1: user@host in the accent, the path in a cooler tint. */
+.terminal-root-body code {
+  font: inherit;
+}
+.ps-user,
+.ps-dollar {
+  color: var(--c);
+}
+.ps-path {
+  color: color-mix(in srgb, var(--c) 60%, #9ab);
+}
+@media (max-width: 767px) {
+  .ps-lead {
+    display: none;
+  }
+}
+
+/* The status bar, tmux-like: where you are, what is here, the three keys. */
+.terminal-os-status {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+  padding: 0 clamp(12px, 3vw, 24px);
+  border-top: 1px solid color-mix(in srgb, var(--c) 25%, transparent);
+  background: color-mix(in srgb, var(--c) 6%, var(--void, #050507));
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
+  font-size: 11px;
+  color: var(--ink-dim);
+  white-space: pre;
+}
+.terminal-os-status code {
+  font: inherit;
+}
+.terminal-os-status-l {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.terminal-os-status-lw {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.terminal-os-status-work {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.terminal-os-status-work i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok, var(--term-green, #3fb950));
+}
+.terminal-os-status-work:hover {
+  color: var(--ink);
+}
+@media (pointer: coarse) {
+  .terminal-os-status-work {
+    min-height: 44px;
+    padding-inline: 8px;
+  }
+}
+.terminal-os-status-net {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  font: inherit;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+.terminal-os-status-net.is-off {
+  color: var(--ink-faint);
+  opacity: 0.8;
+}
+.terminal-os-status-net.is-update {
+  color: var(--c, var(--accent));
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .terminal-os-status-net.is-update {
+    animation: terminal-net-pulse 2.4s ease-in-out infinite;
+  }
+}
+@keyframes terminal-net-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+@media (pointer: coarse) {
+  .terminal-os-status-net.is-update {
+    min-height: 44px;
+    padding-inline: 8px;
+  }
+}
+.terminal-os-status-m {
+  color: var(--ink-faint);
+}
+.terminal-os-pane-live.is-dim {
+  opacity: 0.6;
+}
+.terminal-os-pane-now {
+  color: var(--term-faint, var(--ink-faint));
+  font-size: 12px;
+}
+/* `portfolio`, wide: each section's → commands sit at the right end of its last line. */
+.terminal-root-body .terminal-os-rowgo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 2ch;
+}
+.terminal-os-rowgo .rg-l {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.terminal-os-rowgo .rg-r {
+  white-space: nowrap;
+}
+/* `worlds`: a row per persona; the pulse line wraps under the name on a phone. */
+.terminal-root-body .terminal-os-world {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 1.5ch;
+}
+.terminal-os-world b {
+  min-width: 14ch;
+}
+.terminal-os-world i {
+  font-style: normal;
+}
+.terminal-os-world > span {
+  display: inline;
+}
+.terminal-os-world .terminal-root-link {
+  margin-left: auto;
+}
+.terminal-os-pane-world {
+  color: inherit;
+  text-decoration: none;
+}
+.terminal-os-pane-world:hover {
+  text-decoration: underline;
+}
+.terminal-os-status-r {
+  display: flex;
+  gap: 4px;
+}
+.terminal-os-status-r button {
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ink-dim);
+  -webkit-tap-highlight-color: transparent;
+}
+.terminal-os-status-r button:hover,
+.terminal-os-status-r button:focus-visible {
+  color: var(--ink);
+}
+@media (max-width: 639px) {
+  .terminal-os-status-m {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .terminal-root-frame {
+    transition: none;
+    animation: none;
+  }
+  .terminal-root.is-opening .terminal-root-frame {
+    transform: none;
+  }
+  .terminal-os,
+  .terminal-root.is-os .terminal-os,
+  .terminal-root.is-os .terminal-root-frame,
+  .terminal-root-link {
+    transition: none;
+  }
+  .terminal-root.is-os .terminal-root-frame {
+    transform: none;
+  }
+}
+
+/* Touch targets: the visual size stays, the hit area grows to about 44px. */
+@media (pointer: coarse) {
+  .hit,
+  .hub-rail-end,
+  .hub-hud-actions button,
+  .hub-rail-marks button {
+    position: relative;
+  }
+  .hit::after,
+  .hub-hud-actions button::after {
+    content: "";
+    position: absolute;
+    inset: -14px -14px;
+  }
+  .hub-rail-end::after {
+    content: "";
+    position: absolute;
+    inset: -14px -18px;
+  }
+  .hub-rail-marks button::after {
+    content: "";
+    position: absolute;
+    inset: -18px -20px;
+  }
+}
+
+/* "Hire me": a quiet pill and a small popover, on every host but the terminal. Hub tokens (--ink) and the
+   persona pages' (--fg, --accent) both work through the fallbacks. */
+.hire-pill {
+  --hp-bg: var(--background, #090b15);
+  --hp-fg: var(--fg, #f4f7ff);
+  --hp-accent: var(--accent, #3b82f6);
+  position: fixed;
+  z-index: 40;
+  left: max(1rem, env(safe-area-inset-left, 0px));
+  bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 500ms ease;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
+}
+/* On the hub the page's own dark tokens apply. */
+.hire-pill.is-hub {
+  --hp-bg: var(--void, #07070a);
+  --hp-fg: var(--ink, #f3f1ec);
+  --hp-accent: var(--ink-dim, #a9a7a1);
+}
+.hire-pill.is-on {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (min-width: 1024px) {
+  .hire-pill {
+    left: auto;
+    bottom: auto;
+    top: 4.75rem;
+    right: 2.75rem;
+    align-items: flex-end;
+    flex-direction: column-reverse;
+  }
+}
+.hire-pill-btn {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--hp-accent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hp-bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: var(--hp-fg);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.hire-pill-btn:hover,
+.hire-pill-btn:focus-visible {
+  background: color-mix(in srgb, var(--hp-accent) 18%, var(--hp-bg));
+}
+.hire-pill-pop {
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  padding: 6px;
+  border: 1px solid var(--hp-accent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--hp-bg) 94%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.hire-pill-pop a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  color: var(--hp-fg);
+  font-size: 12px;
+  text-decoration: none;
+}
+.hire-pill-pop a:hover,
+.hire-pill-pop a:focus-visible {
+  background: color-mix(in srgb, var(--hp-accent) 16%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hire-pill {
+    transition: none;
+  }
+}
+
+
+
+
+
+/* Ghost suggestion: the rest of the best completion, dim, after the caret. */
+.hub-exit-body .terminal-ghost {
+  display: inline;
+  color: var(--term-faint, var(--ink-faint));
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* `fit`: the paste box and the overlap card. */
+.terminal-fit-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 6px 0 10px;
+  max-width: 100%;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.terminal-fit-hint,
+.terminal-fit-count {
+  font-size: 12px;
+  color: var(--term-faint, var(--ink-faint));
+}
+.terminal-fit-area {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--c) 5%, transparent);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.45;
+  outline: none;
+}
+.terminal-fit-area:focus {
+  border-color: var(--c);
+}
+.terminal-fit-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.terminal-fit-go,
+.terminal-fit-cancel {
+  min-height: 36px;
+  padding: 4px 14px;
+  border: 1px solid color-mix(in srgb, var(--c) 55%, transparent);
+  border-radius: 4px;
+  background: none;
+  color: var(--c);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.terminal-fit-go {
+  background: color-mix(in srgb, var(--c) 18%, transparent);
+}
+.terminal-fit-cancel {
+  border-color: transparent;
+  color: var(--term-faint, var(--ink-faint));
+}
+.terminal-fit-count {
+  margin-left: auto;
+}
+.terminal-fit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0;
+}
+.terminal-fit-meter {
+  height: 4px;
+  max-width: 320px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ink-faint) 25%, transparent);
+  overflow: hidden;
+}
+.terminal-fit-meter i {
+  display: block;
+  height: 100%;
+  background: var(--term-green, #5fbf6a);
+}
+.terminal-fit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+}
+.terminal-fit-label {
+  min-width: 11ch;
+  color: var(--term-faint, var(--ink-faint));
+}
+.terminal-fit-chip {
+  padding: 0 7px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 0.92em;
+  line-height: 1.5;
+}
+.terminal-fit-chip.is-ok {
+  color: var(--term-green, #5fbf6a);
+}
+.terminal-fit-chip.is-adj {
+  color: var(--c);
+}
+.terminal-fit-chip.is-not {
+  color: var(--term-faint, var(--ink-faint));
+  border-style: dashed;
+}
+
+/* `arch`: box-and-arrow diagrams in text; kinds are coloured, hover lights what a box talks to. */
+.terminal-arch {
+  margin: 4px 0 8px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.terminal-arch-pre {
+  margin: 0;
+  font: inherit;
+  line-height: 1.05; letter-spacing: 0;
+  white-space: pre;
+}
+.hub-exit-body .terminal-arch-pre span,
+.hub-exit-body .terminal-arch-row {
+  display: inline;
+}
+.hub-exit-body .terminal-arch-pre .terminal-arch-g {
+  display: inline-block;
+  width: 1ch;
+  overflow: visible;
+  text-align: center;
+  white-space: nowrap;
+}
+.hub-exit-body .terminal-arch-pre .terminal-arch-bx {
+  display: inline;
+  letter-spacing: var(--bx-ls, 0);
+}
+.hub-exit-body .terminal-arch-legend span {
+  display: inline;
+}
+.terminal-arch .k-ui { color: var(--c); }
+.terminal-arch .k-api { color: var(--term-green, #5fbf6a); }
+.terminal-arch .k-db { color: #b38ad9; }
+.terminal-arch .k-queue { color: #d9b44a; }
+.terminal-arch .k-ext { color: var(--term-faint, var(--ink-faint)); }
+.terminal-arch .k-job { color: #5fc6c9; }
+.terminal-arch-run.is-edge {
+  color: var(--term-faint, var(--ink-faint));
+}
+.terminal-arch-run {
+  transition: opacity 120ms, color 120ms;
+}
+.terminal-arch.has-hot .is-node,
+.terminal-arch.has-hot .is-edge {
+  opacity: 0.35;
+}
+.terminal-arch.has-hot .is-hot {
+  opacity: 1;
+}
+.terminal-arch.has-hot .is-edge.is-hot {
+  color: var(--ink);
+}
+.terminal-arch-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 4px 0;
+  font-size: 12px;
+}
+.terminal-arch-note {
+  display: block;
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-arch-run {
+    transition: none;
+  }
+}
+
+/* The screensaver: a layer that dims the terminal to 35% and fades in over 600 ms and out over 200 ms. */
+.terminal-saver {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  opacity: 0;
+  transition: opacity 600ms ease;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  /* The terminal behind it reads at 35%. */
+  background: color-mix(in srgb, var(--void, #050507) 65%, transparent);
+}
+.terminal-saver.is-in {
+  opacity: 1;
+}
+.terminal-saver:not(.is-in) {
+  transition-duration: 200ms;
+}
+.terminal-saver-art {
+  margin: 0;
+  background: transparent !important;
+  font-size: min(13px, calc(90vw / var(--p-cols) / var(--p-adv)), calc((100dvh - 190px) / var(--p-rows)));
+}
+.terminal-saver-clock {
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
+  font-size: clamp(36px, 8vw, 72px);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+.terminal-saver-line {
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
+  font-size: 12px;
+  color: var(--term-faint, var(--ink-faint));
+  text-align: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-saver {
+    transition: none;
+  }
+}
+
+/* Presence: only from two visitors up. */
+.terminal-os-status-here {
+  color: var(--term-faint, var(--ink-faint));
+  white-space: nowrap;
+}
+.terminal-os-status-here::before {
+  content: "· ";
+}
+@media (max-width: 767px) {
+  .terminal-os-status-here {
+    display: none;
+  }
+}
+

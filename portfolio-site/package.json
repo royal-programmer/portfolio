@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/sw-manifest.mjs",
     "start": "next start",
     "lint": "eslint",
     "hub:media": "node scripts/hub-media.mjs",
@@ -12,6 +12,7 @@
     "prebuild": "node scripts/hub-media.mjs"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.9.0",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
     "@react-three/postprocessing": "^3.2.2",
@@ -27,7 +28,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-type-animation": "^3.2.0",
-    "sharp": "^0.35.3",
+    "sharp": "^0.34.5",
     "three": "^0.187.0"
   },
   "devDependencies": {
