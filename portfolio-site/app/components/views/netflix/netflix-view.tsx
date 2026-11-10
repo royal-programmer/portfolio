@@ -17,6 +17,8 @@ import { AUTOPILOT_TYPE_MS, AutopilotRail, autopilotSeen, useAutopilot } from ".
 import { JD_MIN, netflixFit, sortByFit } from "@/lib/site/netflix-fit";
 import type { FitPool } from "@/lib/site/terminal-fit";
 import { seasonSub, type NfLine, type SubData } from "@/lib/site/netflix-subs";
+import { KeysOverlay, useNetflixKeys } from "./netflix-keys";
+import { chime } from "./netflix-sound";
 import { clearHistory, useCc, useLikes, useMyList, useProgress, useSound } from "./netflix-store";
 import { generatePortrait } from "@/lib/site/portrait-gen";
 import { NETFLIX_PROFILES, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
@@ -261,6 +263,17 @@ function NetflixBody({ show, series, profile, status, portrait, fitPool, subData
 
   const restore = useRef(false);
   const modalOpen = modal !== null;
+  // N9: remote-control keys, and the `?` overlay that lists them.
+  const [keysOpen, setKeysOpen] = useState(false);
+  const said = useNetflixKeys({
+    modalOpen,
+    keysOpen,
+    toggleKeys: () => setKeysOpen((v) => !v),
+    toggleMute: () => {
+      if (!sound.on) chime();
+      sound.toggle();
+    },
+  });
   useEffect(() => {
     if (modalOpen || !restore.current) return;
     restore.current = false;
@@ -499,7 +512,11 @@ function NetflixBody({ show, series, profile, status, portrait, fitPool, subData
 
   return (
     <>
-      <NetflixTopbar glyph={profileMeta?.glyph ?? "R"} tone={TONES[profile]} query={query} onQuery={onQuery} onPasteText={onPasteText} onHome={toTop} onSeries={toRows} onMyList={toList} onProfiles={onSwitch} onClearHistory={askClear} onReplay={onReplay} />
+      <NetflixTopbar glyph={profileMeta?.glyph ?? "R"} tone={TONES[profile]} query={query} onQuery={onQuery} onPasteText={onPasteText} onHome={toTop} onSeries={toRows} onMyList={toList} onProfiles={onSwitch} onClearHistory={askClear} onReplay={onReplay} onKeys={() => setKeysOpen(true)} />
+      <div className="nf-visually-hidden" role="status" aria-live="polite">
+        {said}
+      </div>
+      {keysOpen ? <KeysOverlay onClose={() => setKeysOpen(false)} /> : null}
       {autopilot.state ? <AutopilotRail state={autopilot.state} onSkip={autopilot.skip} onStop={autopilot.stop} /> : null}
       <div className="nf-page" aria-hidden={modal ? true : undefined} inert={modal ? true : undefined}>
         {q ? (

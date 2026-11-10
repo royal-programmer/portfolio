@@ -215,7 +215,7 @@ function CastRow({ row, env }: { row: { id: string; title: string; cast: CastMem
         <ul className="nf-scroller" role="list">
           {row.cast.map((c) => (
             <li key={c.id} className="nf-skill-li">
-              <button type="button" className="nf-cast" aria-pressed={env.cast.active === c.key} onClick={() => env.cast.pick(env.cast.active === c.key ? null : c.key)}>
+              <button type="button" className="nf-cast" data-nf-nav aria-pressed={env.cast.active === c.key} onClick={() => env.cast.pick(env.cast.active === c.key ? null : c.key)}>
                 <span className="nf-cast-name">{c.name}</span>
                 <span className="nf-cast-n">
                   appears in {c.count} {c.count === 1 ? "episode" : "episodes"}

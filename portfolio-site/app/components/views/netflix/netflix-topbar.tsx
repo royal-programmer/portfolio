@@ -21,9 +21,11 @@ type Props = {
   /** Menu entries under Profiles; each is optional. */
   onClearHistory?: () => void;
   onReplay?: () => void;
+  /** `Keyboard shortcuts` in the Profiles menu (N9). */
+  onKeys?: () => void;
 };
 
-export function NetflixTopbar({ glyph, tone, query, onQuery, onPasteText, onHome, onSeries, onMyList, onProfiles, onClearHistory, onReplay }: Props) {
+export function NetflixTopbar({ glyph, tone, query, onQuery, onPasteText, onHome, onSeries, onMyList, onProfiles, onClearHistory, onReplay, onKeys }: Props) {
   const [solid, setSolid] = useState(false);
   const [menu, setMenu] = useState(false);
   const menuBox = useRef<HTMLDivElement>(null);
@@ -131,13 +133,29 @@ export function NetflixTopbar({ glyph, tone, query, onQuery, onPasteText, onHome
             <span aria-hidden>{glyph}</span>
           </button>
           {menu ? (
-            <div className="nf-pmenu" role="menu" aria-label="Profiles">
+            <div
+              className="nf-pmenu"
+              role="menu"
+              aria-label="Profiles"
+              onKeyDown={(e) => {
+                if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+                e.preventDefault();
+                const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>("button"));
+                const i = items.indexOf(document.activeElement as HTMLElement);
+                items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
+              }}
+            >
               <button type="button" role="menuitem" onClick={choose(onProfiles)}>
                 Switch profile
               </button>
               {onReplay ? (
                 <button type="button" role="menuitem" onClick={choose(onReplay)}>
                   Replay the recruiter cut
+                </button>
+              ) : null}
+              {onKeys ? (
+                <button type="button" role="menuitem" onClick={choose(onKeys)}>
+                  Keyboard shortcuts
                 </button>
               ) : null}
               {onClearHistory ? (

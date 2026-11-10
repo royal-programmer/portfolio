@@ -175,6 +175,11 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, play
       requestClose();
       return;
     }
+    if (e.key === "Backspace" && !(e.target as HTMLElement).closest("input, textarea, select")) {
+      e.preventDefault();
+      requestClose();
+      return;
+    }
     if (e.key === " ") {
       const t = e.target as HTMLElement;
       if (t.closest("button, a, select, input, textarea")) return;
