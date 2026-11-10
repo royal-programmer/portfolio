@@ -1058,7 +1058,6 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     const t = fitText.trim();
     if (!t) return void closeFit();
     closeFit();
-    line("fit", true, false, here());
     line(`(pasted ${t.length.toLocaleString("en-US")} characters · read in this tab only)`, false, true);
     print(shell.fit(t));
     beacon("fit");
