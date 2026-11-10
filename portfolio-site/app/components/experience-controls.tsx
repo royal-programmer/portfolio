@@ -80,12 +80,19 @@ export function ModeSwitch({ className = "" }: { className?: string }) {
             type="button"
             role="radio"
             aria-checked={on}
+            aria-label={o.label}
             onClick={() => setExperience(o.v)}
-            className={`hit min-h-8 rounded-full px-3.5 font-mono text-[10px] tracking-[0.16em] uppercase transition-colors duration-[var(--dur-1)] ${
+            className={`hit min-h-8 rounded-full px-3.5 max-sm:min-w-8 max-sm:px-2.5 font-mono text-[10px] tracking-[0.16em] uppercase transition-colors duration-[var(--dur-1)] ${
               on ? "bg-[var(--ink)] text-[var(--void)]" : "text-[var(--ink-dim)] hover:text-[var(--ink)]"
             }`}
           >
-            {o.label}
+            {/* Phones: one letter (the full name is the aria-label). */}
+            <span aria-hidden className="sm:hidden">
+              {o.label[0]}
+            </span>
+            <span aria-hidden className="max-sm:hidden">
+              {o.label}
+            </span>
           </button>
         );
       })}
