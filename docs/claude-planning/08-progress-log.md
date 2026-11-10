@@ -1400,3 +1400,7 @@ stripped service_role's table grants).
 ### Round 14 - two résumés, resume --build with progress (2026-11-10)
 
 - Submitted PDF is the default (`resume --pdf`, hire pill, hub, Netflix hero, fit sheet links); `resume --build` streams a real build (`/api/resume/build`, `lib/resume/{pipeline,store,files}.ts`) and offers preview / download / share. `/resume.pdf` is force-dynamic. Fit sheet availability says employed at Altimetrik (dim on the trailing "ask" only). bn/hi strings added. Netflix "To be continued" has no résumé button (none added).
+
+### Round 15 - profiles, phone gate skip, menus by touch (2026-11-10)
+
+- `profiles` command + `/api/profiles`, hub and Netflix links from the same data; phone gate skip pill and compact mode switch; menu touch hint, up/down chips, `scroll-locked` cleanup (the real cause of frozen views on a phone). Not verified in a browser or by eslint: `portfolio-site/node_modules` lost packages mid-round (`@babel/runtime`, `@eslint-community/eslint-utils`, `.bin`), so the dev server could not compile the hub and eslint could not run; tsc (via `node node_modules/typescript/bin/tsc`) passes.
