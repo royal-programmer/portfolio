@@ -416,6 +416,20 @@ const en = {
   "st.update": "● update ready",
   "st.offline": "○ offline",
   "st.here": (n: number) => `${n} here now`,
+  // The Netflix view's subtitles (CC): the labels around the typed trailer, recap and teleprompter lines.
+  "nf.latest": "Latest episode",
+  "nf.before": "Before that",
+  "nf.status": "Status",
+  "nf.next": "Next episode: your team?",
+  "nf.season": (y: string, n: number) => `Season ${y} · ${n} ${n === 1 ? "episode" : "episodes"}`,
+  "nf.ep": (s: number, n: number) => `Season ${s} · episode ${n}`,
+  "nf.b.main": "work",
+  "nf.b.learn": "learning",
+  "nf.b.side": "side quest",
+  "nf.b.life": "life",
+  "nf.b.project": "project",
+  "nf.b.post": "writing",
+  "nf.b.skill": "skill",
 } as const satisfies Record<string, string | readonly string[] | ((...a: never[]) => string)>;
 
 /** The shape every language has to fill. Widened: string literals become `string`. */

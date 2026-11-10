@@ -16,7 +16,8 @@ import { NetflixTopbar } from "./netflix-topbar";
 import { AUTOPILOT_TYPE_MS, AutopilotRail, autopilotSeen, useAutopilot } from "./netflix-autopilot";
 import { JD_MIN, netflixFit, sortByFit } from "@/lib/site/netflix-fit";
 import type { FitPool } from "@/lib/site/terminal-fit";
-import { clearHistory, useLikes, useMyList, useProgress, useSound } from "./netflix-store";
+import { seasonSub, type NfLine, type SubData } from "@/lib/site/netflix-subs";
+import { clearHistory, useCc, useLikes, useMyList, useProgress, useSound } from "./netflix-store";
 import { generatePortrait } from "@/lib/site/portrait-gen";
 import { NETFLIX_PROFILES, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
 import type { TermLink, TerminalData } from "@/lib/site/terminal-data";
@@ -30,6 +31,8 @@ export type NetflixViewProps = {
   portrait: TerminalData["portrait"];
   /** What a pasted job description is weighed against (N7). */
   fitPool: FitPool;
+  /** The translated facts the subtitles (CC) come from (N8). */
+  subData: SubData;
   /** `via=normal`: no staged motion. */
   fast: boolean;
 };
@@ -213,7 +216,7 @@ function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => voi
 
 type ModalState = { id: string; origin: DOMRect | null; play: boolean; playMs?: number };
 
-function NetflixBody({ show, series, profile, status, portrait, fitPool, fast, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
+function NetflixBody({ show, series, profile, status, portrait, fitPool, subData, fast, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
   const shows = useMemo(() => Object.values(series), [series]);
   const index = useMemo(() => indexItems(shows), [shows]);
   const topId = useMemo(() => topEpisodeId(shows), [shows]);
@@ -221,6 +224,7 @@ function NetflixBody({ show, series, profile, status, portrait, fitPool, fast, c
   const likes = useLikes();
   const progress = useProgress();
   const sound = useSound();
+  const cc = useCc();
 
   /* ----- the portrait, drawn once (the title stays the LCP); skeleton rows until then ----- */
   const [text, setText] = useState("");
@@ -436,13 +440,16 @@ function NetflixBody({ show, series, profile, status, portrait, fitPool, fast, c
     });
 
   /* ----- N4: a season's recap types in the hero's trailer panel ----- */
-  const [recap, setRecap] = useState<{ key: number; lines: string[] } | null>(null);
+  const [recap, setRecap] = useState<{ key: number; lines: NfLine[] } | null>(null);
   const endRecap = useCallback(() => setRecap(null), []);
   const playRecap = (year: number) => {
     const lines = seasonRecap(show, year);
     if (!lines.length) return;
     window.scrollTo({ top: 0, behavior: behavior() });
-    setRecap({ key: Date.now(), lines });
+    // The first line is "Season <year> · <n> episodes": the one line of a recap with a translation.
+    const row = show.rows.find((r) => r.id === `s${year}`);
+    const count = row?.kind === "episodes" ? row.items.length : 0;
+    setRecap({ key: Date.now(), lines: lines.map((text, i) => ({ text, sub: i === 0 && cc.on && cc.lang ? seasonSub(year, count, cc.lang) : undefined })) });
   };
 
   /* ----- N3: the Recruiter cut ----- */
@@ -501,7 +508,7 @@ function NetflixBody({ show, series, profile, status, portrait, fitPool, fast, c
           </div>
         ) : (
           <>
-            <NetflixHero series={show} profile={profile} status={status} text={text} fast={fast} firstRowId={firstRow} onMore={more ? () => open(more, null) : undefined} sound={sound} recap={recap} onRecapEnd={endRecap} />
+            <NetflixHero series={show} profile={profile} status={status} text={text} fast={fast} firstRowId={firstRow} onMore={more ? () => open(more, null) : undefined} sound={sound} recap={recap} onRecapEnd={endRecap} cc={cc} subData={subData} />
             {ready ? <NetflixRows show={show} rows={ratedRows} contact={contact} env={env} onRecap={profile === "story" ? playRecap : undefined} /> : <SkeletonRows />}
           </>
         )}

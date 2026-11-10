@@ -7,6 +7,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Episode, NetflixShow, NetflixProfileId } from "@/lib/site/netflix-data";
+import { factSub, latestSub, nextSub, statusSub, type NfLine, type SubData, type SubLang } from "@/lib/site/netflix-subs";
+import { CcButton } from "./netflix-cc";
 import { tick as tickSound } from "./netflix-sound";
 
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -23,23 +25,26 @@ type Props = {
   /** Where Play / skip lands: the first row's id. */
   firstRowId?: string;
   /** A season recap to type in the trailer panel instead of the profile trailer (N4). */
-  recap?: { key: number; lines: string[] } | null;
+  recap?: { key: number; lines: NfLine[] } | null;
   onRecapEnd?: () => void;
+  /** Subtitles (N8): the toggle and the translated facts they come from. */
+  cc: { on: boolean; lang: SubLang | null; toggle: () => void };
+  subData: SubData;
 };
 
 /** The pitch, built from the hero facts, the two newest main-branch episodes and the status line. */
-function trailerLines(series: NetflixShow, status: string): string[] {
+function trailerLines(series: NetflixShow, status: string, subs: { lang: SubLang; data: SubData } | null): NfLine[] {
   const main: Episode[] = series.rows.flatMap((r) => (r.kind === "episodes" ? r.items : [])).filter((e) => e.branch === "main").sort((a, b) => (a.date < b.date ? 1 : -1));
-  const lines = [`$ ${series.title.toLowerCase().replace(/\s+/g, "-")} --trailer`, `${series.title}. ${series.tagline}.`];
-  for (const f of series.hero.facts.filter((f) => !f.toLowerCase().startsWith("open"))) lines.push(f);
-  if (main[0]) lines.push(`Latest episode: ${main[0].title}.`);
-  if (main[1]) lines.push(`Before that: ${main[1].title}.`);
-  lines.push(`Status: ${status}.`);
-  lines.push("Next episode: your team?");
+  const lines: NfLine[] = [{ text: `$ ${series.title.toLowerCase().replace(/s+/g, "-")} --trailer` }, { text: `${series.title}. ${series.tagline}.` }];
+  for (const f of series.hero.facts.filter((f) => !f.toLowerCase().startsWith("open"))) lines.push({ text: f, sub: subs ? factSub(f, subs.data, subs.lang) : undefined });
+  if (main[0]) lines.push({ text: `Latest episode: ${main[0].title}.`, sub: subs ? latestSub(main[0].title, subs.lang) : undefined });
+  if (main[1]) lines.push({ text: `Before that: ${main[1].title}.`, sub: subs ? latestSub(main[1].title, subs.lang, true) : undefined });
+  lines.push({ text: `Status: ${status}.`, sub: subs ? statusSub(subs.data, subs.lang) : undefined });
+  lines.push({ text: "Next episode: your team?", sub: subs ? nextSub(subs.lang) : undefined });
   return lines.slice(0, 8);
 }
 
-export function NetflixHero({ series, profile, status, text, fast, firstRowId, onMore, sound, recap, onRecapEnd }: Props) {
+export function NetflixHero({ series, profile, status, text, fast, firstRowId, onMore, sound, recap, onRecapEnd, cc, subData }: Props) {
   const [playing, setPlaying] = useState(false);
   const [auto, setAuto] = useState(false);
   const autoDone = useRef(false);
@@ -130,12 +135,15 @@ export function NetflixHero({ series, profile, status, text, fast, firstRowId, o
           <button type="button" className="nf-round nf-vol" aria-label={sound.on ? "Mute" : "Unmute"} aria-pressed={sound.on} onClick={sound.toggle}>
             <span aria-hidden>{sound.on ? "🔊" : "🔇"}</span>
           </button>
+          <CcButton cc={cc} />
         </div>
       </div>
 
       {playing || recap ? (
         <Trailer
-          lines={recap ? recap.lines : trailerLines(series, status)}
+          lines={recap ? recap.lines : trailerLines(series, status, cc.on && cc.lang ? { lang: cc.lang, data: subData } : null)}
+          showSubs={cc.on && !!cc.lang}
+          cc={cc}
           ms={recap ? 20_000 : 14_000}
           fast={fast || reducedMotion()}
           auto={auto && !recap}
@@ -148,11 +156,12 @@ export function NetflixHero({ series, profile, status, text, fast, firstRowId, o
   );
 }
 
-function Trailer({ lines, ms, fast, auto, onEnd, sound }: { lines: string[]; ms: number; fast: boolean; auto: boolean; onEnd: (scroll: boolean, focus?: boolean) => void; sound: { on: boolean; toggle: () => void } }) {
+function Trailer({ lines: entries, showSubs, cc, ms, fast, auto, onEnd, sound }: { lines: NfLine[]; showSubs: boolean; cc: Props["cc"]; ms: number; fast: boolean; auto: boolean; onEnd: (scroll: boolean, focus?: boolean) => void; sound: { on: boolean; toggle: () => void } }) {
   const soundOn = useRef(sound.on);
   useEffect(() => {
     soundOn.current = sound.on;
   });
+  const lines = useMemo(() => entries.map((l) => l.text), [entries]);
   const total = useMemo(() => lines.reduce((n, l) => n + l.length + 1, 0), [lines]);
   const [chars, setChars] = useState(fast ? total : 0);
   const root = useRef<HTMLDivElement>(null);
@@ -208,6 +217,11 @@ function Trailer({ lines, ms, fast, auto, onEnd, sound }: { lines: string[]; ms:
           <p key={i} className="nf-tele-line" hidden={!s.text && i > 0 && !shown[i - 1].done}>
             {s.text}
             {!s.done && s.text ? <span className="nf-caret">▌</span> : null}
+            {showSubs && s.done && entries[i]?.sub ? (
+              <span className="nf-sub" lang={cc.lang ?? undefined}>
+                {entries[i].sub}
+              </span>
+            ) : null}
           </p>
         ))}
       </div>
@@ -215,6 +229,7 @@ function Trailer({ lines, ms, fast, auto, onEnd, sound }: { lines: string[]; ms:
         <div className="nf-progress" aria-hidden>
           <span style={{ width: `${Math.round((chars / total) * 100)}%` }} />
         </div>
+        <CcButton cc={cc} small hint />
         <button
           type="button"
           className="nf-round nf-round-s nf-trailer-vol"

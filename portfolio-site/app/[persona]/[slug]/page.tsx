@@ -16,7 +16,7 @@ import { ViewShell } from "../../components/views/view-shell";
 import { NETFLIX_PROFILES, buildNetflix, isNetflixProfile, type NetflixShow, type NetflixProfileId } from "@/lib/site/netflix-data";
 import { netflixCard, netflixShareLink } from "@/lib/site/netflix-og";
 import { loadEngineerTerminalData } from "../../load-terminal-data";
-import { terminalData } from "@/lib/site/terminal-data";
+import { I18N, terminalData } from "@/lib/site/terminal-data";
 import { NetflixView } from "../../components/views/netflix/netflix-view";
 import { loadHomeContent } from "../../load-home-content";
 import { shareMetadata, siteOrigin } from "@/lib/site/share-meta";
@@ -192,9 +192,10 @@ async function PersonaViewPage({ persona, view, fromTerminal, via }: { persona: 
     const { cfg, views } = await loadTerminalConfig();
     const data = terminalData(personas.find((p) => p.slug === persona), engineerEntries, engineerBlogPosts, views, cfg);
     const series = Object.fromEntries(NETFLIX_PROFILES.map((p) => [p.id, buildNetflix(p.id, data, engineerEntries, engineerBlogPosts)])) as Record<NetflixProfileId, NetflixShow>;
+    const tr = data.i18n ?? I18N;
     return (
       <ViewShell persona={persona} view={view} stripVia={fromTerminal}>
-        <NetflixView accent={accent} series={series} contact={data.contact} status={data.status} portrait={data.portrait} fitPool={{ stack: data.stack, resume: { skills: data.resume.skills } }} fast={via === "normal"} />
+        <NetflixView accent={accent} series={series} contact={data.contact} status={data.status} portrait={data.portrait} subData={{ uptime: data.uptime, i18n: { bn: { uptime: tr.bn.uptime, status: tr.bn.status }, hi: { uptime: tr.hi.uptime, status: tr.hi.status } } }} fitPool={{ stack: data.stack, resume: { skills: data.resume.skills } }} fast={via === "normal"} />
       </ViewShell>
     );
   }
