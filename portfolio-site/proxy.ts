@@ -41,6 +41,8 @@ function route(request: NextRequest) {
   if (parsed.kind === "unrouted") return NextResponse.next();
 
   const { pathname } = request.nextUrl;
+  // The share preview image is served as-is on every host (code.ratulroy.me/og?cmd=timeline).
+  if (pathname === "/og") return NextResponse.next();
   const [first = "", ...restSegments] = pathname.split("/").filter(Boolean);
   const rest = restSegments.length ? `/${restSegments.join("/")}` : "/";
 

@@ -23,6 +23,10 @@ import { HOME, resolvePath, shortPath, USER } from "@/lib/site/terminal-fs";
 import { createShell, HISTORY_CAP, initialShellState, THEMES, type Effect, type FileItem, type MenuId, type MenuRow, type Out, type ShellState, type ThemeId, type TimelineRow, type Tone } from "@/lib/site/terminal-shell";
 import { isPrerendering, whenActive } from "@/lib/site/prerender";
 import { forgetView, readView } from "@/lib/site/view-memory";
+import { themeCss } from "@/lib/site/terminal-themes";
+
+/** The theme colour blocks, generated from the shared palettes (terminal-themes.ts). */
+const THEME_CSS = themeCss();
 
 export type TerminalRootProps = {
   persona: LaunchedPersona;
@@ -1811,6 +1815,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       role="region"
       aria-label="Engineer terminal"
     >
+      <style>{THEME_CSS}</style>
       {/* The boot screen: the ssh window types the script, then dissolves (is-os). */}
       <div className="terminal-root-frame" aria-hidden={os}>
         <div ref={win} className={`hub-exit hub-exit-term terminal-root-win ${booting ? "is-boot" : ""}`}>
