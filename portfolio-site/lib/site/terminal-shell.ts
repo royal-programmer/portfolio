@@ -102,6 +102,9 @@ export type TimelineRow =
   | { head: string }
   | { year: string; mon: string; subject: string; tag?: string; grade?: string; dim?: boolean; life?: boolean; glyph?: string; label?: string; periodGrade?: string };
 
+/** One token in a `links` line: a link (`href`), a command (`cmd`) or a UI action (`act`: copy `url`, or open the phone's share sheet). */
+export type LinkItem = { label: string; href?: string; external?: boolean; cmd?: string; act?: "copy" | "share"; url?: string; title?: string };
+
 export type Out =
   | { kind: "text"; text: string; dim?: boolean; accent?: boolean }
   /** One line of differently coloured runs (`git log`, `theme`); `color` is a CSS colour for a swatch. */
@@ -109,7 +112,7 @@ export type Out =
   /** A QR code as text rows (`qr`). */
   | { kind: "qr"; lines: string[] }
   /** Several links on one line, joined by " · ". */
-  | { kind: "links"; items: Array<{ label: string; href?: string; external?: boolean; cmd?: string }>; prefix?: string; /** Wide `portfolio`: text on the left (clipped), the links at the right end of the same line. */ lead?: string }
+  | { kind: "links"; items: LinkItem[]; prefix?: string; /** Wide `portfolio`: text on the left (clipped), the links at the right end of the same line. */ lead?: string }
   /** A listing: `inline` joins the names on one line (`ls`); otherwise it is one row, `meta` before the name. */
   | { kind: "files"; inline: boolean; items: FileItem[] }
   /** `cal`: weeks of day numbers (null = blank), today highlighted. */
@@ -204,6 +207,7 @@ const COMMANDS: CommandDoc[] = [
   { name: "view", group: "open", usage: "view [id]", desc: "enter a view (no id: pick from the list)" },
   { name: "git", group: "read", usage: "git log [--oneline] [-n k]", desc: "live: my public commits on github" },
   { name: "stats", group: "read", usage: "stats [year|langs]", desc: "the GitHub year as a heatmap · streaks · languages", long: "year prints only the heatmap, langs only the language bar. Live from github, kept on this device for six hours." },
+  { name: "share", group: "read", usage: "share [command]", desc: "a link that opens the terminal on a command, with its preview", long: "Prints the link (code.ratulroy.me/?run=<command>) and the preview image it shows in a chat. No command: the one you ran before." },
   { name: "mail", group: "open", usage: "mail", desc: "send me a message, right here" },
   { name: "pane", group: "terminal", usage: "pane", desc: "show or hide the side pane" },
   { name: "date", group: "terminal", usage: "date", desc: "the local date and time" },
@@ -214,7 +218,7 @@ const COMMANDS: CommandDoc[] = [
 ];
 const NAMES = COMMANDS.map((c) => c.name);
 
-/** The tips box, numbered 1-7: typing a number runs that row's command. */
+/** The tips box, numbered 1-8: typing a number runs that row's command. */
 const TIPS = [
   { cmd: "help", desc: "every command" },
   { cmd: "hire", desc: "the short version, for recruiters" },
@@ -223,6 +227,7 @@ const TIPS = [
   { cmd: "projects", desc: "read what I built" },
   { cmd: "resume", desc: "the overview" },
   { cmd: "portfolio", desc: "the whole thing on one screen" },
+  { cmd: "share", desc: "send someone a command" },
 ];
 
 const text = (t: string, dim = false): Out => ({ kind: "text", text: t, dim: dim || undefined });
@@ -534,8 +539,31 @@ export function createShell(data: TerminalData): Shell {
     }
     head("contact");
     row(clip([...data.contact.filter((c) => !c.group).map((c) => c.label), "resume --pdf"].join(" · ")));
-    go("contact", "mail");
+    go("contact", "mail", "share");
     return out;
+  };
+
+  /** `share [command]`: the link that opens the terminal on a command, and the preview image a chat shows for it. */
+  const share = (args: string[], st: ShellState): Out[] => {
+    const cmdName = (line: string) => line.trim().split(/\s+/)[0].replace(/^\//, "").toLowerCase();
+    let cmd = args.join(" ").trim().replace(/\s+/g, " ").replace(/^\//, "");
+    if (!cmd) {
+      // Default: the command before this one (not share itself), else the whole portfolio.
+      const prev = [...st.history].reverse().find((h) => cmdName(h) !== "share" && NAMES.includes(cmdName(h)));
+      cmd = prev ? prev.trim().replace(/\s+/g, " ").replace(/^\//, "") : "portfolio";
+    }
+    // Same shape the `?run=` handler accepts: a known command, plain characters, short.
+    if (!/^[a-z][a-z0-9 ._~/-]{0,40}$/i.test(cmd) || !NAMES.includes(cmdName(cmd)))
+      return [text(`share: '${args.join(" ").trim()}' is not a command · try share timeline`)];
+    const origin = `https://${host}`;
+    const link = `${origin}/?run=${encodeURIComponent(cmd)}`;
+    const image = `${origin}/og?cmd=${encodeURIComponent(cmd)}`;
+    return [
+      text(`share: ${cmd}`, true),
+      { kind: "links", prefix: "link   ", items: [{ label: link, href: link }] },
+      { kind: "links", prefix: "image  ", items: [{ label: image, href: image }] },
+      { kind: "links", prefix: "       ", items: [{ label: "copy", act: "copy", url: link }, { label: "share…", act: "share", url: link, title: `$ ${cmd} · Ratul Roy` }] },
+    ];
   };
 
   /** `Sun Nov  8 15:04:05 IST 2026`, in the visitor's zone. */
@@ -695,6 +723,8 @@ export function createShell(data: TerminalData): Shell {
         return { lines: timeline(env?.cols ?? 100, args.includes("--all")) };
       case "view":
         return args[0] ? open(args[0], st) : menu("views");
+      case "share":
+        return { lines: share(args, st) };
       case "mail":
         return { lines: [], effect: { kind: "mail" } };
       case "pane":
@@ -804,8 +834,8 @@ export function createShell(data: TerminalData): Shell {
       return item ? { lines: cat([`~/${st.lastMenu}/${item.slug}.md`], st) } : { lines: [text(`no row ${low}`)] };
     }
 
-    // A bare 1-7 with no menu showing is the tips box's number.
-    if (/^[1-7]$/.test(low) && !args.length) return { lines: [], effect: { kind: "run", cmd: TIPS[Number(low) - 1].cmd } };
+    // A bare 1-8 with no menu showing is the tips box's number.
+    if (/^[1-8]$/.test(low) && !args.length) return { lines: [], effect: { kind: "run", cmd: TIPS[Number(low) - 1].cmd } };
 
     const near = nearest(low, NAMES);
     return { lines: [text(`command not found: ${name}`), ...(near ? [text(`did you mean: ${near}`, true)] : [])] };
@@ -840,6 +870,7 @@ export function createShell(data: TerminalData): Shell {
       if (cmd === "view") return viewIds.filter((n) => n.startsWith(word));
       if (cmd === "theme") return [...THEMES.map((t) => t.id as string), "random"].filter((n) => n.startsWith(word));
       if (cmd === "portrait") return [...PORTRAIT_MODES, "list", "next"].filter((n) => n.startsWith(word));
+      if (cmd === "share") return NAMES.filter((n) => n.startsWith(word.toLowerCase()));
       if (cmd === "timeline") return ["--all"].filter((n) => n.startsWith(word));
       if (cmd === "resume") return ["--pdf"].filter((n) => n.startsWith(word));
       if (cmd === "stats") return ["year", "langs"].filter((n) => n.startsWith(word));

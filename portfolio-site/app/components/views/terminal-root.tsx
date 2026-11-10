@@ -20,7 +20,7 @@ import { Heatmap, LangBar } from "@/app/components/views/terminal-heatmap";
 import { cachedPortrait, generatePortrait, PORTRAIT_COLS, PORTRAIT_MODES, type PortraitArt, type PortraitConfig, type PortraitMode } from "@/lib/site/portrait-gen";
 import type { TerminalData } from "@/lib/site/terminal-data";
 import { HOME, resolvePath, shortPath, USER } from "@/lib/site/terminal-fs";
-import { createShell, HISTORY_CAP, initialShellState, THEMES, type Effect, type FileItem, type MenuId, type MenuRow, type Out, type ShellState, type ThemeId, type TimelineRow, type Tone } from "@/lib/site/terminal-shell";
+import { createShell, HISTORY_CAP, initialShellState, THEMES, type Effect, type FileItem, type LinkItem, type MenuId, type MenuRow, type Out, type ShellState, type ThemeId, type TimelineRow, type Tone } from "@/lib/site/terminal-shell";
 import { isPrerendering, whenActive } from "@/lib/site/prerender";
 import { forgetView, readView } from "@/lib/site/view-memory";
 import { themeCss } from "@/lib/site/terminal-themes";
@@ -46,7 +46,7 @@ export type TerminalRootProps = {
 type Entry =
   /** `ps`: the path the command was typed at (the OS prompt); absent on the boot script's plain `$ `. */
   | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string; label?: string; tag?: "ok" | "wait" | "bar"; cands?: string[]; hl?: number }
-  | { n: number; k: "links"; items: Array<{ label: string; href?: string; external?: boolean; cmd?: string }>; prefix?: string; lead?: string }
+  | { n: number; k: "links"; items: LinkItem[]; prefix?: string; lead?: string }
   | { n: number; k: "ghcommit"; label: string; url: string; rest: string }
   | { n: number; k: "portrait"; mode: PortraitMode }
   | { n: number; k: "parts"; parts: Array<{ text: string; tone?: Tone; color?: string }> }
@@ -304,6 +304,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const [cwd, setCwd] = useState(HOME);
   const [partial, setPartial] = useState<string | null>("");
   const [cmd, setCmd] = useState("");
+  /** `share`: the copy token that just copied (`<entry n>`), shown as "copied ✓" for two seconds. */
+  const [copied, setCopied] = useState<number | null>(null);
   /** Where the real input's cursor is, so the drawn caret follows Home, arrows and clicks. */
   const [caret, setCaret] = useState(0);
   const [bell, setBell] = useState(false);
@@ -851,7 +853,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   /** The views menu, as `ls views/` prints it (the picker). */
   const showViews = (boot = false) => {
     const r = shell.run("views", { ...live.current.shell, history: [] });
-    // The boot picker is not numbered and does not take digits: 1-7 belong to the tips box.
+    // The boot picker is not numbered and does not take digits: 1-8 belong to the tips box.
     live.current.shell = { ...live.current.shell, lastMenu: boot ? undefined : r.state.lastMenu };
     print(r.lines, !boot);
   };
@@ -1520,6 +1522,22 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
 
   entriesRef.current = entries;
   const keepFocus = (e: { preventDefault: () => void }) => e.preventDefault();
+
+  /** A `share` token: copy the link, or open the phone's share sheet. */
+  const shareAct = (n: number, l: LinkItem) => {
+    if (!l.url) return;
+    if (l.act === "share") {
+      void navigator.share?.({ title: l.title, url: l.url }).catch(() => {});
+      return;
+    }
+    navigator.clipboard.writeText(l.url).then(
+      () => {
+        setCopied(n);
+        window.setTimeout(() => setCopied((c) => (c === n ? null : c)), 2000);
+      },
+      () => line("copy: the browser did not allow it · select the link above", false, true, here()),
+    );
+  };
   /** While the mail form owns the prompt, chips and bar buttons say so instead of doing nothing. */
   const mailBlocks = () => {
     if (!mailRef.current) return false;
@@ -1745,10 +1763,17 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         {e.lead ? <span className="rg-l">{e.lead}</span> : null}
         <span className={e.lead ? "rg-r" : undefined}>
           {e.prefix}
-          {e.items.map((l, i) => (
+          {/* The share sheet exists on phones; elsewhere only the copy token is shown. */}
+          {e.items.filter((l) => l.act !== "share" || "share" in navigator).map((l, i) => (
             <Fragment key={l.label}>
               {i ? " · " : ""}
-              {l.cmd ? (
+              {l.act ? (
+                <span aria-live="polite">
+                  <button type="button" className="terminal-root-link" onMouseDown={keepFocus} onClick={() => shareAct(e.n, l)}>
+                    {l.act === "copy" && copied === e.n ? "copied ✓" : l.label}
+                  </button>
+                </span>
+              ) : l.cmd ? (
                 <button type="button" className="terminal-root-link" onMouseDown={keepFocus} onClick={() => submit(l.cmd!)}>
                   {l.label}
                 </button>
