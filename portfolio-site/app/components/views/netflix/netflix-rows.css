@@ -191,6 +191,19 @@
   color: #d6d4cf;
   min-height: 1em;
 }
+.nf-teaser {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  padding: 12px 14px;
+  overflow: hidden;
+  pointer-events: none;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: #e9e7e2;
+  background: linear-gradient(180deg, rgba(8, 8, 12, 0.88), rgba(8, 8, 12, 0.97));
+}
 .nf-panel {
   position: absolute;
   top: 100%;

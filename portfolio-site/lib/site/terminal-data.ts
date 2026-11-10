@@ -8,6 +8,7 @@ import { RESUME_FILES, type ResumeFiles } from "@/lib/resume/files";
 import type { ArchDiagram } from "@/lib/site/terminal-arch";
 import type { Settings } from "@/lib/settings/schema";
 import type { ThemePalette } from "@/lib/site/terminal-themes";
+import { PROFILES, type TermProfile } from "@/lib/site/profiles";
 
 export type TermProject = {
   slug: string;
@@ -115,6 +116,8 @@ export type TermHiring = {
   compensation: string;
   visa: string;
   proof: string[];
+  /** Other places a recruiter can find me that have no public link (`hire --brief` prints a dim note per name). */
+  alsoOn?: string[];
   /** linkedin and github come from `contact`, so they cannot drift from it. */
   links: { resume: string; site: string };
 };
@@ -131,6 +134,7 @@ export const HIRING: TermHiring = {
   compensation: "band · ask",
   visa: "Indian citizen · no sponsorship needed in India",
   proof: ["200+ users on the Shift Roster rebuild", "11 Python automations in production", "VMS query 5–10 min → 2–3 min"],
+  alsoOn: ["Naukri"],
   links: { resume: RESUME_FILES.submitted.href, site: "https://code.ratulroy.me" },
 };
 
@@ -367,6 +371,8 @@ export type TerminalData = {
   stack: string[];
   uptime: string;
   contact: TermLink[];
+  /** Every place I am, with the live source each can use (`profiles`). */
+  profiles: TermProfile[];
   projects: TermProject[];
   posts: TermPost[];
   views: PersonaView[];
@@ -447,6 +453,7 @@ export function terminalData(persona: Persona | undefined, entries: Entry[], pos
     uptime: t.uptime,
     // The `mail` row follows the identity's email, so it cannot drift from the hub's.
     contact: t.contact.map((l) => (cfg.identity && l.label === "mail" ? { ...l, href: `mailto:${cfg.identity.email}` } : l)),
+    profiles: PROFILES,
     projects: entries
       .filter((e): e is Extract<Entry, { type: "project" }> => e.type === "project" && e.visibility === "public")
       .sort((a, b) => a.order - b.order)

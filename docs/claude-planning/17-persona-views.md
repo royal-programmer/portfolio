@@ -458,6 +458,12 @@ The engineer terminal quietly points at the other five personas with one live li
 - **`worlds` command** (read group): a row per persona (dot, name, handle or phrase, pulse line, `→ open`), then the footer `one person · six worlds · the hub has them all → ratulroy.me`. Offline it still prints the rows without pulse lines. `portfolio` gains a `worlds` section after `views` (names on one line, `→ worlds`). Strings in `terminal-strings*.ts` (`cmd.worlds.desc`, `pf.worlds`, `worlds.*`).
 - **Not done:** `worlds` is not in the OG allowlist; ride and trader share a green on the spectrum (auto placement).
 
+## 17. profiles, phone gate, menus by touch (round 15)
+
+- **`profiles [group]`** (`code learn work social`): every place I am, from `lib/site/profiles.ts` (data, admin-configurable later). Rows print at once; live numbers fill in place from `/api/profiles` (GitHub repos and contributions, Stack Overflow rep and answers, Holopin badges, HackerRank level, LeetCode solved; 4 s timeouts, 6 h cache, any failure is just a missing number). LinkedIn has no public API: a dated static note. No Naukri row (recruiter-only profiles); `hire --brief` prints a dim `also on Naukri` note from `hiring.alsoOn`. LeetCode is probed (`royal-programmer`, `royalprogrammer`, `royal_programmer`) and shown only when found. Hub closing section and the Netflix "To be continued" card read the same list.
+- **Phone gate**: a full-width `Skip the headset · Normal view →` pill under "Put on the headset" (max-sm); the header Immersive/Normal switch shows `I` / `N` on phones (full aria-labels).
+- **Menus by touch**: a coarse-pointer footer `tap a row · or type its number · Esc closes`, `↑ ↓` chips while a menu is live, transcript `touch-action: pan-y`. Root cause found for "views do not scroll": the hub set `html.scroll-locked` (`overflow: hidden`) and never removed it on unmount, so a view opened in the same document stayed frozen; the hub now cleans up and `ViewShell` clears it on mount.
+
 > **Admin console (round 13):** the view registry, the terminal's data, timeline, `arch` diagrams, themes
 > and translations are now `site_settings` keys (`engineer.views`, `engineer.terminal`, `engineer.timeline`,
 > `engineer.arch`, `engineer.themes`, `engineer.i18n`) with the code constants as defaults; see

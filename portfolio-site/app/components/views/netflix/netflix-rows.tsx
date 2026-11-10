@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Episode, NetflixShow, NfItem, ProjectCard, SkillCard } from "@/lib/site/netflix-data";
 import type { TermLink } from "@/lib/site/terminal-data";
+import { PROFILES } from "@/lib/site/profiles";
 import { useViewExit } from "../view-shell";
 import { tick } from "./netflix-sound";
 
@@ -187,6 +188,50 @@ const Bar = ({ value }: { value?: number }) =>
     </span>
   ) : null;
 
+/* ---------- Hover teaser (one card at a time) ---------- */
+
+let activeTeaser: { token: object; stop: () => void } | null = null;
+const TEASER_MAX = 140;
+
+/** After 800 ms of hover the card's art types a teaser (24 chars/s; at once under reduced motion). `text` is null while idle. */
+function useTeaser(source: string, sound: boolean) {
+  const full = source.length > TEASER_MAX ? `${source.slice(0, TEASER_MAX - 1).trimEnd()}…` : source;
+  const [text, setText] = useState<string | null>(null);
+  const token = useRef({});
+  const wait = useRef(0);
+  const type = useRef(0);
+  const stop = useCallback(() => {
+    window.clearTimeout(wait.current);
+    window.clearInterval(type.current);
+    if (activeTeaser?.token === token.current) activeTeaser = null;
+    setText(null);
+  }, []);
+  const arm = () => {
+    window.clearTimeout(wait.current);
+    wait.current = window.setTimeout(() => {
+      if (activeTeaser && activeTeaser.token !== token.current) activeTeaser.stop();
+      activeTeaser = { token: token.current, stop };
+      if (reducedMotion()) return setText(full);
+      let n = 0;
+      setText("");
+      type.current = window.setInterval(() => {
+        n += 1;
+        setText(full.slice(0, n));
+        if (sound && n % 4 === 0) tick();
+        if (n >= full.length) window.clearInterval(type.current);
+      }, 1000 / 24);
+    }, 800);
+  };
+  useEffect(
+    () => () => {
+      window.clearTimeout(wait.current);
+      window.clearInterval(type.current);
+    },
+    [],
+  );
+  return { text, typing: text !== null && text.length < full.length, arm, stop };
+}
+
 function EpisodeCard({ e, item, env }: { e: Episode; item: NfItem; env: CardEnv }) {
   const li = useRef<HTMLLIElement>(null);
   const timer = useRef(0);
@@ -195,12 +240,18 @@ function EpisodeCard({ e, item, env }: { e: Episode; item: NfItem; env: CardEnv 
   const liked = env.liked(item.id);
   const top = env.topId === item.id;
 
-  // A soft tick as the card expands (desktop, unmuted).
+  const teaser = useTeaser(e.synopsis ?? e.title, env.soundOn);
+
+  // A soft tick as the card expands (desktop, unmuted); after 800 ms the teaser starts typing over the art.
   const enter = (ev: React.PointerEvent) => {
-    if (ev.pointerType !== "mouse" || !env.soundOn) return;
-    timer.current = window.setTimeout(tick, 180);
+    if (ev.pointerType !== "mouse") return;
+    if (env.soundOn) timer.current = window.setTimeout(tick, 180);
+    teaser.arm();
   };
-  const leave = () => window.clearTimeout(timer.current);
+  const leave = () => {
+    window.clearTimeout(timer.current);
+    teaser.stop();
+  };
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
   return (
@@ -217,6 +268,12 @@ function EpisodeCard({ e, item, env }: { e: Episode; item: NfItem; env: CardEnv 
         </span>
         <span className="nf-card-title">{e.title}</span>
         <span className="nf-card-strip">{[e.runtime, e.tag, e.grade].filter(Boolean).join(" · ")}</span>
+        {teaser.text !== null ? (
+          <span className="nf-teaser" aria-hidden>
+            {teaser.text}
+            {teaser.typing ? <span className="nf-caret">▌</span> : null}
+          </span>
+        ) : null}
         <Bar value={env.progress[item.id]} />
       </button>
       <div className="nf-panel">
@@ -293,6 +350,7 @@ function ContinuedRow({ row, contact }: { row: { id: string; title: string }; co
   const mail = link("mail");
   const linkedin = link("linkedin");
   const github = link("github");
+  const so = PROFILES.find((p) => p.id === "stackoverflow")?.href;
   return (
     <section className="nf-row" id={`nf-row-${row.id}`} aria-labelledby={`nf-h-${row.id}`} data-kind="contact">
       <h2 className="nf-visually-hidden" id={`nf-h-${row.id}`}>
@@ -315,6 +373,11 @@ function ContinuedRow({ row, contact }: { row: { id: string; title: string }; co
           {github ? (
             <a className="nf-btn nf-btn-glass" href={github} target="_blank" rel="noreferrer">
               GitHub
+            </a>
+          ) : null}
+          {so ? (
+            <a className="nf-btn nf-btn-glass" href={so} target="_blank" rel="noreferrer">
+              Stack Overflow
             </a>
           ) : null}
           {exit ? (

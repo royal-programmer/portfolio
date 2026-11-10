@@ -53,9 +53,9 @@ export function AdminShell({ groups, tableReady, error, children }: { groups: Ra
             </Link>
           ))}
           <hr />
-          <a href="/capture/admin" onClick={guard}>
+          <Link href="/capture/admin" onClick={guard}>
             Entries · projects
-          </a>
+          </Link>
         </nav>
         <form action={signOut} className="adm-signout">
           <button type="submit" className="adm-link">

@@ -26,6 +26,7 @@ import Lenis from "lenis";
 import type { PersonaSlug } from "@/lib/content/types";
 import { ambient } from "@/lib/site/ambient-sound";
 import { DISPLAY_ROOT, HUB_COPY, personaIdentity } from "@/lib/site/brand";
+import { PROFILES } from "@/lib/site/profiles";
 import { analyseDevice, type DeviceReport } from "@/lib/site/device";
 import type { Quality } from "@/lib/site/experience";
 import { PersonaLink, personaHref } from "@/lib/site/persona-link";
@@ -813,6 +814,9 @@ export function HubExperience({ chapters, upcoming, terminalItems = [], copy: co
     if (scrollFree) lenisRef.current?.start();
     else lenisRef.current?.stop();
   }, [scrollFree]);
+  // Leaving the hub (a view opens in the same document) must not leave `html { overflow: hidden }` behind: that froze
+  // every page-scrolling view (Netflix, Stage ...) on a phone, where the hand-off is a client navigation.
+  useEffect(() => () => document.documentElement.classList.remove("scroll-locked"), []);
 
   // ---- Pointer: parallax always; drag to look, hold to slow, tap to start ----
   useEffect(() => {
@@ -1121,6 +1125,16 @@ export function HubExperience({ chapters, upcoming, terminalItems = [], copy: co
                   Résumé (PDF)
                 </a>
                 <p className="mt-4 font-mono text-xs text-[var(--ink-faint)]">{email}</p>
+                {/* The same data as the terminal's `profiles`: work and social rows, plus GitHub. */}
+                <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1 font-mono text-xs">
+                  {PROFILES.filter((p) => p.href && (p.group === "work" || p.group === "social" || p.id === "github")).map((p) => (
+                    <li key={p.id}>
+                      <a href={p.href} target="_blank" rel="noreferrer" className="hit inline-flex min-h-8 items-center text-[var(--ink-dim)] underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline">
+                        {p.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
                 {immersiveLive && introDone ? (
                   // The one line in the empty sky (D38): click it and the journey rewinds to the headset.
                   <button type="button" onClick={rewind} className="vr-takeoff">

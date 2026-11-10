@@ -27,12 +27,11 @@ const monthName = (m: string) => ["jan", "feb", "mar", "apr", "may", "jun", "jul
 export function TimelinePreview({ value }: { value: Settings["engineer.timeline"] }) {
   const rows = useMemo(() => {
     const sorted = value.entries.map((e, i) => ({ e, i })).sort((a, b) => b.e.date.localeCompare(a.e.date) || b.i - a.i);
-    let prev = "";
-    return sorted.map(({ e }) => {
+    return sorted.map(({ e }, k) => {
       const [y, m] = e.date.split("-");
-      const year = y !== prev ? y : "";
-      prev = y;
-      return { year, mon: monthName(m ?? ""), e };
+      // The year prints on the first row of each run, as the terminal does.
+      const before = k > 0 ? sorted[k - 1].e.date.split("-")[0] : "";
+      return { year: y !== before ? y : "", mon: monthName(m ?? ""), e };
     });
   }, [value.entries]);
   return (
