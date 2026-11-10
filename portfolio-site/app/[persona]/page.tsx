@@ -10,7 +10,7 @@ import { placeOnSpectrum } from "@/lib/site/spectrum";
 import { HomePage } from "../components/home-page";
 import { WorldBoot } from "../components/world-boot";
 import { TerminalRoot } from "../components/views/terminal-root";
-import { getViews } from "@/lib/content/views";
+import { loadTerminalConfig } from "@/lib/settings/load";
 import { terminalData } from "@/lib/site/terminal-data";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -97,8 +97,8 @@ export default async function PersonaPage({ params, searchParams }: PersonaPageP
   // The Engineer page is one dataset with many views; its root is the terminal, which lists them
   // (17-persona-views.md). The other personas keep their page until their own rounds.
   if (launched === "engineer") {
-    const views = getViews(launched);
-    const data = terminalData(personas.find((p) => p.slug === launched), engineerEntries, engineerBlogPosts, views);
+    const { cfg, views } = await loadTerminalConfig();
+    const data = terminalData(personas.find((p) => p.slug === launched), engineerEntries, engineerBlogPosts, views, cfg);
     return <TerminalRoot persona={launched} t={t} color={accent} via={viaKind} pwa={pwa} items={items} views={views} data={data} />;
   }
   return (

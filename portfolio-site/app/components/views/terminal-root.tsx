@@ -2321,7 +2321,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       lang={lang}
       data-lang={lang}
     >
-      <style>{THEME_CSS}</style>
+      <style>{data.themes ? themeCss(data.themes) : THEME_CSS}</style>
       {saver !== "off" ? (
         <TerminalSaver
           cfg={portraitCfg}

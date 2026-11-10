@@ -48,7 +48,8 @@ gsap.registerPlugin(ScrollTrigger, SplitText);
 
 export type HubChapter = { slug: PersonaSlug; t: number; body: string; points: string[] };
 export type HubUpcoming = { slug: PersonaSlug; t: number };
-type Props = { chapters: HubChapter[]; upcoming: HubUpcoming[]; /** Published engineer project slugs (the terminal's `ls`). */ terminalItems?: string[] };
+export type HubCopy = { headline: string; intro: string; throughTitle: string; moreTitle: string; closingTitle: string; closingBody: string; character: readonly string[] };
+type Props = { chapters: HubChapter[]; upcoming: HubUpcoming[]; /** Published engineer project slugs (the terminal's `ls`). */ terminalItems?: string[]; /** Admin-console copy (`hub.copy`); the code defaults when absent. */ copy?: HubCopy; email?: string };
 
 type SectionKind =
   | { kind: "hero" }
@@ -89,7 +90,9 @@ class SceneBoundary extends Component<{ onFail: () => void; children: ReactNode 
   }
 }
 
-export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props) {
+export function HubExperience({ chapters, upcoming, terminalItems = [], copy: copyProp, email: emailProp }: Props) {
+  const copy: HubCopy = copyProp ?? HUB_COPY;
+  const email = emailProp ?? HUB_COPY.email;
   const xp = useExperience();
   const { experience, ready, chosen, setExperience, setQuality, qualityChosen, sound, soundChoice } = xp;
 
@@ -1052,10 +1055,10 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
               <span className="block italic text-[var(--ink-dim)]">Many perspectives.</span>
             </h1>
             <p data-hero-item className="mt-7 text-[length:var(--step-1)] text-[var(--ink-dim)]">
-              {HUB_COPY.intro} <CyclingPhrase chapters={chapters} />
+              {copy.intro} <CyclingPhrase chapters={chapters} />
             </p>
             <p data-hero-item className="mt-3 font-mono text-[11px] leading-relaxed tracking-[0.06em] text-[var(--ink-faint)] sm:text-xs">
-              <CyclingLine lines={HUB_COPY.character} />
+              <CyclingLine lines={copy.character} />
             </p>
           </div>
         </section>
@@ -1063,7 +1066,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         {/* ---------- Into the colour ---------- */}
         <section id="through" data-section className="flex min-h-[110svh] items-center justify-center px-4 text-center sm:px-8">
           <h2 data-split className="max-w-3xl font-display text-[length:var(--step-4)] leading-[0.98] tracking-[-0.015em]">
-            {HUB_COPY.throughTitle}
+            {copy.throughTitle}
           </h2>
         </section>
 
@@ -1076,7 +1079,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
             <div className="max-w-xl">
               <p className="font-mono text-[10px] tracking-[0.24em] text-[var(--ink-faint)] uppercase">Still refracting</p>
               <h2 data-split className="mt-4 font-display text-[length:var(--step-4)] leading-[0.95]">
-                {HUB_COPY.moreTitle}
+                {copy.moreTitle}
               </h2>
               <ul data-rise className="mt-8 flex flex-wrap gap-x-6 gap-y-2 font-mono text-[11px] tracking-[0.16em] uppercase">
                 {upcoming.map((u, i) => (
@@ -1094,17 +1097,17 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         <section id="end" data-section className="flex min-h-[100svh] flex-col px-4 sm:px-8 lg:px-12">
           <div className="my-auto max-w-2xl pt-28 lg:max-w-3xl">
             <h2 data-split className="font-display text-[length:var(--step-4)] leading-[0.95]">
-              {HUB_COPY.closingTitle.split(/(?<=\.)\s+/).map((line, i) => (
+              {copy.closingTitle.split(/(?<=\.)\s+/).map((line, i) => (
                 <span key={i} className={`block ${i > 0 ? "italic text-[var(--ink-dim)]" : ""}`}>
                   {line}
                 </span>
               ))}
             </h2>
             <div data-rise>
-              <p className="mt-6 max-w-lg text-[length:var(--step-0)] leading-relaxed text-[var(--ink-dim)]">{HUB_COPY.closingBody}</p>
+              <p className="mt-6 max-w-lg text-[length:var(--step-0)] leading-relaxed text-[var(--ink-dim)]">{copy.closingBody}</p>
               <div className="mt-10">
                 <a
-                  href={`mailto:${HUB_COPY.email}`}
+                  href={`mailto:${email}`}
                   className="inline-flex min-h-12 items-center gap-3 rounded-full bg-[var(--ink)] px-7 text-sm font-medium text-[var(--void)] transition-transform duration-[var(--dur-2)] hover:-translate-y-0.5"
                 >
                   Say hello <span aria-hidden>→</span>
@@ -1117,7 +1120,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
                 >
                   Résumé (PDF)
                 </a>
-                <p className="mt-4 font-mono text-xs text-[var(--ink-faint)]">{HUB_COPY.email}</p>
+                <p className="mt-4 font-mono text-xs text-[var(--ink-faint)]">{email}</p>
                 {immersiveLive && introDone ? (
                   // The one line in the empty sky (D38): click it and the journey rewinds to the headset.
                   <button type="button" onClick={rewind} className="vr-takeoff">

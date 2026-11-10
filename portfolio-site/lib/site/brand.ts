@@ -51,7 +51,8 @@ export const HIRE_PERSONAS: readonly PersonaSlug[] = ["engineer"];
 
 type IdentitySource = Omit<PersonaIdentity, "subdomain" | "phrase">;
 
-const IDENTITY: Record<PersonaSlug, IdentitySource> = {
+/** The code defaults for `personas.copy` (the admin console can override them per key). */
+export const PERSONA_IDENTITY_SOURCE: Record<PersonaSlug, IdentitySource> = {
   engineer: { role: "Engineer", handle: "royal-programmer", phrases: ["build systems that stay up", "ship code that earns its keep", "automate the boring parts"], cta: "Step into the code" },
   trader: { role: "Trader", handle: "royal-trades", phrases: ["read markets, not rumours", "size the risk before the reward", "wait for the setup"], cta: "Open the trading desk" },
   photographer: { role: "Photographer", handle: "royal-frames", phrases: ["frame the moment before it passes", "chase light, not likes", "tell a story in one frame"], cta: "Look through my lens" },
@@ -61,6 +62,6 @@ const IDENTITY: Record<PersonaSlug, IdentitySource> = {
 };
 
 export function personaIdentity(slug: PersonaSlug): PersonaIdentity {
-  const base = IDENTITY[slug];
+  const base = PERSONA_IDENTITY_SOURCE[slug];
   return { ...base, phrase: base.phrases[0], subdomain: SUBDOMAIN_BY_PERSONA[slug] };
 }
