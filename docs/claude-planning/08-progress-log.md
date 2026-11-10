@@ -1396,3 +1396,7 @@ stripped service_role's table grants).
 ### Round 10 - the other worlds in the terminal (2026-11-10)
 
 - `lib/worlds/` pulse providers + `/api/worlds/pulse`; pane Live gets two rotating world lines; `worlds` command and a `worlds` line on `portfolio`; bn/hi strings. All five other worlds are stubs today (no content entries). Details: 17-persona-views.md section 15.
+
+### Round 14 - two résumés, resume --build with progress (2026-11-10)
+
+- Submitted PDF is the default (`resume --pdf`, hire pill, hub, Netflix hero, fit sheet links); `resume --build` streams a real build (`/api/resume/build`, `lib/resume/{pipeline,store,files}.ts`) and offers preview / download / share. `/resume.pdf` is force-dynamic. Fit sheet availability says employed at Altimetrik (dim on the trailing "ask" only). bn/hi strings added. Netflix "To be continued" has no résumé button (none added).

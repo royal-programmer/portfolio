@@ -367,7 +367,11 @@ registry entry is `enabled: true`, so `view netflix`, the pane row and the picke
   - *Not done*: hover controls only on episode cards; the "match %" is replaced by `New` / season (no fake score).
   - Dev needs `next dev --webpack` inside a git worktree (Turbopack rejects a `node_modules` junction that points outside the root).
 
-## 8. Generated résumé (round 3)
+## 8. Two résumés (round 3, round 14)
+
+**Round 14: there are two.** *Submitted* = `public/Ratul_Roy_Resume.pdf` (the hand-made file; `TerminalData.resumeFiles.submitted`, which the admin console will own). It is the default: `resume --pdf` and every View résumé link open it. *Generated* = the data-built PDF below, reached only through `resume --build` (and `/resume.pdf`). `resume --build` calls `/api/resume/build` (SSE: `collect layout fonts render verify`, each with its ms, then `done` with `{token, bytes, pages, ms}` or `error`); the terminal shows a bar and one line per stage, then `preview · download · share`. Bytes live in a `globalThis` Map (10 min, 20 entries) served by `/resume.pdf?build=<token>` (`&download=1` = attachment `Ratul_Roy_Resume_<date>.pdf`; expired = 410). The verify stage fails the build on a phone-number-shaped run. `/resume.pdf` is now `force-dynamic` (a static route never sees the query) and keeps its Cache-Control. Fit sheet availability reads `employed · Altimetrik · notice period applies · ask`.
+
+### Generated résumé (round 3)
 
 `/resume.pdf` is built from the same data as the terminal and the Netflix view (`RESUME`, `TIMELINE`, `TIMELINE_PERIODS`, contact links, public projects), so editing one place updates all three. One A4 page, ATS-friendly (real text, no tables, no icons, no fills), Inter, a thin persona-accent rule. The résumé-worthy bullets are listed in `RESUME.pdfBullets`. No phone number, ever. The hand-made `public/Ratul_Roy_Resume.pdf` stays until Ratul has compared the two.
 
