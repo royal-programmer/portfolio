@@ -12,6 +12,7 @@
     "prebuild": "node scripts/hub-media.mjs"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.9.0",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
     "@react-three/postprocessing": "^3.2.2",
