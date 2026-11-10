@@ -5,6 +5,13 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-10 — Round 12: the terminal, bolder
+
+- Ghost suggestions, did-you-mean tokens, `fit` (job description vs my stack), `arch` (four system diagrams), screensaver, and Realtime presence. Details: 17-persona-views.md section 16.
+- Commits: a7381b3 (ghost + did-you-mean + fit), b0850fa (arch), 00e71cf (screensaver + presence), plus follow-up fixes.
+- Caught by a node harness before the browser: `arch` layout read `top` before it was defined; `fit` skipped `Go` after a colon.
+- Open: `tsc` reports one error in `app/og/route.tsx` (`sharp` types) after the node_modules reinstall, not from this round (see the sharp trap in section 10). Browser verification waited on the dev server, which stopped answering during the reinstall.
+
 ## 2026-11-10 — Round 5: `share` deep links and generated previews
 
 - `/og?cmd=<command>&theme=<id>` draws the real terminal output as a 1200x630 PNG; metadata on the Engineer page (`?run=`), views and hub points at it; `share [cmd]` prints the link, image URL, copy and share tokens. Details: 17-persona-views.md section 10.

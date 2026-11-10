@@ -102,7 +102,7 @@ function has(text: string, orig: string, alias: string, exact?: boolean): boolea
     if (exact) {
       if (orig.slice(i, i + alias.length) !== "Go") continue;
       const next = /^\s+([a-z]+)/i.exec(orig.slice(i + alias.length))?.[1]?.toLowerCase();
-      if ((next && STOP_AFTER_GO.has(next)) || /(^|[.!?:\n])\s*$/.test(orig.slice(0, i))) continue;
+      if ((next && STOP_AFTER_GO.has(next)) || /(^|[.!?\n])\s*$/.test(orig.slice(0, i))) continue;
     }
     return true;
   }

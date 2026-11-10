@@ -97,13 +97,6 @@ export function layoutArch(d: ArchDiagram, cols: number): ArchLayout {
 
   // Wide: node boxes (3 rows) in columns, a gutter per neighbouring pair.
   const widths = layers.map((l) => Math.max(0, ...l.map((n) => label(n).length + 4)));
-  const gut = layers.map((_, i) => {
-    const es = byGutter[i];
-    if (!es.length || i === layers.length - 1) return 0;
-    const lab = Math.max(0, ...es.map((e) => (d.edges[e][2] ?? "").length));
-    const moves = es.filter((e) => rowMid(e) !== rowMid(e, true)).length;
-    return Math.max(7, lab + 2 * moves + 5);
-  });
   const maxRows = Math.max(1, ...layers.map((l) => l.length));
   const top = (c: number, k: number) => Math.round(((maxRows - layers[c].length) * 4) / 2) + k * 4;
   function rowMid(e: number, target = false) {
@@ -111,6 +104,13 @@ export function layoutArch(d: ArchDiagram, cols: number): ArchLayout {
     const c = col.get(id) ?? 0;
     return top(c, layers[c].findIndex((n) => n.id === id)) + 1;
   }
+  const gut = layers.map((_, i) => {
+    const es = byGutter[i];
+    if (!es.length || i === layers.length - 1) return 0;
+    const lab = Math.max(0, ...es.map((e) => (d.edges[e][2] ?? "").length));
+    const moves = es.filter((e) => rowMid(e) !== rowMid(e, true)).length;
+    return Math.max(7, lab + 2 * moves + 5);
+  });
   const width = widths.reduce((a, b) => a + b, 0) + gut.reduce((a, b) => a + b, 0);
 
   if (width <= cols && !skipped.length) {
@@ -139,6 +139,7 @@ export function layoutArch(d: ArchDiagram, cols: number): ArchLayout {
       if (!g) return;
       const x0 = xs[ci] + widths[ci];
       let lane = 0;
+      const labelled = new Set<string>();
       for (const e of byGutter[ci]) {
         const ya = rowMid(e);
         const yb = rowMid(e, true);
@@ -152,7 +153,7 @@ export function layoutArch(d: ArchDiagram, cols: number): ArchLayout {
           for (let c = 0; c < g; c++) tag(ya, x0 + c, (c > 0 ? W : 0) | (c < g - 1 ? E : 0));
         } else {
           const lx = x0 + 2 + 2 * lane++;
-          for (let c = 0; c <= lx - x0; c++) tag(ya, x0 + c, (c > 0 ? W : 0) | E);
+          for (let c = 0; c < lx - x0; c++) tag(ya, x0 + c, (c > 0 ? W : 0) | E);
           const [lo, hi] = ya < yb ? [ya, yb] : [yb, ya];
           for (let r = lo; r <= hi; r++) tag(r, lx, (r > lo ? N : 0) | (r < hi ? S : 0));
           // The corner turns: from the source row into the lane, and from the lane to the target row.
@@ -163,7 +164,10 @@ export function layoutArch(d: ArchDiagram, cols: number): ArchLayout {
         // Arrowhead and label on the target row's last run.
         const cell = grid[yb][x0 + g - 1];
         cell.ch = "▶";
-        if (lab) {
+        const slot = `${ci}:${yb}`;
+        // Edges that arrive at one box share its last run: the first label stays, the others are left out.
+        if (lab && !labelled.has(slot)) {
+          labelled.add(slot);
           const start = ya === yb ? x0 + 1 : x0 + 2 + 2 * (lane - 1) + 2;
           const room = x0 + g - 1 - start;
           if (room >= lab.length + 2) {
@@ -183,7 +187,7 @@ export function layoutArch(d: ArchDiagram, cols: number): ArchLayout {
   // Narrow: one block per column, the box then the edges that leave it as `↓` lines.
   const lines: ArchRun[][] = [];
   const room = Math.max(12, cols - 2);
-  layers.forEach((l, ci) => {
+  layers.forEach((l) => {
     l.forEach((n) => {
       const text = clip(label(n), room - 4);
       const inner = text.length + 2;

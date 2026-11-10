@@ -53,7 +53,12 @@ export function ghostFor(input: string, history: string[], complete: (input: str
     }
     let best = cands[0];
     let top = 0;
-    for (const [k, v] of uses) if (v > top) (best = k), (top = v);
+    for (const [k, v] of uses) {
+      if (v > top) {
+        best = k;
+        top = v;
+      }
+    }
     return best;
   }
   for (let i = history.length - 1; i >= 0; i--) {
