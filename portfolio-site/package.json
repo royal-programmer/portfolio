@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/sw-manifest.mjs",
     "start": "next start",
     "lint": "eslint",
     "hub:media": "node scripts/hub-media.mjs",

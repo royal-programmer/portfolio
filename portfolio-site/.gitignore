@@ -41,3 +41,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Generated after next build (scripts/sw-manifest.mjs): the service worker precache list
+/public/sw-manifest.json
