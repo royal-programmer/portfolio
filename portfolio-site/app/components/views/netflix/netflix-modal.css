@@ -107,8 +107,12 @@
   display: none;
 }
 .nf-tele2 {
+  padding: 16px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.55);
   position: absolute;
-  inset: 3.5rem 2.5rem 5.2rem;
+  inset: 3.5rem 2.5rem auto;
+  max-height: calc(100% - 9rem);
   margin: 0;
   overflow: hidden;
   font-family: var(--font-geist-mono), monospace;
@@ -470,7 +474,7 @@
     bottom: 5rem;
   }
   .nf-tele2 {
-    inset: 3.5rem 1.1rem 5rem;
+    inset: 3.5rem 1.1rem auto;
   }
   .nf-m-bar {
     left: 1.1rem;

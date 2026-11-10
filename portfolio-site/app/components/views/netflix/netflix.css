@@ -283,9 +283,16 @@
 .nf-btn-glass:hover {
   background: rgba(120, 120, 130, 0.65);
 }
-[data-playing] .nf-hero-copy,
 [data-playing] .nf-art {
   opacity: 0.3;
+}
+/* While the trailer plays the hero copy gets out of its way. */
+.nf-hero-copy {
+  transition: opacity 300ms ease;
+}
+[data-playing] .nf-hero-copy {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* The trailer: a teleprompter inside the hero. */
@@ -302,6 +309,12 @@
   outline: none;
 }
 .nf-tele {
+  align-self: flex-start;
+  width: 100%;
+  max-width: 720px;
+  padding: 16px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.55);
   font-family: var(--font-geist-mono), monospace;
   font-size: clamp(0.95rem, 1.8vw, 1.35rem);
   line-height: 1.7;
