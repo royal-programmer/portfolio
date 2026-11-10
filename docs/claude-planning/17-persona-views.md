@@ -432,3 +432,13 @@ The terminal installs and opens offline.
 - **`mail --fit`**: the message step starts with `Hi Ratul — saw your fit sheet (code.ratulroy.me). We are hiring a <first role>; the stack is <first five core items>. Can we talk this week?` in the input, editable; Enter keeps the line, an empty line sends. The lead is stored with `source: hire-brief` (`/api/lead` allow-list; the column is free text, no migration).
 - **Layout**: 60 columns or more: left rule like `portfolio`; narrower: no rule, one item per line, tokens on two lines. Short `hire` ends with a dim `hire --brief · the one-screen fit sheet`; the pane's `hire` button tooltip adds `--brief for the fit sheet`.
 - **Strings**: `hb.*` keys in en, bn and hi.
+
+## 14. Clock (round 9)
+
+The terminal follows the visitor's clock, never over a choice they made.
+
+- **Data:** `TerminalData.clock` (`lib/site/terminal-data.ts`): five hour bands (night 0-5 matrix, dawn 5-9 solarized, day 9-17 accent, evening 17-21 gruvbox, late 21-24 dracula) each with a greeting and a hint, a weekend greeting/hint, and `myTz` (Asia/Kolkata). English reads the data; bn and hi read `clock.<band>.greet/hint` in `terminal-strings*.ts`.
+- **Rules:** the band comes from the visitor's local hour (`lib/site/terminal-clock.ts`). Its theme applies only when `xp-term-theme` is unset and is never persisted; `theme <name>` persists and wins; `theme auto` clears the key and sets `xp-term-theme-auto=1`. The boot hint line is `<greet> <hint>`: first visit uses the band hint, a returning visitor keeps `hint.back`, and a weekend swaps in the weekend hint for both. The bn/hi language hint line is untouched.
+- **Surfaces:** `theme` menu first row `auto · follows your clock (<band>)` (previews the band theme; numbered picks shift by one); `now` first line `<greet> it is <time> where you are`; one dim pane line `it is <time> for you · <time> for me in Bengaluru` (12-hour am/pm in en, 24-hour in bn/hi), refreshed every 20 s, no seconds. `theme [name|auto|random]` has a man page and completion. The screensaver clock and the pane share `hhmm` / `say` in `terminal-clock.ts`.
+- **SSR:** the clock is client-only; the pane line renders a reserved two-line blank until mount, the boot lines are typed after mount.
+- **Phones:** the side pane is hidden at 393 px (as before), so the clock line is in the DOM but not visible there; `now` carries it on phones.

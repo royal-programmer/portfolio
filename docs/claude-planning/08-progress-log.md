@@ -1388,3 +1388,7 @@ stripped service_role's table grants).
 - ⚠️ Build logs show `NODE_TLS_REJECT_UNAUTHORIZED=0` set in the environment
   (disables TLS cert verification). Track down its source and remove — real security
   risk. Not blocking Phase 0.
+
+### Round 9 - the terminal follows the visitor's clock (2026-11-10)
+
+- `terminal-clock.ts`, `TerminalData.clock`, theme bands (unpersisted, saved pick wins), greeting prefix on the boot hint, weekend variant, `theme auto`, `now` greeting line, pane clock line, bn/hi strings. Verified at stubbed hours 2, 7, 13, 19, 23 and a Saturday; `theme amber` survives reload at hour 2, `theme auto` gives matrix. Details: 17-persona-views.md section 14.
