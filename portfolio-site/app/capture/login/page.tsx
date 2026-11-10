@@ -1,10 +1,13 @@
 "use client";
 
-import { useActionState } from "react";
+import { Suspense, useActionState } from "react";
+import { useSearchParams } from "next/navigation";
 import { signIn, type ActionState } from "../actions";
 
-export default function CaptureLoginPage() {
+function LoginForm() {
   const [state, action, pending] = useActionState<ActionState, FormData>(signIn, {});
+  // Where to go after signing in (e.g. /admin); the action re-validates it server-side.
+  const next = useSearchParams().get("next") ?? "";
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
@@ -14,6 +17,7 @@ export default function CaptureLoginPage() {
       </div>
 
       <form action={action} className="flex flex-col gap-4">
+        <input type="hidden" name="next" value={next} />
         <label className="flex flex-col gap-1 text-sm">
           Email
           <input
@@ -46,5 +50,13 @@ export default function CaptureLoginPage() {
         </button>
       </form>
     </main>
+  );
+}
+
+export default function CaptureLoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

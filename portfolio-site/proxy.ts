@@ -65,8 +65,8 @@ function route(request: NextRequest) {
     }
 
     case "persona": {
-      // Admin + hub live on the root host (auth cookies are host-scoped).
-      if (first === "capture") return NextResponse.redirect(hostUrl(request, parsed.root, null, pathname));
+      // Admin (capture + /admin) + hub live on the root host (auth cookies are host-scoped).
+      if (first === "capture" || first === "admin") return NextResponse.redirect(hostUrl(request, parsed.root, null, pathname));
       if (first === "whoami") return NextResponse.redirect(hostUrl(request, parsed.root, null, "/"));
       // Path-style URL on the persona's own host. Documents get the clean URL;
       // client-router (RSC) fetches are served as-is — the router can't follow

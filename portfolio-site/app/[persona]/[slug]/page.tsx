@@ -8,7 +8,7 @@ import {
   listEntries,
   type LaunchedPersona,
 } from "@/lib/content";
-import { getView, getViews } from "@/lib/content/views";
+import { loadTerminalConfig, loadViews } from "@/lib/settings/load";
 import { placeOnSpectrum } from "@/lib/site/spectrum";
 import { HomePage } from "../../components/home-page";
 import { WorldBoot } from "../../components/world-boot";
@@ -30,7 +30,7 @@ export async function generateStaticParams() {
   const params: Array<{ persona: string; slug: string }> = [];
   for (const persona of personas) {
     // The page's views are branches at the same depth as its entries (17-persona-views.md).
-    const views = getViews(persona);
+    const views = await loadViews(persona);
     for (const view of views) params.push({ persona, slug: view.id });
     const entries = await listEntries(persona);
     for (const entry of entries) {
@@ -51,7 +51,7 @@ export async function generateMetadata({ params }: ProjectDetailProps): Promise<
   if (!isLaunchedPersona(persona)) {
     return { title: "Not found | Ratul Roy", robots: { index: false, follow: false } };
   }
-  const view = getView(persona, slug);
+  const view = (await loadViews(persona)).find((v) => v.id === slug);
   if (view) {
     const record = await getPersona(persona);
     const origin = siteOrigin(SUBDOMAIN_BY_PERSONA[persona]);
@@ -74,7 +74,7 @@ export default async function PersonaEntryPage({ params, searchParams }: Project
 
   if (slug === "series") redirect(`/${persona}/netflix`);
 
-  const view = getView(persona, slug);
+  const view = (await loadViews(persona)).find((v) => v.id === slug);
   if (view) return <PersonaViewPage persona={persona} view={view.id} fromTerminal={via === "terminal"} via={via} />;
 
   const entry = await getEntryBySlug(persona, slug);
@@ -178,7 +178,8 @@ async function PersonaViewPage({ persona, view, fromTerminal, via }: { persona: 
   }
   if (view === "netflix") {
     // One dataset, three orderings: built here, picked on the client ("Who's watching?").
-    const data = terminalData(personas.find((p) => p.slug === persona), engineerEntries, engineerBlogPosts, getViews(persona));
+    const { cfg, views } = await loadTerminalConfig();
+    const data = terminalData(personas.find((p) => p.slug === persona), engineerEntries, engineerBlogPosts, views, cfg);
     const series = Object.fromEntries(NETFLIX_PROFILES.map((p) => [p.id, buildNetflix(p.id, data, engineerEntries, engineerBlogPosts)])) as Record<NetflixProfileId, NetflixShow>;
     return (
       <ViewShell persona={persona} view={view} stripVia={fromTerminal}>

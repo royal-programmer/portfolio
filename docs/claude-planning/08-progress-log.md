@@ -1408,3 +1408,7 @@ stripped service_role's table grants).
 ### Round 16 - Netflix view, part A (2026-11-10)
 
 - Card previews, Because you opened rows, recruiter autopilot (rail, Skip to contact, once per device), season recap trailers, cast and crew with the `?cast=` filter. Profiles menu added (Switch, Replay the recruiter cut, Clear watch history). Verified at 1280 and 393 (no horizontal scroll); details in 17-persona-views.md section 7. Builder: Claude Sonnet 5.5.
+
+### Round 13 - admin console phase A (2026-11-10, branch `claude/admin`)
+
+- `0011_site_settings.sql` (not applied: Ratul runs it), Zod schemas + code defaults for 12 keys, typed reader with draft preview cookie, pages wired to it, `/admin` shell with schema-generated forms, draft/publish/discard, history and revert, `scripts/settings-roundtrip.mjs` (12/12 pass). Verified unauthenticated redirect and the default path (visible text and data props identical on both hosts); signed-in flow left for the lead. `zod` declared in `package.json`.

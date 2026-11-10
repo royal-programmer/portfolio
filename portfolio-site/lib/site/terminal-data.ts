@@ -6,6 +6,8 @@ import type { BlogPost, Entry, Persona, PersonaView } from "@/lib/content/types"
 import { HUB_COPY, personaIdentity } from "@/lib/site/brand";
 import { RESUME_FILES, type ResumeFiles } from "@/lib/resume/files";
 import type { ArchDiagram } from "@/lib/site/terminal-arch";
+import type { Settings } from "@/lib/settings/schema";
+import type { ThemePalette } from "@/lib/site/terminal-themes";
 import { PROFILES, type TermProfile } from "@/lib/site/profiles";
 
 export type TermProject = {
@@ -348,7 +350,7 @@ export const I18N: Record<"bn" | "hi", TermI18n> = {
 export type TermClockBand = { id: string; from: number; to: number; theme: string; greet: string; hint: string };
 export type TermClock = { bands: TermClockBand[]; weekend: { greet: string; hint: string }; myTz: string };
 
-const CLOCK: TermClock = {
+export const CLOCK: TermClock = {
   bands: [
     { id: "night", from: 0, to: 5, theme: "matrix", greet: "late night?", hint: "the short version is portfolio · hire if you are recruiting" },
     { id: "dawn", from: 5, to: 9, theme: "solarized", greet: "early.", hint: "coffee first · then timeline" },
@@ -392,17 +394,20 @@ export type TerminalData = {
   commit?: string;
   /** The translated pieces, by language (`lang bn`, `lang hi`). */
   i18n?: Record<"bn" | "hi", TermI18n>;
+  /** The terminal's palettes when the admin console has edited them; absent means the code's own. */
+  themes?: ThemePalette[];
 };
 
 const MAX_BODY = 6000;
 
-export function terminalData(persona: Persona | undefined, entries: Entry[], posts: BlogPost[], views: PersonaView[]): TerminalData {
+/** The terminal's own values (`engineer.terminal` in the admin console). The defaults are what the code shipped with. */
+export const DEFAULT_TERMINAL: Settings["engineer.terminal"] = (() => {
   const handle = personaIdentity("engineer").handle ?? "royal-programmer";
   return {
     who: "ratulroy · software engineer · bengaluru",
-    about: persona?.body ?? "",
     stack: ["c#", ".net", "react", "typescript", "python", "fastapi", "sql server", "postgresql", "rabbitmq"],
     uptime: "2 years in production · 200+ users on the last rebuild · 11 automations kept alive",
+    status: "open to work · relocates",
     contact: [
       { label: "mail", href: `mailto:${HUB_COPY.email}` },
       { label: "github", href: `https://github.com/${handle}` },
@@ -413,6 +418,41 @@ export function terminalData(persona: Persona | undefined, entries: Entry[], pos
       { label: "google skills", href: "https://www.skills.google/public_profiles/369b718d-7bea-4e4b-9741-63c8d2250b64", group: "elsewhere" },
       { label: "geeksforgeeks", href: "https://www.geeksforgeeks.org/profile/royal_programmer", group: "elsewhere" },
     ],
+    portrait: { src: "/portrait.jpg", crop: [0.27, 0.12, 0.75, 0.74] },
+    now: {
+      month: "2026-11",
+      lines: [
+        "Building this portfolio (Next.js 16, Supabase, free stack)",
+        "Shift Roster v2 in production · supporting 200+ users",
+        "Open to software engineering roles · Bengaluru or relocation",
+      ],
+    },
+    clock: CLOCK,
+    hiring: HIRING,
+    resumeFiles: RESUME_FILES,
+  };
+})();
+
+/** The admin-console values `terminalData` can take instead of the code's own (each key falls back on its own). */
+export type TerminalConfig = Partial<{
+  identity: Settings["identity"];
+  terminal: Settings["engineer.terminal"];
+  resume: Settings["engineer.resume"];
+  i18n: Settings["engineer.i18n"];
+  timeline: Settings["engineer.timeline"];
+  arch: Settings["engineer.arch"];
+  themes: Settings["engineer.themes"];
+}>;
+
+export function terminalData(persona: Persona | undefined, entries: Entry[], posts: BlogPost[], views: PersonaView[], cfg: TerminalConfig = {}): TerminalData {
+  const t = cfg.terminal ?? DEFAULT_TERMINAL;
+  return {
+    who: t.who,
+    about: persona?.body ?? "",
+    stack: t.stack,
+    uptime: t.uptime,
+    // The `mail` row follows the identity's email, so it cannot drift from the hub's.
+    contact: t.contact.map((l) => (cfg.identity && l.label === "mail" ? { ...l, href: `mailto:${cfg.identity.email}` } : l)),
     profiles: PROFILES,
     projects: entries
       .filter((e): e is Extract<Entry, { type: "project" }> => e.type === "project" && e.visibility === "public")
@@ -432,25 +472,19 @@ export function terminalData(persona: Persona | undefined, entries: Entry[], pos
       .sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""))
       .map((p) => ({ slug: p.slug, title: p.title, date: p.publishedAt?.slice(0, 10), excerpt: p.excerpt, body: p.body.slice(0, MAX_BODY) })),
     views,
-    resume: RESUME,
-    hiring: HIRING,
-    resumeFiles: RESUME_FILES,
-    arch: ARCH,
-    projectArch: PROJECT_ARCH,
-    timeline: TIMELINE,
-    periods: TIMELINE_PERIODS,
-    portrait: { src: "/portrait.jpg", crop: [0.27, 0.12, 0.75, 0.74] },
-    now: {
-      month: "2026-11",
-      lines: [
-        "Building this portfolio (Next.js 16, Supabase, free stack)",
-        "Shift Roster v2 in production · supporting 200+ users",
-        "Open to software engineering roles · Bengaluru or relocation",
-      ],
-    },
-    clock: CLOCK,
-    status: "open to work · relocates",
+    resume: cfg.resume ?? RESUME,
+    hiring: t.hiring,
+    resumeFiles: t.resumeFiles,
+    arch: cfg.arch?.diagrams ?? ARCH,
+    projectArch: cfg.arch?.projectArch ?? PROJECT_ARCH,
+    timeline: cfg.timeline?.entries ?? TIMELINE,
+    periods: cfg.timeline?.periods ?? TIMELINE_PERIODS,
+    portrait: t.portrait,
+    now: t.now,
+    clock: t.clock,
+    status: t.status,
     commit: process.env.NEXT_PUBLIC_COMMIT || undefined,
-    i18n: I18N,
+    i18n: cfg.i18n ?? I18N,
+    themes: cfg.themes?.palettes,
   };
 }

@@ -130,3 +130,40 @@ today, to move.
 - **E:** Theme, redirects, analytics, maintenance mode.
 
 Each phase ships behind the draft/live gate, so the live site never shows a half-edited value.
+
+## 5. Phase A as built (round 13)
+
+**Store.** `supabase/migrations/0011_site_settings.sql`: `site_settings(key, draft, live, schema_version,
+updated_by, updated_at)`, `settings_history(id, key, action, before, after, by, at)` and the view
+`site_settings_live(key, value)`. RLS on both tables with no policy for visitors; anon/authenticated read
+only the view (live column); `settings_history` is admin-readable via `is_admin()`; writes go through the
+service role in server actions (`app/admin/actions.ts`) after `isAdmin()`.
+
+**Keys** (`lib/settings/schema.ts`, one strict Zod schema each; defaults in `defaults.ts` are imported from
+the code constants, never retyped): `identity`, `personas.copy`, `hub.copy`, `engineer.terminal` (who, stack,
+uptime, status, contact, portrait, now, clock, hiring, resumeFiles), `engineer.resume`, `engineer.i18n`,
+`engineer.timeline` (entries + periods), `engineer.arch` (diagrams + projectArch), `engineer.views`,
+`engineer.themes`, `site.switches`, `netflix`. A profiles key waits for round 15 landing.
+
+**Reading.** `getSetting(key)` (`lib/settings/read.ts`): live via the view, cached 60 s with tag
+`settings:<key>`; the draft through the service client when a valid signed `xp-preview` cookie is present;
+else the code default. A missing table, a blip or a value failing its schema falls back for that key only
+(schema failures log once). `loadTerminalConfig()` / `loadViews()` (`lib/settings/load.ts`) feed
+`terminalData(..., cfg)`. **Wired:** `identity` (hub email, terminal `mail` row, hub title), `hub.copy`,
+`engineer.terminal|resume|i18n|timeline|arch|views|themes` on the terminal, its views route and the preview
+image data. **Stored and editable but not yet consumed:** `personas.copy` (the `personaIdentity()` callers are
+client components), `site.switches`, `netflix` (the view imports its constants), `engineer.views.defaultView`.
+
+**Preview.** "Preview site" in the admin hits `/admin/preview?to=hub|engineer|off` (admin-checked), which sets
+the HMAC-signed `xp-preview` cookie (30 min, shared root domain) and redirects with `?preview=draft`.
+
+**Admin.** `/admin/<group>` (Identity, Personas, Hub, Engineer terminal, Timeline, Diagrams, Views, Themes,
+Netflix, Switches) and `/admin/history`. Forms are generated from the schemas (`lib/settings/form.tsx`); the
+Timeline, Diagrams, Themes (contrast check) and Views editors add a live preview. Save writes the draft;
+Publish copies draft to live, logs, and `updateTag`s the key; Discard; History Revert puts `before` into the
+draft. Unauthenticated `/admin` redirects to `/capture/login?next=/admin`.
+
+**Add a key.** Schema in `schema.ts` + `SCHEMAS` + `GROUPS`, default in `defaults.ts`, read with
+`getSetting`, run `node scripts/settings-roundtrip.mjs`. **Apply 0011:** paste the file into the Supabase SQL
+editor (`supabase/README.md`, "Applying 0011"); until then everything runs on the code defaults and `/admin`
+shows a banner and cannot save.

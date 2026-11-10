@@ -54,8 +54,8 @@ export function paletteFor(id: string | null | undefined): ThemePalette {
 }
 
 /** The `.terminal-root[data-theme=…]` blocks, generated from the palettes. */
-export function themeCss(): string {
-  return THEME_PALETTES.map((p) => {
+export function themeCss(palettes: ThemePalette[] = THEME_PALETTES): string {
+  return palettes.map((p) => {
     const v: Array<[string, string | undefined]> = [
       ["--c", p.accent],
       ["--link", p.link],
