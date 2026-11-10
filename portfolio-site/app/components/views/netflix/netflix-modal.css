@@ -497,3 +497,35 @@
     animation: none;
   }
 }
+
+/* Cast chips in the meta column (N5): each filters the page by that technology. */
+.nf-m-cast {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  vertical-align: top;
+}
+.nf-m-cast button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--nf-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--nf-ink);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.nf-m-cast button:hover,
+.nf-m-cast button:focus-visible {
+  background: var(--nf-ink);
+  color: #0b0b0f;
+}
+@media (pointer: coarse) {
+  .nf-m-cast button {
+    min-height: 40px;
+  }
+}

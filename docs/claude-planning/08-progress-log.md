@@ -1404,3 +1404,7 @@ stripped service_role's table grants).
 ### Round 15 - profiles, phone gate skip, menus by touch (2026-11-10)
 
 - `profiles` command + `/api/profiles`, hub and Netflix links from the same data; phone gate skip pill and compact mode switch; menu touch hint, up/down chips, `scroll-locked` cleanup (the real cause of frozen views on a phone). Not verified in a browser or by eslint: `portfolio-site/node_modules` lost packages mid-round (`@babel/runtime`, `@eslint-community/eslint-utils`, `.bin`), so the dev server could not compile the hub and eslint could not run; tsc (via `node node_modules/typescript/bin/tsc`) passes.
+
+### Round 16 - Netflix view, part A (2026-11-10)
+
+- Card previews, Because you opened rows, recruiter autopilot (rail, Skip to contact, once per device), season recap trailers, cast and crew with the `?cast=` filter. Profiles menu added (Switch, Replay the recruiter cut, Clear watch history). Verified at 1280 and 393 (no horizontal scroll); details in 17-persona-views.md section 7. Builder: Claude Sonnet 5.5.

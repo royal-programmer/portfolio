@@ -366,6 +366,24 @@ registry entry is `enabled: true`, so `view netflix`, the pane row and the picke
     staggered fade-in, Manage Profiles (pencil overlays, toast). Skeleton rows until the portrait is drawn.
   - *Not done*: hover controls only on episode cards; the "match %" is replaced by `New` / season (no fake score).
   - Dev needs `next dev --webpack` inside a git worktree (Turbopack rejects a `node_modules` junction that points outside the root).
+  - **Netflix, part A (round 16).** Five additions, all copy and rules in `lib/site/netflix-data.ts`:
+    - *N1 previews*: after 800 ms of mouse hover an episode card's art types its synopsis (max 140 chars, 24 chars/s, mono, dark
+      gradient; soft tick every 4th char when unmuted). One card at a time, none on touch, instant under reduced motion.
+    - *N2 Because you opened*: `becauseRows` derives up to two rows after Continue watching from `xp-nf-progress` (seed = most
+      recently opened; up to 8 cards sharing the branch or two tags/stack entries, date desc, never a Continue card). The topbar
+      Profiles menu (profile tile and "Profiles") now holds Switch profile, Replay the recruiter cut and Clear watch history (confirm
+      toast, clears progress, list and likes).
+    - *N3 recruiter autopilot*: `netflix-autopilot.tsx`; `RECRUITER_CUT` (data) resolves to three card ids (Shift Roster v2.0, 11 Python
+      automations, the API Test Center project). 30 s each: scroll, open with a 27 s teleprompter, close; then scroll to To be
+      continued and pulse Say hello. Rail under the top bar (three dots, 90 s fill), Skip to contact, X. Any trusted pointer/wheel/touch/key
+      stops it (synthetic Escape is ignored); nothing prevents default, so touch scroll is never blocked. Starts only on a fresh Recruiter pick
+      (not deep links or restored profiles), once per device (`xp-nf-autopilot-seen`). Reduced motion: no play, a "Start here" badge on the
+      three cards. With a modal open the pill drops to the bottom corner.
+    - *N4 season recaps*: a small play button beside each season chip (full story only) types `seasonRecap(show, year)` in the hero trailer
+      panel (20 s, Skip, mute); Play still plays the profile trailer.
+    - *N5 cast and crew*: `buildCast` = `data.stack` ∪ résumé skills with alias folding (`CAST_ALIASES`) and counts over episodes and
+      projects (technologies with 0 mentions are left off). Row "Cast · the stack" after Skills / Stack / last season. A tile filters every
+      row (`?cast=<key>`, "Showing: X · clear" pill under the season bar); the modal's meta column has `Cast:` chips doing the same.
 
 ## 8. Two résumés (round 3, round 14)
 

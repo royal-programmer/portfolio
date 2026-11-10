@@ -80,7 +80,7 @@ export type NetflixShow = {
 export const RECRUITER_CUT: ReadonlyArray<{ episode?: { title: RegExp; tag?: string }; project?: string }> = [
   { episode: { title: /shift roster/i, tag: "v2.0" } },
   { episode: { title: /11 python automations/i } },
-  { project: "apitestcenter", episode: { title: /api test center/i } },
+  { project: "api-test-center", episode: { title: /api test center/i } },
 ];
 
 const monthIndex = (date: string) => {

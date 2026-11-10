@@ -6,7 +6,7 @@
  * (netflix-modal.tsx); desktop episode cards also grow on hover with play, add, like and more under the title.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Episode, NetflixShow, NfItem, ProjectCard, SkillCard } from "@/lib/site/netflix-data";
+import type { CastMember, Episode, NetflixShow, NfItem, ProjectCard, SkillCard } from "@/lib/site/netflix-data";
 import type { TermLink } from "@/lib/site/terminal-data";
 import { PROFILES } from "@/lib/site/profiles";
 import { useViewExit } from "../view-shell";
@@ -15,7 +15,7 @@ import { tick } from "./netflix-sound";
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const behavior = (): ScrollBehavior => (reducedMotion() ? "auto" : "smooth");
 
-export type DisplayRow = { id: string; title: string; items: NfItem[] } | { id: string; title: string; contact: true };
+export type DisplayRow = { id: string; title: string; items: NfItem[] } | { id: string; title: string; contact: true } | { id: string; title: string; cast: CastMember[] };
 
 /** What every card needs from the view: open the modal, the local lists, the rank badge, the sound. */
 export type CardEnv = {
@@ -27,16 +27,30 @@ export type CardEnv = {
   progress: Record<string, number>;
   topId: string | null;
   soundOn: boolean;
+  /** Cards the Recruiter cut starts with, badged "Start here" (reduced motion only). */
+  startHere?: ReadonlySet<string>;
+  /** The page-wide technology filter (N5): the active key and the toggle. */
+  cast: { active: string | null; label: string | null; pick: (key: string | null) => void };
 };
 
-type Props = { show: NetflixShow; rows: DisplayRow[]; contact: TermLink[]; env: CardEnv };
+type Props = { show: NetflixShow; rows: DisplayRow[]; contact: TermLink[]; env: CardEnv; onRecap?: (year: number) => void };
 
-export function NetflixRows({ show, rows, contact, env }: Props) {
+export function NetflixRows({ show, rows, contact, env, onRecap }: Props) {
   return (
     <>
-      <SeasonBar show={show} />
-      <div className="nf-rows">
-        {rows.map((row) => ("contact" in row ? <ContinuedRow key={row.id} row={row} contact={contact} /> : <Row key={row.id} row={row} env={env} />))}
+      <SeasonBar show={show} onRecap={onRecap} />
+      {env.cast.active ? (
+        <div className="nf-castpill">
+          <span>
+            Showing: <b>{env.cast.label}</b>
+          </span>
+          <button type="button" onClick={() => env.cast.pick(null)}>
+            clear
+          </button>
+        </div>
+      ) : null}
+      <div className="nf-rows" id="nf-rows-top">
+        {rows.map((row) => ("contact" in row ? <ContinuedRow key={row.id} row={row} contact={contact} /> : "cast" in row ? <CastRow key={row.id} row={row} env={env} /> : <Row key={row.id} row={row} env={env} />))}
       </div>
       <footer className="nf-footer">Every row is data &middot; views are picked in the terminal &middot; &copy; 2026 Ratul Roy</footer>
     </>
@@ -45,7 +59,7 @@ export function NetflixRows({ show, rows, contact, env }: Props) {
 
 /* ---------- Season bar ---------- */
 
-function SeasonBar({ show }: { show: NetflixShow }) {
+function SeasonBar({ show, onRecap }: { show: NetflixShow; onRecap?: (year: number) => void }) {
   const [active, setActive] = useState<string | null>(null);
   const bar = useRef<HTMLDivElement>(null);
   const ids = show.nav.map((n) => n.id).join("|");
@@ -77,17 +91,27 @@ function SeasonBar({ show }: { show: NetflixShow }) {
   return (
     <nav className="nf-seasons" aria-label="Seasons">
       <div className="nf-chips" ref={bar}>
-        {show.nav.map((n) => (
-          <button
-            key={n.id}
-            type="button"
-            className="nf-chip"
-            aria-current={active === n.id ? "true" : undefined}
-            onClick={() => document.getElementById(`nf-row-${n.id}`)?.scrollIntoView({ behavior: behavior(), block: "start" })}
-          >
-            {n.label}
-          </button>
-        ))}
+        {show.nav.map((n) => {
+          const year = /^s(\d{4})$/.test(n.id) ? Number(n.id.slice(1)) : null;
+          return (
+            <span className="nf-chipwrap" key={n.id}>
+              <button
+                type="button"
+                className="nf-chip"
+                aria-current={active === n.id ? "true" : undefined}
+                data-recap={year && onRecap ? "" : undefined}
+                onClick={() => document.getElementById(`nf-row-${n.id}`)?.scrollIntoView({ behavior: behavior(), block: "start" })}
+              >
+                {n.label}
+              </button>
+              {year && onRecap ? (
+                <button type="button" className="nf-chip-play" aria-label={`Play the Season ${year} recap`} title={`Season ${year} recap`} onClick={() => onRecap(year)}>
+                  <span aria-hidden>▶</span>
+                </button>
+              ) : null}
+            </span>
+          );
+        })}
       </div>
     </nav>
   );
@@ -150,6 +174,31 @@ function Row({ row, env }: { row: Extract<DisplayRow, { items: NfItem[] }>; env:
             ▶
           </button>
         ) : null}
+      </div>
+    </section>
+  );
+}
+
+/** The Cast row (N5): one tile per technology, how many episodes mention it; a tile filters the whole page. */
+function CastRow({ row, env }: { row: { id: string; title: string; cast: CastMember[] }; env: CardEnv }) {
+  return (
+    <section className="nf-row" id={`nf-row-${row.id}`} aria-labelledby={`nf-h-${row.id}`}>
+      <h2 className="nf-row-title" id={`nf-h-${row.id}`}>
+        {row.title} <span className="nf-count">&middot; {row.cast.length}</span>
+      </h2>
+      <div className="nf-row-body">
+        <ul className="nf-scroller" role="list">
+          {row.cast.map((c) => (
+            <li key={c.id} className="nf-skill-li">
+              <button type="button" className="nf-cast" aria-pressed={env.cast.active === c.key} onClick={() => env.cast.pick(env.cast.active === c.key ? null : c.key)}>
+                <span className="nf-cast-name">{c.name}</span>
+                <span className="nf-cast-n">
+                  appears in {c.count} {c.count === 1 ? "episode" : "episodes"}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );
@@ -263,6 +312,7 @@ function EpisodeCard({ e, item, env }: { e: Episode; item: NfItem; env: CardEnv 
             <b>10</b>
           </span>
         ) : null}
+        {env.startHere?.has(item.id) ? <span className="nf-start">Start here</span> : null}
         <span className="nf-num" aria-hidden>
           S{e.season} E{e.n}
         </span>
@@ -300,6 +350,7 @@ function EpisodeCard({ e, item, env }: { e: Episode; item: NfItem; env: CardEnv 
 function PosterCard({ c, item, env }: { c: ProjectCard; item: NfItem; env: CardEnv }) {
   return (
     <li className="nf-poster">
+      {env.startHere?.has(item.id) ? <span className="nf-start">Start here</span> : null}
       <button type="button" className="nf-poster-title nf-stretch" data-nf-card={item.id} onClick={(ev) => env.open(item, ev.currentTarget)}>
         {c.title}
       </button>

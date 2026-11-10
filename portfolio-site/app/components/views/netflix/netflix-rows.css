@@ -509,3 +509,128 @@ button.nf-skill:hover {
     width: auto;
   }
 }
+
+/* Season recap play button beside each season chip (N4). */
+.nf-chipwrap {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.nf-chip-play {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-left: -2px;
+  padding: 0;
+  border: 1px solid var(--nf-line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--nf-dim);
+  font-size: 0.55rem;
+  cursor: pointer;
+}
+.nf-chip-play:hover,
+.nf-chip-play:focus-visible {
+  color: #0b0b0f;
+  background: var(--nf-ink);
+}
+@media (pointer: coarse) {
+  .nf-chip-play {
+    width: 34px;
+    height: 34px;
+    font-size: 0.7rem;
+  }
+}
+
+/* Cast tiles and the filter pill (N5). */
+#nf-rows-top {
+  scroll-margin-top: 156px;
+}
+button.nf-cast {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.4rem;
+  width: 150px;
+  height: 120px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--nf-line);
+  background: #16161d;
+  color: var(--nf-ink);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+button.nf-cast:hover,
+button.nf-cast:focus-visible {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+button.nf-cast[aria-pressed="true"] {
+  border-color: var(--nf-accent);
+  background: color-mix(in srgb, var(--nf-accent) 22%, #16161d);
+}
+.nf-cast-name {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.nf-cast-n {
+  font-size: 0.72rem;
+  color: var(--nf-dim);
+}
+.nf-castpill {
+  position: sticky;
+  top: 107px;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  padding: 6px 16px;
+  background: rgba(11, 11, 15, 0.92);
+  border-bottom: 1px solid var(--nf-line);
+  font-size: 0.85rem;
+}
+.nf-castpill b {
+  color: var(--nf-accent);
+  font-family: var(--font-geist-mono), monospace;
+}
+.nf-castpill button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--nf-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--nf-ink);
+  font: inherit;
+  cursor: pointer;
+}
+@media (pointer: coarse) {
+  .nf-castpill {
+    top: 117px;
+  }
+  .nf-castpill button {
+    min-height: 40px;
+  }
+}
+
+/* "Start here" badge (reduced motion, N3). */
+.nf-start {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--nf-accent);
+  color: #fff;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  pointer-events: none;
+}

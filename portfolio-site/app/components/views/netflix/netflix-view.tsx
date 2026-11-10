@@ -13,9 +13,10 @@ import { NetflixHero } from "./netflix-hero";
 import { NetflixGrid, NetflixRows, type CardEnv, type DisplayRow } from "./netflix-rows";
 import { NetflixModal } from "./netflix-modal";
 import { NetflixTopbar } from "./netflix-topbar";
+import { AUTOPILOT_TYPE_MS, AutopilotRail, autopilotSeen, useAutopilot } from "./netflix-autopilot";
 import { clearHistory, useLikes, useMyList, useProgress, useSound } from "./netflix-store";
 import { generatePortrait } from "@/lib/site/portrait-gen";
-import { NETFLIX_PROFILES, becauseRows, factsOf, indexItems, isNetflixProfile, rowItems, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
+import { NETFLIX_PROFILES, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
 import type { TermLink, TerminalData } from "@/lib/site/terminal-data";
 
 export type NetflixViewProps = {
@@ -76,6 +77,8 @@ export function NetflixView(props: NetflixViewProps) {
   const [profile, setProfile] = useState<NetflixProfileId | null | undefined>(undefined);
   const [toast, setToast] = useState<{ id: number; msg: string; action?: ToastAction } | null>(null);
   const toastTimer = useRef(0);
+  // N3: bumped to start the guided play (a fresh pick of Recruiter, or "Replay the recruiter cut").
+  const [autoToken, setAutoToken] = useState(0);
 
   const notify = useCallback<Notify>((msg, action) => {
     window.clearTimeout(toastTimer.current);
@@ -102,6 +105,14 @@ export function NetflixView(props: NetflixViewProps) {
     } catch {}
     window.scrollTo({ top: 0 });
     setProfile(id);
+    // The guided play runs once per device, only on a fresh Recruiter pick (never a deep link or a silent restore).
+    if (id === "recruiter" && !autopilotSeen() && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) setAutoToken((n) => n + 1);
+  }, []);
+
+  const replayCut = useCallback(() => {
+    window.scrollTo({ top: 0 });
+    setProfile("recruiter");
+    setAutoToken((n) => n + 1);
   }, []);
 
   const switchProfile = useCallback(() => {
@@ -115,7 +126,7 @@ export function NetflixView(props: NetflixViewProps) {
       {profile === undefined ? null : profile === null ? (
         <ProfileGate onPick={pick} notify={notify} />
       ) : (
-        <NetflixBody {...props} show={series[profile]} profile={profile} onSwitch={switchProfile} notify={notify} />
+        <NetflixBody {...props} show={series[profile]} profile={profile} onSwitch={switchProfile} onReplay={replayCut} autoToken={autoToken} notify={notify} />
       )}
       {toast ? (
         <div className="nf-toast" role="status" key={toast.id}>
@@ -196,9 +207,9 @@ function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => voi
   );
 }
 
-type ModalState = { id: string; origin: DOMRect | null; play: boolean };
+type ModalState = { id: string; origin: DOMRect | null; play: boolean; playMs?: number };
 
-function NetflixBody({ show, series, profile, status, portrait, fast, contact, onSwitch, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; notify: Notify }) {
+function NetflixBody({ show, series, profile, status, portrait, fast, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
   const shows = useMemo(() => Object.values(series), [series]);
   const index = useMemo(() => indexItems(shows), [shows]);
   const topId = useMemo(() => topEpisodeId(shows), [shows]);
@@ -266,6 +277,35 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
     // Focus goes back to the card in the effect below, once the page is no longer inert.
     restore.current = true;
   }, []);
+  // N5: the page-wide technology filter, mirrored in `?cast=`.
+  const [castKey, setCastKey] = useState<string | null>(() => {
+    try {
+      return castKeyOf(new URLSearchParams(window.location.search).get("cast"));
+    } catch {
+      return null;
+    }
+  });
+  const castList = useMemo(() => show.rows.flatMap((r) => (r.kind === "cast" ? r.items : [])), [show.rows]);
+  const castLabel = castKey ? (castList.find((c) => c.key === castKey)?.name ?? castKey) : null;
+  const pickCast = useCallback((key: string | null) => {
+    setCastKey(key);
+    try {
+      const u = new URL(window.location.href);
+      if (key) u.searchParams.set("cast", key);
+      else u.searchParams.delete("cast");
+      window.history.replaceState(window.history.state, "", u);
+    } catch {}
+    if (key) requestAnimationFrame(() => document.getElementById("nf-rows-top")?.scrollIntoView({ behavior: "auto", block: "start" }));
+  }, []);
+  const castFromModal = useCallback(
+    (key: string) => {
+      setModal(null);
+      stripParam("title");
+      pickCast(key);
+    },
+    [pickCast],
+  );
+
   const onShow = useCallback(
     (item: NfItem, through: boolean) => {
       progress.set(item.id, through ? 1 : 0.35);
@@ -274,6 +314,10 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [progress.set],
   );
+
+  // Reduced motion gets no guided play: a static "Start here" badge on the three stops instead.
+  const reducedMotion = useMemo(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches, []);
+  const startHere = useMemo(() => (profile === "recruiter" && reducedMotion ? new Set(show.recruiterCut) : undefined), [profile, reducedMotion, show.recruiterCut]);
 
   const env: CardEnv = {
     open,
@@ -284,6 +328,8 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
     progress: progress.map,
     topId,
     soundOn: sound.on,
+    startHere,
+    cast: { active: castKey, label: castLabel, pick: pickCast },
   };
 
   /* ----- rows: Continue watching and My List first when there is something in them ----- */
@@ -299,9 +345,19 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
       ...(cont.length ? [{ id: "continue", title: "Continue watching", items: cont } as DisplayRow] : []),
       ...because,
       ...(mine.length ? [{ id: "mylist", title: "My List", items: mine } as DisplayRow] : []),
-      ...show.rows.filter((r) => r.kind !== "cast").map((r): DisplayRow => (r.kind === "contact" ? { id: r.id, title: r.title, contact: true } : { id: r.id, title: r.title, items: rowItems(r) })),
+      ...show.rows.map((r): DisplayRow => (r.kind === "contact" ? { id: r.id, title: r.title, contact: true } : r.kind === "cast" ? { id: r.id, title: r.title, cast: r.items } : { id: r.id, title: r.title, items: rowItems(r) })),
     ];
   }, [index, progress.recent, list.ids, show.rows]);
+
+  // N5: with a technology picked, every row keeps only the cards that mention it (rows left empty go).
+  const shownRows = useMemo<DisplayRow[]>(() => {
+    if (!castKey) return rows;
+    return rows.flatMap((r): DisplayRow[] => {
+      if ("contact" in r || "cast" in r) return [r];
+      const items = r.items.filter((it) => mentionsCast(it, castKey));
+      return items.length ? [{ ...r, items }] : [];
+    });
+  }, [rows, castKey]);
 
   /* ----- search ----- */
   const [query, setQuery] = useState("");
@@ -331,7 +387,7 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
   };
   const toRows = () => {
     setQuery("");
-    requestAnimationFrame(() => document.getElementById(`nf-row-${rows[0]?.id}`)?.scrollIntoView({ behavior: behavior(), block: "start" }));
+    requestAnimationFrame(() => document.getElementById(`nf-row-${shownRows[0]?.id}`)?.scrollIntoView({ behavior: behavior(), block: "start" }));
   };
   const toList = () => {
     if (!list.ids.length) return notify("Add something with ＋");
@@ -348,6 +404,56 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
       },
     });
 
+  /* ----- N4: a season's recap types in the hero's trailer panel ----- */
+  const [recap, setRecap] = useState<{ key: number; lines: string[] } | null>(null);
+  const endRecap = useCallback(() => setRecap(null), []);
+  const playRecap = (year: number) => {
+    const lines = seasonRecap(show, year);
+    if (!lines.length) return;
+    window.scrollTo({ top: 0, behavior: behavior() });
+    setRecap({ key: Date.now(), lines });
+  };
+
+  /* ----- N3: the Recruiter cut ----- */
+  const openStop = (id: string): boolean => {
+    const item = index.get(id);
+    const el = document.querySelector<HTMLElement>(`[data-nf-card="${CSS.escape(id)}"]`);
+    if (!item || !el) return false;
+    el.scrollIntoView({ behavior: "auto", block: "center" });
+    trigger.current = { el, id };
+    setModal({ id, origin: el.getBoundingClientRect(), play: true, playMs: AUTOPILOT_TYPE_MS });
+    setTitleParam(id);
+    return true;
+  };
+  const closeModalSoft = () => {
+    if (document.querySelector('[aria-modal="true"].nf-m')) window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+  };
+  const finishCut = () => {
+    document.getElementById("nf-row-tbc")?.scrollIntoView({ behavior: behavior(), block: "center" });
+    const hello = document.querySelector<HTMLElement>("#nf-row-tbc .nf-btn-play");
+    hello?.classList.add("nf-pulse");
+    window.setTimeout(() => hello?.classList.remove("nf-pulse"), 6000);
+  };
+  const autopilot = useAutopilot({ cut: show.recruiterCut, openStop, closeModal: closeModalSoft, finish: finishCut });
+  const startCut = autopilot.start;
+  const stopCut = autopilot.stop;
+  const lastToken = useRef(0);
+  useEffect(() => {
+    if (!autoToken || autoToken === lastToken.current || !ready || profile !== "recruiter") return;
+    lastToken.current = autoToken;
+    if (reducedMotion) {
+      notify("Look for the Start here badges on three cards");
+      return;
+    }
+    // Let the rows paint and the visitor see the page first.
+    const t = window.setTimeout(startCut, 1400);
+    return () => window.clearTimeout(t);
+  }, [autoToken, ready, profile, reducedMotion, startCut, notify]);
+  // Leaving the page's recruiter cut (another profile, a search) ends the play.
+  useEffect(() => {
+    if (profile !== "recruiter" || q) stopCut();
+  }, [profile, q, stopCut]);
+
   const profileMeta = NETFLIX_PROFILES.find((p) => p.id === profile);
   const modalItem = modal ? index.get(modal.id) : undefined;
   const more = topId ? index.get(topId) : undefined;
@@ -355,7 +461,8 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
 
   return (
     <>
-      <NetflixTopbar glyph={profileMeta?.glyph ?? "R"} tone={TONES[profile]} query={query} onQuery={setQuery} onHome={toTop} onSeries={toRows} onMyList={toList} onProfiles={onSwitch} onClearHistory={askClear} />
+      <NetflixTopbar glyph={profileMeta?.glyph ?? "R"} tone={TONES[profile]} query={query} onQuery={setQuery} onHome={toTop} onSeries={toRows} onMyList={toList} onProfiles={onSwitch} onClearHistory={askClear} onReplay={onReplay} />
+      {autopilot.state ? <AutopilotRail state={autopilot.state} onSkip={autopilot.skip} onStop={autopilot.stop} /> : null}
       <div className="nf-page" aria-hidden={modal ? true : undefined} inert={modal ? true : undefined}>
         {q ? (
           <div className="nf-results">
@@ -363,12 +470,12 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
           </div>
         ) : (
           <>
-            <NetflixHero series={show} profile={profile} status={status} text={text} fast={fast} firstRowId={firstRow} onMore={more ? () => open(more, null) : undefined} sound={sound} />
-            {ready ? <NetflixRows show={show} rows={rows} contact={contact} env={env} /> : <SkeletonRows />}
+            <NetflixHero series={show} profile={profile} status={status} text={text} fast={fast} firstRowId={firstRow} onMore={more ? () => open(more, null) : undefined} sound={sound} recap={recap} onRecapEnd={endRecap} />
+            {ready ? <NetflixRows show={show} rows={shownRows} contact={contact} env={env} onRecap={profile === "story" ? playRecap : undefined} /> : <SkeletonRows />}
           </>
         )}
       </div>
-      {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} portraitText={text} autoPlay={modal.play} onClose={close} onSwap={swap} onShow={onShow} /> : null}
+      {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} portraitText={text} autoPlay={modal.play} playMs={modal.playMs} cast={castList} onCast={castFromModal} onClose={close} onSwap={swap} onShow={onShow} /> : null}
     </>
   );
 }

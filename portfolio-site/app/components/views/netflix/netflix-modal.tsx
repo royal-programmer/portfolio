@@ -7,7 +7,7 @@
  * meta row, description, the season's episodes, "More like this" and About. Everything is swapped in place.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { NF_ADJECTIVES, factsOf, moreLike, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
+import { NF_ADJECTIVES, castOf, factsOf, moreLike, type CastMember, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
 import { chime } from "./netflix-sound";
 import { useLikes, useMyList, useSound } from "./netflix-store";
 
@@ -24,14 +24,20 @@ type Props = {
   portraitText: string;
   /** Start playing as soon as it opens (the card's play button). */
   autoPlay?: boolean;
+  /** How long Play's teleprompter types for (the guided play passes a long one); default six seconds. */
+  playMs?: number;
+  /** The show's cast, and what a Cast chip does (filter the page by that technology). */
+  cast?: CastMember[];
+  onCast?: (key: string) => void;
   onClose: () => void;
   onSwap: (item: NfItem) => void;
   /** Called when an item is shown (progress bookkeeping); `playedThrough` once its Play finished. */
   onShow: (item: NfItem, playedThrough: boolean) => void;
 };
 
-export function NetflixModal({ item, index, origin, portraitText, autoPlay, onClose, onSwap, onShow }: Props) {
+export function NetflixModal({ item, index, origin, portraitText, autoPlay, playMs, cast, onCast, onClose, onSwap, onShow }: Props) {
   const facts = useMemo(() => factsOf(item), [item]);
+  const itemCast = useMemo(() => (cast ? castOf(item, cast) : []), [item, cast]);
   const overlay = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const backdrop = useRef<HTMLDivElement>(null);
@@ -218,7 +224,7 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, onCl
       <div className="nf-m" ref={panel} role="dialog" aria-modal="true" aria-label={facts.title}>
         <div className="nf-m-top" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
           <div className="nf-m-handle" aria-hidden />
-          <Billboard key={item.id} facts={facts} portraitText={portraitText} playing={playing} onFinish={finished}>
+          <Billboard key={item.id} facts={facts} portraitText={portraitText} playing={playing} playMs={playMs} onFinish={finished}>
             <button type="button" className="nf-m-x" aria-label="Close" onClick={requestClose}>
               <span aria-hidden>×</span>
             </button>
@@ -293,6 +299,22 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, onCl
               <div>
                 <dt>Tags:</dt>
                 <dd>{[...facts.tags, ...facts.stack.slice(0, 3)].join(", ")}</dd>
+              </div>
+            ) : null}
+            {itemCast.length && onCast ? (
+              <div>
+                <dt>Cast:</dt>
+                <dd>
+                  <ul className="nf-m-cast" role="list" aria-label="Cast">
+                    {itemCast.map((c) => (
+                      <li key={c.id}>
+                        <button type="button" onClick={() => onCast(c.key)} title={`Show only ${c.name}`}>
+                          {c.name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
               </div>
             ) : null}
             <div>
@@ -378,7 +400,7 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, onCl
 
 /* ---------- Billboard ---------- */
 
-function Billboard({ facts, portraitText, playing, onFinish, children }: { facts: NfFacts; portraitText: string; playing: boolean; onFinish: () => void; children: React.ReactNode }) {
+function Billboard({ facts, portraitText, playing, playMs, onFinish, children }: { facts: NfFacts; portraitText: string; playing: boolean; playMs?: number; onFinish: () => void; children: React.ReactNode }) {
   const epTone = facts.tone === "main" || facts.tone === "learn" || facts.tone === "side" || facts.tone === "life";
   return (
     <div className="nf-bb" data-playing={playing || undefined}>
@@ -391,7 +413,7 @@ function Billboard({ facts, portraitText, playing, onFinish, children }: { facts
         </span>
       )}
       <div className="nf-bb-shade" aria-hidden />
-      {playing ? <Teleprompter text={`${facts.title}. ${facts.blurb ?? ""}`.trim()} onDone={onFinish} /> : null}
+      {playing ? <Teleprompter text={`${facts.title}. ${facts.blurb ?? ""}`.trim()} ms={playMs ?? 6000} onDone={onFinish} /> : null}
       <h2 className="nf-bb-title" data-hidden={playing || undefined}>
         {facts.title}
       </h2>
@@ -401,7 +423,7 @@ function Billboard({ facts, portraitText, playing, onFinish, children }: { facts
 }
 
 /** Types the text over six seconds (all at once, then a short hold, under reduced motion). */
-function Teleprompter({ text, onDone }: { text: string; onDone: () => void }) {
+function Teleprompter({ text, ms, onDone }: { text: string; ms: number; onDone: () => void }) {
   const calm = useMemo(() => reduced(), []);
   const [chars, setChars] = useState(calm ? text.length : 0);
   const done = useRef(onDone);
@@ -417,7 +439,7 @@ function Teleprompter({ text, onDone }: { text: string; onDone: () => void }) {
     let raf = 0;
     let hold = 0;
     const tick = (now: number) => {
-      const c = Math.min(text.length, Math.floor(((now - t0) / 6000) * text.length));
+      const c = Math.min(text.length, Math.floor(((now - t0) / ms) * text.length));
       setChars(c);
       if (c >= text.length) {
         hold = window.setTimeout(() => done.current(), 800);
@@ -430,7 +452,7 @@ function Teleprompter({ text, onDone }: { text: string; onDone: () => void }) {
       cancelAnimationFrame(raf);
       window.clearTimeout(hold);
     };
-  }, [calm, text]);
+  }, [calm, text, ms]);
   return (
     <p className="nf-tele2" aria-live="off">
       {text.slice(0, chars)}
