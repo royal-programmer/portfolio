@@ -16,6 +16,7 @@ import { ambient } from "@/lib/site/ambient-sound";
 import { hubHref, personaHref, useOrigin } from "@/lib/site/persona-link";
 import { qrLines, qrModules } from "@/lib/site/qr";
 import { heatGrid, STATS_KEY, STATS_TTL, statsValid, type HeatCell, type HeatMonth, type StatsCache, type StatsData } from "@/lib/site/terminal-stats";
+import { TerminalSaver } from "@/app/components/views/terminal-saver";
 import { ArchView } from "@/app/components/views/terminal-arch";
 import type { ArchRun } from "@/lib/site/terminal-arch";
 import { Heatmap, LangBar } from "@/app/components/views/terminal-heatmap";
@@ -24,6 +25,7 @@ import type { TerminalData } from "@/lib/site/terminal-data";
 import { HOME, resolvePath, shortPath, USER } from "@/lib/site/terminal-fs";
 import { createShell, HISTORY_CAP, initialShellState, THEMES, type Effect, type FileItem, type LinkItem, type MenuId, type MenuRow, type Out, type ShellState, type ThemeId, type TimelineRow, type Tone } from "@/lib/site/terminal-shell";
 import { isPrerendering, whenActive } from "@/lib/site/prerender";
+import { usePresence } from "@/lib/site/terminal-presence";
 import { ghostFor } from "@/lib/site/terminal-suggest";
 import { forgetView, readView } from "@/lib/site/view-memory";
 import { themeCss } from "@/lib/site/terminal-themes";
@@ -92,6 +94,7 @@ const PAGE = 40;
 const SEEN_KEY = "xp-term-seen";
 const THEME_KEY = "xp-term-theme";
 const CRT_KEY = "xp-term-crt";
+const SAVER_KEY = "xp-term-saver";
 const GH_USER = "royal-programmer";
 const GH_KEY = "xp-gh-cache";
 const GH_TTL = 3_600_000;
@@ -330,6 +333,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const [checks, setChecks] = useState<Checks>({});
   const checksRef = useRef<Checks>({});
   const [paneOn, setPaneOn] = useState(true);
+  /** Tabs on this page right now (Realtime presence); shown only from 2 up. */
+  const visitors = usePresence(ready && os);
   /** The pane's "live" lines: the GitHub cache (undefined: not looked at yet; null: unavailable, section left out). */
   const [gh, setGh] = useState<GhCache | null | undefined>(undefined);
   /** The `stats` data, read from this device's cache only (never fetched for the pane). */
@@ -345,6 +350,11 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   /** While the `theme` menu is open: the theme to restore on Esc (the menu previews live as the selection moves). */
   const themeBase = useRef<ThemeId | null>(null);
   const [crt, setCrt] = useState(false);
+  /** The screensaver: on while it shows, leaving for the 200 ms it fades out. */
+  const [saver, setSaver] = useState<"off" | "on" | "leaving">("off");
+  const saverRef = useRef<"off" | "on" | "leaving">("off");
+  const saverOff = useRef(false);
+  const lastActive = useRef(0);
   /** The `fit` paste box under the prompt. */
   const [fitOpen, setFitOpen] = useState(false);
   const fitRef = useRef(false);
@@ -1012,6 +1022,24 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     } catch {}
   };
 
+  const startSaver = (force = false) => {
+    if (saverRef.current !== "off" || (!force && saverOff.current)) return;
+    if (force && saverOff.current) return void line("screensaver is off · screensaver on", false, true, here());
+    saverRef.current = "on";
+    lastActive.current = performance.now();
+    setSaver("on");
+  };
+  const stopSaver = () => {
+    if (saverRef.current !== "on") return;
+    saverRef.current = "leaving";
+    setSaver("leaving");
+    lastActive.current = performance.now();
+    window.setTimeout(() => {
+      saverRef.current = "off";
+      setSaver("off");
+    }, 200);
+  };
+
   const openFit = () => {
     fitRef.current = true;
     setFitText("");
@@ -1086,6 +1114,16 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     }
     else if (fx.kind === "sl") void startSl();
     else if (fx.kind === "fit-box") openFit();
+    else if (fx.kind === "saver") {
+      if (fx.mode === "now") startSaver(true);
+      else {
+        saverOff.current = fx.mode === "off";
+        try {
+          window.localStorage.setItem(SAVER_KEY, fx.mode === "off" ? "0" : "1");
+        } catch {}
+        line(fx.mode === "off" ? "screensaver off · screensaver on brings it back" : "screensaver on", false, true, here());
+      }
+    }
     else if (fx.kind === "mail") startMail();
     else if (fx.kind === "pane") togglePane();
     else toggleFull();
@@ -1529,6 +1567,46 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // The screensaver: idle for 90 s (120 on a phone), tab visible, nothing open that wants the keys.
+  useEffect(() => {
+    try {
+      saverOff.current = window.localStorage.getItem(SAVER_KEY) === "0";
+    } catch {}
+    lastActive.current = performance.now();
+    const touch = () => {
+      if (saverRef.current === "off") lastActive.current = performance.now();
+    };
+    const wake = (e: Event) => {
+      if (saverRef.current === "off") return;
+      // A key held down from the command that started it does not count.
+      if (e instanceof KeyboardEvent && e.repeat) return e.preventDefault();
+      e.preventDefault();
+      e.stopPropagation();
+      stopSaver();
+    };
+    const ev = ["pointermove", "scroll", "wheel", "touchmove"] as const;
+    for (const n of ev) window.addEventListener(n, touch, { passive: true, capture: true });
+    for (const n of ["keydown", "pointerdown", "click"] as const) window.addEventListener(n, wake as EventListener, true);
+    const onVis = () => {
+      if (document.visibilityState === "visible") lastActive.current = performance.now();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    const id = window.setInterval(() => {
+      const s = live.current;
+      const limit = (window.innerWidth < 600 ? 120 : 90) * 1000;
+      if (saverRef.current !== "off" || saverOff.current || document.visibilityState !== "visible") return;
+      if (!osRef.current || !s.ready || s.busy || mailRef.current || fitRef.current || sendingRef.current) return;
+      if (performance.now() - lastActive.current >= limit) startSaver();
+    }, 2000);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+      for (const n of ev) window.removeEventListener(n, touch, true);
+      for (const n of ["keydown", "pointerdown", "click"] as const) window.removeEventListener(n, wake as EventListener, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Desktop: the prompt is live as soon as it is ready. Phones wait for a tap (the keyboard covers the menu).
   useEffect(() => {
     if (ready && !window.matchMedia("(pointer: coarse)").matches) input.current?.focus({ preventScroll: true });
@@ -1914,13 +1992,22 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   return (
     <div
       ref={root}
-      className={`terminal-root ${via === "hub" ? "is-via-hub" : "is-direct"} ${via === "normal" ? "is-via-normal" : ""} ${arriving ? "is-arriving" : ""} ${opening ? "is-opening" : ""} ${os ? "is-os" : ""} ${crt ? "has-crt" : ""}`}
+      className={`terminal-root ${via === "hub" ? "is-via-hub" : "is-direct"} ${via === "normal" ? "is-via-normal" : ""} ${arriving ? "is-arriving" : ""} ${opening ? "is-opening" : ""} ${os ? "is-os" : ""} ${crt ? "has-crt" : ""} ${saver !== "off" ? "is-saver" : ""}`}
       style={{ "--persona-c": color } as CSSProperties}
       data-theme={theme}
       role="region"
       aria-label="Engineer terminal"
     >
       <style>{THEME_CSS}</style>
+      {saver !== "off" ? (
+        <TerminalSaver
+          cfg={portraitCfg}
+          narrow={isNarrow()}
+          leaving={saver === "leaving"}
+          reduce={typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches}
+          line={`press any key · ${stats ? `${stats.total} contributions this year` : "type portfolio"}`}
+        />
+      ) : null}
       {/* The boot screen: the ssh window types the script, then dissolves (is-os). */}
       <div className="terminal-root-frame" aria-hidden={os}>
         <div ref={win} className={`hub-exit hub-exit-term terminal-root-win ${booting ? "is-boot" : ""}`}>
@@ -2106,12 +2193,13 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           <button type="button" tabIndex={-1} className="terminal-os-pane-next" onMouseDown={keepFocus} onClick={() => submit(hintCmd)}>
             {nextTry ? `try: ${hintCmd}` : "all done · try: sudo make me a sandwich"}
           </button>
-          {gh !== null ? (
+          {gh !== null || visitors >= 2 ? (
             <>
               <h3>live</h3>
-              <p className="terminal-os-pane-live">{gh === undefined ? "github · …" : `github · last push ${gh.repos[0] ? ago(Date.now() - Date.parse(gh.repos[0].pushed_at)) : "unknown"}`}</p>
+              {gh !== null ? <p className="terminal-os-pane-live">{gh === undefined ? "github · …" : `github · last push ${gh.repos[0] ? ago(Date.now() - Date.parse(gh.repos[0].pushed_at)) : "unknown"}`}</p> : null}
               {gh ? <p className="terminal-os-pane-live">{`${Number(gh.user.public_repos) || 0} public repos`}</p> : null}
               {stats ? <p className="terminal-os-pane-live">{`${stats.total} contributions · ${stats.streak.current} d streak`}</p> : null}
+              {visitors >= 2 ? <p className="terminal-os-pane-live">{`visitors · ${visitors} here now`}</p> : null}
             </>
           ) : null}
           <h3>keys</h3>
@@ -2129,6 +2217,9 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           <code className="terminal-os-status-m is-counts">
             {[plural(data.projects.length, "project"), plural(data.posts.length, "post"), plural(data.views.length, "view")].filter((t) => !t.startsWith("0 ")).join(" · ")}
           </code>
+          {visitors >= 2 ? (
+            <code className="terminal-os-status-here" aria-live="polite">{`${visitors} here now`}</code>
+          ) : null}
           {nextTry ? (
             <button type="button" tabIndex={-1} className="terminal-os-status-hint" onMouseDown={keepFocus} onClick={() => submit(hintCmd)}>
               {`try: ${hintCmd}`}

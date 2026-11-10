@@ -3468,3 +3468,67 @@ em.font-display,
     transition: none;
   }
 }
+
+/* The screensaver: a layer that dims the terminal to 35% and fades in over 600 ms and out over 200 ms. */
+.terminal-saver {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  opacity: 0;
+  transition: opacity 600ms ease;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  /* The terminal behind it reads at 35%. */
+  background: color-mix(in srgb, var(--void, #050507) 65%, transparent);
+}
+.terminal-saver.is-in {
+  opacity: 1;
+}
+.terminal-saver:not(.is-in) {
+  transition-duration: 200ms;
+}
+.terminal-saver-art {
+  margin: 0;
+  background: transparent !important;
+  font-size: min(13px, calc(90vw / var(--p-cols) / var(--p-adv)), calc((100dvh - 190px) / var(--p-rows)));
+}
+.terminal-saver-clock {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: clamp(36px, 8vw, 72px);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+.terminal-saver-line {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  color: var(--term-faint, var(--ink-faint));
+  text-align: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-saver {
+    transition: none;
+  }
+}
+
+/* Presence: only from two visitors up. */
+.terminal-os-status-here {
+  color: var(--term-faint, var(--ink-faint));
+  white-space: nowrap;
+}
+.terminal-os-status-here::before {
+  content: "· ";
+}
+@media (max-width: 767px) {
+  .terminal-os-status-here {
+    display: none;
+  }
+}

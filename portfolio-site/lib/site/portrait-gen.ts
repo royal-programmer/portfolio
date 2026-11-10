@@ -90,7 +90,8 @@ const DOT = [
   [0x08, 0x10, 0x20, 0x80],
 ];
 
-export function renderPortrait(mode: PortraitMode, cols: number, aspect: number, sample: Sampler): PortraitArt {
+/** `bias` shifts the brightness the cells are judged by (the screensaver drifts it so the portrait breathes). */
+export function renderPortrait(mode: PortraitMode, cols: number, aspect: number, sample: Sampler, bias = 0): PortraitArt {
   const rows = portraitRows(mode, cols, aspect);
   const adv = ADV[mode];
   const lines: PortraitRun[][] = [];
@@ -138,7 +139,7 @@ export function renderPortrait(mode: PortraitMode, cols: number, aspect: number,
     for (let y = 0; y < rows; y++) {
       const cells: PortraitRun[] = [];
       for (let x = 0; x < cols; x++) {
-        const v = L[y * cols + x];
+        const v = Math.min(1, Math.max(0, L[y * cols + x] + bias));
         if (mode === "ascii") cells.push({ t: RAMP[Math.min(RAMP.length - 1, Math.floor(v * RAMP.length))] });
         else if (mode === "blocks") cells.push({ t: BLOCKS[Math.min(BLOCKS.length - 1, Math.floor(v * BLOCKS.length))] });
         else if (v < 0.1) cells.push({ t: " " });
@@ -204,4 +205,35 @@ export async function generatePortrait(cfg: PortraitConfig, mode: PortraitMode, 
   const art = renderPortrait(mode, cols, sw / sh, sample);
   cache.set(key(cfg, mode, cols), art);
   return art;
+}
+
+/** The cropped photo as a sampler plus its aspect, for art that re-renders over time. Samples are kept per size. */
+export async function portraitSampler(cfg: PortraitConfig): Promise<{ sample: Sampler; aspect: number }> {
+  const img = await loadPortraitImage(cfg.src);
+  try {
+    await img.decode();
+  } catch {}
+  const [l, t, r, b] = cfg.crop;
+  const sx = l * img.naturalWidth;
+  const sy = t * img.naturalHeight;
+  const sw = (r - l) * img.naturalWidth;
+  const sh = (b - t) * img.naturalHeight;
+  const memo = new Map<string, ImageData>();
+  const sample: Sampler = (w, h) => {
+    const k = `${w}x${h}`;
+    const hit = memo.get(k);
+    if (hit) return hit;
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    if (!ctx) throw new Error("portrait: no canvas");
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+    const d = ctx.getImageData(0, 0, w, h);
+    memo.set(k, d);
+    return d;
+  };
+  return { sample, aspect: sw / sh };
 }

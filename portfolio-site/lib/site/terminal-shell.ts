@@ -160,6 +160,8 @@ export type Effect =
   | { kind: "sl" }
   /** `fit` with no text: the UI opens its paste box. */
   | { kind: "fit-box" }
+  /** `screensaver [on|off]`: start it now, or switch it off / on for this device. */
+  | { kind: "saver"; mode: "now" | "off" | "on" }
   | { kind: "mail" };
 
 export type ShellState = { cwd: string; history: string[]; lastMenu?: MenuId };
@@ -221,6 +223,7 @@ const COMMANDS: CommandDoc[] = [
   { name: "share", group: "read", usage: "share [command]", desc: "a link that opens the terminal on a command, with its preview", long: "Prints the link (code.ratulroy.me/?run=<command>) and the preview image it shows in a chat. No command: the one you ran before." },
   { name: "fit", group: "read", usage: "fit [paste]", desc: "paste a job description · see what overlaps with my stack", long: "Matches the skills it recognises against mine, and says what I do not have yet. Runs in your browser; nothing you paste is sent anywhere. Max 8 KB." },
   { name: "arch", group: "read", usage: "arch [shift-roster|automations|process-apis|this-site]", desc: "how the systems are wired, as a diagram", long: "Hover or focus a box to light up what it talks to. On a narrow screen each layer is its own block." },
+  { name: "screensaver", group: "terminal", usage: "screensaver [off|on]", desc: "start the screensaver now; off turns it off", long: "It starts by itself after 90 seconds without a key, tap or scroll (120 on a phone). Any key or tap ends it. screensaver off turns it off for this device; screensaver on brings it back." },
   { name: "mail", group: "open", usage: "mail [--fit]", desc: "send me a message, right here" },
   { name: "pane", group: "terminal", usage: "pane", desc: "show or hide the side pane" },
   { name: "date", group: "terminal", usage: "date", desc: "the local date and time" },
@@ -748,6 +751,11 @@ export function createShell(data: TerminalData): Shell {
         const body = line.trim().replace(/^\/?fit\s*/i, "");
         return body ? { lines: fit(body) } : { lines: [], effect: { kind: "fit-box" } };
       }
+      case "screensaver": {
+        const a = (args[0] ?? "").toLowerCase();
+        if (args.length > 1 || (a && a !== "off" && a !== "on")) return { lines: [text("usage: screensaver [off|on]")] };
+        return { lines: [], effect: { kind: "saver", mode: a === "off" ? "off" : a === "on" ? "on" : "now" } };
+      }
       case "arch":
         return { lines: arch(args[0], env?.cols ?? 100) };
       case "mail":
@@ -902,6 +910,7 @@ export function createShell(data: TerminalData): Shell {
       if (cmd === "theme") return [...THEMES.map((t) => t.id as string), "random"].filter((n) => n.startsWith(word));
       if (cmd === "portrait") return [...PORTRAIT_MODES, "list", "next"].filter((n) => n.startsWith(word));
       if (cmd === "fit") return [];
+      if (cmd === "screensaver") return ["off", "on"].filter((n) => n.startsWith(word));
       if (cmd === "arch") return data.arch.map((d) => d.id).filter((n) => n.startsWith(word.toLowerCase()));
       if (cmd === "hire") return ["--brief"].filter((n) => n.startsWith(word));
       if (cmd === "mail") return ["--fit"].filter((n) => n.startsWith(word));
