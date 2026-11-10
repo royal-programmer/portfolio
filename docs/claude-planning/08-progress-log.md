@@ -5,6 +5,10 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-10 — Round 7: `lang bn` and `lang hi`
+
+- All terminal prose moved to `lib/site/terminal-strings.ts` (en, bn, hi); English output unchanged except `help` (four short groups, `help --all` for the full list) and the new `lang` command. `?lang=` and `xp-term-lang` persist the choice; Noto Bengali/Devanagari fonts after Geist Mono. Series view and hub stay English. Details: `17-persona-views.md` §12.
+
 ## 2026-11-10 — Round 6: the terminal as an installable, offline-capable PWA
 
 - Manifest per host, generated icons, `?via=pwa` arrival; hand-written `public/sw.js` with a build-time precache list; status-bar connectivity item, offline command lines, `install` command, tips row 9. Details: `17-persona-views.md` §11.
