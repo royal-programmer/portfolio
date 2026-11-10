@@ -1392,3 +1392,7 @@ stripped service_role's table grants).
 ### Round 9 - the terminal follows the visitor's clock (2026-11-10)
 
 - `terminal-clock.ts`, `TerminalData.clock`, theme bands (unpersisted, saved pick wins), greeting prefix on the boot hint, weekend variant, `theme auto`, `now` greeting line, pane clock line, bn/hi strings. Verified at stubbed hours 2, 7, 13, 19, 23 and a Saturday; `theme amber` survives reload at hour 2, `theme auto` gives matrix. Details: 17-persona-views.md section 14.
+
+### Round 10 - the other worlds in the terminal (2026-11-10)
+
+- `lib/worlds/` pulse providers + `/api/worlds/pulse`; pane Live gets two rotating world lines; `worlds` command and a `worlds` line on `portfolio`; bn/hi strings. All five other worlds are stubs today (no content entries). Details: 17-persona-views.md section 15.
