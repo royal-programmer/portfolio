@@ -50,7 +50,11 @@ export type ProjectCard = {
   kind: "project" | "post";
 };
 
+/** A technology on the cast row (N5): how many episodes / projects mention it. `key` is the canonical lower-case name. */
+export type CastMember = { id: string; key: string; name: string; count: number };
+
 export type NetflixRow =
+  | { id: string; title: string; kind: "cast"; items: CastMember[] }
   | { id: string; title: string; kind: "episodes"; items: Episode[] }
   | { id: string; title: string; kind: "cards"; items: ProjectCard[] }
   | { id: string; title: string; kind: "skills"; items: SkillCard[] }
@@ -65,7 +69,19 @@ export type NetflixShow = {
   /** What the sticky bar offers: seasons for the full story, the rows otherwise. Each id is a row id. */
   nav: Array<{ id: string; label: string }>;
   rows: NetflixRow[];
+  /** The Recruiter cut (N3): card ids in play order, resolved from `RECRUITER_CUT`. Empty on the other profiles. */
+  recruiterCut: string[];
 };
+
+/**
+ * The Recruiter cut's three stops, in order (N3). Each is matched against the data, never hard-coded in the view:
+ * a project card by slug, else an episode by title (and tag, when given). The first hit wins.
+ */
+export const RECRUITER_CUT: ReadonlyArray<{ episode?: { title: RegExp; tag?: string }; project?: string }> = [
+  { episode: { title: /shift roster/i, tag: "v2.0" } },
+  { episode: { title: /11 python automations/i } },
+  { project: "apitestcenter", episode: { title: /api test center/i } },
+];
 
 const monthIndex = (date: string) => {
   const [y, m] = date.split("-");
@@ -126,6 +142,8 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
   const skills: SkillCard[] = data.resume.skills.flatMap((g) => g.items.map((name) => ({ id: `skill-${name}`, name, group: g.group })));
   const stackFirst = [...skills].sort((a, b) => Number(inStack.has(b.name.toLowerCase())) - Number(inStack.has(a.name.toLowerCase())));
 
+  const cast = buildCast(data, episodes, projectCards);
+  const castRows: NetflixRow[] = cast.length ? [{ id: "cast", title: "Cast · the stack", kind: "cast", items: cast }] : [];
   const main = episodes.filter((e) => e.branch === "main").sort(newestFirst);
   const side = episodes.filter((e) => e.branch === "side").sort(newestFirst);
   const collegeFrom = data.periods.find((p) => p.id === "college")?.from ?? "2020-08";
@@ -147,6 +165,7 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
       work,
       projects,
       { id: "skills", title: "Skills", kind: "skills", items: skills },
+      ...castRows,
       { id: "certs", title: "Certifications", kind: "episodes", items: learning },
       tbc,
     ];
@@ -155,6 +174,7 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
     rows = [
       projects,
       { id: "stack", title: "Stack", kind: "skills", items: stackFirst },
+      ...castRows,
       { id: "side", title: "Side quests", kind: "episodes", items: side },
       work,
       ...(postCards.length ? [{ id: "writing", title: "Writing", kind: "cards", items: postCards } as NetflixRow] : []),
@@ -170,11 +190,11 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
       const items = episodes.filter((e) => e.season === y);
       return { id: `s${y}`, title: `Season ${y} · ${label(y, items[0])}`, kind: "episodes", items };
     });
-    rows = [...seasonRows, tbc];
+    rows = [...seasonRows, ...castRows, tbc];
   }
 
   // Newest season first on the bar, like the brief's chips (2026 … 2002); the other profiles list their rows.
-  if (profile === "story") nav = years.map((y) => ({ id: `s${y}`, label: String(y) }));
+  if (profile === "story") nav = [...years.map((y) => ({ id: `s${y}`, label: String(y) })), ...castRows.map(() => ({ id: "cast", label: "Cast" }))];
   else nav = rows.filter((r) => r.kind !== "contact").map((r) => ({ id: r.id, label: r.title }));
 
   return {
@@ -184,6 +204,7 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
     seasons: years,
     nav,
     rows,
+    recruiterCut: profile === "recruiter" ? resolveCut(episodes, projectCards) : [],
   };
 }
 
@@ -306,4 +327,160 @@ export function topEpisodeId(shows: NetflixShow[]): string | null {
         if (hit) return hit.id;
       }
   return null;
+}
+
+/* ---------- N2: "Because you opened …" ---------- */
+
+export type BecauseRow = { id: string; title: string; items: NfItem[] };
+
+/** The tags and stack an item carries, lower-cased, for the "shares two" rule. */
+const tagSet = (item: NfItem): Set<string> => {
+  const f = factsOf(item);
+  return new Set([...f.tags, ...f.stack].map((t) => t.toLowerCase()));
+};
+
+const dateOf = (item: NfItem) => (item.kind === "episode" ? item.e.date : item.kind === "skill" ? "" : `${item.c.year ?? ""}`);
+
+/**
+ * Up to two rows seeded by the most recently opened cards (`recent`, newest first): up to 8 cards that share the
+ * seed's branch, or at least two tags / stack entries with it, newest first, never a card already in Continue
+ * watching (`exclude`) or the seed itself. Derived from what is already stored; nothing new is kept.
+ */
+export function becauseRows(recent: string[], pool: NfItem[], index: Map<string, NfItem>, exclude: Set<string>, rows = 2, per = 8): BecauseRow[] {
+  const out: BecauseRow[] = [];
+  const seen = new Set<string>();
+  for (const id of recent) {
+    if (out.length >= rows) break;
+    const seed = index.get(id);
+    if (!seed || seen.has(id)) continue;
+    seen.add(id);
+    const mine = tagSet(seed);
+    const items = pool
+      .filter((o) => o.id !== seed.id && !exclude.has(o.id))
+      .filter((o) => {
+        if (seed.kind === "episode" && o.kind === "episode" && o.e.branch === seed.e.branch) return true;
+        if (seed.kind === "skill" && o.kind === "skill" && o.s.group === seed.s.group) return true;
+        let shared = 0;
+        for (const t of tagSet(o)) if (mine.has(t)) shared += 1;
+        return shared >= 2;
+      })
+      .sort((a, b) => (dateOf(a) < dateOf(b) ? 1 : dateOf(a) > dateOf(b) ? -1 : a.id < b.id ? -1 : 1))
+      .slice(0, per);
+    if (items.length) out.push({ id: `because-${out.length}`, title: `Because you opened ${clip(factsOf(seed).title, 60)}`, items });
+  }
+  return out;
+}
+
+/* ---------- N3: the Recruiter cut ---------- */
+
+function resolveCut(episodes: Episode[], projects: ProjectCard[]): string[] {
+  const ids: string[] = [];
+  for (const step of RECRUITER_CUT) {
+    const card = step.project ? projects.find((p) => p.id === `project-${step.project}`) : undefined;
+    if (card) {
+      ids.push(card.id);
+      continue;
+    }
+    const spec = step.episode;
+    const ep = spec ? (episodes.find((e) => spec.title.test(e.title) && (!spec.tag || e.tag === spec.tag)) ?? episodes.find((e) => spec.title.test(e.title))) : undefined;
+    if (ep) ids.push(ep.id);
+  }
+  return ids;
+}
+
+/* ---------- N4: season recap ---------- */
+
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+
+/** The typed recap for one season of the full story: the count, one line per episode, then the period and grade. */
+export function seasonRecap(show: NetflixShow, year: number): string[] {
+  const row = show.rows.find((r) => r.id === `s${year}`);
+  if (!row || row.kind !== "episodes") return [];
+  const eps = [...row.items].sort((a, b) => a.n - b.n);
+  const label = row.title.split(" · ").slice(1).join(" · ");
+  const grade = eps.find((e) => e.grade)?.grade;
+  const lines = [`Season ${year} · ${eps.length} ${eps.length === 1 ? "episode" : "episodes"}`, ...eps.map((e) => clip(e.title, 70))];
+  const tail = [label, grade].filter(Boolean).join(" · ");
+  if (tail) lines.push(tail);
+  return lines;
+}
+
+/* ---------- N5: cast and crew ---------- */
+
+/** Spellings that mean the same technology; keyed by the canonical lower-case name. */
+const CAST_ALIASES: Record<string, string[]> = {
+  ".net": [".net", "dotnet", "asp.net", "dot net"],
+  typescript: ["typescript", "ts"],
+  javascript: ["javascript", "js", "ecmascript"],
+  "c#": ["c#", "csharp"],
+  postgresql: ["postgresql", "postgres"],
+  "sql server": ["sql server", "mssql"],
+  react: ["react", "react.js", "reactjs"],
+  "next.js": ["next.js", "nextjs"],
+  "node.js": ["node.js", "nodejs", "node"],
+  "github actions": ["github actions"],
+};
+
+const slug = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9#+.]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+const canonical = (name: string): string => {
+  const n = name.trim().toLowerCase();
+  for (const [key, list] of Object.entries(CAST_ALIASES)) if (key === n || list.includes(n)) return key;
+  return n;
+};
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const reCache = new Map<string, RegExp>();
+const termRe = (key: string): RegExp => {
+  let re = reCache.get(key);
+  if (!re) {
+    const terms = [...new Set([key, ...(CAST_ALIASES[key] ?? [])])];
+    re = new RegExp(`(?<![a-z0-9])(?:${terms.map(escapeRe).join("|")})(?![a-z0-9#+])`, "i");
+    reCache.set(key, re);
+  }
+  return re;
+};
+
+/** The canonical technology behind a `?cast=` value (a slug or a name), or null when empty. */
+export const castKeyOf = (value: string | null | undefined): string | null => {
+  const v = value?.trim().toLowerCase();
+  if (!v) return null;
+  for (const key of Object.keys(CAST_ALIASES)) if (slug(key) === v || key === v) return key;
+  return canonical(v);
+};
+
+const haystack = (item: NfItem): string => {
+  const f = factsOf(item);
+  return [f.title, f.blurb, ...f.tags, ...f.stack].filter(Boolean).join(" \n ");
+};
+
+/** Does this card mention the technology? (title, synopsis, tags, project stack; case-insensitive, aliases folded.) */
+export function mentionsCast(item: NfItem, key: string): boolean {
+  return termRe(key).test(haystack(item));
+}
+
+/** The technologies an item mentions, from the show's cast (the modal's "Cast:" chips). */
+export function castOf(item: NfItem, cast: CastMember[]): CastMember[] {
+  const hay = haystack(item);
+  return cast.filter((c) => termRe(c.key).test(hay));
+}
+
+const niceName = (s: string) => (s === s.toLowerCase() ? (s.length <= 3 ? s.toUpperCase() : s.charAt(0).toUpperCase() + s.slice(1)) : s);
+
+/** data.stack ∪ résumé skills, each with the count of episodes and projects that mention it. Computed once per build. */
+export function buildCast(data: TerminalData, episodes: Episode[], projects: ProjectCard[]): CastMember[] {
+  const names = new Map<string, string>();
+  for (const g of data.resume.skills) for (const n of g.items) if (!names.has(canonical(n))) names.set(canonical(n), n);
+  for (const n of data.stack) if (!names.has(canonical(n))) names.set(canonical(n), niceName(n));
+  const haystacks = [...episodes.map((e) => haystack({ id: e.id, kind: "episode", e })), ...projects.map((c) => haystack({ id: c.id, kind: c.kind, c }))];
+  return [...names.entries()]
+    .map(([key, name]) => {
+      const re = termRe(key);
+      return { id: `cast-${slug(key)}`, key, name, count: haystacks.filter((h) => re.test(h)).length };
+    })
+    .filter((c) => c.count > 0)
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }

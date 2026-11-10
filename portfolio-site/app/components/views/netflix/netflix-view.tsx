@@ -13,9 +13,9 @@ import { NetflixHero } from "./netflix-hero";
 import { NetflixGrid, NetflixRows, type CardEnv, type DisplayRow } from "./netflix-rows";
 import { NetflixModal } from "./netflix-modal";
 import { NetflixTopbar } from "./netflix-topbar";
-import { useLikes, useMyList, useProgress, useSound } from "./netflix-store";
+import { clearHistory, useLikes, useMyList, useProgress, useSound } from "./netflix-store";
 import { generatePortrait } from "@/lib/site/portrait-gen";
-import { NETFLIX_PROFILES, factsOf, indexItems, isNetflixProfile, rowItems, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
+import { NETFLIX_PROFILES, becauseRows, factsOf, indexItems, isNetflixProfile, rowItems, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
 import type { TermLink, TerminalData } from "@/lib/site/terminal-data";
 
 export type NetflixViewProps = {
@@ -28,6 +28,9 @@ export type NetflixViewProps = {
   /** `via=normal`: no staged motion. */
   fast: boolean;
 };
+
+type ToastAction = { label: string; run: () => void };
+type Notify = (msg: string, action?: ToastAction) => void;
 
 const PROFILE_KEY = "xp-nf-profile";
 const OLD_PROFILE_KEY = "xp-series-profile";
@@ -71,13 +74,13 @@ export function NetflixView(props: NetflixViewProps) {
   const { accent, series } = props;
   // undefined: not read yet (the page stays dark, nothing flashes); null: ask.
   const [profile, setProfile] = useState<NetflixProfileId | null | undefined>(undefined);
-  const [toast, setToast] = useState<{ id: number; msg: string } | null>(null);
+  const [toast, setToast] = useState<{ id: number; msg: string; action?: ToastAction } | null>(null);
   const toastTimer = useRef(0);
 
-  const notify = useCallback((msg: string) => {
+  const notify = useCallback<Notify>((msg, action) => {
     window.clearTimeout(toastTimer.current);
-    setToast({ id: Date.now(), msg });
-    toastTimer.current = window.setTimeout(() => setToast(null), 3200);
+    setToast({ id: Date.now(), msg, action });
+    toastTimer.current = window.setTimeout(() => setToast(null), action ? 6500 : 3200);
   }, []);
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
 
@@ -117,13 +120,25 @@ export function NetflixView(props: NetflixViewProps) {
       {toast ? (
         <div className="nf-toast" role="status" key={toast.id}>
           {toast.msg}
+          {toast.action ? (
+            <button
+              type="button"
+              className="nf-toast-act"
+              onClick={() => {
+                toast.action?.run();
+                setToast(null);
+              }}
+            >
+              {toast.action.label}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>
   );
 }
 
-function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => void; notify: (msg: string) => void }) {
+function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => void; notify: Notify }) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const [edit, setEdit] = useState(false);
   useEffect(() => {
@@ -183,7 +198,7 @@ function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => voi
 
 type ModalState = { id: string; origin: DOMRect | null; play: boolean };
 
-function NetflixBody({ show, series, profile, status, portrait, fast, contact, onSwitch, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; notify: (msg: string) => void }) {
+function NetflixBody({ show, series, profile, status, portrait, fast, contact, onSwitch, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; notify: Notify }) {
   const shows = useMemo(() => Object.values(series), [series]);
   const index = useMemo(() => indexItems(shows), [shows]);
   const topId = useMemo(() => topEpisodeId(shows), [shows]);
@@ -276,10 +291,15 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
     const pick = (ids: string[]) => ids.map((id) => index.get(id)).filter((i): i is NfItem => !!i);
     const cont = pick(progress.recent).slice(0, 14);
     const mine = pick(list.ids);
+    // N2: up to two "Because you opened" rows from the same history, never repeating a Continue watching card.
+    const seen = new Set<string>();
+    const poolItems = show.rows.flatMap(rowItems).filter((it) => !seen.has(it.id) && !!seen.add(it.id));
+    const because = becauseRows(progress.recent, poolItems, index, new Set(cont.map((c) => c.id))).map((b): DisplayRow => ({ id: b.id, title: b.title, items: b.items }));
     return [
       ...(cont.length ? [{ id: "continue", title: "Continue watching", items: cont } as DisplayRow] : []),
+      ...because,
       ...(mine.length ? [{ id: "mylist", title: "My List", items: mine } as DisplayRow] : []),
-      ...show.rows.map((r): DisplayRow => (r.kind === "contact" ? { id: r.id, title: r.title, contact: true } : { id: r.id, title: r.title, items: rowItems(r) })),
+      ...show.rows.filter((r) => r.kind !== "cast").map((r): DisplayRow => (r.kind === "contact" ? { id: r.id, title: r.title, contact: true } : { id: r.id, title: r.title, items: rowItems(r) })),
     ];
   }, [index, progress.recent, list.ids, show.rows]);
 
@@ -319,6 +339,15 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
     requestAnimationFrame(() => document.getElementById("nf-row-mylist")?.scrollIntoView({ behavior: behavior(), block: "start" }));
   };
 
+  const askClear = () =>
+    notify("Clear watch history, My List and thumbs-up on this device?", {
+      label: "Clear",
+      run: () => {
+        clearHistory();
+        notify("Watch history cleared");
+      },
+    });
+
   const profileMeta = NETFLIX_PROFILES.find((p) => p.id === profile);
   const modalItem = modal ? index.get(modal.id) : undefined;
   const more = topId ? index.get(topId) : undefined;
@@ -326,7 +355,7 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
 
   return (
     <>
-      <NetflixTopbar glyph={profileMeta?.glyph ?? "R"} tone={TONES[profile]} query={query} onQuery={setQuery} onHome={toTop} onSeries={toRows} onMyList={toList} onProfiles={onSwitch} />
+      <NetflixTopbar glyph={profileMeta?.glyph ?? "R"} tone={TONES[profile]} query={query} onQuery={setQuery} onHome={toTop} onSeries={toRows} onMyList={toList} onProfiles={onSwitch} onClearHistory={askClear} />
       <div className="nf-page" aria-hidden={modal ? true : undefined} inert={modal ? true : undefined}>
         {q ? (
           <div className="nf-results">

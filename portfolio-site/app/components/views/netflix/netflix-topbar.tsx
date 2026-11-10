@@ -16,10 +16,15 @@ type Props = {
   onSeries: () => void;
   onMyList: () => void;
   onProfiles: () => void;
+  /** Menu entries under Profiles; each is optional. */
+  onClearHistory?: () => void;
+  onReplay?: () => void;
 };
 
-export function NetflixTopbar({ glyph, tone, query, onQuery, onHome, onSeries, onMyList, onProfiles }: Props) {
+export function NetflixTopbar({ glyph, tone, query, onQuery, onHome, onSeries, onMyList, onProfiles, onClearHistory, onReplay }: Props) {
   const [solid, setSolid] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const menuBox = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const expanded = open || query !== "";
@@ -30,6 +35,29 @@ export function NetflixTopbar({ glyph, tone, query, onQuery, onHome, onSeries, o
     window.addEventListener("scroll", on, { passive: true });
     return () => window.removeEventListener("scroll", on);
   }, []);
+
+  // The Profiles menu closes on an outside press or Esc.
+  useEffect(() => {
+    if (!menu) return;
+    const away = (e: PointerEvent) => {
+      if (!menuBox.current?.contains(e.target as Node)) setMenu(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setMenu(false);
+    };
+    document.addEventListener("pointerdown", away);
+    window.addEventListener("keydown", esc, true);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      window.removeEventListener("keydown", esc, true);
+    };
+  }, [menu]);
+  const choose = (fn?: () => void) => () => {
+    setMenu(false);
+    fn?.();
+  };
 
   const openSearch = () => {
     setOpen(true);
@@ -55,7 +83,7 @@ export function NetflixTopbar({ glyph, tone, query, onQuery, onHome, onSeries, o
         <button type="button" onClick={onMyList}>
           My List
         </button>
-        <button type="button" onClick={onProfiles}>
+        <button type="button" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((v) => !v)}>
           Profiles
         </button>
       </nav>
@@ -92,9 +120,28 @@ export function NetflixTopbar({ glyph, tone, query, onQuery, onHome, onSeries, o
             </button>
           ) : null}
         </div>
-        <button type="button" className="nf-bar-profile" style={{ "--tone": tone } as React.CSSProperties} onClick={onProfiles} aria-label="Profiles: switch who is watching" title="Who's watching?">
-          <span aria-hidden>{glyph}</span>
-        </button>
+        <div className="nf-pmenu-wrap" ref={menuBox}>
+          <button type="button" className="nf-bar-profile" style={{ "--tone": tone } as React.CSSProperties} onClick={() => setMenu((v) => !v)} aria-haspopup="menu" aria-expanded={menu} aria-label="Profiles menu" title="Profiles">
+            <span aria-hidden>{glyph}</span>
+          </button>
+          {menu ? (
+            <div className="nf-pmenu" role="menu" aria-label="Profiles">
+              <button type="button" role="menuitem" onClick={choose(onProfiles)}>
+                Switch profile
+              </button>
+              {onReplay ? (
+                <button type="button" role="menuitem" onClick={choose(onReplay)}>
+                  Replay the recruiter cut
+                </button>
+              ) : null}
+              {onClearHistory ? (
+                <button type="button" role="menuitem" onClick={choose(onClearHistory)}>
+                  Clear watch history
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </div>
     </header>
   );

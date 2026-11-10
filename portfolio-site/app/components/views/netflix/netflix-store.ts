@@ -94,6 +94,13 @@ export function useProgress() {
   return { map, recent, set };
 }
 
+/** Empties My List, thumbs-up and watch progress (the Profiles menu's "Clear watch history"). */
+export function clearHistory() {
+  write(PROGRESS_KEY, "{}");
+  write(LIST_KEY, "[]");
+  write(LIKES_KEY, "[]");
+}
+
 /** Muted by default; the pick is remembered. */
 export function useSound() {
   const raw = useRaw(SOUND_KEY);
