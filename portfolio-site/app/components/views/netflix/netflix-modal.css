@@ -146,6 +146,33 @@
   line-height: 1;
   cursor: pointer;
 }
+.nf-m-share {
+  position: absolute;
+  top: 12px;
+  right: 64px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: #141419;
+  color: #fff;
+  cursor: pointer;
+}
+.nf-m-copied {
+  position: absolute;
+  top: 62px;
+  right: 12px;
+  z-index: 2;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #fff;
+  color: #141419;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
 .nf-m-bar {
   position: absolute;
   left: 2.5rem;

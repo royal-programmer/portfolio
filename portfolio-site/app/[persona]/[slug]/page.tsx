@@ -13,7 +13,9 @@ import { placeOnSpectrum } from "@/lib/site/spectrum";
 import { HomePage } from "../../components/home-page";
 import { WorldBoot } from "../../components/world-boot";
 import { ViewShell } from "../../components/views/view-shell";
-import { NETFLIX_PROFILES, buildNetflix, type NetflixShow, type NetflixProfileId } from "@/lib/site/netflix-data";
+import { NETFLIX_PROFILES, buildNetflix, isNetflixProfile, type NetflixShow, type NetflixProfileId } from "@/lib/site/netflix-data";
+import { netflixCard, netflixShareLink } from "@/lib/site/netflix-og";
+import { loadEngineerTerminalData } from "../../load-terminal-data";
 import { terminalData } from "@/lib/site/terminal-data";
 import { NetflixView } from "../../components/views/netflix/netflix-view";
 import { loadHomeContent } from "../../load-home-content";
@@ -22,7 +24,7 @@ import { SUBDOMAIN_BY_PERSONA } from "@/lib/site/hosts";
 
 type ProjectDetailProps = {
   params: Promise<{ persona: string; slug: string }>;
-  searchParams: Promise<{ via?: string }>;
+  searchParams: Promise<{ via?: string; title?: string; profile?: string }>;
 };
 
 export async function generateStaticParams() {
@@ -46,7 +48,7 @@ export async function generateStaticParams() {
   return params;
 }
 
-export async function generateMetadata({ params }: ProjectDetailProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: ProjectDetailProps): Promise<Metadata> {
   const { persona, slug } = await params;
   if (!isLaunchedPersona(persona)) {
     return { title: "Not found | Ratul Roy", robots: { index: false, follow: false } };
@@ -55,6 +57,15 @@ export async function generateMetadata({ params }: ProjectDetailProps): Promise<
   if (view) {
     const record = await getPersona(persona);
     const origin = siteOrigin(SUBDOMAIN_BY_PERSONA[persona]);
+    // A watch-party link (N6): `?title=<id>` previews that one episode, drawn by `/og?cmd=netflix:<id>`.
+    if (view.id === "netflix") {
+      const { title: id, profile } = await searchParams;
+      const card = typeof id === "string" ? netflixCard(await loadEngineerTerminalData(), id) : null;
+      if (card) {
+        const p = isNetflixProfile(profile) ? profile : "story";
+        return shareMetadata({ title: `${card.title} · ${view.name} | Ratul Roy`, description: card.line, cmd: `netflix:${id}`, origin, url: netflixShareLink(origin, p, id as string) });
+      }
+    }
     return shareMetadata({ title: `${view.name} · ${record?.label ?? persona} | Ratul Roy`, description: view.line, cmd: `view ${view.id}`, origin, url: `${origin}/${view.id}` });
   }
   const entry = await getEntryBySlug(persona, slug);

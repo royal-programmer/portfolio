@@ -475,7 +475,7 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
           </>
         )}
       </div>
-      {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} portraitText={text} autoPlay={modal.play} playMs={modal.playMs} cast={castList} onCast={castFromModal} onClose={close} onSwap={swap} onShow={onShow} /> : null}
+      {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} portraitText={text} autoPlay={modal.play} playMs={modal.playMs} cast={castList} profile={profile} onCast={castFromModal} onClose={close} onSwap={swap} onShow={onShow} /> : null}
     </>
   );
 }

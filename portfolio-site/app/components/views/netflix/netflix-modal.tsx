@@ -7,7 +7,9 @@
  * meta row, description, the season's episodes, "More like this" and About. Everything is swapped in place.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { NF_ADJECTIVES, castOf, factsOf, moreLike, type CastMember, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
+import { NF_ADJECTIVES, castOf, factsOf, moreLike, type CastMember, type NetflixProfileId, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
+import { DISPLAY_ROOT } from "@/lib/site/brand";
+import { netflixShareLink } from "@/lib/site/netflix-og";
 import { chime } from "./netflix-sound";
 import { useLikes, useMyList, useSound } from "./netflix-store";
 
@@ -28,6 +30,8 @@ type Props = {
   playMs?: number;
   /** The show's cast, and what a Cast chip does (filter the page by that technology). */
   cast?: CastMember[];
+  /** The profile the share link opens in (N6). */
+  profile?: NetflixProfileId;
   onCast?: (key: string) => void;
   onClose: () => void;
   onSwap: (item: NfItem) => void;
@@ -35,7 +39,7 @@ type Props = {
   onShow: (item: NfItem, playedThrough: boolean) => void;
 };
 
-export function NetflixModal({ item, index, origin, portraitText, autoPlay, playMs, cast, onCast, onClose, onSwap, onShow }: Props) {
+export function NetflixModal({ item, index, origin, portraitText, autoPlay, playMs, cast, profile = "story", onCast, onClose, onSwap, onShow }: Props) {
   const facts = useMemo(() => factsOf(item), [item]);
   const itemCast = useMemo(() => (cast ? castOf(item, cast) : []), [item, cast]);
   const overlay = useRef<HTMLDivElement>(null);
@@ -108,6 +112,44 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, play
     if (a) a.onfinish = () => onClose();
     else onClose();
   }, [onClose]);
+
+  /* ----- N6: Share: copies the watch-party link (the system sheet on phones) ----- */
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
+  const share = async () => {
+    const host = window.location.hostname;
+    const origin = host === "localhost" || host.endsWith(".localhost") ? window.location.origin : `https://code.${DISPLAY_ROOT}`;
+    const url = netflixShareLink(origin, profile, item.id);
+    if (isPhone() && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: facts.title, text: facts.blurb, url });
+        return;
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+      }
+    }
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(url);
+      ok = true;
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      ta.style.cssText = "position:fixed;opacity:0";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        ok = document.execCommand("copy");
+      } catch {}
+      ta.remove();
+      panel.current?.querySelector<HTMLElement>(".nf-m-share")?.focus({ preventScroll: true });
+    }
+    if (!ok) return;
+    setCopied(true);
+    window.clearTimeout(copiedTimer.current);
+    copiedTimer.current = window.setTimeout(() => setCopied(false), 2000);
+  };
 
   /* ----- Play ----- */
   const togglePlay = () => {
@@ -228,6 +270,19 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, play
             <button type="button" className="nf-m-x" aria-label="Close" onClick={requestClose}>
               <span aria-hidden>×</span>
             </button>
+            <button type="button" className="nf-m-share" aria-label="Share this episode" title="Share" onClick={share}>
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="6" cy="12" r="2.6" />
+                <circle cx="17.5" cy="6" r="2.6" />
+                <circle cx="17.5" cy="18" r="2.6" />
+                <path d="m8.3 10.8 7-3.6M8.3 13.2l7 3.6" />
+              </svg>
+            </button>
+            {copied ? (
+              <span className="nf-m-copied" role="status">
+                link copied
+              </span>
+            ) : null}
             <div className="nf-m-bar">
               <div className="nf-m-btns">
                 <button type="button" className="nf-btn nf-btn-play" onClick={togglePlay} aria-pressed={playing}>

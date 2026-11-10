@@ -11,6 +11,8 @@ import { USER } from "@/lib/site/terminal-fs";
 import { heatGrid, statsValid, type StatsData } from "@/lib/site/terminal-stats";
 import { portraitRows, renderPortrait } from "@/lib/site/portrait-gen";
 import type { TerminalData } from "@/lib/site/terminal-data";
+import { netflixCard, type NetflixCard } from "@/lib/site/netflix-og";
+import { loadHomeContent } from "../load-home-content";
 import { loadEngineerTerminalData } from "../load-terminal-data";
 import { GET as contributions } from "../api/github/contributions/route";
 
@@ -195,6 +197,31 @@ async function portraitBody(p: ThemePalette, data: TerminalData): Promise<ReactE
   );
 }
 
+/** Mixes `hex` over the cinema black: `share` of the colour, the rest black. */
+function mixBlack(hex: string, share: number) {
+  const n = parseInt(hex.slice(1), 16);
+  const k = (v: number) => Math.round(v * share + 11 * (1 - share));
+  return `rgb(${k(n >> 16)},${k((n >> 8) & 255)},${k(n & 255)})`;
+}
+
+/** `netflix:<id>`: the watch-party card in the Netflix view's look: the billboard gradient, the numeral, the title, one line, our R mark. */
+function NetflixBody({ card, accent }: { card: NetflixCard; accent: string }): ReactElement {
+  const b = card.tone ?? accent;
+  const size = card.title.length > 48 ? 44 : card.title.length > 28 ? 54 : 72;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", width: W, height: H, background: `linear-gradient(135deg, ${mixBlack(b, 0.55)}, ${mixBlack(b, 0.16)})`, color: "#f3f1ec", padding: "56px 72px", position: "relative" }}>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 56, height: 56, borderRadius: 12, background: b, color: "#0b0b0f", fontSize: 38 }}>R</div>
+        <div style={{ display: "flex", marginLeft: 20, fontSize: 22, color: "rgba(243,241,236,.72)" }}>a series by Ratul Roy</div>
+      </div>
+      <div style={{ display: "flex", marginTop: 36, fontSize: 104, lineHeight: 1, color: b === accent ? "#f3f1ec" : b, letterSpacing: -4 }}>{card.numeral}</div>
+      <div style={{ display: "flex", marginTop: 18, fontSize: size, lineHeight: 1.1, maxWidth: 1050 }}>{card.title}</div>
+      <div style={{ display: "flex", marginTop: 20, fontSize: 24, lineHeight: 1.35, maxWidth: 1000, maxHeight: 66, overflow: "hidden", color: "rgba(243,241,236,.82)" }}>{card.line}</div>
+      <div style={{ display: "flex", position: "absolute", left: 72, bottom: 40, fontSize: 24, color: "rgba(243,241,236,.7)" }}>{`${HOST}/netflix`}</div>
+    </div>
+  );
+}
+
 async function draw(plan: OgPlan, data: TerminalData): Promise<ReactElement> {
   const p = paletteFor(plan.theme);
   if (plan.kind === "stats") {
@@ -216,6 +243,14 @@ export async function GET(req: Request) {
   const q = new URL(req.url).searchParams;
   try {
     const data = await loadEngineerTerminalData();
+    const nf = /^netflix:(.{1,90})$/i.exec((q.get("cmd") ?? "").trim());
+    if (nf) {
+      const card = netflixCard(data, nf[1]);
+      if (card) {
+        const { personas } = await loadHomeContent();
+        return await respond(<NetflixBody card={card} accent={personas.find((p) => p.slug === "engineer")?.accent ?? "#3b82f6"} />);
+      }
+    }
     const plan = planOg(q.get("cmd"), q.get("theme"), data.views.map((v) => v.id));
     return await respond(await draw(plan, data));
   } catch (e) {
