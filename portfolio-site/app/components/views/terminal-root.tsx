@@ -26,9 +26,10 @@ import { HOME, resolvePath, shortPath, USER } from "@/lib/site/terminal-fs";
 import { createShell, HISTORY_CAP, initialShellState, THEMES, type Effect, type FileItem, type LinkItem, type MenuId, type MenuRow, type Out, type ShellState, type ThemeId, type TimelineRow, type Tone } from "@/lib/site/terminal-shell";
 import { isPrerendering, whenActive } from "@/lib/site/prerender";
 import { bandFor, clockCopy, hmIn, say, THEME_AUTO_KEY } from "@/lib/site/terminal-clock";
-import { isLang, LANG_HINTS, STRINGS, type Lang, type TerminalStrings } from "@/lib/site/terminal-strings";
+import { isLang, LANG_HINTS, STRINGS, type Lang, type StringKey, type TerminalStrings } from "@/lib/site/terminal-strings";
 import { usePresence } from "@/lib/site/terminal-presence";
 import { OTHER_WORLDS, otherPulses, pulsesValid, pulseText, worldColor, worldName, WORLDS_KEY, WORLDS_TTL, type WorldsCache } from "@/lib/site/terminal-worlds";
+import { PROFILE_GROUPS, visibleProfiles, type ProfileGroup, type TermProfile } from "@/lib/site/profiles";
 import { DISPLAY_ROOT, personaIdentity } from "@/lib/site/brand";
 import type { PersonaSlug } from "@/lib/content/types";
 import type { WorldPulse } from "@/lib/worlds/pulse";
@@ -74,6 +75,7 @@ type Entry =
   | { n: number; k: "cal"; title: string; weeks: Array<Array<number | null>>; today: number }
   | { n: number; k: "more" }
   | { n: number; k: "world"; persona: PersonaSlug; tag: string; line: string; href: string }
+  | { n: number; k: "profile"; id: string; label: string; handle: string; href?: string; stat?: string; pending?: boolean; note?: string }
   | { n: number; k: "heatmap"; weeks: HeatCell[][]; months: HeatMonth[]; narrow: boolean }
   | { n: number; k: "langbar"; langs: StatsData["languages"]; width: number }
   | { n: number; k: "neofetch"; rows: string[] }
@@ -774,6 +776,69 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     append([...rows, { n: ++seq.current, k: "links", dim: true, prefix: S["worlds.foot"], items: [{ label: DISPLAY_ROOT, href: hubHref(origin).href }] }]);
   };
 
+  /** `profiles [group]`: one row per place, grouped; the live numbers fill in place when `/api/profiles` answers (any failure leaves a row's number out). */
+  const profilesRun = async (group?: ProfileGroup) => {
+    if (curlAbort.current) return void line(T()["gh.already"]("profiles"), false, true, here());
+    const S = T();
+    const base = data.profiles.filter((p) => !group || p.group === group);
+    const rowFor = (p: TermProfile, found: Record<string, { handle?: string; href?: string }>) => visibleProfiles([p], found)[0];
+    const live = (p: TermProfile) => !!p.live;
+    // First paint: every row that can have a live number says so; optional rows (LeetCode) wait for the route.
+    const first = base.filter((p) => !p.optional);
+    const numbers = new Map<string, number>();
+    const out: Entry[] = [];
+    for (const g of PROFILE_GROUPS) {
+      const rows = first.filter((p) => p.group === g);
+      if (!rows.length) continue;
+      out.push({ n: ++seq.current, k: "parts", parts: [{ text: `── ${S[`pr.group.${g}` as StringKey] as string} ──────────`, tone: "dim" }] });
+      for (const p of rows) {
+        const n = ++seq.current;
+        numbers.set(p.id, n);
+        out.push({ n, k: "profile", id: p.id, label: p.label, handle: p.handle, href: p.href, pending: live(p), note: p.note });
+      }
+    }
+    append(out);
+    if (!base.some(live)) return void append([{ n: ++seq.current, k: "out", text: S["pr.foot"], dim: true }]);
+    const ac = new AbortController();
+    curlAbort.current = ac;
+    try {
+      const r = await fetch("/api/profiles", { signal: ac.signal });
+      if (!r.ok) throw new Error(`http ${r.status}`);
+      const j = (await r.json()) as { profiles?: Array<{ id?: string; stat?: string; handle?: string; href?: string }> };
+      const got = Array.isArray(j.profiles) ? j.profiles.filter((x) => typeof x?.id === "string") : [];
+      const found: Record<string, { handle?: string; href?: string }> = {};
+      for (const x of got) found[x.id as string] = { handle: x.handle, href: x.href };
+      if (cancelled.current) return;
+      setEntries((es) => {
+        let next = es.map((e) => {
+          if (e.k !== "profile" || !numbers.has(e.id) || numbers.get(e.id) !== e.n) return e;
+          const x = got.find((y) => y.id === e.id);
+          return { ...e, pending: false, stat: typeof x?.stat === "string" ? x.stat : undefined };
+        });
+        // An optional row (LeetCode) that the route found goes at the end of its group.
+        for (const p of base.filter((q) => q.optional)) {
+          const v = rowFor(p, found);
+          if (!v) continue;
+          const x = got.find((y) => y.id === p.id);
+          const row: Entry = { n: ++seq.current, k: "profile", id: p.id, label: v.label, handle: v.handle, href: v.href, stat: x?.stat };
+          let at = -1;
+          next.forEach((e, i) => {
+            if (e.k === "profile" && data.profiles.find((q) => q.id === e.id)?.group === p.group) at = i;
+          });
+          next = at < 0 ? [...next, row] : [...next.slice(0, at + 1), row, ...next.slice(at + 1)];
+        }
+        return next;
+      });
+    } catch {
+      if (!ac.signal.aborted || cancelled.current) {
+        setEntries((es) => es.map((e) => (e.k === "profile" && e.pending ? { ...e, pending: false } : e)));
+      }
+    } finally {
+      if (curlAbort.current === ac) curlAbort.current = null;
+    }
+    if (!cancelled.current) append([{ n: ++seq.current, k: "out", text: S["pr.foot"], dim: true }]);
+  };
+
   /**
    * `resume --build`: the real build, streamed from `/api/resume/build`. A bar (6 steps: five stages and the result)
    * and one line per stage, `[..]` while it runs and `[ok] … · 38 ms` when its event arrives; then the result and
@@ -1338,6 +1403,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     else if (fx.kind === "git-log") void gitLogLive(fx.oneline, fx.limit);
     else if (fx.kind === "stats") void statsRun(fx.mode);
     else if (fx.kind === "worlds") void worldsRun();
+    else if (fx.kind === "profiles") void profilesRun(fx.group);
     else if (fx.kind === "resume-build") void resumeBuildRun();
     else if (fx.kind === "run") {
       // A tip's number: the real command runs next (`/` opens the palette).
@@ -2231,6 +2297,17 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         <a className="terminal-root-link" href={e.href}>
           {S["worlds.open"]}
         </a>
+      </span>
+    ) : e.k === "profile" ? (
+      <span key={e.n} className="is-out terminal-os-profile">
+        <b>{e.label}</b>
+        <i className="is-dim">{e.handle}</i>
+        <span className="is-dim pr-stat">{e.stat ?? (e.pending ? S["pr.fetching"] : e.note ?? "")}</span>
+        {e.href ? (
+          <a className="terminal-root-link" href={e.href} target="_blank" rel="noreferrer" onMouseDown={keepFocus}>
+            {S["pr.open"]}
+          </a>
+        ) : null}
       </span>
     ) : e.k === "more" ? (
       <button key={e.n} type="button" className="terminal-root-more" onMouseDown={keepFocus} onClick={nextPage}>

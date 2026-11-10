@@ -28,6 +28,7 @@ import type { TermCommit, TerminalData } from "@/lib/site/terminal-data";
 import { LANG_NAMES, LANGS, STRINGS, type Lang, type StringKey, type TerminalStrings } from "@/lib/site/terminal-strings";
 import { clockCopy, say } from "@/lib/site/terminal-clock";
 import { OTHER_WORLDS, worldName } from "@/lib/site/terminal-worlds";
+import { isProfileGroup, PROFILE_GROUPS, type ProfileGroup } from "@/lib/site/profiles";
 
 export type MenuId = "views" | "projects" | "writing" | "themes" | "langs";
 export type MenuRow = { key: string; label: string; line: string };
@@ -154,6 +155,8 @@ export type Effect =
   /** `stats [year|langs]`: the UI fetches the GitHub year and draws it. */
   | { kind: "stats"; mode: "all" | "year" | "langs" }
   | { kind: "worlds" }
+  /** `profiles [group]`: the UI prints the rows and fills in the live numbers from `/api/profiles`. */
+  | { kind: "profiles"; group?: ProfileGroup }
   | { kind: "sl" }
   /** `fit` with no text: the UI opens its paste box. */
   | { kind: "fit-box" }
@@ -218,6 +221,7 @@ const COMMANDS: CommandDef[] = [
   { name: "cls", group: "terminal", usage: "cls" },
   { name: "portfolio", group: "read", usage: "portfolio", long: true },
   { name: "worlds", group: "read", usage: "worlds" },
+  { name: "profiles", group: "read", usage: "profiles [group]" },
   { name: "now", group: "read", usage: "now" },
   { name: "hire", group: "read", usage: "hire [--brief]" },
   { name: "timeline", group: "read", usage: "timeline [--all]" },
@@ -262,7 +266,7 @@ const TIPS = [
 /** What `help` shows first: `start here`, then three short groups. `help --all` lists every command under the older four. */
 const HELP_START = ["portfolio", "hire", "help"];
 const HELP_GROUPS: Array<{ key: StringKey; names: string[] }> = [
-  { key: "group.read", names: ["about", "resume", "projects", "writing", "timeline", "now", "worlds", "contact"] },
+  { key: "group.read", names: ["about", "resume", "projects", "writing", "timeline", "now", "worlds", "contact", "profiles"] },
   { key: "group.live", names: ["stats", "git", "curl", "fit"] },
   { key: "group.terminal", names: ["theme", "lang", "pane", "clear", "exit"] },
 ];
@@ -328,7 +332,7 @@ export function createShell(data: TerminalData): Shell {
       };
       const main = data.contact.filter((c) => !c.group);
       const more = data.contact.filter((c) => c.group === "elsewhere");
-      return [...main.map(row), ...(more.length ? [text(""), text(S.elsewhere, true), ...more.map(row)] : [])];
+      return [...main.map(row), ...(more.length ? [text(""), text(S.elsewhere, true), ...more.map(row)] : []), text(""), text(S["contact.profiles"], true)];
     }
     return lines.map((l): Out => {
       const link = /^(?:repo|live) ↗ (\S+)$/.exec(l);
@@ -640,6 +644,7 @@ export function createShell(data: TerminalData): Shell {
       out.push({ kind: "links", prefix: `${bar}→ `, items: tokens.slice(0, 3) });
       out.push({ kind: "links", prefix: `${bar}→ `, items: tokens.slice(3) });
     }
+    for (const n of data.hiring.alsoOn ?? []) out.push(text(`${bar}${S["hb.also"](n)}`, true));
     for (const l of wrapText(S["hb.foot"], w - 2)) out.push(text(`${bar}${l}`, true));
     return out;
   };
@@ -698,7 +703,7 @@ export function createShell(data: TerminalData): Shell {
     go("worlds");
     head(S["pf.contact"]);
     row(clip([...data.contact.filter((c) => !c.group).map((c) => c.label), "resume --pdf"].join(" · ")));
-    go("contact", "mail", "share");
+    go("contact", "profiles", "mail", "share");
     return out;
   };
 
@@ -898,6 +903,11 @@ export function createShell(data: TerminalData): Shell {
         return git(args);
       case "worlds":
         return { lines: [], effect: { kind: "worlds" } };
+      case "profiles": {
+        const g = (args[0] ?? "").toLowerCase();
+        if (args.length > 1 || (g && !isProfileGroup(g))) return { lines: [text(S["err.profiles.usage"])] };
+        return { lines: [], effect: { kind: "profiles", ...(g ? { group: g as ProfileGroup } : {}) } };
+      }
       case "portfolio":
         return { lines: portfolio(env?.cols ?? 100) };
       case "hire":
@@ -1098,6 +1108,7 @@ export function createShell(data: TerminalData): Shell {
       if (cmd === "share") return NAMES.filter((n) => n.startsWith(word.toLowerCase()));
       if (cmd === "timeline") return ["--all"].filter((n) => n.startsWith(word));
       if (cmd === "resume") return ["--pdf", "--build"].filter((n) => n.startsWith(word));
+      if (cmd === "profiles") return [...PROFILE_GROUPS].filter((n) => n.startsWith(word.toLowerCase()));
       if (cmd === "stats") return ["year", "langs"].filter((n) => n.startsWith(word));
       if (cmd === "curl") return ["github"].filter((n) => n.startsWith(word));
       if (cmd === "git") {

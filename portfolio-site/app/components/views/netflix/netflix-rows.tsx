@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Episode, NetflixShow, NfItem, ProjectCard, SkillCard } from "@/lib/site/netflix-data";
 import type { TermLink } from "@/lib/site/terminal-data";
+import { PROFILES } from "@/lib/site/profiles";
 import { useViewExit } from "../view-shell";
 import { tick } from "./netflix-sound";
 
@@ -293,6 +294,7 @@ function ContinuedRow({ row, contact }: { row: { id: string; title: string }; co
   const mail = link("mail");
   const linkedin = link("linkedin");
   const github = link("github");
+  const so = PROFILES.find((p) => p.id === "stackoverflow")?.href;
   return (
     <section className="nf-row" id={`nf-row-${row.id}`} aria-labelledby={`nf-h-${row.id}`} data-kind="contact">
       <h2 className="nf-visually-hidden" id={`nf-h-${row.id}`}>
@@ -315,6 +317,11 @@ function ContinuedRow({ row, contact }: { row: { id: string; title: string }; co
           {github ? (
             <a className="nf-btn nf-btn-glass" href={github} target="_blank" rel="noreferrer">
               GitHub
+            </a>
+          ) : null}
+          {so ? (
+            <a className="nf-btn nf-btn-glass" href={so} target="_blank" rel="noreferrer">
+              Stack Overflow
             </a>
           ) : null}
           {exit ? (
