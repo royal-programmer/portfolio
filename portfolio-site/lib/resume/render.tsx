@@ -7,8 +7,9 @@ import { Document, Font, Page, StyleSheet, Text, View, renderToBuffer } from "@r
 import type { ResumeDoc } from "./build";
 
 const FONT_DIR = path.join(process.cwd(), "public", "fonts");
+export const FONT_FILES = ["Inter-Regular.ttf", "Inter-Medium.ttf", "Inter-SemiBold.ttf"].map((f) => path.join(FONT_DIR, f));
 let registered = false;
-function registerFonts() {
+export function registerFonts() {
   if (registered) return;
   Font.register({
     family: "Inter",
@@ -151,7 +152,10 @@ export function ResumePdf({ d }: { d: ResumeDoc }) {
   );
 }
 
+/** The document tree, before it is rendered (the build route times this step on its own). */
+export const resumeElement = (data: ResumeDoc) => <ResumePdf d={data} />;
+
 export async function renderResume(data: ResumeDoc): Promise<Buffer> {
   registerFonts();
-  return renderToBuffer(<ResumePdf d={data} />);
+  return renderToBuffer(resumeElement(data));
 }

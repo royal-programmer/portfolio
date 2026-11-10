@@ -59,7 +59,7 @@ export type TerminalRootProps = {
 
 type Entry =
   /** `ps`: the path the command was typed at (the OS prompt); absent on the boot script's plain `$ `. */
-  | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string; label?: string; tag?: "ok" | "wait" | "bar"; cands?: string[]; hl?: number }
+  | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string; label?: string; tag?: "ok" | "wait" | "bar" | "err"; cands?: string[]; hl?: number }
   | { n: number; k: "links"; items: LinkItem[]; prefix?: string; suffix?: string; dim?: boolean; lead?: string }
   | { n: number; k: "ghcommit"; label: string; url: string; rest: string }
   | { n: number; k: "portrait"; mode: PortraitMode }
@@ -774,6 +774,102 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     append([...rows, { n: ++seq.current, k: "links", dim: true, prefix: S["worlds.foot"], items: [{ label: DISPLAY_ROOT, href: hubHref(origin).href }] }]);
   };
 
+  /**
+   * `resume --build`: the real build, streamed from `/api/resume/build`. A bar (6 steps: five stages and the result)
+   * and one line per stage, `[..]` while it runs and `[ok] … · 38 ms` when its event arrives; then the result and
+   * the tokens. Reduced motion changes nothing here: the lines already appear only as the events do.
+   */
+  const resumeBuildRun = async () => {
+    if (curlAbort.current) return void line(T()["gh.already"]("resume --build"), false, true, here());
+    const S = T();
+    const stages = ["collect", "layout", "fonts", "render", "verify"] as const;
+    type Stage = (typeof stages)[number];
+    const labels: Record<Stage, string> = { collect: S["rb.collect"], layout: S["rb.layout"], fonts: S["rb.fonts"], render: S["rb.render"], verify: S["rb.verify"] };
+    const fill = (k: number) => Math.round((k * BOOT_BAR_STEPS) / (stages.length + 1));
+    const ac = new AbortController();
+    curlAbort.current = ac;
+    const bar = ++seq.current;
+    let cur = ++seq.current;
+    append([
+      { n: bar, k: "out", text: bootBar(0), tag: "bar" },
+      { n: cur, k: "out", text: labels.collect, tag: "wait" },
+    ]);
+    let at = 0;
+    const fail = (stage: string, msg: string) => {
+      patchEntry(cur, { text: labels[stage as Stage] ?? stage, tag: "err" });
+      append([
+        { n: ++seq.current, k: "out", text: S["rb.fail"](stage, msg), tag: "err" },
+        { n: ++seq.current, k: "links", prefix: "→ ", items: [{ label: "resume --pdf", cmd: "resume --pdf" }] },
+      ]);
+    };
+    try {
+      const r = await fetch("/api/resume/build", { signal: ac.signal, cache: "no-store" });
+      if (!r.ok || !r.body) throw new Error(`http ${r.status}`);
+      const reader = r.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      let finished = false;
+      while (!finished) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i: number;
+        while ((i = buf.indexOf("\n\n")) >= 0) {
+          const block = buf.slice(0, i);
+          buf = buf.slice(i + 2);
+          const ev = /^event: (\w+)/m.exec(block)?.[1];
+          const raw = /^data: (.*)$/m.exec(block)?.[1];
+          if (!ev || !raw || cancelled.current) continue;
+          const d = JSON.parse(raw) as Record<string, unknown>;
+          if ((stages as readonly string[]).includes(ev)) {
+            const stage = ev as Stage;
+            at = stages.indexOf(stage) + 1;
+            patchEntry(cur, { text: `${labels[stage]} · ${Number(d.ms) || 0} ms`, tag: "ok" });
+            patchEntry(bar, { text: bootBar(fill(at)) });
+            ambient.key();
+            if (at < stages.length) {
+              cur = ++seq.current;
+              append([{ n: cur, k: "out", text: labels[stages[at]], tag: "wait" }]);
+            }
+          } else if (ev === "done") {
+            finished = true;
+            const token = String(d.token);
+            patchEntry(bar, { text: bootBar(BOOT_BAR_STEPS) });
+            append([
+              { n: ++seq.current, k: "out", text: S["rb.ok"](Number(d.pages) || 1, Math.max(1, Math.round(Number(d.bytes) / 1024)), (Number(d.ms) / 1000).toFixed(1)), tag: "ok" },
+              {
+                n: ++seq.current,
+                k: "links",
+                prefix: "→ ",
+                items: [
+                  { label: S["rb.preview"], href: `/resume.pdf?build=${token}`, external: true },
+                  { label: S["rb.download"], href: `/resume.pdf?build=${token}&download=1`, external: true },
+                  { label: "share", cmd: "share resume --build" },
+                ],
+              },
+            ]);
+          } else if (ev === "error") {
+            finished = true;
+            fail(String(d.stage), String(d.message));
+          }
+        }
+      }
+      if (!finished && !cancelled.current) fail(stages[Math.min(at, stages.length - 1)], "the stream ended early");
+    } catch (err) {
+      if (cancelled.current) return;
+      if (ac.signal.aborted) {
+        patchEntry(cur, { tag: undefined });
+        append([{ n: ++seq.current, k: "out", text: S["rb.cancel"], dim: true }]);
+      } else {
+        const lost = !navigator.onLine || err instanceof TypeError;
+        if (lost) setDown(true);
+        fail(stages[Math.min(at, stages.length - 1)], lost ? S["net.offline"] : err instanceof Error ? err.message : "failed");
+      }
+    } finally {
+      if (curlAbort.current === ac) curlAbort.current = null;
+    }
+  };
+
   /** One run of a GitHub command: a `fetching …` line that the result or the error replaces. */
   const withGithub = async (who: string, show: (d: GhCache, cached: boolean, ac: AbortController) => Promise<Entry[]>, fail: (kind: "rate" | "net") => string) => {
     if (curlAbort.current) return void line(T()["gh.already"](who), false, true, here());
@@ -1242,6 +1338,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     else if (fx.kind === "git-log") void gitLogLive(fx.oneline, fx.limit);
     else if (fx.kind === "stats") void statsRun(fx.mode);
     else if (fx.kind === "worlds") void worldsRun();
+    else if (fx.kind === "resume-build") void resumeBuildRun();
     else if (fx.kind === "run") {
       // A tip's number: the real command runs next (`/` opens the palette).
       if (fx.cmd === "/") {
@@ -1941,7 +2038,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     e.k === "out" ? (
       <span key={e.n} className={`${e.prompt ? "is-cmd" : "is-out"} ${e.dim ? "is-dim" : ""} ${e.accent ? "is-accent" : ""}`}>
         {e.prompt ? (e.label ? <code className="ps-user">{e.label}</code> : ps1(e.ps)) : ""}
-        {e.tag === "ok" ? <b className="is-ok">[ok] </b> : e.tag === "wait" ? "[..] " : ""}
+        {e.tag === "ok" ? <b className="is-ok">[ok] </b> : e.tag === "wait" ? "[..] " : e.tag === "err" ? "[!!] " : ""}
         {e.cands
           ? e.cands.flatMap((c, i) => [i ? "   " : "", i === e.hl ? <b key={c} className="tab-hl">{c}</b> : c])
           : e.text || " "}
@@ -2397,7 +2494,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
           {data.now?.lines[0] ? <p className="terminal-os-pane-now">{S["pane.now"](data.i18n?.[lang as "bn" | "hi"]?.now[0] ?? data.now.lines[0])}</p> : null}
           <div className="terminal-os-pane-actions">
             {["hire", "resume --pdf", "mail"].map((c) => (
-              <button key={c} type="button" tabIndex={-1} title={c === "hire" ? S["hb.tip"] : undefined} onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit(c)}>
+              <button key={c} type="button" tabIndex={-1} title={c === "hire" ? S["hb.tip"] : c === "resume --pdf" ? S["pane.resume.tip"] : undefined} onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit(c)}>
                 {c}
               </button>
             ))}
