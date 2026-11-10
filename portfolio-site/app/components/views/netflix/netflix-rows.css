@@ -619,6 +619,25 @@ button.nf-cast[aria-pressed="true"] {
   }
 }
 
+/* The percent a pasted job description gives a card (N7). */
+.nf-fit {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 4;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--nf-accent);
+  color: #fff;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+.nf-skill {
+  position: relative;
+}
+
 /* "Start here" badge (reduced motion, N3). */
 .nf-start {
   position: absolute;
@@ -633,4 +652,22 @@ button.nf-cast[aria-pressed="true"] {
   font-size: 0.68rem;
   font-weight: 700;
   pointer-events: none;
+}
+.nf-card:has(.nf-fit) .nf-top {
+  right: 12px;
+  left: auto;
+}
+.nf-poster .nf-fit {
+  position: relative;
+  top: auto;
+  left: auto;
+  flex: none;
+  align-self: flex-start;
+}
+.nf-skill .nf-fit {
+  position: relative;
+  top: auto;
+  left: auto;
+  align-self: flex-start;
+  margin-bottom: 4px;
 }

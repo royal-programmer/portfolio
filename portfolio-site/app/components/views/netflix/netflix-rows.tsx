@@ -31,7 +31,31 @@ export type CardEnv = {
   startHere?: ReadonlySet<string>;
   /** The page-wide technology filter (N5): the active key and the toggle. */
   cast: { active: string | null; label: string | null; pick: (key: string | null) => void };
+  /** A pasted job description is rating the cards (N7): the percent per card, the counts for the pill, and the way out. */
+  fit?: { byId: ReadonlyMap<string, number>; matched: number; total: number; clear: () => void };
 };
+
+/** The top-left percent on a card while a description is active. */
+const FitBadge = ({ env, id }: { env: CardEnv; id: string }) => {
+  const pct = env.fit?.byId.get(id);
+  return pct != null ? <span className="nf-fit">{pct}% fit</span> : null;
+};
+
+/** `Fit: <k> skills matched · clear`, under the top bar while a description is active. */
+function FitPill({ env }: { env: CardEnv }) {
+  const f = env.fit;
+  if (!f) return null;
+  return (
+    <div className="nf-castpill nf-fitpill" role="status">
+      <span>
+        Fit: <b>{f.total ? `${f.matched} ${f.matched === 1 ? "skill" : "skills"} matched` : "no skills recognised"}</b>
+      </span>
+      <button type="button" onClick={f.clear}>
+        clear
+      </button>
+    </div>
+  );
+}
 
 type Props = { show: NetflixShow; rows: DisplayRow[]; contact: TermLink[]; env: CardEnv; onRecap?: (year: number) => void };
 
@@ -39,6 +63,7 @@ export function NetflixRows({ show, rows, contact, env, onRecap }: Props) {
   return (
     <>
       <SeasonBar show={show} onRecap={onRecap} />
+      <FitPill env={env} />
       {env.cast.active ? (
         <div className="nf-castpill">
           <span>
@@ -208,6 +233,7 @@ function CastRow({ row, env }: { row: { id: string; title: string; cast: CastMem
 export function NetflixGrid({ items, env, query }: { items: NfItem[]; env: CardEnv; query: string }) {
   return (
     <section className="nf-search" aria-label="Search results">
+      <FitPill env={env} />
       <h2 className="nf-row-title">
         {items.length ? `Results for “${query}”` : `Nothing matches “${query}”`} <span className="nf-count">&middot; {items.length}</span>
       </h2>
@@ -313,6 +339,7 @@ function EpisodeCard({ e, item, env }: { e: Episode; item: NfItem; env: CardEnv 
           </span>
         ) : null}
         {env.startHere?.has(item.id) ? <span className="nf-start">Start here</span> : null}
+        <FitBadge env={env} id={item.id} />
         <span className="nf-num" aria-hidden>
           S{e.season} E{e.n}
         </span>
@@ -351,6 +378,7 @@ function PosterCard({ c, item, env }: { c: ProjectCard; item: NfItem; env: CardE
   return (
     <li className="nf-poster">
       {env.startHere?.has(item.id) ? <span className="nf-start">Start here</span> : null}
+      <FitBadge env={env} id={item.id} />
       <button type="button" className="nf-poster-title nf-stretch" data-nf-card={item.id} onClick={(ev) => env.open(item, ev.currentTarget)}>
         {c.title}
       </button>
@@ -385,6 +413,7 @@ function SkillTile({ s, item, env }: { s: SkillCard; item: NfItem; env: CardEnv 
   return (
     <li className="nf-skill-li">
       <button type="button" className="nf-skill" data-nf-card={item.id} title={s.group} onClick={(ev) => env.open(item, ev.currentTarget)}>
+        <FitBadge env={env} id={item.id} />
         <span className="nf-skill-name">{s.name}</span>
         <span className="nf-skill-group">{s.group}</span>
         <Bar value={env.progress[item.id]} />

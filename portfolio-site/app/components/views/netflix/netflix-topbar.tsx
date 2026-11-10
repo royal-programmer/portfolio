@@ -12,6 +12,8 @@ type Props = {
   tone: string;
   query: string;
   onQuery: (q: string) => void;
+  /** A paste: return true when the text was taken as a job description (the box then stays as it is). */
+  onPasteText?: (text: string) => boolean;
   onHome: () => void;
   onSeries: () => void;
   onMyList: () => void;
@@ -21,7 +23,7 @@ type Props = {
   onReplay?: () => void;
 };
 
-export function NetflixTopbar({ glyph, tone, query, onQuery, onHome, onSeries, onMyList, onProfiles, onClearHistory, onReplay }: Props) {
+export function NetflixTopbar({ glyph, tone, query, onQuery, onPasteText, onHome, onSeries, onMyList, onProfiles, onClearHistory, onReplay }: Props) {
   const [solid, setSolid] = useState(false);
   const [menu, setMenu] = useState(false);
   const menuBox = useRef<HTMLDivElement>(null);
@@ -104,6 +106,10 @@ export function NetflixTopbar({ glyph, tone, query, onQuery, onHome, onSeries, o
             value={query}
             tabIndex={expanded ? 0 : -1}
             onChange={(e) => onQuery(e.target.value)}
+            onPaste={(e) => {
+              const text = e.clipboardData.getData("text");
+              if (onPasteText?.(text)) e.preventDefault();
+            }}
             onBlur={() => !query && setOpen(false)}
             onKeyDown={(e) => {
               if (e.key === "Escape") {

@@ -194,7 +194,7 @@ async function PersonaViewPage({ persona, view, fromTerminal, via }: { persona: 
     const series = Object.fromEntries(NETFLIX_PROFILES.map((p) => [p.id, buildNetflix(p.id, data, engineerEntries, engineerBlogPosts)])) as Record<NetflixProfileId, NetflixShow>;
     return (
       <ViewShell persona={persona} view={view} stripVia={fromTerminal}>
-        <NetflixView accent={accent} series={series} contact={data.contact} status={data.status} portrait={data.portrait} fast={via === "normal"} />
+        <NetflixView accent={accent} series={series} contact={data.contact} status={data.status} portrait={data.portrait} fitPool={{ stack: data.stack, resume: { skills: data.resume.skills } }} fast={via === "normal"} />
       </ViewShell>
     );
   }

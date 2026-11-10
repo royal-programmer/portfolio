@@ -14,6 +14,8 @@ import { NetflixGrid, NetflixRows, type CardEnv, type DisplayRow } from "./netfl
 import { NetflixModal } from "./netflix-modal";
 import { NetflixTopbar } from "./netflix-topbar";
 import { AUTOPILOT_TYPE_MS, AutopilotRail, autopilotSeen, useAutopilot } from "./netflix-autopilot";
+import { JD_MIN, netflixFit, sortByFit } from "@/lib/site/netflix-fit";
+import type { FitPool } from "@/lib/site/terminal-fit";
 import { clearHistory, useLikes, useMyList, useProgress, useSound } from "./netflix-store";
 import { generatePortrait } from "@/lib/site/portrait-gen";
 import { NETFLIX_PROFILES, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
@@ -26,6 +28,8 @@ export type NetflixViewProps = {
   contact: TermLink[];
   status: string;
   portrait: TerminalData["portrait"];
+  /** What a pasted job description is weighed against (N7). */
+  fitPool: FitPool;
   /** `via=normal`: no staged motion. */
   fast: boolean;
 };
@@ -209,7 +213,7 @@ function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => voi
 
 type ModalState = { id: string; origin: DOMRect | null; play: boolean; playMs?: number };
 
-function NetflixBody({ show, series, profile, status, portrait, fast, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
+function NetflixBody({ show, series, profile, status, portrait, fitPool, fast, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
   const shows = useMemo(() => Object.values(series), [series]);
   const index = useMemo(() => indexItems(shows), [shows]);
   const topId = useMemo(() => topEpisodeId(shows), [shows]);
@@ -319,6 +323,10 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
   const reducedMotion = useMemo(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches, []);
   const startHere = useMemo(() => (profile === "recruiter" && reducedMotion ? new Set(show.recruiterCut) : undefined), [profile, reducedMotion, show.recruiterCut]);
 
+  // N7: a pasted job description (held in memory only) rates every card with the terminal's fit engine.
+  const [jd, setJd] = useState<string | null>(null);
+  const fit = useMemo(() => (jd ? netflixFit(jd, fitPool, [...index.values()]) : null), [jd, fitPool, index]);
+
   const env: CardEnv = {
     open,
     inList: list.has,
@@ -330,6 +338,7 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
     soundOn: sound.on,
     startHere,
     cast: { active: castKey, label: castLabel, pick: pickCast },
+    fit: fit ? { byId: fit.byId, matched: fit.matched, total: fit.total, clear: () => setJd(null) } : undefined,
   };
 
   /* ----- rows: Continue watching and My List first when there is something in them ----- */
@@ -359,10 +368,16 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
     });
   }, [rows, castKey]);
 
+  // N7: with a description active, each row's cards sort by fit, highest first.
+  const ratedRows = useMemo<DisplayRow[]>(() => {
+    if (!fit) return shownRows;
+    return shownRows.map((r) => ("items" in r ? { ...r, items: sortByFit(r.items, fit.byId) } : r));
+  }, [shownRows, fit]);
+
   /* ----- search ----- */
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
-  const results = useMemo(() => {
+  const rawResults = useMemo(() => {
     if (!q) return [];
     const seen = new Set<string>();
     const out: NfItem[] = [];
@@ -378,6 +393,22 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
       }
     return out;
   }, [q, show.rows]);
+
+  const results = useMemo(() => (fit ? sortByFit(rawResults, fit.byId) : rawResults), [rawResults, fit]);
+
+  // A long paste (or a long typed line) is a job description, not a search.
+  const onQuery = useCallback((v: string) => {
+    if (v.trim().length >= JD_MIN) {
+      setJd(v);
+      setQuery("");
+    } else setQuery(v);
+  }, []);
+  const onPasteText = useCallback((v: string) => {
+    if (v.trim().length < JD_MIN) return false;
+    setJd(v);
+    setQuery("");
+    return true;
+  }, []);
 
   /* ----- top bar actions ----- */
   const behavior = (): ScrollBehavior => (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth");
@@ -461,7 +492,7 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
 
   return (
     <>
-      <NetflixTopbar glyph={profileMeta?.glyph ?? "R"} tone={TONES[profile]} query={query} onQuery={setQuery} onHome={toTop} onSeries={toRows} onMyList={toList} onProfiles={onSwitch} onClearHistory={askClear} onReplay={onReplay} />
+      <NetflixTopbar glyph={profileMeta?.glyph ?? "R"} tone={TONES[profile]} query={query} onQuery={onQuery} onPasteText={onPasteText} onHome={toTop} onSeries={toRows} onMyList={toList} onProfiles={onSwitch} onClearHistory={askClear} onReplay={onReplay} />
       {autopilot.state ? <AutopilotRail state={autopilot.state} onSkip={autopilot.skip} onStop={autopilot.stop} /> : null}
       <div className="nf-page" aria-hidden={modal ? true : undefined} inert={modal ? true : undefined}>
         {q ? (
@@ -471,7 +502,7 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
         ) : (
           <>
             <NetflixHero series={show} profile={profile} status={status} text={text} fast={fast} firstRowId={firstRow} onMore={more ? () => open(more, null) : undefined} sound={sound} recap={recap} onRecapEnd={endRecap} />
-            {ready ? <NetflixRows show={show} rows={shownRows} contact={contact} env={env} onRecap={profile === "story" ? playRecap : undefined} /> : <SkeletonRows />}
+            {ready ? <NetflixRows show={show} rows={ratedRows} contact={contact} env={env} onRecap={profile === "story" ? playRecap : undefined} /> : <SkeletonRows />}
           </>
         )}
       </div>
