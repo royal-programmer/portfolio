@@ -4,6 +4,7 @@ import Script from "next/script";
 import { EXPERIENCE_BOOT_SCRIPT } from "@/lib/site/experience";
 import { ExperienceProvider } from "./experience-provider";
 import { PersonaProvider } from "./persona-provider";
+import { ServiceWorker } from "./service-worker";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -67,6 +68,7 @@ export default function RootLayout({
         <ExperienceProvider>
           <PersonaProvider>{children}</PersonaProvider>
         </ExperienceProvider>
+        <ServiceWorker />
       </body>
     </html>
   );
