@@ -65,6 +65,8 @@ export function buildResume(persona: Persona | undefined, entries: Entry[], now 
     ...r.personalProjects.map((p) => ({ name: p.name, line: [p.line, p.url?.replace(/^https?:\/\//, "")].filter(Boolean).join(" ") })),
     ...data.projects
       .filter((p) => !names.has(p.title.toLowerCase()))
+      // A résumé must not carry a placeholder entry: a project needs a real summary and no sample link.
+      .filter((p) => !!p.summary && p.summary.trim().toLowerCase() !== p.title.trim().toLowerCase() && !/(^|\.)(url|example|test)\.com/i.test(`${p.deployedUrl ?? ""} ${p.repoUrl ?? ""}`))
       .map((p) => ({ name: p.title, line: [p.summary, (p.deployedUrl ?? p.repoUrl)?.replace(/^https?:\/\//, "")].filter(Boolean).join(" ") })),
   ];
 
