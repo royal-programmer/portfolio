@@ -5,6 +5,14 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-10 — Round 3: the résumé PDF is generated from the data
+
+- `/resume.pdf` (route `app/resume.pdf/route.ts`, `@react-pdf/renderer`, Node runtime, `force-static`) renders one A4 page from `RESUME`, `TIMELINE`, contact links and the content-layer projects; no phone number. Builder: `lib/resume/build.ts`; renderer: `lib/resume/render.tsx`; Inter (subset, OFL) in `public/fonts/`.
+- Which bullets make the PDF: `RESUME.pdfBullets` (indices into the role's bullets).
+- Wired to `resume --pdf`, the `resume` text (dim last line), Hire pill, hub, Series hero, pane quick action.
+- `public/Ratul_Roy_Resume.pdf` is kept for now; Ratul deletes it after comparing the two.
+- Note: `force-static` ignores the query string, so `?download=1` may not switch to `attachment` once built; if it matters, drop `force-static` for `revalidate`.
+
 ## 2026-11-10 — Round 1m: school grades on the timeline, Tab cycling, seamless hub → persona hand-off
 
 - Class 10 and class 12 are timeline entries with their own highlighted grade; the school bracket label no longer carries the combined string.

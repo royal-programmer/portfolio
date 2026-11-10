@@ -353,3 +353,7 @@ registry entry is `enabled: true`, so `view series`, the pane row and the picker
   is set when a commit's tag equals a project slug.
 - **Not done / notes.** Posts have no page yet, so they open the sheet. Trailer is silent by design. Dev needs
   `next dev --webpack` inside a git worktree (Turbopack rejects a `node_modules` junction that points outside the root).
+
+## 8. Generated résumé (round 3)
+
+`/resume.pdf` is built from the same data as the terminal and the Series view (`RESUME`, `TIMELINE`, `TIMELINE_PERIODS`, contact links, public projects), so editing one place updates all three. One A4 page, ATS-friendly (real text, no tables, no icons, no fills), Inter, a thin persona-accent rule. The résumé-worthy bullets are listed in `RESUME.pdfBullets`. No phone number, ever. The hand-made `public/Ratul_Roy_Resume.pdf` stays until Ratul has compared the two.

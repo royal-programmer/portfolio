@@ -106,7 +106,7 @@ export function SeriesHero({ series, profile, status, portrait, fast, firstRowId
           <button ref={playRef} type="button" className="sr-btn sr-btn-play" onClick={() => setPlaying(true)}>
             <span aria-hidden>▶</span> Play
           </button>
-          <a className="sr-btn sr-btn-glass" href="/Ratul_Roy_Resume.pdf" target="_blank" rel="noreferrer">
+          <a className="sr-btn sr-btn-glass" href="/resume.pdf" target="_blank" rel="noreferrer">
             View résumé
           </a>
         </div>

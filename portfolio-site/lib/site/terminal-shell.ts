@@ -623,6 +623,7 @@ export function createShell(data: TerminalData): Shell {
       out.push(text(`${named.items?.length} ${named.issuer.split(" / ")[0]} credentials${more ? ` · ${more} more` : ""}`));
     }
     out.push(text(""), text("cat ~/resume/experience for the full story · ls ~/resume", true));
+    out.push(text("resume --pdf opens the generated PDF · built from this data", true));
     return out;
   };
 
@@ -710,10 +711,10 @@ export function createShell(data: TerminalData): Shell {
         if (args.includes("--pdf"))
           return {
             lines: [
-              text("opening the résumé (pdf) · no phone number in the public copy"),
-              { kind: "link", label: "/Ratul_Roy_Resume.pdf", href: "/Ratul_Roy_Resume.pdf", external: true },
+              text("opening the résumé (pdf) · generated from this data · no phone number"),
+              { kind: "link", label: "/resume.pdf", href: "/resume.pdf", external: true },
             ],
-            effect: { kind: "window", url: "/Ratul_Roy_Resume.pdf" },
+            effect: { kind: "window", url: "/resume.pdf" },
           };
         return { lines: resume() };
       case "curl": {
