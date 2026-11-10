@@ -35,7 +35,7 @@ export function HirePill({ on = true, hub = false }: { on?: boolean; hub?: boole
     <div ref={box} className={`hire-pill ${hub ? "is-hub" : ""} ${on ? "is-on" : ""}`} aria-hidden={!on}>
       {shown ? (
         <div className="hire-pill-pop" role="menu" aria-label="Résumé and contact">
-          <a role="menuitem" href="/resume.pdf" target="_blank" rel="noreferrer">
+          <a role="menuitem" href="/Ratul_Roy_Resume.pdf" target="_blank" rel="noreferrer">
             Résumé (PDF)
           </a>
           <a role="menuitem" href={`mailto:${HUB_COPY.email}`}>

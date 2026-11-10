@@ -4,6 +4,7 @@
  */
 import type { BlogPost, Entry, Persona, PersonaView } from "@/lib/content/types";
 import { HUB_COPY, personaIdentity } from "@/lib/site/brand";
+import { RESUME_FILES, type ResumeFiles } from "@/lib/resume/files";
 import type { ArchDiagram } from "@/lib/site/terminal-arch";
 
 export type TermProject = {
@@ -128,7 +129,7 @@ export const HIRING: TermHiring = {
   compensation: "band · ask",
   visa: "Indian citizen · no sponsorship needed in India",
   proof: ["200+ users on the Shift Roster rebuild", "11 Python automations in production", "VMS query 5–10 min → 2–3 min"],
-  links: { resume: "/resume.pdf", site: "https://code.ratulroy.me" },
+  links: { resume: RESUME_FILES.submitted.href, site: "https://code.ratulroy.me" },
 };
 
 export type TermCommit = {
@@ -369,6 +370,8 @@ export type TerminalData = {
   views: PersonaView[];
   resume: TermResume;
   hiring: TermHiring;
+  /** The submitted PDF (the default) and the generated one (`resume --build`). */
+  resumeFiles: ResumeFiles;
   timeline: TermCommit[];
   periods: TermPeriod[];
   /** The portrait's source photo and crop (fractions l,t,r,b); every `portrait` mode is generated from it. */
@@ -424,6 +427,7 @@ export function terminalData(persona: Persona | undefined, entries: Entry[], pos
     views,
     resume: RESUME,
     hiring: HIRING,
+    resumeFiles: RESUME_FILES,
     arch: ARCH,
     projectArch: PROJECT_ARCH,
     timeline: TIMELINE,

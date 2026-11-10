@@ -139,6 +139,8 @@ export type Effect =
   /** `git log`: the UI fetches the public activity. */
   | { kind: "git-log"; oneline: boolean; limit: number }
   | { kind: "window"; url: string }
+  /** `resume --build`: the UI streams the build's progress from `/api/resume/build`. */
+  | { kind: "resume-build" }
   | { kind: "theme"; id: ThemeId }
   /** `theme auto`: forget the saved pick; the UI follows the visitor's clock again. */
   | { kind: "theme-auto" }
@@ -202,7 +204,7 @@ const COMMANDS: CommandDef[] = [
   { name: "qr", group: "open", usage: "qr" },
   { name: "theme", group: "terminal", usage: "theme [name|auto|random]", long: true },
   { name: "crt", group: "terminal", usage: "crt" },
-  { name: "resume", group: "read", usage: "resume [--pdf]" },
+  { name: "resume", group: "read", usage: "resume [--pdf|--build]" },
   { name: "portrait", group: "read", usage: "portrait [mode|list|next]" },
   { name: "whoami", group: "read", usage: "whoami" },
   { name: "neofetch", group: "read", usage: "neofetch" },
@@ -625,6 +627,7 @@ export function createShell(data: TerminalData): Shell {
       ...(linkedin ? [{ label: "linkedin", href: linkedin, external: true }] : []),
       ...(github ? [{ label: "github", href: github, external: true }] : []),
       { label: "resume --pdf", cmd: "resume --pdf" },
+      { label: "resume --build", cmd: "resume --build" },
       { label: S["share.copy"], act: "copy" as const, url: sheet },
       { label: S["share.share"], act: "share" as const, url: link, title: `$ hire --brief · ${data.resume.name}` },
     ];
@@ -823,6 +826,7 @@ export function createShell(data: TerminalData): Shell {
     }
     out.push(text(""), text(S["resume.foot1"], true));
     out.push(text(S["resume.foot2"], true));
+    out.push(text(S["resume.foot3"], true));
     return out;
   };
 
@@ -932,14 +936,11 @@ export function createShell(data: TerminalData): Shell {
       case "neofetch":
         return { lines: neofetch() };
       case "resume":
-        if (args.includes("--pdf"))
-          return {
-            lines: [
-              text(S["resume.pdf"]),
-              { kind: "link", label: "/resume.pdf", href: "/resume.pdf", external: true },
-            ],
-            effect: { kind: "window", url: "/resume.pdf" },
-          };
+        if (args.includes("--build")) return { lines: [], effect: { kind: "resume-build" } };
+        if (args.includes("--pdf")) {
+          const href = data.resumeFiles.submitted.href;
+          return { lines: [text(S["resume.pdf"]), { kind: "link", label: href, href, external: true }], effect: { kind: "window", url: href } };
+        }
         return { lines: resume() };
       case "stats": {
         const a = (args[0] ?? "").toLowerCase();
@@ -1092,7 +1093,7 @@ export function createShell(data: TerminalData): Shell {
       if (cmd === "mail") return ["--fit"].filter((n) => n.startsWith(word));
       if (cmd === "share") return NAMES.filter((n) => n.startsWith(word.toLowerCase()));
       if (cmd === "timeline") return ["--all"].filter((n) => n.startsWith(word));
-      if (cmd === "resume") return ["--pdf"].filter((n) => n.startsWith(word));
+      if (cmd === "resume") return ["--pdf", "--build"].filter((n) => n.startsWith(word));
       if (cmd === "stats") return ["year", "langs"].filter((n) => n.startsWith(word));
       if (cmd === "curl") return ["github"].filter((n) => n.startsWith(word));
       if (cmd === "git") {

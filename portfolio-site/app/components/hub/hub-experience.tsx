@@ -1110,7 +1110,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
                   Say hello <span aria-hidden>→</span>
                 </a>
                 <a
-                  href="/resume.pdf"
+                  href="/Ratul_Roy_Resume.pdf"
                   target="_blank"
                   rel="noreferrer"
                   className="hit ml-3 inline-flex min-h-12 items-center rounded-full border border-[var(--line)] px-6 text-sm text-[var(--ink-dim)] transition-colors hover:text-[var(--ink)]"

@@ -118,7 +118,7 @@ export function NetflixHero({ series, profile, status, text, fast, firstRowId, o
               <span aria-hidden>ⓘ</span> More info
             </button>
           ) : null}
-          <a className="nf-btn nf-btn-glass" href="/resume.pdf" target="_blank" rel="noreferrer">
+          <a className="nf-btn nf-btn-glass" href="/Ratul_Roy_Resume.pdf" target="_blank" rel="noreferrer">
             View résumé
           </a>
           <button type="button" className="nf-round nf-vol" aria-label={sound.on ? "Mute" : "Unmute"} aria-pressed={sound.on} onClick={sound.toggle}>
