@@ -22,6 +22,7 @@ import type { TerminalData } from "@/lib/site/terminal-data";
 import { HOME, resolvePath, shortPath, USER } from "@/lib/site/terminal-fs";
 import { createShell, HISTORY_CAP, initialShellState, THEMES, type Effect, type FileItem, type LinkItem, type MenuId, type MenuRow, type Out, type ShellState, type ThemeId, type TimelineRow, type Tone } from "@/lib/site/terminal-shell";
 import { isPrerendering, whenActive } from "@/lib/site/prerender";
+import { ghostFor } from "@/lib/site/terminal-suggest";
 import { forgetView, readView } from "@/lib/site/view-memory";
 import { themeCss } from "@/lib/site/terminal-themes";
 
@@ -46,11 +47,12 @@ export type TerminalRootProps = {
 type Entry =
   /** `ps`: the path the command was typed at (the OS prompt); absent on the boot script's plain `$ `. */
   | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string; label?: string; tag?: "ok" | "wait" | "bar"; cands?: string[]; hl?: number }
-  | { n: number; k: "links"; items: LinkItem[]; prefix?: string; lead?: string }
+  | { n: number; k: "links"; items: LinkItem[]; prefix?: string; suffix?: string; dim?: boolean; lead?: string }
   | { n: number; k: "ghcommit"; label: string; url: string; rest: string }
   | { n: number; k: "portrait"; mode: PortraitMode }
   | { n: number; k: "parts"; parts: Array<{ text: string; tone?: Tone; color?: string }> }
   | { n: number; k: "qr"; lines: string[] }
+  | { n: number; k: "fit"; matched: string[]; adjacent: Array<{ want: string; have: string }>; notYet: string[]; verdict: string; pct: number | null }
   | { n: number; k: "timeline"; wide: boolean; rows: TimelineRow[] }
   | { n: number; k: "art"; text: string }
   | { n: number; k: "ghrepo"; name: string; url: string; pad: number; rest: string }
@@ -340,6 +342,11 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   /** While the `theme` menu is open: the theme to restore on Esc (the menu previews live as the selection moves). */
   const themeBase = useRef<ThemeId | null>(null);
   const [crt, setCrt] = useState(false);
+  /** The `fit` paste box under the prompt. */
+  const [fitOpen, setFitOpen] = useState(false);
+  const fitRef = useRef(false);
+  const [fitText, setFitText] = useState("");
+  const fitArea = useRef<HTMLTextAreaElement>(null);
   /** A `curl github` in flight, and a `sl` crossing the screen: Ctrl+C or Esc ends them. */
   const curlAbort = useRef<AbortController | null>(null);
   const slStop = useRef<(() => void) | null>(null);
@@ -407,6 +414,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     return [...all.filter((c) => c.name.startsWith(f)), ...(f ? all.filter((c) => !c.name.startsWith(f) && c.name.includes(f)) : [])];
   }, [cmd, shell]);
   const palIdx = Math.min(palSel, Math.max(0, palMatches.length - 1));
+  /** The rest of the best completion, shown dim after the caret (right arrow or End takes it). */
+  const ghost = !ready || mailStep || paging || partial !== null || palette || caret < cmd.length ? "" : ghostFor(cmd, live.current.shell.history, (v) => shell.complete(v, live.current.shell));
   const menu = entries.find((e) => e.k === "menu" && e.n === menuN) as Extract<Entry, { k: "menu" }> | undefined;
   // The theme menu previews the highlighted row; leaving it any other way than Enter puts the old theme back.
   useEffect(() => {
@@ -428,13 +437,14 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     lines.map((o): Entry => {
       const n = ++seq.current;
       if (o.kind === "text") return { n, k: "out", text: o.text, dim: o.dim, accent: o.accent };
-      if (o.kind === "links") return { n, k: "links", items: o.items, prefix: o.prefix, lead: o.lead };
+      if (o.kind === "links") return { n, k: "links", items: o.items, prefix: o.prefix, suffix: o.suffix, dim: o.dim, lead: o.lead };
       if (o.kind === "portrait") {
         const mode = o.mode === "next" ? PORTRAIT_MODES[(PORTRAIT_MODES.indexOf(portraitMode.current) + 1) % PORTRAIT_MODES.length] : o.mode;
         portraitMode.current = mode;
         return { n, k: "portrait", mode };
       }
       if (o.kind === "parts") return { n, k: "parts", parts: o.parts };
+      if (o.kind === "fit") return { n, k: "fit", matched: o.matched, adjacent: o.adjacent, notYet: o.notYet, verdict: o.verdict, pct: o.pct };
       if (o.kind === "qr") return { n, k: "qr", lines: o.lines };
       if (o.kind === "timeline") return { n, k: "timeline", wide: o.wide, rows: o.rows };
       if (o.kind === "files") return { n, k: "files", inline: o.inline, items: o.items };
@@ -998,6 +1008,30 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     } catch {}
   };
 
+  const openFit = () => {
+    fitRef.current = true;
+    setFitText("");
+    setFitOpen(true);
+    window.setTimeout(() => fitArea.current?.focus({ preventScroll: false }), 30);
+  };
+  const closeFit = () => {
+    fitRef.current = false;
+    setFitOpen(false);
+    window.setTimeout(() => {
+      if (!window.matchMedia("(pointer: coarse)").matches) input.current?.focus({ preventScroll: true });
+    }, 0);
+  };
+  /** Runs the paste box: echoes `fit`, prints the card. Nothing is sent anywhere. */
+  const runFit = () => {
+    const t = fitText.trim();
+    if (!t) return void closeFit();
+    closeFit();
+    line("fit", true, false, here());
+    line(`(pasted ${t.length.toLocaleString("en-US")} characters · read in this tab only)`, false, true);
+    print(shell.fit(t));
+    beacon("fit");
+  };
+
   const effect = (fx: Effect) => {
     if (fx.kind === "open-view") act.current.open(`/${fx.id}`, null);
     else if (fx.kind === "open-slug") act.current.open(fx.blog ? `/blog/${fx.slug}` : `/${fx.slug}`, null);
@@ -1047,6 +1081,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       } else submit(fx.cmd);
     }
     else if (fx.kind === "sl") void startSl();
+    else if (fx.kind === "fit-box") openFit();
     else if (fx.kind === "mail") startMail();
     else if (fx.kind === "pane") togglePane();
     else toggleFull();
@@ -1056,6 +1091,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const submit = (raw: string, echo = true) => {
     const c = raw.trim();
     if (!live.current.ready || !c || mailRef.current) return;
+    if (fitRef.current) closeFit();
     setCmd("");
     histIdx.current = -1;
     if (echo) line(c, true, false, here());
@@ -1079,7 +1115,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       const name = c.split(/\s+/)[0].replace(/^\//, "").toLowerCase();
       const known = shell.commands.some((x) => x.name === name) || EGGS.includes(name);
       const first = r.lines[0];
-      beacon(known ? name : "unknown", known && !(first?.kind === "text" && first.text.startsWith("command not found")));
+      beacon(known ? name : "unknown", known && !(first?.kind === "text" && /command not found$/.test(first.text)));
     }
     if (r.effect) effect(r.effect);
     if (!window.matchMedia("(pointer: coarse)").matches) input.current?.focus({ preventScroll: true });
@@ -1100,6 +1136,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   /** Esc, in order: palette, typed text, menu selection; with none of those, exit. (An auto-open call-off is handled while busy.) */
   act.current.esc = () => {
     if (sendingRef.current) return void line("sending · wait a moment", false, true, here());
+    if (fitRef.current) return void closeFit();
     if (curlAbort.current) curlAbort.current.abort();
     else if (slStop.current) slStop.current();
     else if (mailRef.current) abortMail();
@@ -1228,6 +1265,11 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       e.preventDefault();
       if (e.key === " " || e.key === "ArrowDown" || e.key === "Enter") nextPage();
       else if (e.key === "q" || e.key === "Q" || e.key === "Escape") endPaging();
+      return;
+    }
+    if ((e.key === "ArrowRight" || e.key === "End") && ghost && !e.shiftKey && e.currentTarget.selectionStart === cmd.length && e.currentTarget.selectionEnd === cmd.length) {
+      e.preventDefault();
+      setCmd(cmd + ghost);
       return;
     }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -1687,6 +1729,37 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           ),
         )}
       </div>
+    ) : e.k === "fit" ? (
+      <div key={e.n} className="terminal-fit-card">
+        <div className="terminal-fit-verdict">
+          <b className={e.pct === null ? "is-dim" : "tone-accent"}>{e.verdict}</b>
+        </div>
+        {e.pct !== null ? <div className="terminal-fit-meter" aria-hidden="true"><i style={{ width: `${e.pct}%` }} /></div> : null}
+        {e.matched.length ? (
+          <div className="terminal-fit-row">
+            <span className="terminal-fit-label">{`matched (${e.matched.length})`}</span>
+            {e.matched.map((m) => (
+              <span key={m} className="terminal-fit-chip is-ok">{m}</span>
+            ))}
+          </div>
+        ) : null}
+        {e.adjacent.length ? (
+          <div className="terminal-fit-row">
+            <span className="terminal-fit-label">{`adjacent (${e.adjacent.length})`}</span>
+            {e.adjacent.map((m) => (
+              <span key={m.want} className="terminal-fit-chip is-adj">{m.have ? `${m.want} → ${m.have}` : m.want}</span>
+            ))}
+          </div>
+        ) : null}
+        {e.notYet.length ? (
+          <div className="terminal-fit-row">
+            <span className="terminal-fit-label">{`not yet (${e.notYet.length})`}</span>
+            {e.notYet.map((m) => (
+              <span key={m} className="terminal-fit-chip is-not">{m}</span>
+            ))}
+          </div>
+        ) : null}
+      </div>
     ) : e.k === "qr" ? (
       // Glyphs are 0.6em wide and 1em tall, two modules per row: stretch rows 1.2x so modules are square.
       <div key={e.n}>
@@ -1759,7 +1832,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         -- more (space / ↓ next, q quit) --
       </button>
     ) : e.k === "links" ? (
-      <span key={e.n} className={`is-out${e.lead ? " terminal-os-rowgo" : ""}`}>
+      <span key={e.n} className={`is-out${e.dim ? " is-dim" : ""}${e.lead ? " terminal-os-rowgo" : ""}`}>
         {e.lead ? <span className="rg-l">{e.lead}</span> : null}
         <span className={e.lead ? "rg-r" : undefined}>
           {e.prefix}
@@ -1784,6 +1857,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
               )}
             </Fragment>
           ))}
+          {e.suffix}
         </span>
       </span>
     ) : e.k === "link" ? (
@@ -1901,7 +1975,45 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
               )}
             </ul>
           ) : null}
-          {os && (partial !== null || ready) ? (
+          {os && fitOpen ? (
+            <div className="terminal-fit-box">
+              <label htmlFor="fit-paste" className="terminal-fit-hint">
+                paste a job description · Ctrl+Enter matches · Esc cancels · nothing leaves your browser
+              </label>
+              <textarea
+                id="fit-paste"
+                ref={fitArea}
+                className="terminal-fit-area"
+                value={fitText}
+                maxLength={8192}
+                rows={8}
+                spellCheck={false}
+                autoCapitalize="off"
+                autoCorrect="off"
+                placeholder="paste here…"
+                onChange={(e) => setFitText(e.target.value.slice(0, 8192))}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    closeFit();
+                  } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    runFit();
+                  }
+                }}
+              />
+              <div className="terminal-fit-actions">
+                <button type="button" className="terminal-fit-go" onClick={runFit}>
+                  match
+                </button>
+                <button type="button" className="terminal-fit-cancel" onClick={closeFit}>
+                  cancel
+                </button>
+                <span className="terminal-fit-count">{`${fitText.length.toLocaleString("en-US")} / 8,192`}</span>
+              </div>
+            </div>
+          ) : null}
+          {os && !fitOpen && (partial !== null || ready) ? (
             <span className="terminal-root-prompt is-cmd">
               {paging ? null : (
                 <code className="terminal-root-typed" aria-hidden="true">
@@ -1916,6 +2028,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
                       {cmd.slice(0, Math.min(caret, cmd.length))}
                       <i className={`hub-enter-caret${bell ? " terminal-os-bell" : ""}`} />
                       {cmd.slice(Math.min(caret, cmd.length))}
+                      {ghost ? <span className="terminal-ghost">{ghost}</span> : null}
                     </>
                   )}
                 </code>

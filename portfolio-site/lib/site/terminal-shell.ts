@@ -21,6 +21,8 @@ import {
   type EntryKind,
   type FsEntry,
 } from "@/lib/site/terminal-fs";
+import { fitMatch, FIT_MAX } from "@/lib/site/terminal-fit";
+import { didYouMean } from "@/lib/site/terminal-suggest";
 import type { TermCommit, TerminalData } from "@/lib/site/terminal-data";
 
 export type MenuId = "views" | "projects" | "writing" | "themes";
@@ -112,7 +114,7 @@ export type Out =
   /** A QR code as text rows (`qr`). */
   | { kind: "qr"; lines: string[] }
   /** Several links on one line, joined by " · ". */
-  | { kind: "links"; items: LinkItem[]; prefix?: string; /** Wide `portfolio`: text on the left (clipped), the links at the right end of the same line. */ lead?: string }
+  | { kind: "links"; items: LinkItem[]; prefix?: string; suffix?: string; dim?: boolean; /** Wide `portfolio`: text on the left (clipped), the links at the right end of the same line. */ lead?: string }
   /** A listing: `inline` joins the names on one line (`ls`); otherwise it is one row, `meta` before the name. */
   | { kind: "files"; inline: boolean; items: FileItem[] }
   /** `cal`: weeks of day numbers (null = blank), today highlighted. */
@@ -127,6 +129,8 @@ export type Out =
   | { kind: "menu"; id: MenuId; rows: MenuRow[] }
   /** `timeline`: one grid, so the bracket column stays straight. */
   | { kind: "timeline"; wide: boolean; rows: TimelineRow[] }
+  /** `fit`: a job description matched against my stack. */
+  | { kind: "fit"; matched: string[]; adjacent: Array<{ want: string; have: string }>; notYet: string[]; verdict: string; pct: number | null }
   /** The welcome: block-letter art (88 columns), the welcome line, and the tips box rows. */
   | { kind: "banner"; art: string[]; welcome: string; overview: string[]; tips: Array<{ cmd: string; desc: string }> };
 
@@ -151,6 +155,8 @@ export type Effect =
   /** `stats [year|langs]`: the UI fetches the GitHub year and draws it. */
   | { kind: "stats"; mode: "all" | "year" | "langs" }
   | { kind: "sl" }
+  /** `fit` with no text: the UI opens its paste box. */
+  | { kind: "fit-box" }
   | { kind: "mail" };
 
 export type ShellState = { cwd: string; history: string[]; lastMenu?: MenuId };
@@ -167,6 +173,8 @@ export type Shell = {
   /** Candidates for the last token of `input` (whole-token strings; the UI swaps the token in). */
   complete: (input: string, state: ShellState) => string[];
   commands: CommandDoc[];
+  /** `fit` on pasted text (kept out of the history): the card, the next steps and the privacy line. */
+  fit: (text: string) => Out[];
 };
 
 export const HISTORY_CAP = 200;
@@ -202,13 +210,14 @@ const COMMANDS: CommandDoc[] = [
   { name: "cls", group: "terminal", usage: "cls", desc: "empty the screen (same as clear)" },
   { name: "portfolio", group: "read", usage: "portfolio", desc: "the whole portfolio on one screen", long: "Every section ends with the command that goes deeper; the → commands are clickable." },
   { name: "now", group: "read", usage: "now", desc: "what I am doing this month" },
-  { name: "hire", group: "read", usage: "hire", desc: "the 20-second version, for recruiters" },
+  { name: "hire", group: "read", usage: "hire [--brief]", desc: "the 20-second version, for recruiters" },
   { name: "timeline", group: "read", usage: "timeline [--all]", desc: "school → college → work, as one line" },
   { name: "view", group: "open", usage: "view [id]", desc: "enter a view (no id: pick from the list)" },
   { name: "git", group: "read", usage: "git log [--oneline] [-n k]", desc: "live: my public commits on github" },
   { name: "stats", group: "read", usage: "stats [year|langs]", desc: "the GitHub year as a heatmap · streaks · languages", long: "year prints only the heatmap, langs only the language bar. Live from github, kept on this device for six hours." },
   { name: "share", group: "read", usage: "share [command]", desc: "a link that opens the terminal on a command, with its preview", long: "Prints the link (code.ratulroy.me/?run=<command>) and the preview image it shows in a chat. No command: the one you ran before." },
-  { name: "mail", group: "open", usage: "mail", desc: "send me a message, right here" },
+  { name: "fit", group: "read", usage: "fit [paste]", desc: "paste a job description · see what overlaps with my stack", long: "Matches the skills it recognises against mine, and says what I do not have yet. Runs in your browser; nothing you paste is sent anywhere. Max 8 KB." },
+  { name: "mail", group: "open", usage: "mail [--fit]", desc: "send me a message, right here" },
   { name: "pane", group: "terminal", usage: "pane", desc: "show or hide the side pane" },
   { name: "date", group: "terminal", usage: "date", desc: "the local date and time" },
   { name: "cal", group: "terminal", usage: "cal", desc: "this month, today highlighted" },
@@ -232,30 +241,6 @@ const TIPS = [
 
 const text = (t: string, dim = false): Out => ({ kind: "text", text: t, dim: dim || undefined });
 const texts = (ls: string[]): Out[] => ls.map((l) => text(l));
-
-function distance(a: string, b: string): number {
-  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array<number>(b.length).fill(0)]);
-  for (let j = 1; j <= b.length; j++) d[0][j] = j;
-  for (let i = 1; i <= a.length; i++)
-    for (let j = 1; j <= b.length; j++)
-      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-  return d[a.length][b.length];
-}
-
-function nearest(word: string, pool: string[]): string | null {
-  if (word.length < 3) return null;
-  const limit = Math.max(1, Math.floor(word.length / 3));
-  let best: string | null = null;
-  let bd = limit + 1;
-  for (const n of pool) {
-    const dd = distance(word, n);
-    if (dd < bd) {
-      bd = dd;
-      best = n;
-    }
-  }
-  return best;
-}
 
 export function createShell(data: TerminalData): Shell {
   const fs: Fs = buildFs(data);
@@ -467,6 +452,17 @@ export function createShell(data: TerminalData): Shell {
     return [text(`now · ${MONTHS[(m || 1) - 1]} ${y}`, true), ...data.now.lines.map((l) => text(`  • ${l}`))];
   };
 
+  /** `fit`: the overlap card for a pasted job description. */
+  const fit = (raw: string): Out[] => {
+    const r = fitMatch(raw, data);
+    return [
+      { kind: "fit", matched: r.matched, adjacent: r.adjacent, notYet: r.notYet, verdict: r.verdict, pct: r.pct },
+      ...(r.truncated ? [text(`only the first ${FIT_MAX / 1024} KB was read`, true)] : []),
+      { kind: "links", prefix: "→ ", items: [{ label: "hire --brief", cmd: "hire --brief" }, { label: "mail --fit", cmd: "mail --fit" }, { label: "resume --pdf", cmd: "resume --pdf" }] },
+      text("nothing you paste leaves your browser", true),
+    ];
+  };
+
   const hire = (): Out[] => {
     const r = data.resume;
     const role = r.title.split(" · ");
@@ -514,7 +510,7 @@ export function createShell(data: TerminalData): Shell {
     head("who");
     row(clip([r.name, role, city, /relocat/i.test(r.location) ? "open to relocation" : ""].filter(Boolean).join(" · ")));
     row(clip(data.uptime));
-    go("hire", "resume", "stats");
+    go("hire", "fit", "resume", "stats");
     head("stack");
     row(clip(data.stack.join(" · ")));
     go("stack");
@@ -725,6 +721,10 @@ export function createShell(data: TerminalData): Shell {
         return args[0] ? open(args[0], st) : menu("views");
       case "share":
         return { lines: share(args, st) };
+      case "fit": {
+        const body = line.trim().replace(/^\/?fit\s*/i, "");
+        return body ? { lines: fit(body) } : { lines: [], effect: { kind: "fit-box" } };
+      }
       case "mail":
         return { lines: [], effect: { kind: "mail" } };
       case "pane":
@@ -837,13 +837,19 @@ export function createShell(data: TerminalData): Shell {
     // A bare 1-8 with no menu showing is the tips box's number.
     if (/^[1-8]$/.test(low) && !args.length) return { lines: [], effect: { kind: "run", cmd: TIPS[Number(low) - 1].cmd } };
 
-    const near = nearest(low, NAMES);
-    return { lines: [text(`command not found: ${name}`), ...(near ? [text(`did you mean: ${near}`, true)] : [])] };
+    const near = didYouMean(low, [...NAMES, ...viewIds]);
+    return {
+      lines: [
+        text(`bash: ${name}: command not found`),
+        ...(near.length ? [{ kind: "links" as const, dim: true, prefix: "did you mean: ", items: near.map((n) => ({ label: n, cmd: n })), suffix: "?" }] : []),
+      ],
+    };
   };
 
   return {
     commands: COMMANDS,
     banner,
+    fit,
     run(input, state, env) {
       const line = input.trim();
       if (!line) return { lines: [], state };
@@ -870,6 +876,9 @@ export function createShell(data: TerminalData): Shell {
       if (cmd === "view") return viewIds.filter((n) => n.startsWith(word));
       if (cmd === "theme") return [...THEMES.map((t) => t.id as string), "random"].filter((n) => n.startsWith(word));
       if (cmd === "portrait") return [...PORTRAIT_MODES, "list", "next"].filter((n) => n.startsWith(word));
+      if (cmd === "fit") return [];
+      if (cmd === "hire") return ["--brief"].filter((n) => n.startsWith(word));
+      if (cmd === "mail") return ["--fit"].filter((n) => n.startsWith(word));
       if (cmd === "share") return NAMES.filter((n) => n.startsWith(word.toLowerCase()));
       if (cmd === "timeline") return ["--all"].filter((n) => n.startsWith(word));
       if (cmd === "resume") return ["--pdf"].filter((n) => n.startsWith(word));
