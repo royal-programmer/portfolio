@@ -3700,3 +3700,178 @@ em.font-display,
   font-size: 9px;
   opacity: 0.7;
 }
+
+/* The Stage's scroll story (S9): a tall container, the stage stuck to the top, words beside the stops, a dot rail. */
+.stage-story {
+  position: relative;
+  height: calc(100svh + 3 * var(--travel-d, 80) * 1svh);
+}
+.stage-story-stick {
+  position: sticky;
+  top: 5.25rem;
+}
+.stage-story-box {
+  height: calc(100svh - 10rem);
+  min-height: 320px;
+}
+.stage-story-words {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 1.5rem;
+}
+.stage-panel {
+  position: absolute;
+  top: 50%;
+  max-width: min(24rem, 42%);
+  margin-top: -6rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--stage-c, #7aa2ff) 35%, transparent);
+  background: rgba(8, 8, 12, 0.72);
+  backdrop-filter: blur(10px);
+  color: #ecebe6;
+  opacity: 0;
+  visibility: hidden;
+  will-change: opacity, transform;
+}
+.stage-panel[data-side="left"] {
+  left: clamp(1rem, 4vw, 3rem);
+}
+.stage-panel[data-side="right"] {
+  right: clamp(1rem, 4vw, 3rem);
+}
+.stage-panel-eyebrow {
+  font: 500 11px/1 var(--font-geist-mono), ui-monospace, monospace;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--stage-c, #7aa2ff);
+}
+.stage-panel-title {
+  margin-top: 0.55rem;
+  font-size: clamp(1.25rem, 2.4vw, 1.9rem);
+  font-weight: 600;
+  line-height: 1.15;
+}
+.stage-panel-body {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  opacity: 0.75;
+}
+.stage-panel-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+.stage-panel-link {
+  font: 500 12px/1 var(--font-geist-mono), ui-monospace, monospace;
+  color: var(--stage-c, #7aa2ff);
+  border: 1px solid color-mix(in srgb, var(--stage-c, #7aa2ff) 55%, transparent);
+  border-radius: 999px;
+  padding: 0.6rem 0.9rem;
+  min-height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+}
+.stage-panel-link:hover,
+.stage-panel-link:focus-visible {
+  background: color-mix(in srgb, var(--stage-c, #7aa2ff) 18%, transparent);
+  outline: none;
+}
+.stage-static {
+  display: grid;
+  gap: 0.9rem;
+  padding: 0.5rem 0 0;
+}
+.stage-panel-static {
+  position: static;
+  opacity: 1;
+  visibility: visible;
+  max-width: none;
+  margin: 0;
+}
+.stage-rail {
+  position: fixed;
+  right: max(0.6rem, env(safe-area-inset-right, 0px));
+  top: 50%;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  transform: translateY(-50%);
+  transition: opacity 200ms ease;
+  opacity: 0;
+  pointer-events: none;
+}
+.stage-rail-dot {
+  position: relative;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.stage-rail-dot::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  border: 1.5px solid var(--stage-c, #7aa2ff);
+  background: transparent;
+  transition: background 160ms ease, transform 160ms ease;
+}
+.stage-rail-dot[data-active="true"]::before {
+  background: var(--stage-c, #7aa2ff);
+  transform: scale(1.25);
+}
+.stage-rail-dot:focus-visible {
+  outline: 2px solid var(--stage-c, #7aa2ff);
+  outline-offset: -4px;
+  border-radius: 999px;
+}
+.stage-rail-label {
+  position: absolute;
+  right: 2rem;
+  padding: 3px 7px;
+  font: 500 11px/1 var(--font-geist-mono), ui-monospace, monospace;
+  color: #ecebe6;
+  background: rgba(8, 8, 12, 0.85);
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+.stage-rail-dot:hover .stage-rail-label,
+.stage-rail-dot:focus-visible .stage-rail-label {
+  opacity: 1;
+}
+@media (max-width: 767px) {
+  .stage-story {
+    height: calc(100svh + 3 * var(--travel-p, 55) * 1svh);
+  }
+  .stage-story-stick {
+    top: 4.5rem;
+  }
+  .stage-story-box {
+    height: 60svh;
+    min-height: 0;
+  }
+  .stage-panel {
+    max-width: none;
+    left: 0.6rem !important;
+    right: 0.6rem !important;
+    top: auto;
+    bottom: 0.6rem;
+    margin-top: 0;
+  }
+}
+
+
+
+

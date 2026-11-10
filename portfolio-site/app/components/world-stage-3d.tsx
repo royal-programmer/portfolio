@@ -17,7 +17,7 @@ import type { PersonaSlug } from "@/lib/content/types";
 import { getViews } from "@/lib/content/views";
 import { ogLines } from "@/lib/site/og-lines";
 import { personaHref } from "@/lib/site/persona-link";
-import { shelfFromEntries, STAGE_PROPS, type ShelfCase, type StageProp } from "@/lib/site/stage-data";
+import { shelfFromEntries, STAGE_PROPS, STAGE_STOPS, type ShelfCase, type StageProp } from "@/lib/site/stage-data";
 import { bandFor } from "@/lib/site/terminal-clock";
 import { CLOCK, terminalData } from "@/lib/site/terminal-data";
 import { paletteFor } from "@/lib/site/terminal-themes";
@@ -51,6 +51,9 @@ const PLACE: Record<PersonaSlug, { fwd: number; right: number; up: number }> = {
 };
 
 type HubMedia = Partial<Record<string, string[]>>;
+
+/** The scroll story's state, written by the page (world-stage.tsx) and read by the rig: `p` is the stop reached (0 = desk … 3 = window). */
+export type StoryState = { p: number; on: boolean };
 
 function StudioEnvironment({ onReady }: { onReady: () => void }) {
   const get = useThree((s) => s.get);
@@ -93,7 +96,27 @@ type Scratch = {
   eye: THREE.Vector3;
   /** The camera's resting pitch above the setup (radians): the desk wants a higher eye than a lone object. */
   pitch0: number;
+  /** The scroll story (S9): the page's state, the eased stop reached, the assembly's frame, scratch vectors. */
+  story: MutableRefObject<StoryState> | null;
+  ps: number;
+  extras: THREE.Object3D | null;
+  a: THREE.Vector3;
+  b: THREE.Vector3;
+  la: THREE.Vector3;
+  lb: THREE.Vector3;
 };
+
+const smooth = (x: number) => x * x * (3 - 2 * x);
+
+/** A stop's eye and look points in world space (the assembly's frame carried to the world); a narrow frame stands further back. */
+function stopPose(stop: (typeof STAGE_STOPS)[number], frame: THREE.Matrix4, back: number, eye: THREE.Vector3, look: THREE.Vector3) {
+  const [lx, ly, lz] = stop.look ?? [0, 0, 0];
+  const [ex, ey, ez] = stop.eye ?? [0, 0, 0];
+  look.set(lx, ly, lz);
+  eye.set(lx + (ex - lx) * back, ly + (ey - ly) * back, lz + (ez - lz) * back);
+  eye.applyMatrix4(frame);
+  look.applyMatrix4(frame);
+}
 
 /** How much of the frame the setup may fill (NDC half-extent); the rest is air. */
 const FIT_MARGIN = 0.82;
@@ -178,6 +201,27 @@ function driveStage(k: VrClock, s: VrState, tmp: Scratch, pose: Pose, place: { f
       tmp.fit += (want - tmp.fit) * Math.min(1, dt * 6);
     }
   }
+  // The scroll story: between stops the camera glides from one pose to the next (eased twice: the page's progress is
+  // smoothed, then each leg is a smoothstep). The first leg starts from the stage's own resting camera.
+  const st = tmp.story?.current;
+  if (st?.on) {
+    tmp.ps += (st.p - tmp.ps) * Math.min(1, dt * 5);
+    const ex = (tmp.extras ??= scene.getObjectByName("stage-extras") ?? null);
+    if (ex && tmp.ps > 0.002) {
+      ex.updateWorldMatrix(true, false);
+      const i = Math.min(2, Math.floor(tmp.ps));
+      const f = smooth(Math.min(1, tmp.ps - i));
+      const back = THREE.MathUtils.clamp(1.6 / aspect, 1, 2.2);
+      if (i === 0) {
+        tmp.a.copy(camera.position);
+        tmp.la.copy(tmp.look);
+      } else stopPose(STAGE_STOPS[i], ex.matrixWorld, back, tmp.a, tmp.la);
+      stopPose(STAGE_STOPS[i + 1], ex.matrixWorld, back, tmp.b, tmp.lb);
+      camera.position.lerpVectors(tmp.a, tmp.b, f);
+      tmp.look.lerpVectors(tmp.la, tmp.lb, f);
+      camera.lookAt(tmp.look);
+    }
+  }
   // Zoom into the screen: the camera glides from where the stage put it to an eye point in front of
   // the screen that makes the screen cover the frame; the page's overlay takes over for the last stretch.
   const z = tmp.zoom;
@@ -206,13 +250,22 @@ function driveStage(k: VrClock, s: VrState, tmp: Scratch, pose: Pose, place: { f
 }
 
 /** Drives the clock and stands the camera in front of the setup; the pointer turns it a little. */
-function Rig({ slug, zoomRef, onFrame, onZoomDone, onFirstFrame }: { slug: PersonaSlug; zoomRef: MutableRefObject<Scratch["zoom"] | null>; onFrame?: (t: number) => void; onZoomDone?: () => void; onFirstFrame?: () => void }) {
+function Rig({ slug, zoomRef, story, onFrame, onZoomDone, onFirstFrame }: { slug: PersonaSlug; zoomRef: MutableRefObject<Scratch["zoom"] | null>; story?: MutableRefObject<StoryState>; onFrame?: (t: number) => void; onZoomDone?: () => void; onFirstFrame?: () => void }) {
   const { clock, state } = useVr();
   const size = useThree((s) => s.size);
   // Per-frame scratch (a ref: it is written every frame).
-  const scratch = useRef<Scratch>({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0, handle: false, box: new THREE.Box3(), boxAt: -1, corner: new THREE.Vector3(), fit: 1, zoom: { on: false, t0: 0, dur: 0.7, e: 0, fired: false }, screen: null, sp: new THREE.Vector3(), sn: new THREE.Vector3(), sq: new THREE.Quaternion(), ss: new THREE.Vector3(), eye: new THREE.Vector3(), pitch0: slug === "engineer" ? 0.4 : 0.1 });
+  const scratch = useRef<Scratch>({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0, handle: false, box: new THREE.Box3(), boxAt: -1, corner: new THREE.Vector3(), fit: 1, zoom: { on: false, t0: 0, dur: 0.7, e: 0, fired: false }, screen: null, sp: new THREE.Vector3(), sn: new THREE.Vector3(), sq: new THREE.Quaternion(), ss: new THREE.Vector3(), eye: new THREE.Vector3(), pitch0: slug === "engineer" ? 0.4 : 0.1, story: null, ps: 0, extras: null, a: new THREE.Vector3(), b: new THREE.Vector3(), la: new THREE.Vector3(), lb: new THREE.Vector3() });
   const pose = useMemo(() => climbPose(C), []);
   const framed = useRef(false);
+  // Render on demand: nothing is drawn while the stage is off screen (the rest of the page is long).
+  const gl = useThree((s) => s.gl);
+  const setFrameloop = useThree((s) => s.setFrameloop);
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => setFrameloop(e.isIntersecting ? "always" : "never"));
+    io.observe(gl.domElement);
+    return () => io.disconnect();
+  }, [gl, setFrameloop]);
   useFrame(({ camera, scene }, rawDt) => {
     const tmp = scratch.current;
     if (!framed.current) {
@@ -224,6 +277,7 @@ function Rig({ slug, zoomRef, onFrame, onZoomDone, onFirstFrame }: { slug: Perso
       });
     }
     zoomRef.current = tmp.zoom;
+    tmp.story = story ?? null;
     if (!tmp.handle) {
       tmp.handle = true;
       // Dev-only handle for tests.
@@ -273,7 +327,7 @@ function screenTheme(bandTheme: string): string {
   }
 }
 
-export default function WorldStage3D({ slug, t, entries, posts, onFirstFrame }: { slug: PersonaSlug; t: number; entries?: Entry[]; posts?: BlogPost[]; onFirstFrame?: () => void }) {
+export default function WorldStage3D({ slug, t, entries, posts, story, onFirstFrame }: { slug: PersonaSlug; t: number; entries?: Entry[]; posts?: BlogPost[]; story?: MutableRefObject<StoryState>; onFirstFrame?: () => void }) {
   const router = useRouter();
   const clock = useRef<VrClock>(createClock());
   const state = useRef<VrState>(createVrState());
@@ -529,11 +583,11 @@ export default function WorldStage3D({ slug, t, entries, posts, onFirstFrame }: 
         slug === "engineer" ? (
           <>
             <StageProps items={STAGE_PROPS} accent={accent} focusId={focusId} soundOn={soundOn} onRun={runProp} tapId={tapId} onTap={onTap} />
-            {constellation ? <StageConstellation data={constellation} accent={accent} active={starsActive} reduced={reducedMotion()} onRun={runCommand} /> : null}
+            {constellation ? <StageConstellation data={constellation} accent={accent} active={starsActive} reduced={reducedMotion()} story={story} onRun={runCommand} /> : null}
             <StageShelf items={cases} accent={accent} focusId={caseFocus} openId={openId} onOpen={openCase} onPick={setOpenId} reduced={reducedMotion()} />
           </>
         ) : undefined,
-    }), [liveScreen, envReady, go, look, slug, accent, focusId, soundOn, runProp, tapId, onTap, cases, caseFocus, openId, openCase, constellation, runCommand]);
+    }), [liveScreen, envReady, go, look, slug, accent, focusId, soundOn, runProp, tapId, onTap, cases, caseFocus, openId, openCase, constellation, runCommand, story]);
 
   return (
     <Canvas
@@ -558,7 +612,10 @@ export default function WorldStage3D({ slug, t, entries, posts, onFirstFrame }: 
         <Rig
           slug={slug}
           zoomRef={zoomRef}
+          story={story}
           onFrame={() => {
+            // Stars answer the pointer only while the camera is looking at them.
+            starsActive.current = Boolean(story?.current.on) && Math.abs((story?.current.p ?? 0) - 2) < 0.7;
             screenRef.current?.tick(reducedMotion() ? 99 : clock.current.t, performance.now());
             // The live texture is on the glass once it has been drawn and a frame has gone by with it bound.
             if (!screenMarked.current && screenRef.current?.drawn() && liveScreenBound.current) {

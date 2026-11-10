@@ -1420,3 +1420,7 @@ stripped service_role's table grants).
 ### Round 18 - Stage, part A (2026-11-11)
 
 - S1 live terminal on the laptop (click zooms in, `?via=stage`), S2 lighting by the clock band with lamp and window, S3 five command props with HUD strip, S8 silhouette and flat first paint with `stage:*` marks. Details: 17-persona-views.md section 18. Verified at 1280 and 393 in Chrome (dev server). Not done: admin forms for props and lighting.
+
+### Round 19 - Stage, part B (2026-11-11)
+
+- S4 project shelf (one instanced mesh of cases with an atlas for spine labels, hover pull, pull-out then a view-transition to the project header, HUD buttons), S5 skill constellation (Points + LineSegments, co-occurrence from `arch` diagrams and project stacks), S9 scroll-driven story (sticky stage, four camera stops, panels, dot rail, off-screen pause). Details: 17-persona-views.md section 19. Verified at 1280 and 393 in Chrome (dev server). Not done: admin forms for stops and copy; the `?` keyboard path into stars.

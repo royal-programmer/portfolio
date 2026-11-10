@@ -116,3 +116,37 @@ export function shelfFromEntries(entries: Entry[] | undefined): ShelfCase[] {
       .map((e) => ({ slug: e.slug, title: e.title })),
   );
 }
+
+/**
+ * The scroll-driven story (S9): four stops the camera visits as the page scrolls. `eye` and `look` are in the
+ * assembly's frame (the desk's); the desk stop has none, it is the stage's own resting camera. `side` is the
+ * half of the frame the text panel takes (the scene is pushed to the other half by where `look` sits).
+ */
+export type StageStop = { id: "desk" | "shelf" | "constellation" | "window"; label: string; eye?: [number, number, number]; look?: [number, number, number]; side: "left" | "right" | "none" };
+
+export const STAGE_STOPS: StageStop[] = [
+  { id: "desk", label: "desk", side: "none" },
+  { id: "shelf", label: "projects", eye: [0.9, 2.15, 2.3], look: [0.0, 2.0, -1.55], side: "left" },
+  { id: "constellation", label: "stack", eye: [0.3, 1.5, 3.4], look: [0.3, 3.0, -0.6], side: "left" },
+  { id: "window", label: "contact", eye: [0.4, 1.25, 2.9], look: [1.7, 1.2, -1.85], side: "right" },
+];
+
+/** Scroll distance per stop, in svh (a phone travels less). The sticky stage is one screen tall besides. */
+export const STAGE_TRAVEL = { desktop: 80, phone: 55 };
+
+/** The words beside each stop. The commands are terminal commands (`hire` and `resume --pdf` open the terminal). */
+export const STAGE_STORY_COPY = {
+  shelf: { eyebrow: "Projects", title: "Things I have built", body: "Pull a case off the shelf to open the project.", cta: { label: "all projects", cmd: "projects" } },
+  constellation: { eyebrow: "Stack", title: "What it is built with", body: "Stars that sit together are used together. Hover one, click to see where.", cta: { label: "the full stack", cmd: "stack" } },
+  window: {
+    eyebrow: "Contact",
+    title: "Let us talk",
+    body: "Open to full-stack and API work, forward-deployed style.",
+    links: [
+      { label: "mail", kind: "mail" },
+      { label: "hire", kind: "cmd", cmd: "hire" },
+      { label: "resume --pdf", kind: "cmd", cmd: "resume --pdf" },
+      { label: "linkedin", kind: "linkedin" },
+    ],
+  },
+} as const;

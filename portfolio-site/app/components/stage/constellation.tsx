@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/immutability -- R3F idiom: materials and geometry attributes are mutated every frame. */
 
 /**
  * The skill constellation (S5): one soft star per technology on a cap above the desk, faint lines between
@@ -21,13 +22,15 @@ export type StageConstellationProps = {
   /** Read each frame: 0 = stars are not interactive (the camera is not looking at them), 1 = interactive. */
   active: MutableRefObject<boolean>;
   reduced: boolean;
+  /** The scroll story's state: the stars fade in as the camera leaves the desk (always shown when there is no story). */
+  story?: MutableRefObject<{ p: number; on: boolean }>;
   onRun: (cmd: string) => void;
 };
 
 const WHITE = new THREE.Color("#ffffff");
-const BASE = 0.34;
-const NEAR = 0.8;
-const LINE = 0.16;
+const BASE = 0.62;
+const NEAR = 1.1;
+const LINE = 0.3;
 
 function sprite() {
   const c = document.createElement("canvas");
@@ -44,7 +47,7 @@ function sprite() {
   return t;
 }
 
-export function StageConstellation({ data, accent, active, reduced, onRun }: StageConstellationProps) {
+export function StageConstellation({ data, accent, active, reduced, story, onRun }: StageConstellationProps) {
   const { stars, edges } = data;
   const n = stars.length;
   const get = useThree((s) => s.get);
@@ -78,7 +81,7 @@ export function StageConstellation({ data, accent, active, reduced, onRun }: Sta
     return { pointsGeo: pg, lineGeo: lg };
   }, [stars, edges, n]);
   const pointsMat = useMemo(() => {
-    const m = new THREE.PointsMaterial({ size: 0.34, map: tex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true, toneMapped: false });
+    const m = new THREE.PointsMaterial({ size: 0.4, map: tex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true, toneMapped: false });
     m.onBeforeCompile = (sh) => {
       sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float aSize;").replace("gl_PointSize = size;", "gl_PointSize = size * aSize;");
     };
@@ -163,6 +166,12 @@ export function StageConstellation({ data, accent, active, reduced, onRun }: Sta
   useFrame(({ clock }, dt) => {
     const g = group.current;
     if (!g) return;
+    // Out of sight at the desk (the hero stays as it was), fully there by the constellation stop.
+    const st = story?.current;
+    const reveal = st?.on ? Math.min(1, Math.max(0, (st.p - 0.5) / 1.0)) : 1;
+    g.visible = reveal > 0.01;
+    pointsMat.opacity = reveal;
+    lineMat.opacity = reveal;
     if (!reduced) g.rotation.y = Math.sin(clock.elapsedTime * 0.05) * 0.06;
     // Each star eases to its target brightness; neighbours of the lit one sit between.
     const target = (i: number) => (lit == null ? BASE : i === lit ? 1.6 : neighbours[lit].includes(i) ? NEAR : BASE * 0.55);

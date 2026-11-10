@@ -126,7 +126,7 @@ export function EngineerAssembly({ world, screenSrc, liveScreen, onScreenGo, loo
   return (
     <group ref={root}>
       {look ? (
-        <group ref={extras}>
+        <group ref={extras} name="stage-extras">
           <StageDesk look={look} deskMat={flat ? flatMat : deskMat} />
           {flat ? null : extra}
         </group>

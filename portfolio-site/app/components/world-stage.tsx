@@ -6,11 +6,13 @@
  * drawing itself in. Everything under it is the same page in both modes.
  */
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { BlogPost, Entry } from "@/lib/content";
 import type { PersonaSlug } from "@/lib/content/types";
 import { StageSilhouette } from "./stage/silhouette";
-import { shelfFromEntries, STAGE_PROPS } from "@/lib/site/stage-data";
+import { StoryPanel, StoryRail } from "./stage/story";
+import type { StoryState } from "./world-stage-3d";
+import { shelfFromEntries, STAGE_PROPS, STAGE_STOPS, STAGE_TRAVEL } from "@/lib/site/stage-data";
 import { spectrumColor } from "@/lib/site/spectrum";
 import { useExperience } from "../experience-provider";
 import { CONSTELLATIONS, strokeObject, strokesLength } from "./hub/constellations";
@@ -108,6 +110,13 @@ function StageLines({ slug, t }: { slug: PersonaSlug; t: number }) {
   return <canvas ref={ref} aria-hidden className="h-full w-full" />;
 }
 
+/** Is the scroll story allowed here? Not with reduced motion, nor when the visitor asked to save data. */
+function storyAllowed() {
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true || window.matchMedia("(prefers-reduced-data: reduce)").matches;
+  return !reduce && !saveData;
+}
+
 export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: number; entries?: Entry[]; posts?: BlogPost[] }) {
   const { experience, ready } = useExperience();
   const c = spectrumColor(t, 60);
@@ -115,65 +124,164 @@ export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: 
   const props = ready && experience === "immersive" && slug === "engineer";
   const cases = shelfFromEntries(entries);
   const send = (name: string, detail: unknown) => window.dispatchEvent(new CustomEvent(name, { detail }));
+
+  // The scroll story: a tall container with the stage stuck to the top; the page's scroll position becomes the camera's stop.
+  const [story, setStory] = useState(false);
+  useEffect(() => {
+    if (!props) return;
+    const ok = () => queueMicrotask(() => setStory(storyAllowed()));
+    ok();
+    const mqs = [window.matchMedia("(prefers-reduced-motion: reduce)"), window.matchMedia("(prefers-reduced-data: reduce)")];
+    mqs.forEach((m) => m.addEventListener("change", ok));
+    return () => mqs.forEach((m) => m.removeEventListener("change", ok));
+  }, [props]);
+  const state = useRef<StoryState>({ p: 0, on: false });
+  const wrap = useRef<HTMLDivElement>(null);
+  const stick = useRef<HTMLDivElement>(null);
+  const rail = useRef<HTMLElement>(null);
+  const panels = useRef<Array<HTMLDivElement | null>>([]);
+  const [active, setActive] = useState(0);
+  const activeRef = useRef(0);
+  const live = props && story;
+  useEffect(() => {
+    state.current.on = Boolean(live);
+    if (!live) {
+      state.current.p = 0;
+      return;
+    }
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const w = wrap.current;
+      const st = stick.current;
+      if (!w || !st) return;
+      const r = w.getBoundingClientRect();
+      const top = parseFloat(getComputedStyle(st).top) || 0;
+      const range = Math.max(1, r.height - st.offsetHeight);
+      const p = Math.min(1, Math.max(0, (top - r.top) / range)) * (STAGE_STOPS.length - 1);
+      state.current.p = p;
+      const inView = r.bottom > 0 && r.top < window.innerHeight;
+      if (rail.current) {
+        rail.current.style.opacity = inView ? "1" : "0";
+        rail.current.style.pointerEvents = inView ? "auto" : "none";
+      }
+      // Each panel is fully there at its own stop and gone a stop away.
+      panels.current.forEach((el, k) => {
+        if (!el) return;
+        const stop = k + 1;
+        const wgt = Math.min(1, Math.max(0, 1 - Math.abs(p - stop) * 1.7));
+        el.style.opacity = String(wgt);
+        el.style.transform = `translateY(${(1 - wgt) * 14 * (p < stop ? 1 : -1)}px)`;
+        el.style.pointerEvents = wgt > 0.5 ? "auto" : "none";
+        el.style.visibility = wgt > 0.01 ? "visible" : "hidden";
+      });
+      const idx = Math.round(p);
+      if (idx !== activeRef.current) {
+        activeRef.current = idx;
+        setActive(idx);
+      }
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [live]);
+  const goStop = useCallback((i: number) => {
+    const w = wrap.current;
+    const st = stick.current;
+    if (!w || !st) return;
+    const top = parseFloat(getComputedStyle(st).top) || 0;
+    const range = Math.max(1, w.offsetHeight - st.offsetHeight);
+    const y = w.getBoundingClientRect().top + window.scrollY + (i / (STAGE_STOPS.length - 1)) * range - top;
+    window.scrollTo({ top: y, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }, []);
+
+  const box = (
+    <div
+      className={`world-stage relative w-full overflow-hidden rounded-3xl border ${live ? "stage-story-box" : "h-[46svh] min-h-[260px]"}`}
+      style={{
+        borderColor: "var(--surface-border)",
+        background: `radial-gradient(ellipse at 50% 60%, color-mix(in srgb, ${c} 18%, #07070a), #07070a 72%)`,
+        boxShadow: `0 30px 80px -30px color-mix(in srgb, ${c} 45%, transparent), var(--panel-shadow)`,
+      }}
+      aria-hidden
+    >
+      {/* Server-rendered first paint: the desk's outline, until the first WebGL frame (or the line drawing) takes over. */}
+      {slug === "engineer" ? <StageSilhouette color={c} gone={framed || (ready && experience !== "immersive")} /> : null}
+      {!ready ? null : experience === "immersive" ? <WorldStage3D slug={slug} t={t} entries={entries} posts={posts} story={state} onFirstFrame={() => setFramed(true)} /> : <StageLines slug={slug} t={t} />}
+    </div>
+  );
+  // The desk's props as text buttons, so keyboard and screen-reader users reach them; focus lights the prop.
+  const hud = props ? (
+    <div className="stage-hud" style={{ ["--stage-c" as string]: c }} role="group" aria-label="On the desk: run a command; on the shelf: open a project">
+      {STAGE_PROPS.map((p, i) => (
+        <span key={p.id} className="inline-flex items-center">
+          {i ? (
+            <span aria-hidden className="mr-2.5">
+              ·
+            </span>
+          ) : null}
+          <button type="button" onClick={() => send("stage:run", p.id)} onFocus={() => send("stage:focus", p.id)} onBlur={() => send("stage:focus", null)} onPointerEnter={() => send("stage:focus", p.id)} onPointerLeave={() => send("stage:focus", null)}>
+            {p.label}
+          </button>
+        </span>
+      ))}
+      {/* The project shelf's cases, as buttons: focus pulls the case out, Enter opens the project. */}
+      <span aria-hidden className="mx-2.5">
+        |
+      </span>
+      {cases.map((cs, i) => (
+        <span key={cs.id} className="inline-flex items-center">
+          {i ? (
+            <span aria-hidden className="mr-2.5">
+              ·
+            </span>
+          ) : null}
+          <button type="button" onClick={() => send("stage:case", cs.id)} onFocus={() => send("stage:casefocus", cs.id)} onBlur={() => send("stage:casefocus", null)} onPointerEnter={() => send("stage:casefocus", cs.id)} onPointerLeave={() => send("stage:casefocus", null)}>
+            {cs.title.toLowerCase()}
+          </button>
+        </span>
+      ))}
+    </div>
+  ) : null;
+
+  if (live) {
+    return (
+      <>
+        <div ref={wrap} className="stage-story" style={{ ["--travel-d" as string]: STAGE_TRAVEL.desktop, ["--travel-p" as string]: STAGE_TRAVEL.phone, ["--stage-c" as string]: c }}>
+          <div ref={stick} className="stage-story-stick">
+            <div className="relative">
+              {box}
+              {/* Words beside the stops, over the stage; the page fades them with the scroll. */}
+              <div className="stage-story-words">
+                {([1, 2, 3] as const).map((k) => (
+                  <StoryPanel key={k} stop={k} ref={(el) => void (panels.current[k - 1] = el)} />
+                ))}
+              </div>
+            </div>
+            {hud}
+          </div>
+        </div>
+        <StoryRail ref={rail} active={active} color={c} onGo={goStop} />
+      </>
+    );
+  }
   return (
     <>
-      <div
-        className="world-stage relative h-[46svh] min-h-[260px] w-full overflow-hidden rounded-3xl border"
-        style={{
-          borderColor: "var(--surface-border)",
-          background: `radial-gradient(ellipse at 50% 60%, color-mix(in srgb, ${c} 18%, #07070a), #07070a 72%)`,
-          boxShadow: `0 30px 80px -30px color-mix(in srgb, ${c} 45%, transparent), var(--panel-shadow)`,
-        }}
-        aria-hidden
-      >
-        {/* Server-rendered first paint: the desk's outline, until the first WebGL frame (or the line drawing) takes over. */}
-        {slug === "engineer" ? <StageSilhouette color={c} gone={framed || (ready && experience !== "immersive")} /> : null}
-        {!ready ? null : experience === "immersive" ? <WorldStage3D slug={slug} t={t} entries={entries} posts={posts} onFirstFrame={() => setFramed(true)} /> : <StageLines slug={slug} t={t} />}
-      </div>
-      {/* The desk's props as text buttons, so keyboard and screen-reader users reach them; focus lights the prop. */}
+      {box}
+      {hud}
+      {/* No camera travel (reduced motion, data saver): the three panels simply stack under the desk. */}
       {props ? (
-        <div className="stage-hud" style={{ ["--stage-c" as string]: c }} role="group" aria-label="On the desk: run a command; on the shelf: open a project">
-          {STAGE_PROPS.map((p, i) => (
-            <span key={p.id} className="inline-flex items-center">
-              {i ? (
-                <span aria-hidden className="mr-2.5">
-                  ·
-                </span>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => send("stage:run", p.id)}
-                onFocus={() => send("stage:focus", p.id)}
-                onBlur={() => send("stage:focus", null)}
-                onPointerEnter={() => send("stage:focus", p.id)}
-                onPointerLeave={() => send("stage:focus", null)}
-              >
-                {p.label}
-              </button>
-            </span>
-          ))}
-          {/* The project shelf's cases, as buttons: focus pulls the case out, Enter opens the project. */}
-          <span aria-hidden className="mx-2.5">
-            |
-          </span>
-          {cases.map((c, i) => (
-            <span key={c.id} className="inline-flex items-center">
-              {i ? (
-                <span aria-hidden className="mr-2.5">
-                  ·
-                </span>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => send("stage:case", c.id)}
-                onFocus={() => send("stage:casefocus", c.id)}
-                onBlur={() => send("stage:casefocus", null)}
-                onPointerEnter={() => send("stage:casefocus", c.id)}
-                onPointerLeave={() => send("stage:casefocus", null)}
-              >
-                {c.title.toLowerCase()}
-              </button>
-            </span>
+        <div className="stage-static" style={{ ["--stage-c" as string]: c }}>
+          {([1, 2, 3] as const).map((k) => (
+            <StoryPanel key={k} stop={k} static />
           ))}
         </div>
       ) : null}
