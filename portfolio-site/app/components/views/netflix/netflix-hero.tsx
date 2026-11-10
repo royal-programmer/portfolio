@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Episode, NetflixShow, NetflixProfileId } from "@/lib/site/netflix-data";
+import { tick as tickSound } from "./netflix-sound";
 
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -21,6 +22,9 @@ type Props = {
   sound: { on: boolean; toggle: () => void };
   /** Where Play / skip lands: the first row's id. */
   firstRowId?: string;
+  /** A season recap to type in the trailer panel instead of the profile trailer (N4). */
+  recap?: { key: number; lines: string[] } | null;
+  onRecapEnd?: () => void;
 };
 
 /** The pitch, built from the hero facts, the two newest main-branch episodes and the status line. */
@@ -35,7 +39,7 @@ function trailerLines(series: NetflixShow, status: string): string[] {
   return lines.slice(0, 8);
 }
 
-export function NetflixHero({ series, profile, status, text, fast, firstRowId, onMore, sound }: Props) {
+export function NetflixHero({ series, profile, status, text, fast, firstRowId, onMore, sound, recap, onRecapEnd }: Props) {
   const [playing, setPlaying] = useState(false);
   const [auto, setAuto] = useState(false);
   const autoDone = useRef(false);
@@ -69,15 +73,16 @@ export function NetflixHero({ series, profile, status, text, fast, firstRowId, o
   const end = useCallback(
     (scroll: boolean, focus = true) => {
       setPlaying(false);
+      if (recap) return onRecapEnd?.();
       if (!scroll) return focus ? playRef.current?.focus() : undefined;
       const el = firstRowId ? document.getElementById(`nf-row-${firstRowId}`) : null;
       el?.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "start" });
     },
-    [firstRowId],
+    [firstRowId, recap, onRecapEnd],
   );
 
   return (
-    <header className="nf-hero" data-playing={playing || undefined}>
+    <header className="nf-hero" data-playing={playing || !!recap || undefined}>
       <div className="nf-art" aria-hidden>
         {text ? <pre className="nf-art-pre">{text}</pre> : <span className="nf-shimmer" />}
       </div>
@@ -106,6 +111,7 @@ export function NetflixHero({ series, profile, status, text, fast, firstRowId, o
             type="button"
             className="nf-btn nf-btn-play"
             onClick={() => {
+              onRecapEnd?.();
               setAuto(false);
               autoDone.current = true;
               setPlaying(true);
@@ -127,12 +133,26 @@ export function NetflixHero({ series, profile, status, text, fast, firstRowId, o
         </div>
       </div>
 
-      {playing ? <Trailer lines={trailerLines(series, status)} fast={fast || reducedMotion()} auto={auto} onEnd={end} key={profile} /> : null}
+      {playing || recap ? (
+        <Trailer
+          lines={recap ? recap.lines : trailerLines(series, status)}
+          ms={recap ? 20_000 : 14_000}
+          fast={fast || reducedMotion()}
+          auto={auto && !recap}
+          onEnd={end}
+          sound={sound}
+          key={recap ? `recap-${recap.key}` : profile}
+        />
+      ) : null}
     </header>
   );
 }
 
-function Trailer({ lines, fast, auto, onEnd }: { lines: string[]; fast: boolean; auto: boolean; onEnd: (scroll: boolean, focus?: boolean) => void }) {
+function Trailer({ lines, ms, fast, auto, onEnd, sound }: { lines: string[]; ms: number; fast: boolean; auto: boolean; onEnd: (scroll: boolean, focus?: boolean) => void; sound: { on: boolean; toggle: () => void } }) {
+  const soundOn = useRef(sound.on);
+  useEffect(() => {
+    soundOn.current = sound.on;
+  });
   const total = useMemo(() => lines.reduce((n, l) => n + l.length + 1, 0), [lines]);
   const [chars, setChars] = useState(fast ? total : 0);
   const root = useRef<HTMLDivElement>(null);
@@ -143,12 +163,17 @@ function Trailer({ lines, fast, auto, onEnd }: { lines: string[]; fast: boolean;
       const t = window.setTimeout(() => onEnd(!auto, !auto), 2000);
       return () => window.clearTimeout(t);
     }
-    // ~14 s for the whole pitch, with a short hold at the end.
-    const per = 14000 / total;
+    // `ms` for the whole pitch (14 s; 20 s for a season recap), with a short hold at the end. A soft tick per few characters when unmuted.
+    const per = ms / total;
     const t0 = performance.now();
     let raf = 0;
+    let last = 0;
     const tick = (now: number) => {
       const c = Math.min(total, Math.floor((now - t0) / per));
+      if (soundOn.current && c - last >= 4) {
+        last = c;
+        tickSound();
+      }
       setChars(c);
       if (c >= total) {
         window.setTimeout(() => onEnd(!auto, !auto), 900);
@@ -158,7 +183,7 @@ function Trailer({ lines, fast, auto, onEnd }: { lines: string[]; fast: boolean;
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [fast, total, auto, onEnd]);
+  }, [fast, total, auto, onEnd, ms]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -190,6 +215,18 @@ function Trailer({ lines, fast, auto, onEnd }: { lines: string[]; fast: boolean;
         <div className="nf-progress" aria-hidden>
           <span style={{ width: `${Math.round((chars / total) * 100)}%` }} />
         </div>
+        <button
+          type="button"
+          className="nf-round nf-round-s nf-trailer-vol"
+          aria-label={sound.on ? "Mute" : "Unmute"}
+          aria-pressed={sound.on}
+          onClick={(e) => {
+            e.stopPropagation();
+            sound.toggle();
+          }}
+        >
+          <span aria-hidden>{sound.on ? "🔊" : "🔇"}</span>
+        </button>
         <button
           type="button"
           className="nf-skip"
