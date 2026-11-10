@@ -165,12 +165,12 @@ export const ARCH: ArchDiagram[] = [
     title: "Shift Roster",
     line: "React/TS UI → .NET APIs → SQL Server, with sync services to HR and transport",
     nodes: [
-      { id: "ui", label: "React / TS UI", kind: "ui" },
+      { id: "ui", label: "React UI", kind: "ui" },
       { id: "ad", label: "Azure AD", kind: "ext" },
       { id: "api", label: ".NET APIs", kind: "api" },
       { id: "db", label: "SQL Server", kind: "db" },
-      { id: "sync", label: "Sync services", kind: "job" },
-      { id: "hr", label: "HR system", kind: "ext" },
+      { id: "sync", label: "Sync svcs", kind: "job" },
+      { id: "hr", label: "HR", kind: "ext" },
       { id: "tr", label: "Transport", kind: "ext" },
     ],
     edges: [
@@ -192,9 +192,9 @@ export const ARCH: ArchDiagram[] = [
     title: "Python automations",
     line: "scheduler or API → Python jobs → RabbitMQ → consumers → finance and background verification",
     nodes: [
-      { id: "sch", label: "Scheduler", kind: "job" },
-      { id: "api", label: "API trigger", kind: "api" },
-      { id: "py", label: "Python jobs", kind: "job" },
+      { id: "sch", label: "Cron", kind: "job" },
+      { id: "api", label: "API", kind: "api" },
+      { id: "py", label: "Py jobs", kind: "job" },
       { id: "mq", label: "RabbitMQ", kind: "queue" },
       { id: "con", label: "Consumers", kind: "job" },
       { id: "fin", label: "Finance", kind: "ext" },

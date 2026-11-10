@@ -3305,7 +3305,8 @@ em.font-display,
 
 
 /* Ghost suggestion: the rest of the best completion, dim, after the caret. */
-.terminal-ghost {
+.hub-exit-body .terminal-ghost {
+  display: inline;
   color: var(--term-faint, var(--ink-faint));
   opacity: 0.7;
   pointer-events: none;
@@ -3425,10 +3426,25 @@ em.font-display,
 .terminal-arch-pre {
   margin: 0;
   font: inherit;
-  line-height: 1.25;
+  line-height: 1.05; letter-spacing: 0;
   white-space: pre;
 }
-.terminal-arch-row {
+.hub-exit-body .terminal-arch-pre span,
+.hub-exit-body .terminal-arch-row {
+  display: inline;
+}
+.hub-exit-body .terminal-arch-pre .terminal-arch-g {
+  display: inline-block;
+  width: 1ch;
+  overflow: visible;
+  text-align: center;
+  white-space: nowrap;
+}
+.hub-exit-body .terminal-arch-pre .terminal-arch-bx {
+  display: inline;
+  letter-spacing: var(--bx-ls, 0);
+}
+.hub-exit-body .terminal-arch-legend span {
   display: inline;
 }
 .terminal-arch .k-ui { color: var(--c); }
@@ -3532,3 +3548,4 @@ em.font-display,
     display: none;
   }
 }
+

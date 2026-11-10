@@ -481,7 +481,8 @@ export function createShell(data: TerminalData): Shell {
       ];
     const d = data.arch.find((x) => x.id === name.toLowerCase());
     if (!d) return [text(`arch: no diagram '${name}' · ${data.arch.map((x) => x.id).join(" · ")}`)];
-    const l = layoutArch(d, cols);
+    // `cols` is an estimate at 7.8 px a character; the real advance is a little wider, so leave a little spare.
+    const l = layoutArch(d, Math.floor(cols * 0.93));
     return [
       text(d.title, true),
       { kind: "arch", id: d.id, title: d.title, wide: l.wide, lines: l.lines, edges: d.edges.map(([a, b]) => [a, b]), notes: d.notes },
