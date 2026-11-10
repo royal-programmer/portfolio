@@ -270,7 +270,7 @@ export function createShell(data: TerminalData): Shell {
   /** The language this call speaks; set at the top of every public entry point (the shell is synchronous, so one slot is enough). */
   let L: Lang = "en";
   let S: TerminalStrings = STRINGS.en;
-  const use = (lang?: Lang) => {
+  const setLang = (lang?: Lang) => {
     L = lang ?? "en";
     S = STRINGS[L];
   };
@@ -940,15 +940,15 @@ export function createShell(data: TerminalData): Shell {
     commands: COMMANDS.map((c) => docOf(STRINGS.en, c)),
     docs: (lang) => COMMANDS.map((c) => docOf(STRINGS[lang], c)),
     banner: (lang) => {
-      use(lang);
+      setLang(lang);
       return banner();
     },
     fit: (text, lang) => {
-      use(lang);
+      setLang(lang);
       return fit(text);
     },
     run(input, state, env) {
-      use(env?.lang);
+      setLang(env?.lang);
       const line = input.trim();
       if (!line) return { lines: [], state };
       const withLine = state.history[state.history.length - 1] === line ? state.history : [...state.history, line].slice(-HISTORY_CAP);
