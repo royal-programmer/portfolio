@@ -857,7 +857,7 @@ html.is-portal-hover .light-cursor-ring::before {
 /* The code world's boot: a small terminal, lines typed in turn, a block cursor that waits. */
 .hub-enter-term {
   margin: 0;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 12px;
   line-height: 1.9;
   letter-spacing: 0.04em;
@@ -1082,7 +1082,7 @@ html.is-holding .light-cursor-ring::before {
   top: 50%;
   transform: translateY(-50%) translateX(-4px);
   white-space: nowrap;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 11px;
   letter-spacing: 0.04em;
   color: var(--ink);
@@ -1182,7 +1182,7 @@ em.font-display,
   height: 38px;
   padding: 0 14px;
   border-bottom: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 11px;
   letter-spacing: 0.06em;
   color: var(--ink-faint);
@@ -1213,7 +1213,7 @@ em.font-display,
   flex: 1;
   margin: 0;
   padding: 18px 20px;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 13px;
   line-height: 2;
   letter-spacing: 0.03em;
@@ -1249,7 +1249,7 @@ em.font-display,
   padding: 14px 0;
   list-style: none;
   border-right: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1335,7 +1335,7 @@ em.font-display,
 .vf-read {
   position: absolute;
   margin: 0;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 13px;
   letter-spacing: 0.06em;
   color: rgba(243, 241, 236, 0.85);
@@ -1435,7 +1435,7 @@ em.font-display,
   gap: 10px;
   margin-top: -6%;
   padding-left: 6%;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
 }
 .dash-speed b {
   font-weight: 500;
@@ -1457,7 +1457,7 @@ em.font-display,
   right: 18px;
   bottom: 16px;
   text-align: center;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
 }
 .dash-gear span {
   display: block;
@@ -1482,7 +1482,7 @@ em.font-display,
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--ink-faint);
@@ -1501,7 +1501,7 @@ em.font-display,
   left: 50%;
   top: 50%;
   translate: -50% -50%;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-weight: 600;
   font-size: clamp(30px, 7vh, 56px);
   line-height: 1;
@@ -1525,7 +1525,7 @@ em.font-display,
   left: 50%;
   top: 50%;
   translate: -50% -52%;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-weight: 500;
   font-size: clamp(46px, 11vh, 84px);
   line-height: 1;
@@ -1539,7 +1539,7 @@ em.font-display,
   flex: 0 0 auto;
   gap: 8px;
   margin-left: auto;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 9px;
   letter-spacing: 0.1em;
 }
@@ -1600,7 +1600,7 @@ em.font-display,
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 11px;
   letter-spacing: 0.14em;
   color: var(--ink-dim);
@@ -1660,7 +1660,7 @@ em.font-display,
   bottom: 9%;
   translate: -50% 0;
   margin: 0;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 12px;
   letter-spacing: 0.12em;
   color: var(--c);
@@ -2105,7 +2105,7 @@ em.font-display,
   /* Above the page's round control in the same corner (fixed bottom-5 right-5, 48px). */
   bottom: max(5.5rem, calc(4.25rem + env(safe-area-inset-bottom)));
   z-index: 60;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   text-transform: uppercase;
 }
 .view-exit button {
@@ -2402,7 +2402,7 @@ em.font-display,
     border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
     border-radius: 8px;
     background: transparent;
-    font-family: var(--font-geist-mono), monospace;
+    font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
     font-size: 11px;
     color: var(--ink-dim);
     -webkit-tap-highlight-color: transparent;
@@ -2480,7 +2480,7 @@ em.font-display,
 }
 .terminal-os-banner {
   margin: 0 0 8px;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   white-space: pre;
   overflow: hidden;
   letter-spacing: 0;
@@ -2492,7 +2492,7 @@ em.font-display,
 /* The generated portrait: every mode is one grid of cells, sized to the body (cqw) and the viewport height. */
 .terminal-os-portrait {
   margin: 4px 0;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: min(13px, calc(100cqw / var(--p-cols) / var(--p-adv)), calc((100dvh - 190px) / var(--p-rows)));
   line-height: 1;
   letter-spacing: 0;
@@ -2658,7 +2658,7 @@ em.font-display,
   overflow: hidden;
   background: #fff;
   color: #000;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 13px;
   line-height: 1;
   letter-spacing: 0;
@@ -2669,7 +2669,7 @@ em.font-display,
 .terminal-os-sl {
   margin: 4px 0;
   overflow: hidden;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 13px;
   line-height: 1.2;
   white-space: pre;
@@ -2679,7 +2679,7 @@ em.font-display,
 /* `cal`, and the pager line (reverse video). */
 .terminal-os-cal {
   margin: 4px 0;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 13px;
   line-height: 1.6;
   color: var(--ink);
@@ -2701,7 +2701,7 @@ em.font-display,
   --hm-4: var(--c);
   margin: 6px 0;
   width: min(100%, calc(var(--hm-n) * var(--hm-w) + 1.4ch));
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 11px;
   line-height: 1.4;
   color: var(--ink-dim);
@@ -2761,7 +2761,7 @@ em.font-display,
 }
 .terminal-lb {
   margin: 6px 0;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -2819,7 +2819,7 @@ em.font-display,
     overflow-y: auto;
     padding: 16px;
     border-left: 1px solid color-mix(in srgb, var(--c) 25%, transparent);
-    font-family: var(--font-geist-mono), monospace;
+    font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
     font-size: 12px;
     line-height: 1.7;
     color: var(--ink-dim);
@@ -3032,7 +3032,7 @@ em.font-display,
 .terminal-os-fetch-rows {
   margin: 0;
   min-width: 0;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 13px;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -3077,7 +3077,7 @@ em.font-display,
   padding: 0 clamp(12px, 3vw, 24px);
   border-top: 1px solid color-mix(in srgb, var(--c) 25%, transparent);
   background: color-mix(in srgb, var(--c) 6%, var(--void, #050507));
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 11px;
   color: var(--ink-dim);
   white-space: pre;
@@ -3266,7 +3266,7 @@ em.font-display,
   opacity: 0;
   pointer-events: none;
   transition: opacity 500ms ease;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
 }
 /* On the hub the page's own dark tokens apply. */
 .hire-pill.is-hub {
@@ -3554,14 +3554,14 @@ em.font-display,
   font-size: min(13px, calc(90vw / var(--p-cols) / var(--p-adv)), calc((100dvh - 190px) / var(--p-rows)));
 }
 .terminal-saver-clock {
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: clamp(36px, 8vw, 72px);
   line-height: 1;
   letter-spacing: 0.04em;
   color: var(--ink);
 }
 .terminal-saver-line {
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-geist-mono), var(--font-noto-bn), var(--font-noto-hi), monospace;
   font-size: 12px;
   color: var(--term-faint, var(--ink-faint));
   text-align: center;
