@@ -266,6 +266,50 @@ export const PROJECT_ARCH: Record<string, string> = {
   "shift-roster": "shift-roster",
 };
 
+/** The few pieces of data that read differently in another language (`lang bn`, `lang hi`); everything else in the data stays English. Numbers stay Western digits. */
+export type TermI18n = { who: string; role: string; city: string; uptime: string; summary: string; status: string; now: string[]; proof: string[] };
+
+export const I18N: Record<"bn" | "hi", TermI18n> = {
+  bn: {
+    who: "ratulroy · সফটওয়্যার ইঞ্জিনিয়ার · বেঙ্গালুরু",
+    role: "সফটওয়্যার ইঞ্জিনিয়ার",
+    city: "বেঙ্গালুরু",
+    uptime: "production-এ 2 বছর · শেষ rebuild-এ 200+ ব্যবহারকারী · 11টি automation চালু রাখা",
+    summary:
+      "Full stack development, API, automation আর production support-এ 2 বছরের অভিজ্ঞতার সফটওয়্যার ইঞ্জিনিয়ার। কাজ করে forward-deployed ধাঁচে: আগে stakeholder-দের সঙ্গে কথা বলে চাহিদা বোঝা, তারপর শুরু থেকে শেষ পর্যন্ত ডেলিভারি। AI-সহায়ক development করে, সঙ্গে code validation, security control আর end-to-end testing।",
+    status: "কাজের খোঁজে · relocate করতে রাজি",
+    now: [
+      "এই portfolio বানাচ্ছি (Next.js 16, Supabase, free stack)",
+      "Shift Roster v2 production-এ · 200+ ব্যবহারকারীর সাপোর্টে",
+      "software engineering-এর কাজের জন্য খোলা · বেঙ্গালুরু বা relocation",
+    ],
+    proof: [
+      "200+ সক্রিয় ব্যবহারকারী আর 1,500–2,000 কর্মীর shift data সামলায়; প্রথম মাসেই 56K+ employee-shift record।",
+      "finance, project sync আর background verification জুড়ে 11টি Python automation-এর দায়িত্বে; RabbitMQ producer–consumer integration।",
+      "Oracle EBS আর NetSuite-এর ওপর Python/FastAPI-তে Project ও Attendance Process API, সঙ্গে async fetching, source-side filtering, pagination আর pooled connection।",
+    ],
+  },
+  hi: {
+    who: "ratulroy · सॉफ़्टवेयर इंजीनियर · बेंगलुरु",
+    role: "सॉफ़्टवेयर इंजीनियर",
+    city: "बेंगलुरु",
+    uptime: "production में 2 साल · पिछले rebuild पर 200+ उपयोगकर्ता · 11 automations चालू रखे",
+    summary:
+      "Full stack development, API, automation और production support में 2 साल के अनुभव वाला सॉफ़्टवेयर इंजीनियर। forward-deployed तरीके से काम करता है: पहले stakeholders से ज़रूरतें समझना, फिर शुरू से अंत तक डिलीवरी। AI-सहायता से development करता है, साथ में code validation, security controls और end-to-end testing।",
+    status: "काम की तलाश में · relocate को तैयार",
+    now: [
+      "यह portfolio बना रहा हूँ (Next.js 16, Supabase, free stack)",
+      "Shift Roster v2 production में · 200+ उपयोगकर्ताओं का सपोर्ट",
+      "software engineering roles के लिए उपलब्ध · बेंगलुरु या relocation",
+    ],
+    proof: [
+      "200+ सक्रिय उपयोगकर्ता और 1,500–2,000 कर्मचारियों का shift data संभालता है; पहले महीने में 56K+ employee-shift records।",
+      "finance, project sync और background verification की 11 Python automations का ज़िम्मा; RabbitMQ producer–consumer integrations।",
+      "Oracle EBS और NetSuite के ऊपर Python/FastAPI में Project और Attendance Process APIs, साथ में async fetching, source-side filtering, pagination और pooled connections।",
+    ],
+  },
+};
+
 export type TerminalData = {
   arch: ArchDiagram[];
   projectArch: Record<string, string>;
@@ -289,6 +333,8 @@ export type TerminalData = {
   status: string;
   /** Build id, when the deploy exposes one. */
   commit?: string;
+  /** The translated pieces, by language (`lang bn`, `lang hi`). */
+  i18n?: Record<"bn" | "hi", TermI18n>;
 };
 
 const MAX_BODY = 6000;
@@ -344,5 +390,6 @@ export function terminalData(persona: Persona | undefined, entries: Entry[], pos
     },
     status: "open to work · relocates",
     commit: process.env.NEXT_PUBLIC_COMMIT || undefined,
+    i18n: I18N,
   };
 }

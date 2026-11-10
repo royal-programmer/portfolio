@@ -27,6 +27,7 @@ import { CanvasExit, DashExit, MonitorExit } from "./exit-sequence-worlds";
 import { BootScreen, useOnce, useSkip } from "./exit-shared";
 import { optimized } from "./vr/screens";
 import type { World } from "./vr/state";
+import type { TerminalStrings } from "@/lib/site/terminal-strings";
 
 type Props = {
   world: World;
@@ -87,18 +88,28 @@ export const bootBar = (fill: number) =>
   `[${"█".repeat(fill)}${"░".repeat(BOOT_BAR_STEPS - fill)}] ${fill * 10}%${fill === BOOT_BAR_STEPS ? "  ready" : ""}`;
 
 /** The profile tool starting up: one function for the hub's exit window and the Engineer terminal's boot. */
-export function terminalScript(n: { projects: number; posts: number; views: number }, cached = false): Line[] {
-  const plural = (c: number, w: string) => `${c} ${w}${c === 1 ? "" : "s"}`;
+/** The boot script's own words. English lives here, not in terminal-strings.ts, so the hub does not carry the Bengali and Hindi tables; the terminal passes its language's. */
+export type BootStrings = Pick<TerminalStrings, "boot.tool" | "boot.cached" | "boot.sound" | "unit.project" | "unit.file" | "unit.view">;
+const BOOT_EN: BootStrings = {
+  "boot.tool": "the profile tool of Ratul Roy",
+  "boot.cached": "cached profile",
+  "boot.sound": "key clicks follow the site setting",
+  "unit.project": (n) => `${n} project${n === 1 ? "" : "s"}`,
+  "unit.file": (n) => `${n} file${n === 1 ? "" : "s"}`,
+  "unit.view": (n) => `${n} view${n === 1 ? "" : "s"}`,
+};
+
+export function terminalScript(n: { projects: number; posts: number; views: number }, cached = false, S: BootStrings = BOOT_EN): Line[] {
   const row = (label: string, text: string): Line => ({ text: `${label.padEnd(18)}${text}`, typed: false, tag: "ok" });
   return [
     { text: "royal-programmer --boot", typed: true, prompt: true },
-    { text: `royal-programmer v1 · the profile tool of Ratul Roy${cached ? " · cached profile" : ""}`, typed: false },
+    { text: `royal-programmer v1 · ${S["boot.tool"]}${cached ? ` · ${S["boot.cached"]}` : ""}`, typed: false },
     row("profile", "ratulroy · software engineer · bengaluru"),
-    row("mount ~/projects", plural(n.projects, "project")),
-    row("mount ~/resume", "6 files"),
-    row("mount ~/views", plural(n.views, "view")),
+    row("mount ~/projects", S["unit.project"](n.projects)),
+    row("mount ~/resume", S["unit.file"](6)),
+    row("mount ~/views", S["unit.view"](n.views)),
     row("link github", "github.com/royal-programmer"),
-    row("sound", "key clicks follow the site setting"),
+    row("sound", S["boot.sound"]),
     { text: bootBar(BOOT_BAR_STEPS), typed: false, tag: "bar" },
   ];
 }

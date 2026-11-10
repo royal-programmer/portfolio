@@ -80,6 +80,9 @@ export type FitResult = {
   /** Share of the recognised skills I cover (adjacent counts half); null when nothing was recognised. */
   pct: number | null;
   verdict: string;
+  /** What the verdict says, for the shell to put in words: no skill recognised, or how strong the overlap is. */
+  level: "none" | "strong" | "good" | "partial";
+  total: number;
   truncated: boolean;
 };
 
@@ -129,8 +132,9 @@ export function fitMatch(raw: string, data: TerminalData): FitResult {
     else notYet.push(s.id);
   }
   const total = matched.length + adjacent.length + notYet.length;
-  if (!total) return { matched, adjacent, notYet, pct: null, verdict: "no skills I recognise in that text · is it a job description?", truncated };
+  if (!total) return { matched, adjacent, notYet, pct: null, verdict: "no skills I recognise in that text · is it a job description?", level: "none", total: 0, truncated };
   const pct = Math.round(((matched.length + adjacent.length * 0.5) / total) * 100);
-  const word = pct >= 70 ? "strong overlap" : pct >= 45 ? "good overlap" : "partial overlap";
-  return { matched, adjacent, notYet, pct, verdict: `${word} · ${pct}% of the ${total} skills I recognised`, truncated };
+  const level = pct >= 70 ? "strong" : pct >= 45 ? "good" : "partial";
+  const word = `${level} overlap`;
+  return { matched, adjacent, notYet, pct, verdict: `${word} · ${pct}% of the ${total} skills I recognised`, level, total, truncated };
 }

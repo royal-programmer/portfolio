@@ -25,6 +25,7 @@ import type { TerminalData } from "@/lib/site/terminal-data";
 import { HOME, resolvePath, shortPath, USER } from "@/lib/site/terminal-fs";
 import { createShell, HISTORY_CAP, initialShellState, THEMES, type Effect, type FileItem, type LinkItem, type MenuId, type MenuRow, type Out, type ShellState, type ThemeId, type TimelineRow, type Tone } from "@/lib/site/terminal-shell";
 import { isPrerendering, whenActive } from "@/lib/site/prerender";
+import { isLang, LANG_HINTS, STRINGS, type Lang, type TerminalStrings } from "@/lib/site/terminal-strings";
 import { usePresence } from "@/lib/site/terminal-presence";
 import { ghostFor } from "@/lib/site/terminal-suggest";
 import { forgetView, readView } from "@/lib/site/view-memory";
@@ -60,7 +61,7 @@ type Entry =
   | { n: number; k: "parts"; parts: Array<{ text: string; tone?: Tone; color?: string }> }
   | { n: number; k: "qr"; lines: string[] }
   | { n: number; k: "arch"; id: string; title: string; lines: ArchRun[][]; edges: Array<[string, string]>; notes: string[] }
-  | { n: number; k: "fit"; matched: string[]; adjacent: Array<{ want: string; have: string }>; notYet: string[]; verdict: string; pct: number | null }
+  | { n: number; k: "fit"; matched: string[]; adjacent: Array<{ want: string; have: string }>; notYet: string[]; verdict: string; pct: number | null; labels: { matched: string; adjacent: string; notYet: string } }
   | { n: number; k: "timeline"; wide: boolean; rows: TimelineRow[] }
   | { n: number; k: "art"; text: string }
   | { n: number; k: "ghrepo"; name: string; url: string; pad: number; rest: string }
@@ -70,7 +71,7 @@ type Entry =
   | { n: number; k: "heatmap"; weeks: HeatCell[][]; months: HeatMonth[]; narrow: boolean }
   | { n: number; k: "langbar"; langs: StatsData["languages"]; width: number }
   | { n: number; k: "neofetch"; rows: string[] }
-  | { n: number; k: "banner"; art: string[]; welcome: string; overview: string[]; tips: Array<{ cmd: string; desc: string }> }
+  | { n: number; k: "banner"; art: string[]; welcome: string; overview: string[]; title: string; tips: Array<{ cmd: string; desc: string }> }
   | { n: number; k: "link"; label: string; href: string; external?: boolean }
   | { n: number; k: "run"; text: string; cmd: string }
   | { n: number; k: "menu"; id: MenuId; rows: MenuRow[]; numbered?: boolean };
@@ -98,10 +99,9 @@ const SEEN_KEY = "xp-term-seen";
 const THEME_KEY = "xp-term-theme";
 const CRT_KEY = "xp-term-crt";
 const SAVER_KEY = "xp-term-saver";
+const LANG_KEY = "xp-term-lang";
 const GH_USER = "royal-programmer";
 const GH_KEY = "xp-gh-cache";
-/** What the commands that need a connection print when there is none. */
-const OFFLINE_LINE = "offline · this needs a connection";
 /** Running as an installed app (Chrome/Edge display-mode, or iOS standalone). */
 const isStandalone = () => window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
 const GH_TTL = 3_600_000;
@@ -119,14 +119,14 @@ type GhCache = {
   }>;
 };
 
-const ago = (ms: number) => {
-  if (!Number.isFinite(ms)) return "unknown";
+const ago = (S: TerminalStrings, ms: number) => {
+  if (!Number.isFinite(ms)) return S["ago.unknown"];
   const m = Math.floor(ms / 60_000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return S["ago.now"];
+  if (m < 60) return S["ago.m"](m);
   const h = Math.floor(m / 60);
-  if (h < 48) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  if (h < 48) return S["ago.h"](h);
+  return S["ago.d"](Math.floor(h / 24));
 };
 
 /** A cache or a fresh response is only used if it has the shape the output code reads. */
@@ -158,8 +158,7 @@ const slFrame = (i: number) => {
   const w = i % 2 ? "o" : "O";
   return [`      ${smoke}`, "       _||_____    ", "   ___/ |     |___ ", "  |  [] [] []  ==| ", `  '-${w}-${w}-----${w}-${w}-' `];
 };
-const MAIL_LABEL = { name: "name: ", email: "email: ", message: "message: " } as const;
-type MailStep = keyof typeof MAIL_LABEL;
+type MailStep = "name" | "email" | "message";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const seenBefore = () => {
   try {
@@ -235,7 +234,7 @@ function ArtLines({ art, className }: { art: PortraitArt; className: string }) {
 }
 
 /** Develops the portrait from the photo: `[..] developing…` while it loads, the art when it is ready, one line if it fails. */
-const PortraitView = memo(function PortraitView({ mode, cfg, cols, className, fetchCard, run }: { mode: PortraitMode; cfg: PortraitConfig; cols: number; className: string; fetchCard?: boolean; run?: (cmd: string) => void }) {
+const PortraitView = memo(function PortraitView({ mode, cfg, cols, className, fetchCard, run, s }: { mode: PortraitMode; cfg: PortraitConfig; cols: number; className: string; fetchCard?: boolean; run?: (cmd: string) => void; s: TerminalStrings }) {
   const [made, setArt] = useState<PortraitArt | undefined>();
   const art = cachedPortrait(cfg, mode, cols) ?? made;
   const [failed, setFailed] = useState(false);
@@ -258,11 +257,11 @@ const PortraitView = memo(function PortraitView({ mode, cfg, cols, className, fe
   }, [cfg, mode, cols]);
   return (
     <>
-      <span className="sr-only">a portrait of Ratul</span>
-      {art ? <ArtLines art={art} className={className} /> : failed ? <span className="is-out is-dim">the portrait did not load · try again</span> : <span className="is-out">[..] developing…</span>}
+      <span className="sr-only">{s["pt.alt"]}</span>
+      {art ? <ArtLines art={art} className={className} /> : failed ? <span className="is-out is-dim">{s["pt.fail"]}</span> : <span className="is-out">{s["pt.dev"]}</span>}
       {run && !fetchCard ? (
         <span className="is-out is-dim terminal-os-modes">
-          {"modes: "}
+          {s["pt.modes"]}
           {PORTRAIT_MODES.map((m) => (
             <Fragment key={m}>
               <button type="button" className="terminal-root-link" onMouseDown={(e) => e.preventDefault()} onClick={() => run(`portrait ${m}`)}>
@@ -271,7 +270,7 @@ const PortraitView = memo(function PortraitView({ mode, cfg, cols, className, fe
               {" · "}
             </Fragment>
           ))}
-          {"portrait <mode>"}
+          {s["pt.hint"]}
         </span>
       ) : null}
       <span ref={end} />
@@ -280,10 +279,10 @@ const PortraitView = memo(function PortraitView({ mode, cfg, cols, className, fe
 });
 
 /** The tips box: CSS borders with the title in the top one, so the frame always lines up with the text. */
-function Tips({ tips }: { tips: Array<{ cmd: string; desc: string }> }) {
+function Tips({ tips, title }: { tips: Array<{ cmd: string; desc: string }>; title: string }) {
   return (
     <fieldset className="terminal-os-tips">
-      <legend>Tips · type a number or a command</legend>
+      <legend>{title}</legend>
       {tips.map((t, k) => (
         <div key={t.cmd} className="terminal-os-tip">
           <em>{k + 1}</em>
@@ -301,6 +300,20 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   const router = useRouter();
   const origin = useOrigin();
   const shell = useMemo(() => createShell(data), [data]);
+  /** The language of the words the terminal speaks (`lang bn`); the ref is for the long-lived async code. */
+  const [lang, setLang] = useState<Lang>("en");
+  const langRef = useRef<Lang>("en");
+  const T = () => STRINGS[langRef.current];
+  const S = STRINGS[lang];
+  const docs = useMemo(() => shell.docs(lang), [shell, lang]);
+  const applyLang = (l: Lang, persist: boolean) => {
+    langRef.current = l;
+    setLang(l);
+    if (!persist) return;
+    try {
+      window.localStorage.setItem(LANG_KEY, l);
+    } catch {}
+  };
   const root = useRef<HTMLDivElement>(null);
   const win = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
@@ -434,9 +447,9 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   const palMatches = useMemo(() => {
     if (!cmd.startsWith("/")) return [];
     const f = cmd.slice(1).toLowerCase();
-    const all = shell.commands;
+    const all = docs;
     return [...all.filter((c) => c.name.startsWith(f)), ...(f ? all.filter((c) => !c.name.startsWith(f) && c.name.includes(f)) : [])];
-  }, [cmd, shell]);
+  }, [cmd, docs]);
   const palIdx = Math.min(palSel, Math.max(0, palMatches.length - 1));
   /** The rest of the best completion, shown dim after the caret (right arrow or End takes it). */
   const ghost = !ready || mailStep || paging || partial !== null || palette || caret < cmd.length ? "" : ghostFor(cmd, live.current.shell.history, (v) => shell.complete(v, live.current.shell));
@@ -469,13 +482,13 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       }
       if (o.kind === "parts") return { n, k: "parts", parts: o.parts };
       if (o.kind === "arch") return { n, k: "arch", id: o.id, title: o.title, lines: o.lines, edges: o.edges, notes: o.notes };
-      if (o.kind === "fit") return { n, k: "fit", matched: o.matched, adjacent: o.adjacent, notYet: o.notYet, verdict: o.verdict, pct: o.pct };
+      if (o.kind === "fit") return { n, k: "fit", matched: o.matched, adjacent: o.adjacent, notYet: o.notYet, verdict: o.verdict, pct: o.pct, labels: o.labels };
       if (o.kind === "qr") return { n, k: "qr", lines: o.lines };
       if (o.kind === "timeline") return { n, k: "timeline", wide: o.wide, rows: o.rows };
       if (o.kind === "files") return { n, k: "files", inline: o.inline, items: o.items };
       if (o.kind === "cal") return { n, k: "cal", title: o.title, weeks: o.weeks, today: o.today };
       if (o.kind === "neofetch") return { n, k: "neofetch", rows: o.rows };
-      if (o.kind === "banner") return { n, k: "banner", art: o.art, welcome: o.welcome, overview: o.overview, tips: o.tips };
+      if (o.kind === "banner") return { n, k: "banner", art: o.art, welcome: o.welcome, overview: o.overview, title: o.title, tips: o.tips };
       if (o.kind === "link") return { n, k: "link", label: o.label, href: o.href, external: o.external };
       if (o.kind === "run") return { n, k: "run", text: o.text, cmd: o.cmd };
       return { n, k: "menu", id: o.id, rows: o.rows, numbered };
@@ -537,7 +550,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     let next: Checks = { ...cur, [id]: true };
     if (!next.achieved && osRef.current && required.every((r) => next[r])) {
       next = { ...next, achieved: true };
-      append([{ n: ++seq.current, k: "out", text: "achievement unlocked · explorer — try: sudo make me a sandwich", accent: true }]);
+      append([{ n: ++seq.current, k: "out", text: T()["ach.unlocked"], accent: true }]);
       beacon("achievement");
     }
     checksRef.current = next;
@@ -589,7 +602,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   const startMail = () => {
     mailRef.current = { step: "name", name: "", email: "", lines: [] };
     setMailStep("name");
-    line("send me a message, right here · Esc cancels", false, true, here());
+    line(T()["mail.start"], false, true, here());
   };
   const abortMail = () => {
     line("^C mail", false, true, here());
@@ -601,11 +614,11 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   const sendMail = async (name: string, email: string, message: string) => {
     sendingRef.current = true;
     const n = ++seq.current;
-    append([{ n, k: "out", text: "sending …", dim: true }]);
+    append([{ n, k: "out", text: T()["mail.sending"], dim: true }]);
     const patch = (p: Partial<Extract<Entry, { k: "out" }>>) => setEntries((es) => es.map((e) => (e.n === n && e.k === "out" ? { ...e, ...p } : e)));
     const fail = (why: string) => {
       patch({ text: why, dim: true });
-      append([{ n: ++seq.current, k: "out", text: "your message was:", dim: true }, ...message.split("\n").map((t): Entry => ({ n: ++seq.current, k: "out", text: t }))]);
+      append([{ n: ++seq.current, k: "out", text: T()["mail.yours"], dim: true }, ...message.split("\n").map((t): Entry => ({ n: ++seq.current, k: "out", text: t }))]);
     };
     try {
       const res = await fetch("/api/lead", {
@@ -617,16 +630,16 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (cancelled.current) return;
       if (res.ok && j.ok) {
-        patch({ text: `sent · I read these myself · reply lands at ${email}`, dim: false, accent: true });
+        patch({ text: T()["mail.sent"](email), dim: false, accent: true });
         tick("mail");
-      } else fail(j.error ?? `could not send (${res.status})`);
+      } else fail(j.error ?? T()["mail.fail"](res.status));
     } catch {
       if (cancelled.current) return;
       // Nothing is queued: the text is printed back so it can be copied and sent later.
       if (!navigator.onLine) {
         setDown(true);
-        fail(`${OFFLINE_LINE} · nothing is queued, so your message is printed below`);
-      } else fail("could not reach the server");
+        fail(`${T()["net.offline"]} · ${T()["net.queue"]}`);
+      } else fail(T()["mail.unreach"]);
     } finally {
       sendingRef.current = false;
     }
@@ -639,28 +652,28 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     const val = raw.trim();
     setCmd("");
     if (m.step === "name") {
-      echoAnswer(MAIL_LABEL.name, raw);
-      if (!val) return void line("name is required", false, false, here());
+      echoAnswer(T()["mail.name"], raw);
+      if (!val) return void line(T()["mail.needname"], false, false, here());
       m.name = val;
       m.step = "email";
       setMailStep("email");
     } else if (m.step === "email") {
-      echoAnswer(MAIL_LABEL.email, raw);
-      if (!EMAIL_RE.test(val)) return void line("that does not look like an email", false, false, here());
+      echoAnswer(T()["mail.email"], raw);
+      if (!EMAIL_RE.test(val)) return void line(T()["mail.bademail"], false, false, here());
       m.email = val;
       m.step = "message";
       setMailStep("message");
-      line("(empty line to send)", false, true, here());
+      line(T()["mail.empty"], false, true, here());
     } else {
       if (val) {
-        echoAnswer(MAIL_LABEL.message, raw);
+        echoAnswer(T()["mail.message"], raw);
         m.lines.push(raw);
         if (!send) return;
-      } else if (!send) echoAnswer(MAIL_LABEL.message, "");
+      } else if (!send) echoAnswer(T()["mail.message"], "");
       const body = m.lines.join("\n").trim();
       if (body.length < 5) {
         m.lines = [];
-        return void line("say a little more", false, false, here());
+        return void line(T()["mail.more"], false, false, here());
       }
       const { name, email } = m;
       endMail();
@@ -696,9 +709,9 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
 
   /** One run of a GitHub command: a `fetching …` line that the result or the error replaces. */
   const withGithub = async (who: string, show: (d: GhCache, cached: boolean, ac: AbortController) => Promise<Entry[]>, fail: (kind: "rate" | "net") => string) => {
-    if (curlAbort.current) return void line(`${who}: already fetching`, false, true, here());
+    if (curlAbort.current) return void line(T()["gh.already"](who), false, true, here());
     const n = ++seq.current;
-    append([{ n, k: "out", text: "fetching …", dim: true }]);
+    append([{ n, k: "out", text: T()["gh.fetching"], dim: true }]);
     const ac = new AbortController();
     curlAbort.current = ac;
     try {
@@ -711,7 +724,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       if (cancelled.current) return;
       const lost = !navigator.onLine || err instanceof TypeError;
       if (lost && !ac.signal.aborted) setDown(true);
-      patchEntry(n, { text: ac.signal.aborted ? "^C" : lost ? OFFLINE_LINE : fail(err instanceof Error && err.message === "rate" ? "rate" : "net"), dim: true });
+      patchEntry(n, { text: ac.signal.aborted ? "^C" : lost ? T()["net.offline"] : fail(err instanceof Error && err.message === "rate" ? "rate" : "net"), dim: true });
     } finally {
       if (curlAbort.current === ac) curlAbort.current = null;
     }
@@ -719,9 +732,9 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
 
   /** `stats`: the GitHub year. Cached on this device for six hours; the route does the GitHub calls. */
   const statsRun = async (mode: "all" | "year" | "langs") => {
-    if (curlAbort.current) return void line("stats: already fetching", false, true, here());
+    if (curlAbort.current) return void line(T()["gh.already"]("stats"), false, true, here());
     const n = ++seq.current;
-    append([{ n, k: "out", text: "fetching …", dim: true }]);
+    append([{ n, k: "out", text: T()["gh.fetching"], dim: true }]);
     const ac = new AbortController();
     curlAbort.current = ac;
     try {
@@ -751,10 +764,10 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         const g = heatGrid(d, wide ? 53 : 26);
         out.push({ n: ++seq.current, k: "heatmap", weeks: g.weeks, months: g.months, narrow: !wide });
       }
-      if (mode === "all") out.push(parts([{ text: `${d.total} contributions in the last year · current streak ${d.streak.current} d · longest ${d.streak.longest} d` }]));
+      if (mode === "all") out.push(parts([{ text: T()["stats.line"](d.total, d.streak.current, d.streak.longest) }]));
       if (mode !== "year") {
         if (d.languages.length) out.push({ n: ++seq.current, k: "langbar", langs: d.languages, width: Math.max(24, Math.min(wide ? 60 : 36, cols - 2)) });
-        else out.push({ n: ++seq.current, k: "out", text: "langs: no public repositories with a language", dim: true });
+        else out.push({ n: ++seq.current, k: "out", text: T()["stats.nolang"], dim: true });
       }
       setEntries((l) => l.filter((e) => e.n !== n));
       append(out);
@@ -762,7 +775,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       if (cancelled.current) return;
       const lost = !navigator.onLine || err instanceof TypeError;
       if (lost && !ac.signal.aborted) setDown(true);
-      patchEntry(n, { text: ac.signal.aborted ? "^C" : lost ? OFFLINE_LINE : "stats: github did not answer · try again later", dim: true });
+      patchEntry(n, { text: ac.signal.aborted ? "^C" : lost ? T()["net.offline"] : T()["stats.fail"], dim: true });
     } finally {
       if (curlAbort.current === ac) curlAbort.current = null;
     }
@@ -770,27 +783,27 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
 
   /** `install`: Chrome/Edge's prompt if the browser offered one, the share-sheet steps on iOS, else an honest no. */
   const installApp = async () => {
-    if (isStandalone()) return void line("already installed · running as an app", false, true, here());
+    if (isStandalone()) return void line(T()["inst.already"], false, true, here());
     const offer = window.__xpInstall as InstallPrompt | undefined;
     if (offer) {
       window.__xpInstall = undefined; // a prompt can be used once
       try {
         await offer.prompt();
         const { outcome } = await offer.userChoice;
-        if (!cancelled.current) line(outcome === "accepted" ? "installed ✓" : "maybe later", false, outcome !== "accepted", here());
+        if (!cancelled.current) line(outcome === "accepted" ? T()["inst.ok"] : T()["inst.later"], false, outcome !== "accepted", here());
       } catch {
-        if (!cancelled.current) line("maybe later", false, true, here());
+        if (!cancelled.current) line(T()["inst.later"], false, true, here());
       }
       return;
     }
     const ua = navigator.userAgent;
     const ios = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     if (ios) {
-      line("1 · tap the share button in Safari's toolbar", false, false, here());
-      line("2 · choose Add to Home Screen", false, false, here());
+      line(T()["inst.ios1"], false, false, here());
+      line(T()["inst.ios2"], false, false, here());
       return;
     }
-    line("your browser did not offer an install · try Chrome or Edge", false, true, here());
+    line(T()["inst.none"], false, true, here());
   };
 
   /** `curl github`: user, recent repos and the 12-week strip. */
@@ -799,23 +812,23 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       "curl",
       async (d, cached) => {
         const pad = Math.max(...d.repos.map((r) => r.name.length), 4);
-        const rel = (iso: string) => ago(Date.now() - Date.parse(iso));
+        const rel = (iso: string) => ago(T(), Date.now() - Date.parse(iso));
         const safeUrl = (u: string) => (/^https:\/\/github\.com\//.test(u) ? u : "");
         const plain = (text: string, dim = false): Entry => ({ n: ++seq.current, k: "out", text, dim });
         const parts = (text: string): Entry => ({ n: ++seq.current, k: "parts", parts: [{ text }] });
         return [
           plain("HTTP/2 200", true),
-          ...(cached ? [plain(`(cached · ${ago(Date.now() - d.t)})`, true)] : []),
+          ...(cached ? [plain(T()["gh.cached"](ago(T(), Date.now() - d.t)), true)] : []),
           plain(" "),
-          parts(`${GH_USER} · ${Number(d.user.public_repos) || 0} repos · ${Number(d.user.followers) || 0} followers`),
-          ...(d.repos[0] ? [parts(`last push  ${d.repos[0].name} · ${rel(d.repos[0].pushed_at)}`)] : []),
+          parts(T()["gh.summary"](GH_USER, Number(d.user.public_repos) || 0, Number(d.user.followers) || 0)),
+          ...(d.repos[0] ? [parts(`${T()["gh.lastpush"]}${d.repos[0].name} · ${rel(d.repos[0].pushed_at)}`)] : []),
           ...d.repos.slice(0, 5).map(
             (r): Entry => ({ n: ++seq.current, k: "ghrepo", name: String(r.name), url: safeUrl(r.html_url), pad, rest: `  ${(r.language ?? "-").padEnd(11)}  ★${Number(r.stargazers_count) || 0}  ${rel(r.pushed_at)}` }),
           ),
-          { n: ++seq.current, k: "parts", parts: [{ text: "contributions (12w)  " }, { text: strip(d.events), tone: "accent" }] },
+          { n: ++seq.current, k: "parts", parts: [{ text: T()["gh.contrib"] }, { text: strip(d.events), tone: "accent" }] },
         ];
       },
-      (kind) => (kind === "rate" ? "github: rate limited, try again in a while" : "curl: (6) could not resolve api.github.com"),
+      (kind) => (kind === "rate" ? T()["gh.rate"] : T()["gh.dns"]),
     );
 
   /**
@@ -858,17 +871,17 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         } catch {}
         const local = (iso: string) => {
           const t = new Date(iso);
-          if (Number.isNaN(t.getTime())) return "unknown";
+          if (Number.isNaN(t.getTime())) return T()["ago.unknown"];
           const off = -t.getTimezoneOffset();
           const hh = (n: number) => String(n).padStart(2, "0");
           return `${t.toLocaleDateString("en-US", { weekday: "short" })} ${t.toLocaleDateString("en-US", { month: "short" })} ${t.getDate()} ${hh(t.getHours())}:${hh(t.getMinutes())} ${t.getFullYear()} ${off < 0 ? "-" : "+"}${hh(Math.floor(Math.abs(off) / 60))}${hh(Math.abs(off) % 60)}`;
         };
         const plain = (text: string, dim = false): Entry => ({ n: ++seq.current, k: "out", text, dim });
         const parts = (text: string): Entry => ({ n: ++seq.current, k: "parts", parts: [{ text }] });
-        const out: Entry[] = [plain(`# public activity, last 90 days · github.com/${GH_USER}`, true)];
-        if (!shown.length) out.push(plain("no public pushes in the last 90 days", true));
+        const out: Entry[] = [plain(T()["git.head"](GH_USER), true)];
+        if (!shown.length) out.push(plain(T()["git.nopush"], true));
         for (const x of shown) {
-          const msg = x.msg ?? known[x.sha] ?? "(message unavailable)";
+          const msg = x.msg ?? known[x.sha] ?? T()["git.nomsg"];
           const url = `https://github.com/${x.repo}/commit/${x.sha}`;
           if (oneline) out.push({ n: ++seq.current, k: "ghcommit", label: x.sha.slice(0, 7), url, rest: ` ${x.repo}: ${msg}` });
           else
@@ -883,7 +896,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         }
         return out;
       },
-      (kind) => (kind === "rate" ? "fatal: github rate limited · try `timeline`" : "fatal: github unreachable · try `timeline`"),
+      (kind) => (kind === "rate" ? T()["git.rate"] : T()["git.down"]),
     );
 
   /** `sl`: a locomotive crosses the width in about two seconds; any key or tap stops it. */
@@ -923,7 +936,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
 
   /** The views menu, as `ls views/` prints it (the picker). */
   const showViews = (boot = false) => {
-    const r = shell.run("views", { ...live.current.shell, history: [] });
+    const r = shell.run("views", { ...live.current.shell, history: [] }, { lang: langRef.current });
     // The boot picker is not numbered and does not take digits: 1-8 belong to the tips box.
     live.current.shell = { ...live.current.shell, lastMenu: boot ? undefined : r.state.lastMenu };
     print(r.lines, !boot);
@@ -934,7 +947,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     markSeen();
     osRef.current = true;
     setOs(true);
-    if (banner) append(toEntries(shell.banner()));
+    if (banner) append(toEntries(shell.banner(langRef.current)));
   };
 
   /** Back to the waiting prompt (Back from a bfcache page, or a cancelled auto-open). */
@@ -970,12 +983,12 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     };
     const patch = (n: number, p: Partial<Extract<Entry, { k: "out" }>>) => (osRef.current ? setEntries : setBootEntries)((es) => es.map((e) => (e.n === n && e.k === "out" ? { ...e, ...p } : e)));
     if (fast) {
-      row(`mounting ${id}`, "ok");
+      row(T()["bv.mount"](id), "ok");
       row(bootBar(BOOT_BAR_STEPS), undefined);
-      row("handing over · Esc comes back", "ok");
+      row(T()["bv.handover"], "ok");
       return true;
     }
-    const a = row(`mounting ${id}`, "wait");
+    const a = row(T()["bv.mount"](id), "wait");
     await wait(160);
     if (aborted()) return false;
     patch(a, { tag: "ok" });
@@ -988,7 +1001,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     }
     await wait(60);
     if (aborted()) return false;
-    row("handing over · Esc comes back", "ok");
+    row(T()["bv.handover"], "ok");
     await wait(140);
     return !aborted();
   };
@@ -1051,7 +1064,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
 
   /** Browser full screen. Needs a user gesture, so call it straight from a key or tap. */
   const toggleFull = () => {
-    const off = () => line("full screen is not available here", false, true, here());
+    const off = () => line(T()["fx.nofull"], false, true, here());
     try {
       const p = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
       p.catch(off);
@@ -1061,7 +1074,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   };
 
   const togglePane = () => {
-    if (window.innerWidth < 1024) return void line("the pane needs a screen at least 1024px wide", false, true, here());
+    if (window.innerWidth < 1024) return void line(T()["fx.nopane"], false, true, here());
     const next = !paneOn;
     setPaneOn(next);
     try {
@@ -1071,7 +1084,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
 
   const startSaver = (force = false) => {
     if (saverRef.current !== "off" || (!force && saverOff.current)) return;
-    if (force && saverOff.current) return void line("screensaver is off · screensaver on", false, true, here());
+    if (force && saverOff.current) return void line(T()["fx.saver.is-off"], false, true, here());
     saverRef.current = "on";
     lastActive.current = performance.now();
     setSaver("on");
@@ -1105,8 +1118,8 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     const t = fitText.trim();
     if (!t) return void closeFit();
     closeFit();
-    line(`(pasted ${t.length.toLocaleString("en-US")} characters · read in this tab only)`, false, true);
-    print(shell.fit(t));
+    line(T()["fit.pasted"](t.length.toLocaleString("en-US")), false, true);
+    print(shell.fit(t, langRef.current));
     beacon("fit");
   };
 
@@ -1114,11 +1127,11 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     if (fx.kind === "open-view") act.current.open(`/${fx.id}`, null);
     else if (fx.kind === "open-slug") act.current.open(fx.blog ? `/blog/${fx.slug}` : `/${fx.slug}`, null);
     else if (fx.kind === "open-url") {
-      line(`opening ${fx.url}`, false, true);
+      line(T()["fx.opening"](fx.url), false, true);
       append([{ n: ++seq.current, k: "link", label: fx.url, href: fx.url, external: true }]);
       window.open(fx.url, "_blank", "noopener,noreferrer");
     } else if (fx.kind === "exit") {
-      if (sendingRef.current) line("sending · wait a moment", false, true, here());
+      if (sendingRef.current) line(T()["fx.wait"], false, true, here());
       else act.current.exit(false);
     }
     else if (fx.kind === "clear") {
@@ -1130,7 +1143,9 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       try {
         window.localStorage.setItem(THEME_KEY, fx.id);
       } catch {}
-      line(`theme: ${fx.id}`, false, true, here());
+      line(T()["fx.theme"](fx.id), false, true, here());
+    } else if (fx.kind === "lang") {
+      applyLang(fx.lang, true);
     } else if (fx.kind === "crt") {
       const next = !crtRef.current;
       crtRef.current = next;
@@ -1138,11 +1153,11 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       try {
         window.localStorage.setItem(CRT_KEY, next ? "1" : "0");
       } catch {}
-      line(`crt ${next ? "on" : "off"}`, false, true, here());
+      line(T()["fx.crt"](next), false, true, here());
     } else if (fx.kind === "qr") {
       const url = `${window.location.origin}${window.location.pathname}`;
       const m = qrModules(url);
-      if (!m) line("qr: this address is too long to encode", false, false, here());
+      if (!m) line(T()["qr.long"], false, false, here());
       else {
         append([{ n: ++seq.current, k: "qr", lines: qrLines(m) }]);
         line(url, false, true, here());
@@ -1168,7 +1183,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         try {
           window.localStorage.setItem(SAVER_KEY, fx.mode === "off" ? "0" : "1");
         } catch {}
-        line(fx.mode === "off" ? "screensaver off · screensaver on brings it back" : "screensaver on", false, true, here());
+        line(fx.mode === "off" ? T()["fx.saver.off"] : T()["fx.saver.on"], false, true, here());
       }
     }
     else if (fx.kind === "mail") startMail();
@@ -1187,7 +1202,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     const cwd0 = live.current.shell.cwd;
     // Characters per line, for output that has a wide and a narrow form (`timeline`).
     const cols = Math.floor(((body.current?.clientWidth ?? window.innerWidth) - 64) / 7.8);
-    const r = shell.run(c, live.current.shell, { cols });
+    const r = shell.run(c, live.current.shell, { cols, lang: langRef.current });
     live.current.shell = r.state;
     setCwd(r.state.cwd);
     try {
@@ -1219,12 +1234,13 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     } else if (id === "themes") {
       themeBase.current = null;
       submit(`theme ${row.key}`);
-    } else submit(`cat ~/${id}/${row.key}.md`);
+    } else if (id === "langs") submit(`lang ${row.key}`);
+    else submit(`cat ~/${id}/${row.key}.md`);
   };
 
   /** Esc, in order: palette, typed text, menu selection; with none of those, exit. (An auto-open call-off is handled while busy.) */
   act.current.esc = () => {
-    if (sendingRef.current) return void line("sending · wait a moment", false, true, here());
+    if (sendingRef.current) return void line(T()["fx.wait"], false, true, here());
     if (fitRef.current) return void closeFit();
     if (curlAbort.current) curlAbort.current.abort();
     else if (slStop.current) slStop.current();
@@ -1398,6 +1414,24 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     live.current.auto = false;
     live.current.cancelAuto = false;
     live.current.shell = initialShellState(loadHistory(persona));
+    // The language: `?lang=` on the address wins and is remembered; else the saved choice; else English.
+    let savedLang: Lang | null = null;
+    let urlLang: Lang | null = null;
+    try {
+      const v = window.localStorage.getItem(LANG_KEY);
+      if (isLang(v)) savedLang = v;
+    } catch {}
+    try {
+      const u = new URL(window.location.href);
+      const l = u.searchParams.get("lang");
+      if (l !== null) {
+        u.searchParams.delete("lang");
+        window.history.replaceState(window.history.state, "", u);
+        if (isLang(l.trim().toLowerCase())) urlLang = l.trim().toLowerCase() as Lang;
+      }
+    } catch {}
+    const startLang: Lang = urlLang ?? savedLang ?? "en";
+    applyLang(startLang, urlLang !== null);
     const direct = via === "normal";
     osRef.current = direct;
     setOs(direct);
@@ -1421,7 +1455,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     } catch {}
     const run = async () => {
       // The banner replaces the static one in the same commit: no gap, no second banner.
-      setEntries(direct ? toEntries(shell.banner()) : []);
+      setEntries(direct ? toEntries(shell.banner(startLang)) : []);
       setBootEntries([]);
       setMenuN(null);
       setPartial("");
@@ -1429,11 +1463,11 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       if (!direct) await wait(via === "hub" ? 150 : 100);
       if (stopped()) return;
       setBooting(false);
-      const script = terminalScript({ projects: items.length, posts: data.posts.length, views: views.length }, !firstVisit);
+      const script = terminalScript({ projects: items.length, posts: data.posts.length, views: views.length }, !firstVisit, STRINGS[startLang]);
       // Opened from the home screen: one more row, before the progress bar.
       const extra: Line[] = [];
-      if (pwa) extra.push({ text: "installed · running as an app", typed: false, tag: "ok" });
-      if (isStandalone()) extra.push({ text: "app mode · works offline", typed: false, tag: "ok" });
+      if (pwa) extra.push({ text: STRINGS[startLang]["boot.pwa"], typed: false, tag: "ok" });
+      if (isStandalone()) extra.push({ text: STRINGS[startLang]["boot.app"], typed: false, tag: "ok" });
       script.splice(script.length - 1, 0, ...extra);
       for (const l of direct ? [] : script) {
         if (stopped()) return;
@@ -1486,7 +1520,10 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       tick("boot");
       if (!instant) await wait(520);
       if (stopped()) return;
-      line(firstVisit ? "new here? type portfolio · hiring? type hire · help lists everything" : "type help, / for the menu · hire for the short version", false, true);
+      line(firstVisit ? STRINGS[startLang]["hint.new"] : STRINGS[startLang]["hint.back"], false, true);
+      // A browser that lists Bengali or Hindi, and no choice saved yet: one extra dim line, in that language.
+      const offered = savedLang === null && urlLang === null ? (navigator.languages ?? []).map((l) => l.toLowerCase().split("-")[0]).find((l) => l === "bn" || l === "hi") : undefined;
+      if (offered === "bn" || offered === "hi") line(LANG_HINTS[offered], false, true);
       await type("ls views/", 13, instant, false, token);
       if (stopped()) return;
       showViews(true);
@@ -1728,13 +1765,13 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         setCopied(n);
         window.setTimeout(() => setCopied((c) => (c === n ? null : c)), 2000);
       },
-      () => line("copy: the browser did not allow it · select the link above", false, true, here()),
+      () => line(T()["fx.copyfail"], false, true, here()),
     );
   };
   /** While the mail form owns the prompt, chips and bar buttons say so instead of doing nothing. */
   const mailBlocks = () => {
     if (!mailRef.current) return false;
-    line("finish or Esc the message first", false, true, here());
+    line(T()["fx.mailfirst"], false, true, here());
     return true;
   };
   const chipKey = (k: "tab" | "up" | "esc") => {
@@ -1760,19 +1797,17 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       </>
     );
 
-  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
-
   const firstYear = Math.min(...data.periods.map((p) => Number(p.from.slice(0, 4))).filter(Boolean), ...data.timeline.map((c) => Number(c.date.slice(0, 4))).filter(Boolean));
   const allContents: Array<{ id: CheckId; cmd: string; label: string; note: string }> = [
-    { id: "resume", cmd: "resume", label: "resume", note: "the overview · 6 files" },
-    { id: "projects", cmd: "projects", label: "projects", note: plural(data.projects.length, "project") },
-    { id: "writing", cmd: "writing", label: "writing", note: plural(data.posts.length, "post") },
-    { id: "views", cmd: "views", label: "views", note: plural(data.views.length, "view") },
-    { id: "timeline", cmd: "timeline", label: "timeline", note: `${Number.isFinite(firstYear) ? firstYear : "…"} → now` },
-    { id: "gitlog", cmd: "git log", label: "git log", note: "live from github" },
-    { id: "portrait", cmd: "portrait", label: "portrait", note: "the face behind it" },
-    { id: "contact", cmd: "contact", label: "contact", note: "mail · github · linkedin" },
-    { id: "mail", cmd: "mail", label: "mail", note: "write to me" },
+    { id: "resume", cmd: "resume", label: "resume", note: S["ct.resume"] },
+    { id: "projects", cmd: "projects", label: "projects", note: S["unit.project"](data.projects.length) },
+    { id: "writing", cmd: "writing", label: "writing", note: S["unit.post"](data.posts.length) },
+    { id: "views", cmd: "views", label: "views", note: S["unit.view"](data.views.length) },
+    { id: "timeline", cmd: "timeline", label: "timeline", note: S["ct.timeline"](String(Number.isFinite(firstYear) ? firstYear : "…")) },
+    { id: "gitlog", cmd: "git log", label: "git log", note: S["ct.gitlog"] },
+    { id: "portrait", cmd: "portrait", label: "portrait", note: S["ct.portrait"] },
+    { id: "contact", cmd: "contact", label: "contact", note: S["ct.contact"] },
+    { id: "mail", cmd: "mail", label: "mail", note: S["ct.mail"] },
   ];
   const contents = allContents.filter((row) => !emptyIds.includes(row.id));
   const seen = contents.filter((r) => checks[r.id]).length;
@@ -1816,14 +1851,14 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
             ))}
           </div>
         </div>
-        <Tips tips={e.tips} />
+        <Tips tips={e.tips} title={e.title} />
       </div>
     ) : e.k === "portrait" ? (
-      <PortraitView key={e.n} mode={e.mode} cfg={portraitCfg} cols={PORTRAIT_COLS[e.mode][isNarrow() ? "narrow" : "wide"]} className={`is-${e.mode}`} run={(c) => submit(c)} />
+      <PortraitView key={e.n} mode={e.mode} cfg={portraitCfg} cols={PORTRAIT_COLS[e.mode][isNarrow() ? "narrow" : "wide"]} className={`is-${e.mode}`} run={(c) => submit(c)} s={S} />
     ) : e.k === "neofetch" ? (
       <div key={e.n} className="terminal-os-fetch">
-        <span className="sr-only">a portrait of Ratul</span>
-        <PortraitView mode="braille" cfg={portraitCfg} cols={26} className="is-fetch" fetchCard />
+        <span className="sr-only">{S["pt.alt"]}</span>
+        <PortraitView mode="braille" cfg={portraitCfg} cols={26} className="is-fetch" fetchCard s={S} />
         <pre className="terminal-os-fetch-rows">
           <code className="ps-user">{e.rows[0]}</code>
           {`\n${e.rows.slice(1).join("\n")}\n\n`}
@@ -1890,7 +1925,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         {e.pct !== null ? <div className="terminal-fit-meter" aria-hidden="true"><i style={{ width: `${e.pct}%` }} /></div> : null}
         {e.matched.length ? (
           <div className="terminal-fit-row">
-            <span className="terminal-fit-label">{`matched (${e.matched.length})`}</span>
+            <span className="terminal-fit-label">{e.labels.matched}</span>
             {e.matched.map((m) => (
               <span key={m} className="terminal-fit-chip is-ok">{m}</span>
             ))}
@@ -1898,7 +1933,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         ) : null}
         {e.adjacent.length ? (
           <div className="terminal-fit-row">
-            <span className="terminal-fit-label">{`adjacent (${e.adjacent.length})`}</span>
+            <span className="terminal-fit-label">{e.labels.adjacent}</span>
             {e.adjacent.map((m) => (
               <span key={m.want} className="terminal-fit-chip is-adj">{m.have ? `${m.want} → ${m.have}` : m.want}</span>
             ))}
@@ -1906,7 +1941,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         ) : null}
         {e.notYet.length ? (
           <div className="terminal-fit-row">
-            <span className="terminal-fit-label">{`not yet (${e.notYet.length})`}</span>
+            <span className="terminal-fit-label">{e.labels.notYet}</span>
             {e.notYet.map((m) => (
               <span key={m} className="terminal-fit-chip is-not">{m}</span>
             ))}
@@ -1916,7 +1951,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     ) : e.k === "qr" ? (
       // Glyphs are 0.6em wide and 1em tall, two modules per row: stretch rows 1.2x so modules are square.
       <div key={e.n}>
-        <span className="sr-only">a QR code of this page&apos;s address</span>
+        <span className="sr-only">{S["qr.alt"]}</span>
         <pre
           className="terminal-os-qr"
           aria-hidden="true"
@@ -1982,7 +2017,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       <LangBar key={e.n} langs={e.langs} width={e.width} />
     ) : e.k === "more" ? (
       <button key={e.n} type="button" className="terminal-root-more" onMouseDown={keepFocus} onClick={nextPage}>
-        -- more (space / ↓ next, q quit) --
+        {S.more}
       </button>
     ) : e.k === "links" ? (
       <span key={e.n} className={`is-out${e.dim ? " is-dim" : ""}${e.lead ? " terminal-os-rowgo" : ""}`}>
@@ -1996,7 +2031,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
               {l.act ? (
                 <span aria-live="polite" style={{ display: "inline" }}>
                   <button type="button" className="terminal-root-link" onMouseDown={keepFocus} onClick={() => shareAct(e.n, l)}>
-                    {l.act === "copy" && copied === e.n ? "copied ✓" : l.label}
+                    {l.act === "copy" && copied === e.n ? S["share.copied"] : l.label}
                   </button>
                 </span>
               ) : l.cmd ? (
@@ -2065,7 +2100,9 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       style={{ "--persona-c": color } as CSSProperties}
       data-theme={theme}
       role="region"
-      aria-label="Engineer terminal"
+      aria-label={S["root.aria"]}
+      lang={lang}
+      data-lang={lang}
     >
       <style>{THEME_CSS}</style>
       {saver !== "off" ? (
@@ -2074,7 +2111,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
           narrow={isNarrow()}
           leaving={saver === "leaving"}
           reduce={typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches}
-          line={`press any key · ${stats ? `${stats.total} contributions this year` : "type portfolio"}`}
+          line={S["saver.line"](stats ? stats.total : null)}
         />
       ) : null}
       {/* The boot screen: the ssh window types the script, then dissolves (is-os). */}
@@ -2108,13 +2145,13 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
             input.current?.focus({ preventScroll: true });
           }}
         >
-          <span className="sr-only">Type commands. help lists them, hire is the short version, / opens the menu, banner prints the welcome again, cls clears the screen, Ctrl+C cancels, Esc or exit returns to the hub.</span>
+          <span className="sr-only">{S["root.sr"]}</span>
           <div role="log" aria-live="polite" aria-relevant="additions">
-            {via === "normal" && !hydrated ? renderEntry(toEntries(shell.banner())[0]) : null}
+            {via === "normal" && !hydrated ? renderEntry(toEntries(shell.banner(lang))[0]) : null}
             {entries.map(renderEntry)}
           </div>
           {palette ? (
-            <ul ref={palList} role="listbox" aria-label="Commands" className="terminal-root-palette">
+            <ul ref={palList} role="listbox" aria-label={S["pal.aria"]} className="terminal-root-palette">
               {palMatches.length ? (
                 palMatches.map((c, n) => (
                   <li key={c.name} role="option" aria-selected={n === palIdx}>
@@ -2133,14 +2170,14 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
                   </li>
                 ))
               ) : (
-                <li className="terminal-root-palette-none is-out">no command matches</li>
+                <li className="terminal-root-palette-none is-out">{S["pal.none"]}</li>
               )}
             </ul>
           ) : null}
           {os && fitOpen ? (
             <div className="terminal-fit-box">
               <label htmlFor="fit-paste" className="terminal-fit-hint">
-                paste a job description · Ctrl+Enter matches · Esc cancels · nothing leaves your browser
+                {S["fitbox.hint"]}
               </label>
               <textarea
                 id="fit-paste"
@@ -2152,7 +2189,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
                 spellCheck={false}
                 autoCapitalize="off"
                 autoCorrect="off"
-                placeholder="paste here…"
+                placeholder={S["fitbox.ph"]}
                 onChange={(e) => setFitText(e.target.value.slice(0, 8192))}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
@@ -2166,10 +2203,10 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
               />
               <div className="terminal-fit-actions">
                 <button type="button" className="terminal-fit-go" onClick={runFit}>
-                  match
+                  {S["fitbox.go"]}
                 </button>
                 <button type="button" className="terminal-fit-cancel" onClick={closeFit}>
-                  cancel
+                  {S["fitbox.cancel"]}
                 </button>
                 <span className="terminal-fit-count">{`${fitText.length.toLocaleString("en-US")} / 8,192`}</span>
               </div>
@@ -2179,7 +2216,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
             <span className="terminal-root-prompt is-cmd">
               {paging ? null : (
                 <code className="terminal-root-typed" aria-hidden="true">
-                  {mailStep ? <code className="ps-user">{MAIL_LABEL[mailStep]}</code> : ps1(shortPath(cwd))}
+                  {mailStep ? <code className="ps-user">{S[`mail.${mailStep}` as const]}</code> : ps1(shortPath(cwd))}
                   {partial !== null ? (
                     <>
                       {partial}
@@ -2200,7 +2237,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
                 className="terminal-root-input"
                 value={cmd}
                 disabled={!ready}
-                aria-label="terminal command"
+                aria-label={S["input.aria"]}
                 autoCapitalize="off"
                 autoCorrect="off"
                 autoComplete="off"
@@ -2224,17 +2261,17 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
             </span>
           ) : null}
         </div>
-        <aside className="terminal-os-pane" aria-label="Side pane">
-          <h3>where</h3>
+        <aside className="terminal-os-pane" aria-label={S["pane.aria"]}>
+          <h3>{S["pane.where"]}</h3>
           <p className="terminal-os-pane-where">{shortPath(cwd)}</p>
-          <h3>who</h3>
+          <h3>{S["pane.who"]}</h3>
           <p className="terminal-os-pane-name">{data.resume.name.toLowerCase()}</p>
-          <p>{`${(data.resume.title.split(" · ")[0] ?? "").toLowerCase()} · ${data.resume.location.split(",")[0].toLowerCase()}`}</p>
+          <p>{S["pane.role"](data.i18n?.[lang as "bn" | "hi"]?.role ?? (data.resume.title.split(" · ")[0] ?? "").toLowerCase(), data.i18n?.[lang as "bn" | "hi"]?.city ?? data.resume.location.split(",")[0].toLowerCase())}</p>
           <p className="terminal-os-pane-status">
             <i aria-hidden="true" />
-            {data.status}
+            {data.i18n?.[lang as "bn" | "hi"]?.status ?? data.status}
           </p>
-          {data.now?.lines[0] ? <p className="terminal-os-pane-now">{`now · ${data.now.lines[0]}`}</p> : null}
+          {data.now?.lines[0] ? <p className="terminal-os-pane-now">{S["pane.now"](data.i18n?.[lang as "bn" | "hi"]?.now[0] ?? data.now.lines[0])}</p> : null}
           <div className="terminal-os-pane-actions">
             {["hire", "resume --pdf", "mail"].map((c) => (
               <button key={c} type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit(c)}>
@@ -2242,9 +2279,9 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
               </button>
             ))}
           </div>
-          <h3>contents</h3>
-          <p className="terminal-os-pane-seen">{seen === contents.length ? "all seen · thanks for reading" : `seen ${seen} of ${contents.length}`}</p>
-          <div className="terminal-os-pane-meter" role="progressbar" aria-label="sections seen" aria-valuemin={0} aria-valuemax={contents.length} aria-valuenow={seen}>
+          <h3>{S["pane.contents"]}</h3>
+          <p className="terminal-os-pane-seen">{seen === contents.length ? S["pane.allseen"] : S["pane.seen"](seen, contents.length)}</p>
+          <div className="terminal-os-pane-meter" role="progressbar" aria-label={S["pane.meter"]} aria-valuemin={0} aria-valuemax={contents.length} aria-valuenow={seen}>
             <i style={{ width: `${contents.length ? (seen / contents.length) * 100 : 0}%` }} />
           </div>
           <ul role="list" className="terminal-os-contents">
@@ -2258,22 +2295,22 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
               </li>
             ))}
           </ul>
-          <h3>next</h3>
+          <h3>{S["pane.next"]}</h3>
           <button type="button" tabIndex={-1} className="terminal-os-pane-next" onMouseDown={keepFocus} onClick={() => submit(hintCmd)}>
-            {nextTry ? `try: ${hintCmd}` : "all done · try: sudo make me a sandwich"}
+            {nextTry ? S["pane.try"](hintCmd) : S["pane.alldone"]}
           </button>
           {gh !== null || visitors >= 2 || down ? (
             <>
-              <h3>live</h3>
-              {down ? <p className="terminal-os-pane-live is-dim">offline · showing what you saw last</p> : null}
-              {gh !== null && !(down && gh === undefined) ? <p className="terminal-os-pane-live">{gh === undefined ? "github · …" : `github · last push ${gh.repos[0] ? ago(Date.now() - Date.parse(gh.repos[0].pushed_at)) : "unknown"}`}</p> : null}
-              {gh ? <p className="terminal-os-pane-live">{`${Number(gh.user.public_repos) || 0} public repos`}</p> : null}
-              {stats ? <p className="terminal-os-pane-live">{`${stats.total} contributions · ${stats.streak.current} d streak`}</p> : null}
-              {visitors >= 2 ? <p className="terminal-os-pane-live">{`visitors · ${visitors} here now`}</p> : null}
+              <h3>{S["pane.live"]}</h3>
+              {down ? <p className="terminal-os-pane-live is-dim">{S["pane.offline"]}</p> : null}
+              {gh !== null && !(down && gh === undefined) ? <p className="terminal-os-pane-live">{gh === undefined ? S["pane.gh.wait"] : S["pane.gh.push"](gh.repos[0] ? ago(S, Date.now() - Date.parse(gh.repos[0].pushed_at)) : S["ago.unknown"])}</p> : null}
+              {gh ? <p className="terminal-os-pane-live">{S["pane.repos"](Number(gh.user.public_repos) || 0)}</p> : null}
+              {stats ? <p className="terminal-os-pane-live">{S["pane.contrib"](stats.total, stats.streak.current)}</p> : null}
+              {visitors >= 2 ? <p className="terminal-os-pane-live">{S["pane.visitors"](visitors)}</p> : null}
             </>
           ) : null}
-          <h3>keys</h3>
-          <p className="terminal-os-keys">Tab complete · ↑ history · / menu · cls clear · Ctrl+C cancel · Esc exit</p>
+          <h3>{S["pane.keys"]}</h3>
+          <p className="terminal-os-keys">{S["pane.keysline"]}</p>
         </aside>
         </div>
         <div className="terminal-os-status">
@@ -2281,27 +2318,27 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
             <code className="terminal-os-status-l">{`${USER}@code  ${shortPath(cwd)}`}</code>
             <button type="button" tabIndex={-1} className="terminal-os-status-work" onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit("hire")}>
               <i aria-hidden="true" />
-              open to work
+              {S["st.work"]}
             </button>
             {swUpdate ? (
               <button type="button" tabIndex={-1} className="terminal-os-status-net is-update" onMouseDown={keepFocus} onClick={() => window.location.reload()}>
-                ● update ready
+                {S["st.update"]}
               </button>
             ) : down ? (
               <span className="terminal-os-status-net is-off" role="status">
-                ○ offline
+                {S["st.offline"]}
               </span>
             ) : null}
           </span>
           <code className="terminal-os-status-m is-counts">
-            {[plural(data.projects.length, "project"), plural(data.posts.length, "post"), plural(data.views.length, "view")].filter((t) => !t.startsWith("0 ")).join(" · ")}
+            {[data.projects.length ? S["unit.project"](data.projects.length) : "", data.posts.length ? S["unit.post"](data.posts.length) : "", data.views.length ? S["unit.view"](data.views.length) : ""].filter(Boolean).join(" · ")}
           </code>
           {visitors >= 2 ? (
-            <code className="terminal-os-status-here" aria-live="polite">{`${visitors} here now`}</code>
+            <code className="terminal-os-status-here" aria-live="polite">{S["st.here"](visitors)}</code>
           ) : null}
           {nextTry ? (
             <button type="button" tabIndex={-1} className="terminal-os-status-hint" onMouseDown={keepFocus} onClick={() => submit(hintCmd)}>
-              {`try: ${hintCmd}`}
+              {S["pane.try"](hintCmd)}
             </button>
           ) : null}
           <span className="terminal-os-status-r">
@@ -2328,7 +2365,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
             </button>
           </span>
         </div>
-        <div className="terminal-root-chips" aria-label="Terminal keys">
+        <div className="terminal-root-chips" aria-label={S["chips.aria"]}>
           <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={typeChip(() => submit("help"))}>
             help
           </button>
@@ -2353,7 +2390,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
           <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={typeChip(() => chipKey("tab"))}>
             Tab
           </button>
-          <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => chipKey("up")} aria-label="Up">
+          <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => chipKey("up")} aria-label={S["chip.up"]}>
             ↑
           </button>
           <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => chipKey("esc")}>
