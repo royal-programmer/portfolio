@@ -1,16 +1,19 @@
 "use client";
+/* eslint-disable react-hooks/immutability -- R3F idiom: materials and uniforms are mutated every frame. */
 
 /**
  * The engineer's laptop (D38 round B): base, lid, 70 keys and a trackpad fly
  * together, the lid unfolds toward you and the screen boots into the editor.
  */
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type MutableRefObject } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { Halo, makeScreenMaterial, useAssembly } from "../assembly";
 import { makeLaptopScreen, optimized } from "../screens";
 import type { World } from "../state";
 import { easeInOut } from "../util";
+import { StageDesk } from "../../../stage/desk";
+import type { StageLook } from "../../../stage/stage-look";
 
 const KEY_COLS = 14;
 const KEY_ROWS = 5;
@@ -23,7 +26,7 @@ const OPEN_ANGLE = THREE.MathUtils.degToRad(104);
 const SCREEN_W = LAP_W * 0.93;
 const SCREEN_H = LAP_D * 0.98 * 0.88;
 
-export function EngineerAssembly({ world, screenSrc, liveScreen, onScreenGo }: { world: World; /** Ratul's own screenshot for the laptop, if there is one. */ screenSrc?: string; /** The Stage's live terminal texture: it replaces the screenshot once it has drawn. */ liveScreen?: THREE.Texture | null; /** Click or tap on the screen (the Stage zooms in and opens the terminal). */ onScreenGo?: () => void }) {
+export function EngineerAssembly({ world, screenSrc, liveScreen, onScreenGo, look }: { world: World; /** Ratul's own screenshot for the laptop, if there is one. */ screenSrc?: string; /** The Stage's live terminal texture: it replaces the screenshot once it has drawn. */ liveScreen?: THREE.Texture | null; /** Click or tap on the screen (the Stage zooms in and opens the terminal). */ onScreenGo?: () => void; /** The Stage: the desk, the lamp and the window, lit by the hour (omit on the hub). */ look?: MutableRefObject<StageLook> }) {
   const root = useRef<THREE.Group>(null);
   const baseRef = useRef<THREE.Group>(null);
   const lidPivot = useRef<THREE.Group>(null);
@@ -74,6 +77,9 @@ export function EngineerAssembly({ world, screenSrc, liveScreen, onScreenGo }: {
   useEffect(() => {
     if (liveScreen) screenMat.uniforms.tScreen.value = liveScreen;
   }, [screenMat, liveScreen]);
+  const deskMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#17120f", roughness: 0.78, metalness: 0.05 }), []);
+  useEffect(() => () => deskMat.dispose(), [deskMat]);
+  const extras = useRef<THREE.Group>(null);
   const hov = useRef(0);
   const hovTarget = useRef(0);
 
@@ -90,6 +96,8 @@ export function EngineerAssembly({ world, screenSrc, liveScreen, onScreenGo }: {
     onFrame: (L, place) => {
       // On the Stage the screen is a button: a soft glow while the pointer is on it.
       hov.current += (hovTarget.current - hov.current) * 0.2;
+      if (extras.current) extras.current.scale.setScalar(0.001 + L.g3);
+      if (look) mats.halo.opacity *= look.current.glow;
       if (onScreenGo) screenMat.uniforms.uHover.value = Math.max(screenMat.uniforms.uHover.value as number, hov.current * 0.9);
       if (baseRef.current) place(baseRef.current, 0);
       if (padRef.current) place(padRef.current, 2);
@@ -112,6 +120,11 @@ export function EngineerAssembly({ world, screenSrc, liveScreen, onScreenGo }: {
 
   return (
     <group ref={root}>
+      {look ? (
+        <group ref={extras}>
+          <StageDesk look={look} deskMat={deskMat} />
+        </group>
+      ) : null}
       <group ref={baseRef}>
         <mesh geometry={geo.base} material={mats.shell} />
       </group>

@@ -17,8 +17,10 @@ import type { PersonaSlug } from "@/lib/content/types";
 import { getViews } from "@/lib/content/views";
 import { ogLines } from "@/lib/site/og-lines";
 import { personaHref } from "@/lib/site/persona-link";
-import { terminalData } from "@/lib/site/terminal-data";
+import { bandFor } from "@/lib/site/terminal-clock";
+import { CLOCK, terminalData } from "@/lib/site/terminal-data";
 import { paletteFor } from "@/lib/site/terminal-themes";
+import { createLook, StageLights, type StageLook } from "./stage/stage-look";
 import { createTerminalScreen, type TerminalScreen } from "./stage/terminal-screen";
 import { personaIdentity } from "@/lib/site/brand";
 import { VrContext, createClock, useVr, type VrClock } from "./hub/vr/clock";
@@ -95,7 +97,7 @@ function measureSetup(scene: THREE.Scene, box: THREE.Box3, tmp: THREE.Vector3) {
     const m = o as THREE.Mesh;
     if (!m.isMesh || !m.visible) return;
     const mat = m.material as THREE.Material | THREE.Material[];
-    if (!Array.isArray(mat) && mat?.name === "halo") return;
+    if (m.userData.noFit || (!Array.isArray(mat) && mat?.name === "halo")) return;
     const g = m.geometry;
     if (!g.boundingBox) g.computeBoundingBox();
     const b = g.boundingBox;
@@ -216,12 +218,12 @@ function Rig({ slug, zoomRef, onFrame, onZoomDone }: { slug: PersonaSlug; zoomRe
   return null;
 }
 
-type StageHooks = { liveScreen: THREE.Texture | null; onScreenGo: () => void };
+type StageHooks = { liveScreen: THREE.Texture | null; onScreenGo: () => void; look: MutableRefObject<StageLook> };
 
 function Setup({ slug, world, media, stage }: { slug: PersonaSlug; world: World; media: HubMedia; stage: StageHooks }) {
   switch (slug) {
     case "engineer":
-      return <EngineerAssembly world={world} screenSrc={media.engineer?.[0] ? `/hub/engineer/${media.engineer[0]}` : undefined} liveScreen={stage.liveScreen} onScreenGo={stage.onScreenGo} />;
+      return <EngineerAssembly world={world} screenSrc={media.engineer?.[0] ? `/hub/engineer/${media.engineer[0]}` : undefined} liveScreen={stage.liveScreen} onScreenGo={stage.onScreenGo} look={stage.look} />;
     case "trader":
       return <TraderAssembly world={world} />;
     case "photographer":
@@ -238,12 +240,12 @@ function Setup({ slug, world, media, stage }: { slug: PersonaSlug; world: World;
 const THEME_KEY = "xp-term-theme";
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** The terminal theme the screen shows: the visitor's saved pick wins (same rule as the terminal), else the default. */
-function screenTheme(): string {
+/** The terminal theme the screen shows: the visitor's saved pick wins (same rule as the terminal), else the band's. */
+function screenTheme(bandTheme: string): string {
   try {
-    return window.localStorage.getItem(THEME_KEY) || "accent";
+    return window.localStorage.getItem(THEME_KEY) || bandTheme;
   } catch {
-    return "accent";
+    return bandTheme;
   }
 }
 
@@ -255,6 +257,20 @@ export default function WorldStage3D({ slug, t, entries, posts }: { slug: Person
   const world = useMemo<World>(() => ({ slug, t, c: C }), [slug, t]);
   const [media, setMedia] = useState<HubMedia>({});
   const [liveScreen, setLiveScreen] = useState<THREE.Texture | null>(null);
+  // The visitor's part of the day (round 9's bands); checked again every minute.
+  const [band, setBand] = useState(() => bandFor(CLOCK, new Date().getHours()));
+  const bandRef = useRef(band);
+  useEffect(() => {
+    bandRef.current = band;
+  }, [band]);
+  const look = useRef<StageLook>(createLook());
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const next = bandFor(CLOCK, new Date().getHours());
+      setBand((b) => (b.id === next.id ? b : next));
+    }, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
   const zoomRef = useRef<Scratch["zoom"] | null>(null);
   const screenRef = useRef<TerminalScreen | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
@@ -278,7 +294,7 @@ export default function WorldStage3D({ slug, t, entries, posts }: { slug: Person
       screen = createTerminalScreen({
         banner: ogLines(data, "banner"),
         output: ogLines(data, "portfolio"),
-        palette: paletteFor(screenTheme()),
+        palette: paletteFor(screenTheme(bandRef.current.theme)),
         host: "ratulroy ~ portfolio",
       });
       screenRef.current = screen;
@@ -294,6 +310,11 @@ export default function WorldStage3D({ slug, t, entries, posts }: { slug: Person
       screen?.dispose();
     };
   }, [slug, entries, posts]);
+
+  // A new band re-themes the screen (a saved theme still wins).
+  useEffect(() => {
+    screenRef.current?.setPalette(paletteFor(screenTheme(band.theme)));
+  }, [band, liveScreen]);
 
   // The overlay that takes over for the zoom's last stretch (a plain element on the body: the stage's own box clips and transforms).
   useEffect(() => {
@@ -338,9 +359,9 @@ export default function WorldStage3D({ slug, t, entries, posts }: { slug: Person
     z.dur = window.matchMedia("(max-width: 767px)").matches ? 0.45 : 0.7;
     z.fired = false;
     const el = overlayRef.current;
-    if (el) el.style.background = paletteFor(screenTheme()).bg;
+    if (el) el.style.background = paletteFor(screenTheme(bandRef.current.theme)).bg;
   }, [navigate]);
-  const stage = useMemo<StageHooks>(() => ({ liveScreen, onScreenGo: go }), [liveScreen, go]);
+  const stage = useMemo<StageHooks>(() => ({ liveScreen, onScreenGo: go, look }), [liveScreen, go, look]);
 
   return (
     <Canvas
@@ -361,6 +382,7 @@ export default function WorldStage3D({ slug, t, entries, posts }: { slug: Person
     >
       <VrContext.Provider value={ctx}>
         <StudioEnvironment />
+        <StageLights band={band.id} look={look} instant={reducedMotion()} />
         <Rig
           slug={slug}
           zoomRef={zoomRef}
