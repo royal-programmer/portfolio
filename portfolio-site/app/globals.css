@@ -2803,6 +2803,99 @@ em.font-display,
   background: var(--c);
   color: var(--void, #050507);
 }
+/* `stats`: the contribution heatmap and the language bar. Shades are mixes of the theme accent over the
+   window colour, so every theme re-skins them; override --hm-0..4 on a theme if a shade does not read. */
+.terminal-hm {
+  --hm-0: color-mix(in srgb, var(--ink-faint) 30%, var(--term-win, #050507));
+  --hm-1: color-mix(in srgb, var(--c) 30%, var(--term-win, #050507));
+  --hm-2: color-mix(in srgb, var(--c) 55%, var(--term-win, #050507));
+  --hm-3: color-mix(in srgb, var(--c) 80%, var(--term-win, #050507));
+  --hm-4: var(--c);
+  margin: 6px 0;
+  width: min(100%, calc(var(--hm-n) * var(--hm-w) + 1.4ch));
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ink-dim);
+}
+.terminal-root[data-theme="paper"] .terminal-hm {
+  --hm-0: color-mix(in srgb, var(--ink-faint) 22%, var(--term-win));
+  --hm-1: color-mix(in srgb, var(--c) 42%, var(--term-win));
+  --hm-2: color-mix(in srgb, var(--c) 65%, var(--term-win));
+  --hm-3: color-mix(in srgb, var(--c) 85%, var(--term-win));
+}
+.terminal-hm-grid {
+  display: grid;
+  gap: 2px;
+}
+.terminal-hm-mon,
+.terminal-hm-wd {
+  white-space: nowrap;
+  color: var(--ink-faint);
+}
+.terminal-hm-wd {
+  align-self: center;
+  font-size: 9px;
+  line-height: 1;
+}
+.terminal-hm-c {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: var(--hm-0);
+  animation: terminal-hm-in 160ms ease-out both;
+}
+.terminal-hm-c[data-l="1"] {
+  background: var(--hm-1);
+}
+.terminal-hm-c[data-l="2"] {
+  background: var(--hm-2);
+}
+.terminal-hm-c[data-l="3"] {
+  background: var(--hm-3);
+}
+.terminal-hm-c[data-l="4"] {
+  background: var(--hm-4);
+}
+.terminal-hm-status {
+  margin-top: 4px;
+  min-height: 1.4em;
+  color: var(--ink-faint);
+}
+@keyframes terminal-hm-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-hm-c {
+    animation: none;
+  }
+}
+.terminal-lb {
+  margin: 6px 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.terminal-lb span {
+  display: inline;
+}
+.terminal-lb-bar {
+  white-space: nowrap;
+  overflow: hidden;
+  color: var(--c);
+}
+.terminal-lb-bar .is-alt,
+.terminal-lb-labels .is-alt {
+  opacity: 0.55;
+}
+.terminal-lb-labels {
+  color: var(--ink-dim);
+}
+.terminal-lb-labels b {
+  font-weight: 400;
+  color: var(--c);
+}
 .terminal-root-more {
   display: block;
   margin: 0;
@@ -3318,5 +3411,7 @@ em.font-display,
     transition: none;
   }
 }
+
+
 
 

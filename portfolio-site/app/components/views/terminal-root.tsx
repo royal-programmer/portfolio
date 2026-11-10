@@ -15,6 +15,8 @@ import type { LaunchedPersona, PersonaView } from "@/lib/content/types";
 import { ambient } from "@/lib/site/ambient-sound";
 import { hubHref, personaHref, useOrigin } from "@/lib/site/persona-link";
 import { qrLines, qrModules } from "@/lib/site/qr";
+import { heatGrid, STATS_KEY, STATS_TTL, statsValid, type HeatCell, type HeatMonth, type StatsCache, type StatsData } from "@/lib/site/terminal-stats";
+import { Heatmap, LangBar } from "@/app/components/views/terminal-heatmap";
 import { cachedPortrait, generatePortrait, PORTRAIT_COLS, PORTRAIT_MODES, type PortraitArt, type PortraitConfig, type PortraitMode } from "@/lib/site/portrait-gen";
 import type { TerminalData } from "@/lib/site/terminal-data";
 import { HOME, resolvePath, shortPath, USER } from "@/lib/site/terminal-fs";
@@ -51,6 +53,8 @@ type Entry =
   | { n: number; k: "files"; inline: boolean; items: FileItem[] }
   | { n: number; k: "cal"; title: string; weeks: Array<Array<number | null>>; today: number }
   | { n: number; k: "more" }
+  | { n: number; k: "heatmap"; weeks: HeatCell[][]; months: HeatMonth[]; narrow: boolean }
+  | { n: number; k: "langbar"; langs: StatsData["languages"]; width: number }
   | { n: number; k: "neofetch"; rows: string[] }
   | { n: number; k: "banner"; art: string[]; welcome: string; overview: string[]; tips: Array<{ cmd: string; desc: string }> }
   | { n: number; k: "link"; label: string; href: string; external?: boolean }
@@ -317,6 +321,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   const [paneOn, setPaneOn] = useState(true);
   /** The pane's "live" lines: the GitHub cache (undefined: not looked at yet; null: unavailable, section left out). */
   const [gh, setGh] = useState<GhCache | null | undefined>(undefined);
+  /** The `stats` data, read from this device's cache only (never fetched for the pane). */
+  const [stats, setStats] = useState<StatsData | null>(null);
   /** Long output waits behind `-- more --`; `rest` is what has not been printed yet. */
   const [paging, setPaging] = useState(false);
   const pager = useRef<{ rest: Out[] } | null>(null);
@@ -662,6 +668,54 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     }
   };
 
+  /** `stats`: the GitHub year. Cached on this device for six hours; the route does the GitHub calls. */
+  const statsRun = async (mode: "all" | "year" | "langs") => {
+    if (curlAbort.current) return void line("stats: already fetching", false, true, here());
+    const n = ++seq.current;
+    append([{ n, k: "out", text: "fetching …", dim: true }]);
+    const ac = new AbortController();
+    curlAbort.current = ac;
+    try {
+      let d: StatsData | null = null;
+      try {
+        const c = JSON.parse(window.localStorage.getItem(STATS_KEY) ?? "null") as StatsCache | null;
+        if (c && typeof c.t === "number" && statsValid(c.d) && Date.now() - c.t < STATS_TTL) d = c.d;
+      } catch {}
+      if (!d) {
+        const r = await fetch("/api/github/contributions", { signal: ac.signal });
+        if (!r.ok) throw new Error(`http ${r.status}`);
+        const j: unknown = await r.json();
+        if (!statsValid(j)) throw new Error("shape");
+        d = j;
+        try {
+          window.localStorage.setItem(STATS_KEY, JSON.stringify({ t: Date.now(), d } satisfies StatsCache));
+        } catch {}
+      }
+      if (cancelled.current) return;
+      setStats(d);
+      const cols = Math.floor(((body.current?.clientWidth ?? window.innerWidth) - 64) / 7.8);
+      const wide = cols >= 80;
+      const parts = (ps: Array<{ text: string; tone?: Tone }>): Entry => ({ n: ++seq.current, k: "parts", parts: ps });
+      const out: Entry[] = [];
+      if (mode !== "langs") {
+        const g = heatGrid(d, wide ? 53 : 26);
+        out.push({ n: ++seq.current, k: "heatmap", weeks: g.weeks, months: g.months, narrow: !wide });
+      }
+      if (mode === "all") out.push(parts([{ text: `${d.total} contributions in the last year · current streak ${d.streak.current} d · longest ${d.streak.longest} d` }]));
+      if (mode !== "year") {
+        if (d.languages.length) out.push({ n: ++seq.current, k: "langbar", langs: d.languages, width: Math.max(24, Math.min(wide ? 60 : 36, cols - 2)) });
+        else out.push({ n: ++seq.current, k: "out", text: "langs: no public repositories with a language", dim: true });
+      }
+      setEntries((l) => l.filter((e) => e.n !== n));
+      append(out);
+    } catch {
+      if (cancelled.current) return;
+      patchEntry(n, { text: ac.signal.aborted ? "^C" : "stats: github did not answer · try again later", dim: true });
+    } finally {
+      if (curlAbort.current === ac) curlAbort.current = null;
+    }
+  };
+
   /** `curl github`: user, recent repos and the 12-week strip. */
   const curlGithub = () =>
     withGithub(
@@ -977,6 +1031,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       }
     } else if (fx.kind === "curl-github") void curlGithub();
     else if (fx.kind === "git-log") void gitLogLive(fx.oneline, fx.limit);
+    else if (fx.kind === "stats") void statsRun(fx.mode);
     else if (fx.kind === "run") {
       // A tip's number: the real command runs next (`/` opens the palette).
       if (fx.cmd === "/") {
@@ -1346,6 +1401,10 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
     } catch {}
     // Only read the cache here; the network is not touched on boot.
     try {
+      const sc = JSON.parse(window.localStorage.getItem(STATS_KEY) ?? "null") as StatsCache | null;
+      if (sc && typeof sc.t === "number" && statsValid(sc.d)) setStats(sc.d);
+    } catch {}
+    try {
       const c = JSON.parse(window.localStorage.getItem(GH_KEY) ?? "null") as GhCache | null;
       if (c && ghValid(c)) setGh(c);
     } catch {}
@@ -1669,6 +1728,10 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           </Fragment>
         ))}
       </pre>
+    ) : e.k === "heatmap" ? (
+      <Heatmap key={e.n} weeks={e.weeks} months={e.months} narrow={e.narrow} />
+    ) : e.k === "langbar" ? (
+      <LangBar key={e.n} langs={e.langs} width={e.width} />
     ) : e.k === "more" ? (
       <button key={e.n} type="button" className="terminal-root-more" onMouseDown={keepFocus} onClick={nextPage}>
         -- more (space / ↓ next, q quit) --
@@ -1899,6 +1962,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
               <h3>live</h3>
               <p className="terminal-os-pane-live">{gh === undefined ? "github · …" : `github · last push ${gh.repos[0] ? ago(Date.now() - Date.parse(gh.repos[0].pushed_at)) : "unknown"}`}</p>
               {gh ? <p className="terminal-os-pane-live">{`${Number(gh.user.public_repos) || 0} public repos`}</p> : null}
+              {stats ? <p className="terminal-os-pane-live">{`${stats.total} contributions · ${stats.streak.current} d streak`}</p> : null}
             </>
           ) : null}
           <h3>keys</h3>

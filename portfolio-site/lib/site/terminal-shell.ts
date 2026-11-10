@@ -145,6 +145,8 @@ export type Effect =
   | { kind: "crt" }
   | { kind: "qr" }
   | { kind: "curl-github" }
+  /** `stats [year|langs]`: the UI fetches the GitHub year and draws it. */
+  | { kind: "stats"; mode: "all" | "year" | "langs" }
   | { kind: "sl" }
   | { kind: "mail" };
 
@@ -201,6 +203,7 @@ const COMMANDS: CommandDoc[] = [
   { name: "timeline", group: "read", usage: "timeline [--all]", desc: "school → college → work, as one line" },
   { name: "view", group: "open", usage: "view [id]", desc: "enter a view (no id: pick from the list)" },
   { name: "git", group: "read", usage: "git log [--oneline] [-n k]", desc: "live: my public commits on github" },
+  { name: "stats", group: "read", usage: "stats [year|langs]", desc: "the GitHub year as a heatmap · streaks · languages", long: "year prints only the heatmap, langs only the language bar. Live from github, kept on this device for six hours." },
   { name: "mail", group: "open", usage: "mail", desc: "send me a message, right here" },
   { name: "pane", group: "terminal", usage: "pane", desc: "show or hide the side pane" },
   { name: "date", group: "terminal", usage: "date", desc: "the local date and time" },
@@ -506,7 +509,7 @@ export function createShell(data: TerminalData): Shell {
     head("who");
     row(clip([r.name, role, city, /relocat/i.test(r.location) ? "open to relocation" : ""].filter(Boolean).join(" · ")));
     row(clip(data.uptime));
-    go("hire", "resume");
+    go("hire", "resume", "stats");
     head("stack");
     row(clip(data.stack.join(" · ")));
     go("stack");
@@ -717,6 +720,11 @@ export function createShell(data: TerminalData): Shell {
             effect: { kind: "window", url: "/resume.pdf" },
           };
         return { lines: resume() };
+      case "stats": {
+        const a = (args[0] ?? "").toLowerCase();
+        if (args.length > 1 || (a && a !== "year" && a !== "langs")) return { lines: [text("usage: stats [year|langs]")] };
+        return { lines: [], effect: { kind: "stats", mode: a === "year" ? "year" : a === "langs" ? "langs" : "all" } };
+      }
       case "curl": {
         const t = (args[0] ?? "").replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/$/, "").toLowerCase();
         if (!args.length) return { lines: [text("usage: curl github")] };
@@ -834,6 +842,7 @@ export function createShell(data: TerminalData): Shell {
       if (cmd === "portrait") return [...PORTRAIT_MODES, "list", "next"].filter((n) => n.startsWith(word));
       if (cmd === "timeline") return ["--all"].filter((n) => n.startsWith(word));
       if (cmd === "resume") return ["--pdf"].filter((n) => n.startsWith(word));
+      if (cmd === "stats") return ["year", "langs"].filter((n) => n.startsWith(word));
       if (cmd === "curl") return ["github"].filter((n) => n.startsWith(word));
       if (cmd === "git") {
         if (head.trim() === "git") return ["log", "status"].filter((n) => n.startsWith(word));
