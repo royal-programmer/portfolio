@@ -457,3 +457,8 @@ The engineer terminal quietly points at the other five personas with one live li
 - **Terminal:** `lib/site/terminal-worlds.ts` (cache key `xp-worlds-pulse`, 30 min; validation; names and colours from the brand and spectrum). The pane loads it once, 3 s after ready (skipped on save-data or offline), and shows two lines at the end of Live: `<persona coloured> · <line>`, links to that world's host through `personaHref`; every 20 s the pair swaps hard (reduced motion keeps the first two). The engineer is never shown. Omitted when offline or the route fails.
 - **`worlds` command** (read group): a row per persona (dot, name, handle or phrase, pulse line, `→ open`), then the footer `one person · six worlds · the hub has them all → ratulroy.me`. Offline it still prints the rows without pulse lines. `portfolio` gains a `worlds` section after `views` (names on one line, `→ worlds`). Strings in `terminal-strings*.ts` (`cmd.worlds.desc`, `pf.worlds`, `worlds.*`).
 - **Not done:** `worlds` is not in the OG allowlist; ride and trader share a green on the spectrum (auto placement).
+
+> **Admin console (round 13):** the view registry, the terminal's data, timeline, `arch` diagrams, themes
+> and translations are now `site_settings` keys (`engineer.views`, `engineer.terminal`, `engineer.timeline`,
+> `engineer.arch`, `engineer.themes`, `engineer.i18n`) with the code constants as defaults; see
+> `16-admin-console.md` section 5.
