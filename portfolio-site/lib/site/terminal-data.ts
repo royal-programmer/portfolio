@@ -102,6 +102,35 @@ export const RESUME: TermResume = {
   education: [{ degree: "B.Tech, Computer Science and Engineering", school: "ITER, Siksha O Anusandhan University", year: "2024", note: "CGPA 7.75/10" }],
 };
 
+/** `hire --brief`: the forwardable fit sheet. `availability` and `compensation` are deliberate "· ask" placeholders until Ratul fills them in. */
+export type TermHiring = {
+  roles: string[];
+  level: string;
+  stack: { core: string[]; plus: string[] };
+  location: { base: string; modes: string[]; relocate: boolean };
+  availability: string;
+  compensation: string;
+  visa: string;
+  proof: string[];
+  /** linkedin and github come from `contact`, so they cannot drift from it. */
+  links: { resume: string; site: string };
+};
+
+export const HIRING: TermHiring = {
+  roles: ["Software Engineer", "Full-stack Engineer", "Backend Engineer (.NET / Python)"],
+  level: "2 yrs · mid-level · owns features end to end",
+  stack: {
+    core: ["C#", ".NET", "React", "TypeScript", "Python", "FastAPI", "SQL Server", "PostgreSQL"],
+    plus: ["RabbitMQ", "GitHub Actions", "Azure AD", "Oracle EBS / NetSuite integrations"],
+  },
+  location: { base: "Bengaluru", modes: ["on-site", "hybrid", "remote"], relocate: true },
+  availability: "notice period · ask",
+  compensation: "band · ask",
+  visa: "Indian citizen · no sponsorship needed in India",
+  proof: ["200+ users on the Shift Roster rebuild", "11 Python automations in production", "VMS query 5–10 min → 2–3 min"],
+  links: { resume: "/resume.pdf", site: "https://code.ratulroy.me" },
+};
+
 export type TermCommit = {
   /** ISO date, used for ordering and the `Date:` line. */
   date: string;
@@ -323,6 +352,7 @@ export type TerminalData = {
   posts: TermPost[];
   views: PersonaView[];
   resume: TermResume;
+  hiring: TermHiring;
   timeline: TermCommit[];
   periods: TermPeriod[];
   /** The portrait's source photo and crop (fractions l,t,r,b); every `portrait` mode is generated from it. */
@@ -375,6 +405,7 @@ export function terminalData(persona: Persona | undefined, entries: Entry[], pos
       .map((p) => ({ slug: p.slug, title: p.title, date: p.publishedAt?.slice(0, 10), excerpt: p.excerpt, body: p.body.slice(0, MAX_BODY) })),
     views,
     resume: RESUME,
+    hiring: HIRING,
     arch: ARCH,
     projectArch: PROJECT_ARCH,
     timeline: TIMELINE,
