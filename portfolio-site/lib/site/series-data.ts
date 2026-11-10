@@ -132,7 +132,6 @@ export function buildSeries(profile: SeriesProfileId, data: TerminalData, entrie
   const learning = episodes.filter((e) => e.branch === "learn" && e.date >= collegeFrom).sort(newestFirst);
 
   const parts = data.uptime.split(" · ").map((s) => s.trim()).filter(Boolean);
-  const open = data.status;
 
   const work: SeriesRow = { id: "work", title: "Work seasons", kind: "episodes", items: main };
   const projects: SeriesRow = { id: "projects", title: "Projects", kind: "cards", items: projectCards };
@@ -143,7 +142,7 @@ export function buildSeries(profile: SeriesProfileId, data: TerminalData, entrie
   let nav: Series["nav"];
 
   if (profile === "recruiter") {
-    facts = [parts[0], parts[1], open].filter((s): s is string => !!s);
+    facts = [parts[0], parts[1], parts[2]].filter((s): s is string => !!s);
     rows = [
       work,
       projects,
@@ -152,7 +151,7 @@ export function buildSeries(profile: SeriesProfileId, data: TerminalData, entrie
       tbc,
     ];
   } else if (profile === "developer") {
-    facts = [`${publicProjects.length} projects`, `${data.stack.length} tools in the stack`, parts[0]].filter((s): s is string => !!s);
+    facts = [`${publicProjects.length} ${publicProjects.length === 1 ? "project" : "projects"}`, `${skills.length} tools in the stack`, parts[0]].filter((s): s is string => !!s);
     rows = [
       projects,
       { id: "stack", title: "Stack", kind: "skills", items: stackFirst },
@@ -162,7 +161,7 @@ export function buildSeries(profile: SeriesProfileId, data: TerminalData, entrie
       tbc,
     ];
   } else {
-    facts = [`${years.length} seasons`, `${episodes.length} episodes`, open].filter((s): s is string => !!s);
+    facts = [`${years.length} seasons`, `${episodes.length} episodes`, parts[1]].filter((s): s is string => !!s);
     const label = (year: number, first: Episode) => {
       const period = data.periods.find((p) => p.from.slice(0, 4) <= String(year) && (p.to === null || String(year) <= p.to.slice(0, 4)));
       return period?.label.split(" · ")[0] ?? first.title.split(" · ")[0];
