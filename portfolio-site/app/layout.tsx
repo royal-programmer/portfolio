@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import { EXPERIENCE_BOOT_SCRIPT } from "@/lib/site/experience";
@@ -33,7 +33,19 @@ export const metadata: Metadata = {
   title: "Ratul Roy — one light, many colours",
   description:
     "Ratul Roy: engineer, trader, photographer — and more wavelengths on the way. Pick a colour to step into that world.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "ratulroy", statusBarStyle: "black-translucent" },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
+
+/** The browser chrome takes the void while the page loads. */
+export const viewport: Viewport = { themeColor: "#05060a" };
 
 export default function RootLayout({
   children,

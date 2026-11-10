@@ -40,6 +40,8 @@ export type TerminalRootProps = {
   color: string;
   /** "hub": the camera flew into this window. "normal": the hub's display already played the script. null: direct visit. */
   via: "hub" | "normal" | null;
+  /** Opened from the home screen (`?via=pwa`): a direct arrival, with one extra boot line. */
+  pwa?: boolean;
   /** Public project slugs for `ls /engineer`. */
   items: string[];
   /** Enabled views, in picker order. */
@@ -290,7 +292,7 @@ function Tips({ tips }: { tips: Array<{ cmd: string; desc: string }> }) {
 
 const PALETTE = ["#3b4150", "#e5655d", "#5fbf6a", "#d9b44a", "var(--c)", "#b38ad9", "#5fc6c9", "#ece7dc"];
 
-export function TerminalRoot({ persona, color, via, items, views, data }: TerminalRootProps) {
+export function TerminalRoot({ persona, color, via, pwa = false, items, views, data }: TerminalRootProps) {
   const router = useRouter();
   const origin = useOrigin();
   const shell = useMemo(() => createShell(data), [data]);
@@ -1382,6 +1384,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
       if (stopped()) return;
       setBooting(false);
       const script = terminalScript({ projects: items.length, posts: data.posts.length, views: views.length }, !firstVisit);
+      // Opened from the home screen: one more row, before the progress bar.
+      if (pwa) script.splice(script.length - 1, 0, { text: "installed · running as an app", typed: false, tag: "ok" });
       for (const l of direct ? [] : script) {
         if (stopped()) return;
         if (l.typed && !instant) await type(l.text, 13, false, false, token);
@@ -1517,7 +1521,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
   }, [ready, gh, cmd, entries.length]);
 
   useEffect(() => {
-    if (via) {
+    if (via || pwa) {
       try {
         const u = new URL(window.location.href);
         if (u.searchParams.has("via")) {
@@ -1526,7 +1530,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         }
       } catch {}
     }
-  }, [via]);
+  }, [via, pwa]);
 
   useEffect(() => {
     const onShow = (e: PageTransitionEvent) => {

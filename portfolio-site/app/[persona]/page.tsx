@@ -91,13 +91,15 @@ export default async function PersonaPage({ params, searchParams }: PersonaPageP
   const t = placeOnSpectrum(ranked).find((p) => p.slug === launched)?.t ?? 0.5;
   const items = engineerEntries.filter((e) => e.visibility === "public").map((e) => e.slug);
   const photo = media.photographer?.[0] ? `/hub/photographer/${media.photographer[0]}` : undefined;
+  // ?via=pwa: opened from the home screen. A direct arrival (no hub hand-off) that says so in the boot.
+  const pwa = via === "pwa";
   const viaKind = via === "hub" ? "hub" : via === "normal" ? "normal" : null;
   // The Engineer page is one dataset with many views; its root is the terminal, which lists them
   // (17-persona-views.md). The other personas keep their page until their own rounds.
   if (launched === "engineer") {
     const views = getViews(launched);
     const data = terminalData(personas.find((p) => p.slug === launched), engineerEntries, engineerBlogPosts, views);
-    return <TerminalRoot persona={launched} t={t} color={accent} via={viaKind} items={items} views={views} data={data} />;
+    return <TerminalRoot persona={launched} t={t} color={accent} via={viaKind} pwa={pwa} items={items} views={views} data={data} />;
   }
   return (
     <>
