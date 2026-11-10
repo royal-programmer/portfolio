@@ -1416,3 +1416,7 @@ stripped service_role's table grants).
 ### Round 17 - Netflix view, part B (2026-11-11)
 
 - N6 Share link + `/og?cmd=netflix:<id>` card and per-title metadata; N7 real fit ratings from a pasted job description (matcher kept in `terminal-fit.ts`, now with `jdWanted`/`textFit`); N8 CC subtitles (bn/hi, `nf.*` strings in all three files); N9 keyboard and remote navigation with the `?` overlay; N10 end-of-season card. Commits `feat(netflix)` x5 plus one `refactor(engineer)`. The `netflix` settings key is still not consumed.
+
+### Round 18 - Stage, part A (2026-11-11)
+
+- S1 live terminal on the laptop (click zooms in, `?via=stage`), S2 lighting by the clock band with lamp and window, S3 five command props with HUD strip, S8 silhouette and flat first paint with `stage:*` marks. Details: 17-persona-views.md section 18. Verified at 1280 and 393 in Chrome (dev server). Not done: admin forms for props and lighting.
