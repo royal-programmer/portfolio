@@ -422,3 +422,13 @@ The terminal installs and opens offline.
 - **`help`** is now four short groups (`start here`, `read`, `live`, `terminal`); `help --all` lists everything under the older four; `man` stays complete.
 - **Fonts**: Noto Sans Bengali and Noto Sans Devanagari (400, `display: swap`, not preloaded: fetched only when a page shows the script) follow Geist Mono in the font stacks, so Latin stays mono. A Bengali, a Hindi and a Latin line have the same box height (checked at 26 px). The terminal region carries `lang` and `data-lang` so screen readers switch voices.
 - **Not in scope**: the Series view and the hub stay English. The `date` and `cal` output, the heatmap and diagram widgets' accessible labels, `neofetch` row labels and the saver clock stay English.
+
+## 13. hire --brief (round 8)
+
+`hire --brief` (also `hire brief`) prints the one-screen fit sheet a recruiter can forward: `fit sheet · Ratul Roy · YYYY-MM`, then `roles` (three roles and the level), `stack` (core, plus dim), `where` (Bengaluru, modes, relocates, visa), `when` (availability and compensation), `proof`, `reach`.
+
+- **Data**: `TerminalData.hiring` (`HIRING` in `terminal-data.ts`). `availability` and `compensation` are deliberate `· ask` placeholders, drawn dim; Ratul fills the real values (later: admin console). linkedin and github come from `contact`, so they cannot drift.
+- **Reach tokens**: `mail` (runs `mail --fit`), `linkedin`, `github`, `resume --pdf`, `copy` (the whole sheet as plain text, wrapped at 72 columns, links as full URLs; reuses the round 5 `act: "copy"` token and its `copied ✓` state) and `share…` (the `?run=hire%20--brief` link, where the browser has a share sheet).
+- **`mail --fit`**: the message step starts with `Hi Ratul — saw your fit sheet (code.ratulroy.me). We are hiring a <first role>; the stack is <first five core items>. Can we talk this week?` in the input, editable; Enter keeps the line, an empty line sends. The lead is stored with `source: hire-brief` (`/api/lead` allow-list; the column is free text, no migration).
+- **Layout**: 60 columns or more: left rule like `portfolio`; narrower: no rule, one item per line, tokens on two lines. Short `hire` ends with a dim `hire --brief · the one-screen fit sheet`; the pane's `hire` button tooltip adds `--brief for the fit sheet`.
+- **Strings**: `hb.*` keys in en, bn and hi.

@@ -5,6 +5,10 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-10 — Round 8: `hire --brief`
+
+Forwardable one-screen fit sheet from a new `hiring` data block; `copy` token puts the sheet on the clipboard (72 cols); `mail --fit` pre-fills the message and tags the lead `hire-brief`. Details: 17-persona-views.md section 13. Availability and compensation are `· ask` placeholders until Ratul fills them. Not done: Series view and hub unchanged; the sheet's role/stack/proof lines stay English in bn and hi.
+
 ## 2026-11-10 — Round 7: `lang bn` and `lang hi`
 
 - All terminal prose moved to `lib/site/terminal-strings.ts` (en, bn, hi); English output unchanged except `help` (four short groups, `help --all` for the full list) and the new `lang` command. `?lang=` and `xp-term-lang` persist the choice; Noto Bengali/Devanagari fonts after Geist Mono. Series view and hub stay English. Details: `17-persona-views.md` §12.
