@@ -357,3 +357,12 @@ registry entry is `enabled: true`, so `view series`, the pane row and the picker
 ## 8. Generated résumé (round 3)
 
 `/resume.pdf` is built from the same data as the terminal and the Series view (`RESUME`, `TIMELINE`, `TIMELINE_PERIODS`, contact links, public projects), so editing one place updates all three. One A4 page, ATS-friendly (real text, no tables, no icons, no fills), Inter, a thin persona-accent rule. The résumé-worthy bullets are listed in `RESUME.pdfBullets`. No phone number, ever. The hand-made `public/Ratul_Roy_Resume.pdf` stays until Ratul has compared the two.
+
+## 9. stats (round 4)
+
+`stats [year|langs]` draws the GitHub year in the terminal: a heatmap (53 weeks wide at 80+ columns, the last 26 weeks narrower), then `<total> contributions in the last year · current streak n d · longest n d`, then a language bar with labels. `year` is only the grid, `langs` only the bar. A failure prints `stats: github did not answer · try again later`, never throws.
+
+- **Route** `app/api/github/contributions/route.ts` (Node runtime, ISR 6 h, `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400`). Source 1 is the GraphQL API when `GITHUB_TOKEN` is set (server env only; optional, a no-scope classic PAT is enough); source 2 parses the public `github.com/users/<handle>/contributions` HTML (cell `data-date`/`data-level` plus the tooltip count) and takes languages from the REST repo list (repos per language). Under 300 days parsed answers `502 {error:"shape"}`. The handle comes from `personaIdentity("engineer")`. The route prefers IPv4 (`dns.setDefaultResultOrder`), because some networks hand out IPv6 addresses that never answer.
+- **Client** `lib/site/terminal-stats.ts` (types, validation, week grid, month labels, language blocks) and `app/components/views/terminal-heatmap.tsx` (`Heatmap`, `LangBar`). Cached in `localStorage` `xp-gh-stats` for 6 h; the pane's Live block shows `<total> contributions · <n> d streak` from that cache only (no fetch on boot).
+- **Colour**: five shades are `color-mix` of the theme accent over the window colour (`--hm-0 … --hm-4` on `.terminal-hm`); `paper` overrides 1-3 to read on a light page. Cells fade in column by column over 600 ms, no animation under reduced motion. Hover shows `3 contributions · 2026-04-12` in a dim line under the grid and as the cell `title`.
+- **Not done**: the numbered tips box stays at seven rows (a number maps to a row; an eighth would break `1-7`); keyboard focus per cell (371 tab stops would hurt more than help).

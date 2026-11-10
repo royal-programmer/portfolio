@@ -5,6 +5,11 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-10 — Round 4: `stats`, the GitHub year as a heatmap
+
+- `/api/github/contributions` (GraphQL with `GITHUB_TOKEN`, else the public contributions HTML) and the `stats [year|langs]` command: heatmap, streaks, language bar; cached on-device 6 h; pane Live line. Design and caveats in `17-persona-views.md` §9.
+- Exercised source 2 (no token in `.env.local`); source 1 is written but untested. Node's fetch hung on this machine's IPv6 route until the route set IPv4-first; the upstream also answered 502 once in a few tries (the terminal shows the dim "did not answer" line).
+
 ## 2026-11-10 — Round 3: the résumé PDF is generated from the data
 
 - `/resume.pdf` (route `app/resume.pdf/route.ts`, `@react-pdf/renderer`, Node runtime, `force-static`) renders one A4 page from `RESUME`, `TIMELINE`, contact links and the content-layer projects; no phone number. Builder: `lib/resume/build.ts`; renderer: `lib/resume/render.tsx`; Inter (subset, OFL) in `public/fonts/`.
