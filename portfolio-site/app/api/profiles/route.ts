@@ -42,6 +42,10 @@ async function github(): Promise<Row> {
   return { id: "github", stat: parts.length ? parts.join(" · ") : undefined };
 }
 
+/** Stats below these stay hidden: a thin number on a portfolio reads worse than none. */
+const MIN_SO_REP = 50;
+const MIN_LC_SOLVED = 25;
+
 async function stackoverflow(): Promise<Row> {
   const r = await get(`https://api.stackexchange.com/2.3/users/${SO}?site=stackoverflow`);
   if (!r.ok) throw new Error("so");
@@ -51,7 +55,9 @@ async function stackoverflow(): Promise<Row> {
   const a = await get(`https://api.stackexchange.com/2.3/users/${SO}/answers?site=stackoverflow&pagesize=1&filter=total`)
     .then((x) => (x.ok ? (x.json() as Promise<{ total?: number }>) : null))
     .catch(() => null);
-  return { id: "stackoverflow", stat: `${kilo(rep)} rep${typeof a?.total === "number" ? ` · ${a.total} answers` : ""}` };
+  // A number that undersells stays out: the profile row still links, the stat appears once it is worth reading.
+  if (rep < MIN_SO_REP) return { id: "stackoverflow", stat: undefined };
+  return { id: "stackoverflow", stat: `${kilo(rep)} rep${typeof a?.total === "number" && a.total > 0 ? ` · ${a.total} answers` : ""}` };
 }
 
 async function holopin(): Promise<Row> {
@@ -84,7 +90,7 @@ async function leetcode(): Promise<Row> {
       const m = j.data?.matchedUser;
       if (!m?.username) continue;
       const all = m.submitStats?.acSubmissionNum?.find((x) => x.difficulty === "All")?.count;
-      const row: Row = { id: "leetcode", handle: m.username, href: `https://leetcode.com/u/${m.username}/`, stat: typeof all === "number" ? `${all} solved` : undefined };
+      const row: Row = { id: "leetcode", handle: m.username, href: `https://leetcode.com/u/${m.username}/`, stat: typeof all === "number" && all >= MIN_LC_SOLVED ? `${all} solved` : undefined };
       lcCache = { t: Date.now(), row };
       return row;
     } catch {}
