@@ -7,10 +7,12 @@
  * meta row, description, the season's episodes, "More like this" and About. Everything is swapped in place.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { NF_ADJECTIVES, castOf, factsOf, moreLike, type CastMember, type NetflixProfileId, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
+import { NF_ADJECTIVES, castOf, endCardOf, factsOf, moreLike, type CastMember, type NetflixProfileId, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
 import { DISPLAY_ROOT } from "@/lib/site/brand";
 import { netflixShareLink } from "@/lib/site/netflix-og";
+import type { TermLink } from "@/lib/site/terminal-data";
 import { epSub } from "@/lib/site/netflix-subs";
+import { useViewExit } from "../view-shell";
 import { CcButton } from "./netflix-cc";
 import { chime } from "./netflix-sound";
 import { useCc, useLikes, useMyList, useSound } from "./netflix-store";
@@ -34,6 +36,9 @@ type Props = {
   cast?: CastMember[];
   /** The profile the share link opens in (N6). */
   profile?: NetflixProfileId;
+  /** What the end-of-season card shows (N10): what I am doing now, and how to reach me. */
+  now?: { month: string; lines: string[] };
+  contact?: TermLink[];
   onCast?: (key: string) => void;
   onClose: () => void;
   onSwap: (item: NfItem) => void;
@@ -41,7 +46,7 @@ type Props = {
   onShow: (item: NfItem, playedThrough: boolean) => void;
 };
 
-export function NetflixModal({ item, index, origin, portraitText, autoPlay, playMs, cast, profile = "story", onCast, onClose, onSwap, onShow }: Props) {
+export function NetflixModal({ item, index, origin, portraitText, autoPlay, playMs, cast, profile = "story", now: nowInfo, contact = [], onCast, onClose, onSwap, onShow }: Props) {
   const facts = useMemo(() => factsOf(item), [item]);
   const itemCast = useMemo(() => (cast ? castOf(item, cast) : []), [item, cast]);
   const overlay = useRef<HTMLDivElement>(null);
@@ -54,6 +59,9 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, play
   const likes = useLikes();
   const [play, setPlay] = useState<{ id: string; on: boolean }>({ id: item.id, on: !!autoPlay });
   const playing = play.id === item.id && play.on;
+  // N10: the id of the last episode whose end card is showing.
+  const [endFor, setEndFor] = useState<string | null>(null);
+  const showEnd = endFor === item.id;
   const [seasonPick, setSeasonPick] = useState<{ id: string; season: number } | null>(null);
   const [now] = useState(() => Date.now());
 
@@ -165,6 +173,8 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, play
   const finished = () => {
     setPlay({ id: item.id, on: false });
     onShow(item, true);
+    // The teleprompter ending on a season's last episode rolls the credits (not in the guided play, which closes the card itself).
+    if (isLast && playMs == null) setEndFor(item.id);
   };
 
   /* ----- keyboard: Esc, Tab trap, Space toggles Play ----- */
@@ -178,6 +188,11 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, play
     if (e.key === "Backspace" && !(e.target as HTMLElement).closest("input, textarea, select")) {
       e.preventDefault();
       requestClose();
+      return;
+    }
+    if ((e.key === "ArrowRight" || e.key === "ArrowLeft") && item.kind === "episode" && !(e.target as HTMLElement).closest("input, textarea, select")) {
+      e.preventDefault();
+      step(e.key === "ArrowRight" ? 1 : -1);
       return;
     }
     if (e.key === " ") {
@@ -253,6 +268,26 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, play
     [index, item.kind, season],
   );
   const more = useMemo(() => moreLike(item, index, 6), [item, index]);
+  // The item's own season in Episodes order, whatever season the picker shows: Next walks it, the last one ends on the card.
+  const own = useMemo(
+    () => (item.kind === "episode" ? [...index.values()].flatMap((o) => (o.kind === "episode" && o.e.season === item.e.season ? [o] : [])).sort((a, b) => (a.kind === "episode" && b.kind === "episode" ? a.e.n - b.e.n : 0)) : []),
+    [index, item],
+  );
+  const isLast = item.kind === "episode" && own.length > 0 && own[own.length - 1].id === item.id;
+  const end = useMemo(() => (item.kind === "episode" ? endCardOf(item.e.season, index, nowInfo?.month) : null), [item, index, nowInfo?.month]);
+  const step = (dir: 1 | -1) => {
+    if (item.kind !== "episode") return;
+    if (showEnd) {
+      if (dir < 0) setEndFor(null);
+      return;
+    }
+    const to = own[own.findIndex((o) => o.id === item.id) + dir];
+    if (to) onSwap(to);
+    else if (dir > 0) setEndFor(item.id);
+  };
+  useEffect(() => {
+    if (showEnd) panel.current?.querySelector<HTMLElement>(".nf-m-x")?.focus({ preventScroll: true });
+  }, [showEnd]);
 
   const onEpisodeKey = (e: React.KeyboardEvent, i: number) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
@@ -271,7 +306,11 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, play
   return (
     <div className="nf-modal" ref={overlay} onKeyDown={onKeyDown} data-tone={facts.tone}>
       <div className="nf-backdrop" ref={backdrop} onClick={requestClose} aria-hidden />
-      <div className="nf-m" ref={panel} role="dialog" aria-modal="true" aria-label={facts.title}>
+      <div className="nf-m" ref={panel} role="dialog" aria-modal="true" aria-label={showEnd && end ? end.complete : facts.title}>
+        {showEnd && end ? (
+          <EndCard end={end} now={nowInfo} contact={contact} onClose={requestClose} onNext={end.nextFirst ? () => onSwap(end.nextFirst as NfItem) : undefined} />
+        ) : (
+          <>
         <div className="nf-m-top" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
           <div className="nf-m-handle" aria-hidden />
           <Billboard key={item.id} facts={facts} portraitText={portraitText} playing={playing} playMs={playMs} sub={cc.on && cc.lang ? epSub(facts.tone, facts.season, facts.n, cc.lang) : undefined} lang={cc.lang} onFinish={finished}>
@@ -296,6 +335,11 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, play
                 <button type="button" className="nf-btn nf-btn-play" onClick={togglePlay} aria-pressed={playing}>
                   <span aria-hidden>{playing ? "■" : "▶"}</span> {playing ? "Stop" : "Play"}
                 </button>
+                {item.kind === "episode" ? (
+                  <button type="button" className="nf-btn nf-btn-glass nf-m-next" onClick={() => step(1)}>
+                    Next <span aria-hidden>▶</span>
+                  </button>
+                ) : null}
                 <button type="button" className="nf-round" aria-label={inList ? "Remove from My List" : "Add to My List"} aria-pressed={inList} title={inList ? "Remove from My List" : "Add to My List"} onClick={() => list.toggle(item.id)}>
                   <span aria-hidden>{inList ? "✓" : "＋"}</span>
                 </button>
@@ -457,8 +501,66 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, play
             <span>Created by</span> Ratul Roy · <span>Data:</span> terminal-data.ts · <span>Maturity:</span> open to work
           </p>
         </section>
+          </>
+        )}
       </div>
     </div>
+  );
+}
+
+/* ---------- N10: the end-of-season card ---------- */
+
+function EndCard({ end, now, contact, onClose, onNext }: { end: ReturnType<typeof endCardOf>; now?: { month: string; lines: string[] }; contact: TermLink[]; onClose: () => void; onNext?: () => void }) {
+  const exit = useViewExit();
+  const link = (label: string) => contact.find((c) => c.label === label)?.href;
+  const mail = link("mail");
+  const linkedin = link("linkedin");
+  const github = link("github");
+  return (
+    <section className="nf-end" aria-labelledby="nf-end-h">
+      <button type="button" className="nf-m-x" aria-label="Close" onClick={onClose}>
+        <span aria-hidden>×</span>
+      </button>
+      <h2 id="nf-end-h">{end.complete}</h2>
+      <p className="nf-end-next">{end.next}</p>
+      {now?.lines.length ? (
+        <div className="nf-end-now">
+          <h3>Now</h3>
+          <ul role="list">
+            {now.lines.map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      <div className="nf-end-actions">
+        {onNext ? (
+          <button type="button" className="nf-btn nf-btn-play" onClick={onNext}>
+            <span aria-hidden>▶</span> Watch next season
+          </button>
+        ) : null}
+        {mail ? (
+          <a className="nf-btn nf-btn-glass" href={mail}>
+            Say hello
+          </a>
+        ) : null}
+        {linkedin ? (
+          <a className="nf-btn nf-btn-glass" href={linkedin} target="_blank" rel="noreferrer">
+            LinkedIn
+          </a>
+        ) : null}
+        {github ? (
+          <a className="nf-btn nf-btn-glass" href={github} target="_blank" rel="noreferrer">
+            GitHub
+          </a>
+        ) : null}
+        {exit ? (
+          <button type="button" className="nf-btn nf-btn-glass" onClick={exit}>
+            Back to the terminal
+          </button>
+        ) : null}
+      </div>
+    </section>
   );
 }
 

@@ -195,7 +195,7 @@ async function PersonaViewPage({ persona, view, fromTerminal, via }: { persona: 
     const tr = data.i18n ?? I18N;
     return (
       <ViewShell persona={persona} view={view} stripVia={fromTerminal}>
-        <NetflixView accent={accent} series={series} contact={data.contact} status={data.status} portrait={data.portrait} subData={{ uptime: data.uptime, i18n: { bn: { uptime: tr.bn.uptime, status: tr.bn.status }, hi: { uptime: tr.hi.uptime, status: tr.hi.status } } }} fitPool={{ stack: data.stack, resume: { skills: data.resume.skills } }} fast={via === "normal"} />
+        <NetflixView accent={accent} series={series} contact={data.contact} status={data.status} portrait={data.portrait} subData={{ uptime: data.uptime, i18n: { bn: { uptime: tr.bn.uptime, status: tr.bn.status }, hi: { uptime: tr.hi.uptime, status: tr.hi.status } } }} now={data.now} fitPool={{ stack: data.stack, resume: { skills: data.resume.skills } }} fast={via === "normal"} />
       </ViewShell>
     );
   }

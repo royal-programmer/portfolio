@@ -33,6 +33,8 @@ export type NetflixViewProps = {
   portrait: TerminalData["portrait"];
   /** What a pasted job description is weighed against (N7). */
   fitPool: FitPool;
+  /** What I am doing now (the end-of-season card shows it). */
+  now?: { month: string; lines: string[] };
   /** The translated facts the subtitles (CC) come from (N8). */
   subData: SubData;
   /** `via=normal`: no staged motion. */
@@ -218,7 +220,7 @@ function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => voi
 
 type ModalState = { id: string; origin: DOMRect | null; play: boolean; playMs?: number };
 
-function NetflixBody({ show, series, profile, status, portrait, fitPool, subData, fast, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
+function NetflixBody({ show, series, profile, status, portrait, fitPool, subData, now, fast, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
   const shows = useMemo(() => Object.values(series), [series]);
   const index = useMemo(() => indexItems(shows), [shows]);
   const topId = useMemo(() => topEpisodeId(shows), [shows]);
@@ -530,7 +532,7 @@ function NetflixBody({ show, series, profile, status, portrait, fitPool, subData
           </>
         )}
       </div>
-      {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} portraitText={text} autoPlay={modal.play} playMs={modal.playMs} cast={castList} profile={profile} onCast={castFromModal} onClose={close} onSwap={swap} onShow={onShow} /> : null}
+      {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} portraitText={text} autoPlay={modal.play} playMs={modal.playMs} cast={castList} profile={profile} now={now} contact={contact} onCast={castFromModal} onClose={close} onSwap={swap} onShow={onShow} /> : null}
     </>
   );
 }

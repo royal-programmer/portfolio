@@ -484,3 +484,35 @@ export function buildCast(data: TerminalData, episodes: Episode[], projects: Pro
     .filter((c) => c.count > 0)
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
+
+/* ---------- N10: end-of-season card ---------- */
+
+export type EndCard = {
+  complete: string;
+  /** "Next season starts in 42 days" only when the data's `now.month` is later than this season's year; otherwise "This is the current season". */
+  next: string;
+  /** The first episode of the next season in the data, for "Watch next season". */
+  nextFirst: NfItem | null;
+};
+
+/**
+ * What the modal shows after a season's last episode. The countdown is the gap, in days, between this season's
+ * last episode and the next season's first one in the data (a season that is over has a next one already).
+ */
+export function endCardOf(season: number, index: Map<string, NfItem>, nowMonth?: string): EndCard {
+  const eps = [...index.values()].flatMap((o) => (o.kind === "episode" ? [o] : []));
+  const mine = eps.filter((o) => o.e.season === season);
+  const later = eps.filter((o) => o.e.season > season);
+  const nextSeason = later.length ? Math.min(...later.map((o) => o.e.season)) : null;
+  const nextEps = nextSeason == null ? [] : later.filter((o) => o.e.season === nextSeason).sort((a, b) => a.e.n - b.e.n);
+  const nextFirst = nextEps[0] ?? null;
+  const nowYear = nowMonth ? Number(nowMonth.slice(0, 4)) : NaN;
+  let next = "This is the current season";
+  if (nowYear > season) {
+    const lastEnd = Math.max(...mine.map((o) => monthIndex(o.e.date)), 0);
+    const nextStart = nextFirst ? monthIndex(nextFirst.e.date) : null;
+    const days = nextStart == null ? null : Math.max(1, Math.round((nextStart - lastEnd) * 30.4));
+    next = days == null ? "The next season is already running" : `Next season starts in ${days} ${days === 1 ? "day" : "days"}`;
+  }
+  return { complete: `Season ${season} complete`, next, nextFirst };
+}
