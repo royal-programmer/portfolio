@@ -3415,3 +3415,56 @@ em.font-display,
   color: var(--term-faint, var(--ink-faint));
   border-style: dashed;
 }
+
+/* `arch`: box-and-arrow diagrams in text; kinds are coloured, hover lights what a box talks to. */
+.terminal-arch {
+  margin: 4px 0 8px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.terminal-arch-pre {
+  margin: 0;
+  font: inherit;
+  line-height: 1.25;
+  white-space: pre;
+}
+.terminal-arch-row {
+  display: inline;
+}
+.terminal-arch .k-ui { color: var(--c); }
+.terminal-arch .k-api { color: var(--term-green, #5fbf6a); }
+.terminal-arch .k-db { color: #b38ad9; }
+.terminal-arch .k-queue { color: #d9b44a; }
+.terminal-arch .k-ext { color: var(--term-faint, var(--ink-faint)); }
+.terminal-arch .k-job { color: #5fc6c9; }
+.terminal-arch-run.is-edge {
+  color: var(--term-faint, var(--ink-faint));
+}
+.terminal-arch-run {
+  transition: opacity 120ms, color 120ms;
+}
+.terminal-arch.has-hot .is-node,
+.terminal-arch.has-hot .is-edge {
+  opacity: 0.35;
+}
+.terminal-arch.has-hot .is-hot {
+  opacity: 1;
+}
+.terminal-arch.has-hot .is-edge.is-hot {
+  color: var(--ink);
+}
+.terminal-arch-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 4px 0;
+  font-size: 12px;
+}
+.terminal-arch-note {
+  display: block;
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-arch-run {
+    transition: none;
+  }
+}

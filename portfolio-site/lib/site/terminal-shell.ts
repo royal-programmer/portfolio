@@ -22,6 +22,7 @@ import {
   type FsEntry,
 } from "@/lib/site/terminal-fs";
 import { fitMatch, FIT_MAX } from "@/lib/site/terminal-fit";
+import { layoutArch, type ArchRun } from "@/lib/site/terminal-arch";
 import { didYouMean } from "@/lib/site/terminal-suggest";
 import type { TermCommit, TerminalData } from "@/lib/site/terminal-data";
 
@@ -131,6 +132,8 @@ export type Out =
   | { kind: "timeline"; wide: boolean; rows: TimelineRow[] }
   /** `fit`: a job description matched against my stack. */
   | { kind: "fit"; matched: string[]; adjacent: Array<{ want: string; have: string }>; notYet: string[]; verdict: string; pct: number | null }
+  /** `arch`: a diagram as rows of tagged runs; `edges` are the [from, to] pairs the runs refer to by index. */
+  | { kind: "arch"; id: string; title: string; wide: boolean; lines: ArchRun[][]; edges: Array<[string, string]>; notes: string[] }
   /** The welcome: block-letter art (88 columns), the welcome line, and the tips box rows. */
   | { kind: "banner"; art: string[]; welcome: string; overview: string[]; tips: Array<{ cmd: string; desc: string }> };
 
@@ -217,6 +220,7 @@ const COMMANDS: CommandDoc[] = [
   { name: "stats", group: "read", usage: "stats [year|langs]", desc: "the GitHub year as a heatmap · streaks · languages", long: "year prints only the heatmap, langs only the language bar. Live from github, kept on this device for six hours." },
   { name: "share", group: "read", usage: "share [command]", desc: "a link that opens the terminal on a command, with its preview", long: "Prints the link (code.ratulroy.me/?run=<command>) and the preview image it shows in a chat. No command: the one you ran before." },
   { name: "fit", group: "read", usage: "fit [paste]", desc: "paste a job description · see what overlaps with my stack", long: "Matches the skills it recognises against mine, and says what I do not have yet. Runs in your browser; nothing you paste is sent anywhere. Max 8 KB." },
+  { name: "arch", group: "read", usage: "arch [shift-roster|automations|process-apis|this-site]", desc: "how the systems are wired, as a diagram", long: "Hover or focus a box to light up what it talks to. On a narrow screen each layer is its own block." },
   { name: "mail", group: "open", usage: "mail [--fit]", desc: "send me a message, right here" },
   { name: "pane", group: "terminal", usage: "pane", desc: "show or hide the side pane" },
   { name: "date", group: "terminal", usage: "date", desc: "the local date and time" },
@@ -281,6 +285,8 @@ export function createShell(data: TerminalData): Shell {
       if (link) return /^https?:\/\//i.test(link[1]) ? { kind: "link", label: l, href: link[1], external: true } : text(l);
       const open = /^open (\S+)  → /.exec(l);
       if (open) return { kind: "run", text: l, cmd: `open ${open[1]}` };
+      const arch = /^arch (\S+)  → /.exec(l);
+      if (arch) return { kind: "run", text: l, cmd: `arch ${arch[1]}` };
       return text(l);
     });
   };
@@ -460,6 +466,23 @@ export function createShell(data: TerminalData): Shell {
       ...(r.truncated ? [text(`only the first ${FIT_MAX / 1024} KB was read`, true)] : []),
       { kind: "links", prefix: "→ ", items: [{ label: "hire --brief", cmd: "hire --brief" }, { label: "mail --fit", cmd: "mail --fit" }, { label: "resume --pdf", cmd: "resume --pdf" }] },
       text("nothing you paste leaves your browser", true),
+    ];
+  };
+
+  /** `arch [name]`: the list, or one diagram. */
+  const arch = (name: string | undefined, cols: number): Out[] => {
+    if (!name)
+      return [
+        text("architecture · the systems I built, as diagrams", true),
+        ...data.arch.map((d): Out => ({ kind: "run", text: `arch ${d.id.padEnd(13)} ${d.line ?? d.title}`, cmd: `arch ${d.id}` })),
+      ];
+    const d = data.arch.find((x) => x.id === name.toLowerCase());
+    if (!d) return [text(`arch: no diagram '${name}' · ${data.arch.map((x) => x.id).join(" · ")}`)];
+    const l = layoutArch(d, cols);
+    return [
+      text(d.title, true),
+      { kind: "arch", id: d.id, title: d.title, wide: l.wide, lines: l.lines, edges: d.edges.map(([a, b]) => [a, b]), notes: d.notes },
+      ...(l.skipped.length ? [text(l.skipped.map((i) => `${d.edges[i][0]} ⇢ ${d.edges[i][1]}${d.edges[i][2] ? ` (${d.edges[i][2]})` : ""}`).join(" · "), true)] : []),
     ];
   };
 
@@ -725,6 +748,8 @@ export function createShell(data: TerminalData): Shell {
         const body = line.trim().replace(/^\/?fit\s*/i, "");
         return body ? { lines: fit(body) } : { lines: [], effect: { kind: "fit-box" } };
       }
+      case "arch":
+        return { lines: arch(args[0], env?.cols ?? 100) };
       case "mail":
         return { lines: [], effect: { kind: "mail" } };
       case "pane":
@@ -877,6 +902,7 @@ export function createShell(data: TerminalData): Shell {
       if (cmd === "theme") return [...THEMES.map((t) => t.id as string), "random"].filter((n) => n.startsWith(word));
       if (cmd === "portrait") return [...PORTRAIT_MODES, "list", "next"].filter((n) => n.startsWith(word));
       if (cmd === "fit") return [];
+      if (cmd === "arch") return data.arch.map((d) => d.id).filter((n) => n.startsWith(word.toLowerCase()));
       if (cmd === "hire") return ["--brief"].filter((n) => n.startsWith(word));
       if (cmd === "mail") return ["--fit"].filter((n) => n.startsWith(word));
       if (cmd === "share") return NAMES.filter((n) => n.startsWith(word.toLowerCase()));

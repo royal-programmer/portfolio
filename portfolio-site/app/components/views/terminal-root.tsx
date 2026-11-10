@@ -16,6 +16,8 @@ import { ambient } from "@/lib/site/ambient-sound";
 import { hubHref, personaHref, useOrigin } from "@/lib/site/persona-link";
 import { qrLines, qrModules } from "@/lib/site/qr";
 import { heatGrid, STATS_KEY, STATS_TTL, statsValid, type HeatCell, type HeatMonth, type StatsCache, type StatsData } from "@/lib/site/terminal-stats";
+import { ArchView } from "@/app/components/views/terminal-arch";
+import type { ArchRun } from "@/lib/site/terminal-arch";
 import { Heatmap, LangBar } from "@/app/components/views/terminal-heatmap";
 import { cachedPortrait, generatePortrait, PORTRAIT_COLS, PORTRAIT_MODES, type PortraitArt, type PortraitConfig, type PortraitMode } from "@/lib/site/portrait-gen";
 import type { TerminalData } from "@/lib/site/terminal-data";
@@ -52,6 +54,7 @@ type Entry =
   | { n: number; k: "portrait"; mode: PortraitMode }
   | { n: number; k: "parts"; parts: Array<{ text: string; tone?: Tone; color?: string }> }
   | { n: number; k: "qr"; lines: string[] }
+  | { n: number; k: "arch"; id: string; title: string; lines: ArchRun[][]; edges: Array<[string, string]>; notes: string[] }
   | { n: number; k: "fit"; matched: string[]; adjacent: Array<{ want: string; have: string }>; notYet: string[]; verdict: string; pct: number | null }
   | { n: number; k: "timeline"; wide: boolean; rows: TimelineRow[] }
   | { n: number; k: "art"; text: string }
@@ -444,6 +447,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
         return { n, k: "portrait", mode };
       }
       if (o.kind === "parts") return { n, k: "parts", parts: o.parts };
+      if (o.kind === "arch") return { n, k: "arch", id: o.id, title: o.title, lines: o.lines, edges: o.edges, notes: o.notes };
       if (o.kind === "fit") return { n, k: "fit", matched: o.matched, adjacent: o.adjacent, notYet: o.notYet, verdict: o.verdict, pct: o.pct };
       if (o.kind === "qr") return { n, k: "qr", lines: o.lines };
       if (o.kind === "timeline") return { n, k: "timeline", wide: o.wide, rows: o.rows };
@@ -1729,6 +1733,8 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
           ),
         )}
       </div>
+    ) : e.k === "arch" ? (
+      <ArchView key={e.n} title={e.title} lines={e.lines} edges={e.edges} notes={e.notes} />
     ) : e.k === "fit" ? (
       <div key={e.n} className="terminal-fit-card">
         <div className="terminal-fit-verdict">

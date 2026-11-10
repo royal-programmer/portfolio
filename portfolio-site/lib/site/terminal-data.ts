@@ -4,6 +4,7 @@
  */
 import type { BlogPost, Entry, Persona, PersonaView } from "@/lib/content/types";
 import { HUB_COPY, personaIdentity } from "@/lib/site/brand";
+import type { ArchDiagram } from "@/lib/site/terminal-arch";
 
 export type TermProject = {
   slug: string;
@@ -157,7 +158,117 @@ export const TIMELINE_PERIODS: TermPeriod[] = [
   { id: "work", label: "SLK → Altimetrik", from: "2024-10", to: null },
 ];
 
+/** The systems from the résumé, as `arch` draws them. Labels stay short: they sit on the arrows. */
+export const ARCH: ArchDiagram[] = [
+  {
+    id: "shift-roster",
+    title: "Shift Roster",
+    line: "React/TS UI → .NET APIs → SQL Server, with sync services to HR and transport",
+    nodes: [
+      { id: "ui", label: "React / TS UI", kind: "ui" },
+      { id: "ad", label: "Azure AD", kind: "ext" },
+      { id: "api", label: ".NET APIs", kind: "api" },
+      { id: "db", label: "SQL Server", kind: "db" },
+      { id: "sync", label: "Sync services", kind: "job" },
+      { id: "hr", label: "HR system", kind: "ext" },
+      { id: "tr", label: "Transport", kind: "ext" },
+    ],
+    edges: [
+      ["ui", "api", "REST"],
+      ["ad", "api", "groups"],
+      ["api", "db", "SQL"],
+      ["api", "sync", "queue"],
+      ["sync", "hr", "sync"],
+      ["sync", "tr", "sync"],
+    ],
+    notes: [
+      "Azure AD groups decide what the UI shows and what the API allows.",
+      "The three sync services (HR, transport, scheduled reconciliation) talk both ways: idempotency keys, acknowledgements, retries, alerts, logged reprocessing.",
+      "Publishing is isolated per employee, with version-conflict detection; a failed external sync retries without republishing.",
+    ],
+  },
+  {
+    id: "automations",
+    title: "Python automations",
+    line: "scheduler or API → Python jobs → RabbitMQ → consumers → finance and background verification",
+    nodes: [
+      { id: "sch", label: "Scheduler", kind: "job" },
+      { id: "api", label: "API trigger", kind: "api" },
+      { id: "py", label: "Python jobs", kind: "job" },
+      { id: "mq", label: "RabbitMQ", kind: "queue" },
+      { id: "con", label: "Consumers", kind: "job" },
+      { id: "fin", label: "Finance", kind: "ext" },
+      { id: "bgv", label: "BGV", kind: "ext" },
+    ],
+    edges: [
+      ["sch", "py", "cron"],
+      ["api", "py", "call"],
+      ["py", "mq", "AMQP"],
+      ["mq", "con", "get"],
+      ["con", "fin", "post"],
+      ["con", "bgv", "post"],
+    ],
+    notes: [
+      "Eleven automations across finance, project sync and background verification; some run on a schedule, some are triggered by an API call.",
+      "Producers and consumers are separate processes, so a slow consumer never blocks a job.",
+    ],
+  },
+  {
+    id: "process-apis",
+    title: "Process APIs",
+    line: "FastAPI over Oracle EBS and NetSuite, async and pooled",
+    nodes: [
+      { id: "cl", label: "Client apps", kind: "ui" },
+      { id: "api", label: "FastAPI", kind: "api" },
+      { id: "pool", label: "Conn pool", kind: "job" },
+      { id: "ebs", label: "Oracle EBS", kind: "db" },
+      { id: "ns", label: "NetSuite", kind: "ext" },
+    ],
+    edges: [
+      ["cl", "api", "HTTPS"],
+      ["api", "pool", "async"],
+      ["pool", "ebs", "SQL"],
+      ["pool", "ns", "REST"],
+    ],
+    notes: [
+      "The Project and Attendance Process APIs: async fetching, source-side filtering, pagination.",
+      "Connections are pooled, so a burst of callers does not become a burst of logins on the source systems.",
+    ],
+  },
+  {
+    id: "this-site",
+    title: "This site",
+    line: "Next.js on Vercel, Supabase, the GitHub cache and the preview image route",
+    nodes: [
+      { id: "br", label: "Browser", kind: "ui" },
+      { id: "next", label: "Next.js · Vercel", kind: "api" },
+      { id: "gh", label: "GitHub API", kind: "ext" },
+      { id: "sb", label: "Supabase", kind: "db" },
+      { id: "og", label: "/og image", kind: "job" },
+    ],
+    edges: [
+      ["br", "next", "HTTPS"],
+      ["br", "gh", "cache"],
+      ["next", "sb", "RLS"],
+      ["next", "og", "route"],
+    ],
+    notes: [
+      "The browser asks GitHub directly and keeps the answer on the device for an hour; nothing about you is stored.",
+      "Content comes from Supabase through a typed layer; /og draws the share previews from the terminal's own output.",
+    ],
+  },
+];
+
+/** Which `arch` diagram a project page points at (by project slug). */
+export const PROJECT_ARCH: Record<string, string> = {
+  "portfolio-platform": "this-site",
+  portfolio: "this-site",
+  "shift-roster": "shift-roster",
+};
+
 export type TerminalData = {
+  arch: ArchDiagram[];
+  projectArch: Record<string, string>;
   /** One-line identity and the longer `about` text. */
   who: string;
   about: string;
@@ -218,6 +329,8 @@ export function terminalData(persona: Persona | undefined, entries: Entry[], pos
       .map((p) => ({ slug: p.slug, title: p.title, date: p.publishedAt?.slice(0, 10), excerpt: p.excerpt, body: p.body.slice(0, MAX_BODY) })),
     views,
     resume: RESUME,
+    arch: ARCH,
+    projectArch: PROJECT_ARCH,
     timeline: TIMELINE,
     periods: TIMELINE_PERIODS,
     portrait: { src: "/portrait.jpg", crop: [0.27, 0.12, 0.75, 0.74] },

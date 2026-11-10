@@ -96,6 +96,8 @@ function flatten(o: Out): OgLine[] {
       return o.rows.map((r, i) => line({ t: `${String(i + 1).padStart(2)}) `, tone: "dim" }, { t: fit(r.label, 14).padEnd(14), tone: "accent" }, { t: fit(r.line, OG_COLS - 18), tone: "dim" }));
     case "timeline":
       return o.rows.map((r) => ("head" in r ? plain(r.head, "dim") : timelineLine(r)));
+    case "arch":
+      return [plain(`${o.title} · ${o.edges.length} connections`, "accent"), ...o.notes.slice(0, 2).map((n) => plain(n, "dim"))];
     case "fit":
       return [plain(o.verdict, "accent"), plain(`matched (${o.matched.length}): ${o.matched.join(" · ")}`, "ok"), plain(`not yet (${o.notYet.length}): ${o.notYet.join(" · ")}`, "dim")];
     case "banner":

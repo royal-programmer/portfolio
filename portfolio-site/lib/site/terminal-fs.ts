@@ -58,6 +58,7 @@ export function buildFs(data: TerminalData): Fs {
     if (p.repoUrl) lines.push(`repo ↗ ${p.repoUrl}`);
     if (p.deployedUrl) lines.push(`live ↗ ${p.deployedUrl}`);
     lines.push(`open ${p.slug}  → the project page`);
+    if (data.projectArch[p.slug]) lines.push(`arch ${data.projectArch[p.slug]}  → how it is wired`);
     add(`${HOME}/projects/${p.slug}.md`, { kind: "file", lines });
   }
   add(`${HOME}/projects`, { kind: "dir", children: data.projects.map((p) => `${p.slug}.md`) });
