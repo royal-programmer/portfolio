@@ -22,7 +22,9 @@ import { bandFor } from "@/lib/site/terminal-clock";
 import { CLOCK, terminalData } from "@/lib/site/terminal-data";
 import { paletteFor } from "@/lib/site/terminal-themes";
 import { StageProps } from "./stage/props";
+import { StageConstellation } from "./stage/constellation";
 import { StageShelf } from "./stage/shelf";
+import { buildConstellation } from "@/lib/site/stage-constellation";
 import { createLook, StageLights, type StageLook } from "./stage/stage-look";
 import { createTerminalScreen, type TerminalScreen } from "./stage/terminal-screen";
 import { personaIdentity } from "@/lib/site/brand";
@@ -423,6 +425,26 @@ export default function WorldStage3D({ slug, t, entries, posts, onFirstFrame }: 
     },
     [navigate],
   );
+  // Run a terminal command from a star: the same hand-off as a prop's.
+  const runCommand = useCallback(
+    (cmd: string) => {
+      const el = overlayRef.current;
+      if (reducedMotion() || !el) return navigate(cmd);
+      el.style.background = paletteFor(screenTheme(bandRef.current.theme)).bg;
+      el.style.transition = "opacity 180ms ease-out";
+      el.style.opacity = "1";
+      window.setTimeout(() => navigate(cmd), 190);
+    },
+    [navigate],
+  );
+  // The skill constellation (S5): stack and résumé skills, joined by what shares a diagram or a project.
+  const constellation = useMemo(() => {
+    if (slug !== "engineer") return null;
+    const d = terminalData(undefined, entries ?? [], posts ?? [], getViews("engineer"));
+    const max = window.matchMedia("(max-width: 767px)").matches ? 14 : 28;
+    return buildConstellation({ stack: d.stack, skills: d.resume.skills.flatMap((g) => g.items), arch: d.arch, projects: d.projects }, max);
+  }, [slug, entries, posts]);
+  const starsActive = useRef(true);
   const onTap = useCallback((id: string) => {
     setTapId(id);
     window.clearTimeout(tapTimer.current);
@@ -507,10 +529,11 @@ export default function WorldStage3D({ slug, t, entries, posts, onFirstFrame }: 
         slug === "engineer" ? (
           <>
             <StageProps items={STAGE_PROPS} accent={accent} focusId={focusId} soundOn={soundOn} onRun={runProp} tapId={tapId} onTap={onTap} />
+            {constellation ? <StageConstellation data={constellation} accent={accent} active={starsActive} reduced={reducedMotion()} onRun={runCommand} /> : null}
             <StageShelf items={cases} accent={accent} focusId={caseFocus} openId={openId} onOpen={openCase} onPick={setOpenId} reduced={reducedMotion()} />
           </>
         ) : undefined,
-    }), [liveScreen, envReady, go, look, slug, accent, focusId, soundOn, runProp, tapId, onTap, cases, caseFocus, openId, openCase]);
+    }), [liveScreen, envReady, go, look, slug, accent, focusId, soundOn, runProp, tapId, onTap, cases, caseFocus, openId, openCase, constellation, runCommand]);
 
   return (
     <Canvas
