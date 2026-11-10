@@ -5,8 +5,12 @@ import { useEffect } from "react";
 /** localStorage flag that turns the service worker on in `next dev` (production always has it). */
 export const SW_DEV_FLAG = "xp-sw-dev";
 
+/** Chrome's install prompt, held until the terminal's `install` command asks for it. */
+export type InstallPrompt = { prompt(): Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
+
 declare global {
   interface Window {
+    __xpInstall?: InstallPrompt;
     /** Set once a new worker has taken over a page that already had one; the terminal reads it for "update ready". */
     __xpSwUpdated?: boolean;
   }
@@ -19,6 +23,23 @@ declare global {
  * dispatches `xp-sw-update` on window for the status bar.
  */
 export function ServiceWorker() {
+  // The install prompt is independent of the worker: keep it for `install`.
+  useEffect(() => {
+    const hold = (e: Event) => {
+      e.preventDefault();
+      window.__xpInstall = e as unknown as InstallPrompt;
+    };
+    const done = () => {
+      window.__xpInstall = undefined;
+    };
+    window.addEventListener("beforeinstallprompt", hold);
+    window.addEventListener("appinstalled", done);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", hold);
+      window.removeEventListener("appinstalled", done);
+    };
+  }, []);
+
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     let flag = false;

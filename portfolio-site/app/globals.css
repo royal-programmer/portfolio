@@ -3124,8 +3124,45 @@ em.font-display,
     padding-inline: 8px;
   }
 }
+.terminal-os-status-net {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  font: inherit;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+.terminal-os-status-net.is-off {
+  color: var(--ink-faint);
+  opacity: 0.8;
+}
+.terminal-os-status-net.is-update {
+  color: var(--c, var(--accent));
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .terminal-os-status-net.is-update {
+    animation: terminal-net-pulse 2.4s ease-in-out infinite;
+  }
+}
+@keyframes terminal-net-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+@media (pointer: coarse) {
+  .terminal-os-status-net.is-update {
+    min-height: 44px;
+    padding-inline: 8px;
+  }
+}
 .terminal-os-status-m {
   color: var(--ink-faint);
+}
+.terminal-os-pane-live.is-dim {
+  opacity: 0.6;
 }
 .terminal-os-pane-now {
   color: var(--term-faint, var(--ink-faint));
@@ -3548,5 +3585,7 @@ em.font-display,
     display: none;
   }
 }
+
+
 
 

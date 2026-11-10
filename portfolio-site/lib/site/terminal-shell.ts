@@ -155,6 +155,8 @@ export type Effect =
   | { kind: "crt" }
   | { kind: "qr" }
   | { kind: "curl-github" }
+  /** `install`: the UI owns the browser's install prompt. */
+  | { kind: "install" }
   /** `stats [year|langs]`: the UI fetches the GitHub year and draws it. */
   | { kind: "stats"; mode: "all" | "year" | "langs" }
   | { kind: "sl" }
@@ -197,6 +199,7 @@ const COMMANDS: CommandDoc[] = [
   { name: "stack", group: "read", usage: "stack", desc: "the tools I work in" },
   { name: "uptime", group: "read", usage: "uptime", desc: "time in production" },
   { name: "contact", group: "read", usage: "contact", desc: "mail and github, as links" },
+  { name: "install", group: "read", usage: "install", desc: "add this terminal to your home screen", long: "Works offline once installed: the terminal opens without a connection and says so in the status bar." },
   { name: "curl", group: "read", usage: "curl github", desc: "live: repos, last push, contributions" },
   { name: "qr", group: "open", usage: "qr", desc: "this page as a QR code" },
   { name: "theme", group: "terminal", usage: "theme [name|random]", desc: "pick a colour theme; no name opens the menu" },
@@ -234,7 +237,7 @@ const COMMANDS: CommandDoc[] = [
 ];
 const NAMES = COMMANDS.map((c) => c.name);
 
-/** The tips box, numbered 1-8: typing a number runs that row's command. */
+/** The tips box, numbered 1-9: typing a number runs that row's command. */
 const TIPS = [
   { cmd: "help", desc: "every command" },
   { cmd: "hire", desc: "the short version, for recruiters" },
@@ -244,6 +247,7 @@ const TIPS = [
   { cmd: "resume", desc: "the overview" },
   { cmd: "portfolio", desc: "the whole thing on one screen" },
   { cmd: "share", desc: "send someone a command" },
+  { cmd: "install", desc: "keep the terminal on your phone" },
 ];
 
 const text = (t: string, dim = false): Out => ({ kind: "text", text: t, dim: dim || undefined });
@@ -805,6 +809,8 @@ export function createShell(data: TerminalData): Shell {
         if (!th) return { lines: [text(`theme: unknown theme '${args[0]}' (${THEMES.map((x) => x.id).join(", ")})`)] };
         return { lines: [], effect: { kind: "theme", id: th.id } };
       }
+      case "install":
+        return { lines: [], effect: { kind: "install" } };
       case "crt":
         return { lines: [], effect: { kind: "crt" } };
       case "qr":
@@ -868,8 +874,8 @@ export function createShell(data: TerminalData): Shell {
       return item ? { lines: cat([`~/${st.lastMenu}/${item.slug}.md`], st) } : { lines: [text(`no row ${low}`)] };
     }
 
-    // A bare 1-8 with no menu showing is the tips box's number.
-    if (/^[1-8]$/.test(low) && !args.length) return { lines: [], effect: { kind: "run", cmd: TIPS[Number(low) - 1].cmd } };
+    // A bare 1-9 with no menu showing is the tips box's number.
+    if (/^[1-9]$/.test(low) && !args.length) return { lines: [], effect: { kind: "run", cmd: TIPS[Number(low) - 1].cmd } };
 
     const near = didYouMean(low, [...NAMES, ...viewIds]);
     return {

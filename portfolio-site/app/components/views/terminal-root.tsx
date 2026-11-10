@@ -10,7 +10,7 @@
 import gsap from "gsap";
 import { useRouter } from "next/navigation";
 import { Fragment, memo, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { BOOT_BAR_STEPS, bootBar, terminalScript } from "@/app/components/hub/exit-sequence";
+import { BOOT_BAR_STEPS, bootBar, terminalScript, type Line } from "@/app/components/hub/exit-sequence";
 import type { LaunchedPersona, PersonaView } from "@/lib/content/types";
 import { ambient } from "@/lib/site/ambient-sound";
 import { hubHref, personaHref, useOrigin } from "@/lib/site/persona-link";
@@ -29,6 +29,7 @@ import { usePresence } from "@/lib/site/terminal-presence";
 import { ghostFor } from "@/lib/site/terminal-suggest";
 import { forgetView, readView } from "@/lib/site/view-memory";
 import { themeCss } from "@/lib/site/terminal-themes";
+import type { InstallPrompt } from "@/app/service-worker";
 
 /** The theme colour blocks, generated from the shared palettes (terminal-themes.ts). */
 const THEME_CSS = themeCss();
@@ -99,6 +100,10 @@ const CRT_KEY = "xp-term-crt";
 const SAVER_KEY = "xp-term-saver";
 const GH_USER = "royal-programmer";
 const GH_KEY = "xp-gh-cache";
+/** What the commands that need a connection print when there is none. */
+const OFFLINE_LINE = "offline · this needs a connection";
+/** Running as an installed app (Chrome/Edge display-mode, or iOS standalone). */
+const isStandalone = () => window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
 const GH_TTL = 3_600_000;
 const WEEK = 7 * 86_400_000;
 
@@ -339,6 +344,10 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   const visitors = usePresence(ready && os);
   /** The pane's "live" lines: the GitHub cache (undefined: not looked at yet; null: unavailable, section left out). */
   const [gh, setGh] = useState<GhCache | null | undefined>(undefined);
+  /** No connection: the browser says so, or the last network call failed. Cleared when it comes back or a call succeeds. */
+  const [down, setDown] = useState(false);
+  /** A new service worker took over while this page was open. */
+  const [swUpdate, setSwUpdate] = useState(false);
   /** The `stats` data, read from this device's cache only (never fetched for the pane). */
   const [stats, setStats] = useState<StatsData | null>(null);
   /** Long output waits behind `-- more --`; `rest` is what has not been printed yet. */
@@ -612,7 +621,12 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         tick("mail");
       } else fail(j.error ?? `could not send (${res.status})`);
     } catch {
-      if (!cancelled.current) fail("could not reach the server");
+      if (cancelled.current) return;
+      // Nothing is queued: the text is printed back so it can be copied and sent later.
+      if (!navigator.onLine) {
+        setDown(true);
+        fail(`${OFFLINE_LINE} · nothing is queued, so your message is printed below`);
+      } else fail("could not reach the server");
     } finally {
       sendingRef.current = false;
     }
@@ -676,6 +690,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       window.localStorage.setItem(GH_KEY, JSON.stringify(d));
     } catch {}
     setGh(d);
+    setDown(false);
     return { d, cached: false };
   };
 
@@ -694,7 +709,9 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       append(es);
     } catch (err) {
       if (cancelled.current) return;
-      patchEntry(n, { text: ac.signal.aborted ? "^C" : fail(err instanceof Error && err.message === "rate" ? "rate" : "net"), dim: true });
+      const lost = !navigator.onLine || err instanceof TypeError;
+      if (lost && !ac.signal.aborted) setDown(true);
+      patchEntry(n, { text: ac.signal.aborted ? "^C" : lost ? OFFLINE_LINE : fail(err instanceof Error && err.message === "rate" ? "rate" : "net"), dim: true });
     } finally {
       if (curlAbort.current === ac) curlAbort.current = null;
     }
@@ -719,6 +736,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         const j: unknown = await r.json();
         if (!statsValid(j)) throw new Error("shape");
         d = j;
+        setDown(false);
         try {
           window.localStorage.setItem(STATS_KEY, JSON.stringify({ t: Date.now(), d } satisfies StatsCache));
         } catch {}
@@ -740,12 +758,39 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       }
       setEntries((l) => l.filter((e) => e.n !== n));
       append(out);
-    } catch {
+    } catch (err) {
       if (cancelled.current) return;
-      patchEntry(n, { text: ac.signal.aborted ? "^C" : "stats: github did not answer · try again later", dim: true });
+      const lost = !navigator.onLine || err instanceof TypeError;
+      if (lost && !ac.signal.aborted) setDown(true);
+      patchEntry(n, { text: ac.signal.aborted ? "^C" : lost ? OFFLINE_LINE : "stats: github did not answer · try again later", dim: true });
     } finally {
       if (curlAbort.current === ac) curlAbort.current = null;
     }
+  };
+
+  /** `install`: Chrome/Edge's prompt if the browser offered one, the share-sheet steps on iOS, else an honest no. */
+  const installApp = async () => {
+    if (isStandalone()) return void line("already installed · running as an app", false, true, here());
+    const offer = window.__xpInstall as InstallPrompt | undefined;
+    if (offer) {
+      window.__xpInstall = undefined; // a prompt can be used once
+      try {
+        await offer.prompt();
+        const { outcome } = await offer.userChoice;
+        if (!cancelled.current) line(outcome === "accepted" ? "installed ✓" : "maybe later", false, outcome !== "accepted", here());
+      } catch {
+        if (!cancelled.current) line("maybe later", false, true, here());
+      }
+      return;
+    }
+    const ua = navigator.userAgent;
+    const ios = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (ios) {
+      line("1 · tap the share button in Safari's toolbar", false, false, here());
+      line("2 · choose Add to Home Screen", false, false, here());
+      return;
+    }
+    line("your browser did not offer an install · try Chrome or Edge", false, true, here());
   };
 
   /** `curl github`: user, recent repos and the 12-week strip. */
@@ -1102,7 +1147,8 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         append([{ n: ++seq.current, k: "qr", lines: qrLines(m) }]);
         line(url, false, true, here());
       }
-    } else if (fx.kind === "curl-github") void curlGithub();
+    } else if (fx.kind === "install") void installApp();
+    else if (fx.kind === "curl-github") void curlGithub();
     else if (fx.kind === "git-log") void gitLogLive(fx.oneline, fx.limit);
     else if (fx.kind === "stats") void statsRun(fx.mode);
     else if (fx.kind === "run") {
@@ -1385,7 +1431,10 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       setBooting(false);
       const script = terminalScript({ projects: items.length, posts: data.posts.length, views: views.length }, !firstVisit);
       // Opened from the home screen: one more row, before the progress bar.
-      if (pwa) script.splice(script.length - 1, 0, { text: "installed · running as an app", typed: false, tag: "ok" });
+      const extra: Line[] = [];
+      if (pwa) extra.push({ text: "installed · running as an app", typed: false, tag: "ok" });
+      if (isStandalone()) extra.push({ text: "app mode · works offline", typed: false, tag: "ok" });
+      script.splice(script.length - 1, 0, ...extra);
       for (const l of direct ? [] : script) {
         if (stopped()) return;
         if (l.typed && !instant) await type(l.text, 13, false, false, token);
@@ -1502,6 +1551,23 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       if (c && ghValid(c)) setGh(c);
     } catch {}
   }, [persona]);
+
+  // Connectivity for the status bar and the pane, and the service worker's "update ready".
+  useEffect(() => {
+    setDown(!navigator.onLine);
+    setSwUpdate(!!window.__xpSwUpdated);
+    const off = () => setDown(true);
+    const on = () => setDown(false);
+    const upd = () => setSwUpdate(true);
+    window.addEventListener("offline", off);
+    window.addEventListener("online", on);
+    window.addEventListener("xp-sw-update", upd);
+    return () => {
+      window.removeEventListener("offline", off);
+      window.removeEventListener("online", on);
+      window.removeEventListener("xp-sw-update", upd);
+    };
+  }, []);
 
   // Once the terminal has been ready and idle for 3 s, look GitHub up once for the pane (unless the connection asks for less data).
   useEffect(() => {
@@ -2196,10 +2262,11 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
           <button type="button" tabIndex={-1} className="terminal-os-pane-next" onMouseDown={keepFocus} onClick={() => submit(hintCmd)}>
             {nextTry ? `try: ${hintCmd}` : "all done · try: sudo make me a sandwich"}
           </button>
-          {gh !== null || visitors >= 2 ? (
+          {gh !== null || visitors >= 2 || down ? (
             <>
               <h3>live</h3>
-              {gh !== null ? <p className="terminal-os-pane-live">{gh === undefined ? "github · …" : `github · last push ${gh.repos[0] ? ago(Date.now() - Date.parse(gh.repos[0].pushed_at)) : "unknown"}`}</p> : null}
+              {down ? <p className="terminal-os-pane-live is-dim">offline · showing what you saw last</p> : null}
+              {gh !== null && !(down && gh === undefined) ? <p className="terminal-os-pane-live">{gh === undefined ? "github · …" : `github · last push ${gh.repos[0] ? ago(Date.now() - Date.parse(gh.repos[0].pushed_at)) : "unknown"}`}</p> : null}
               {gh ? <p className="terminal-os-pane-live">{`${Number(gh.user.public_repos) || 0} public repos`}</p> : null}
               {stats ? <p className="terminal-os-pane-live">{`${stats.total} contributions · ${stats.streak.current} d streak`}</p> : null}
               {visitors >= 2 ? <p className="terminal-os-pane-live">{`visitors · ${visitors} here now`}</p> : null}
@@ -2216,6 +2283,15 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
               <i aria-hidden="true" />
               open to work
             </button>
+            {swUpdate ? (
+              <button type="button" tabIndex={-1} className="terminal-os-status-net is-update" onMouseDown={keepFocus} onClick={() => window.location.reload()}>
+                ● update ready
+              </button>
+            ) : down ? (
+              <span className="terminal-os-status-net is-off" role="status">
+                ○ offline
+              </span>
+            ) : null}
           </span>
           <code className="terminal-os-status-m is-counts">
             {[plural(data.projects.length, "project"), plural(data.posts.length, "post"), plural(data.views.length, "view")].filter((t) => !t.startsWith("0 ")).join(" · ")}
