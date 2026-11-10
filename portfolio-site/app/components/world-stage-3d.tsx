@@ -17,11 +17,12 @@ import type { PersonaSlug } from "@/lib/content/types";
 import { getViews } from "@/lib/content/views";
 import { ogLines } from "@/lib/site/og-lines";
 import { personaHref } from "@/lib/site/persona-link";
-import { STAGE_PROPS, type StageProp } from "@/lib/site/stage-data";
+import { shelfFromEntries, STAGE_PROPS, type ShelfCase, type StageProp } from "@/lib/site/stage-data";
 import { bandFor } from "@/lib/site/terminal-clock";
 import { CLOCK, terminalData } from "@/lib/site/terminal-data";
 import { paletteFor } from "@/lib/site/terminal-themes";
 import { StageProps } from "./stage/props";
+import { StageShelf } from "./stage/shelf";
 import { createLook, StageLights, type StageLook } from "./stage/stage-look";
 import { createTerminalScreen, type TerminalScreen } from "./stage/terminal-screen";
 import { personaIdentity } from "@/lib/site/brand";
@@ -449,7 +450,67 @@ export default function WorldStage3D({ slug, t, entries, posts, onFirstFrame }: 
       window.clearTimeout(tapTimer.current);
     };
   }, [runProp]);
-  const stage = useMemo<StageHooks>(() => ({ liveScreen, flat: !envReady, onScreenGo: go, look, extra: slug === "engineer" ? <StageProps items={STAGE_PROPS} accent={accent} focusId={focusId} soundOn={soundOn} onRun={runProp} tapId={tapId} onTap={onTap} /> : undefined }), [liveScreen, envReady, go, look, slug, accent, focusId, soundOn, runProp, tapId, onTap]);
+  // The project shelf (S4): hover / HUD focus pull a case out, a click opens its project.
+  const cases = useMemo(() => shelfFromEntries(entries), [entries]);
+  const [caseFocus, setCaseFocus] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const openCase = useCallback(
+    (item: ShelfCase, rect: { x: number; y: number; w: number; h: number } | null) => {
+      const fade = (go: () => void) => {
+        const el = overlayRef.current;
+        if (reducedMotion() || !el) return go();
+        el.style.background = paletteFor(screenTheme(bandRef.current.theme)).bg;
+        el.style.transition = "opacity 200ms ease-out";
+        el.style.opacity = "1";
+        window.setTimeout(go, 210);
+      };
+      if (item.kind !== "project" || !item.slug) return fade(() => navigate("projects"));
+      const dest = personaHref(window.location.origin, slug, `/${item.slug}`);
+      if (dest.crossOrigin) return fade(() => window.location.assign(dest.href));
+      const start = (document as Document & { startViewTransition?: (cb: () => Promise<void>) => unknown }).startViewTransition?.bind(document);
+      if (!start || !rect || reducedMotion()) return fade(() => router.push(dest.href));
+      // The shared element: a plain box over the case, named like the project page's header; the browser morphs one into the other.
+      const el = document.createElement("div");
+      el.setAttribute("aria-hidden", "true");
+      el.style.cssText = `position:fixed;left:${rect.x}px;top:${rect.y}px;width:${rect.w}px;height:${rect.h}px;border-radius:6px;pointer-events:none;z-index:70;background:#${accent.getHexString()};opacity:.85;view-transition-name:case-${item.slug};`;
+      document.body.appendChild(el);
+      const before = window.location.pathname;
+      const vt = start(async () => {
+        try {
+          router.push(dest.href);
+          const t0 = performance.now();
+          while (window.location.pathname === before && performance.now() - t0 < 1500) await new Promise((r) => setTimeout(r, 30));
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        } finally {
+          el.remove();
+        }
+      }) as { ready?: Promise<unknown>; finished?: Promise<unknown>; updateCallbackDone?: Promise<unknown> } | undefined;
+      // A slow page (first compile, a bad network) only costs the morph, never the navigation.
+      for (const p of [vt?.ready, vt?.finished, vt?.updateCallbackDone]) p?.catch(() => {});
+    },
+    [navigate, router, slug, accent],
+  );
+  useEffect(() => {
+    const onCase = (e: Event) => setOpenId((e as CustomEvent<string>).detail);
+    const onCaseFocus = (e: Event) => setCaseFocus((e as CustomEvent<string | null>).detail ?? null);
+    window.addEventListener("stage:case", onCase);
+    window.addEventListener("stage:casefocus", onCaseFocus);
+    const reset = () => setOpenId(null);
+    window.addEventListener("pageshow", reset);
+    return () => {
+      window.removeEventListener("stage:case", onCase);
+      window.removeEventListener("stage:casefocus", onCaseFocus);
+      window.removeEventListener("pageshow", reset);
+    };
+  }, []);
+  const stage = useMemo<StageHooks>(() => ({ liveScreen, flat: !envReady, onScreenGo: go, look, extra:
+        slug === "engineer" ? (
+          <>
+            <StageProps items={STAGE_PROPS} accent={accent} focusId={focusId} soundOn={soundOn} onRun={runProp} tapId={tapId} onTap={onTap} />
+            <StageShelf items={cases} accent={accent} focusId={caseFocus} openId={openId} onOpen={openCase} onPick={setOpenId} reduced={reducedMotion()} />
+          </>
+        ) : undefined,
+    }), [liveScreen, envReady, go, look, slug, accent, focusId, soundOn, runProp, tapId, onTap, cases, caseFocus, openId, openCase]);
 
   return (
     <Canvas

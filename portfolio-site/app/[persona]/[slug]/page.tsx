@@ -107,7 +107,7 @@ export default async function PersonaEntryPage({ params, searchParams }: Project
         </PersonaLink>
 
         <article className="mt-8 space-y-6">
-          <header className="space-y-3">
+          <header className="space-y-3" style={{ viewTransitionName: `case-${entry.slug}` } as React.CSSProperties}>
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">{entry.type}</p>
             <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">{entry.title}</h1>
             {role ? <p className="text-[var(--muted)]">{role}</p> : null}

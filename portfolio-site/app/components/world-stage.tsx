@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import type { BlogPost, Entry } from "@/lib/content";
 import type { PersonaSlug } from "@/lib/content/types";
 import { StageSilhouette } from "./stage/silhouette";
-import { STAGE_PROPS } from "@/lib/site/stage-data";
+import { shelfFromEntries, STAGE_PROPS } from "@/lib/site/stage-data";
 import { spectrumColor } from "@/lib/site/spectrum";
 import { useExperience } from "../experience-provider";
 import { CONSTELLATIONS, strokeObject, strokesLength } from "./hub/constellations";
@@ -113,6 +113,7 @@ export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: 
   const c = spectrumColor(t, 60);
   const [framed, setFramed] = useState(false);
   const props = ready && experience === "immersive" && slug === "engineer";
+  const cases = shelfFromEntries(entries);
   const send = (name: string, detail: unknown) => window.dispatchEvent(new CustomEvent(name, { detail }));
   return (
     <>
@@ -131,7 +132,7 @@ export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: 
       </div>
       {/* The desk's props as text buttons, so keyboard and screen-reader users reach them; focus lights the prop. */}
       {props ? (
-        <div className="stage-hud" style={{ ["--stage-c" as string]: c }} role="group" aria-label="On the desk: run a command">
+        <div className="stage-hud" style={{ ["--stage-c" as string]: c }} role="group" aria-label="On the desk: run a command; on the shelf: open a project">
           {STAGE_PROPS.map((p, i) => (
             <span key={p.id} className="inline-flex items-center">
               {i ? (
@@ -148,6 +149,29 @@ export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: 
                 onPointerLeave={() => send("stage:focus", null)}
               >
                 {p.label}
+              </button>
+            </span>
+          ))}
+          {/* The project shelf's cases, as buttons: focus pulls the case out, Enter opens the project. */}
+          <span aria-hidden className="mx-2.5">
+            |
+          </span>
+          {cases.map((c, i) => (
+            <span key={c.id} className="inline-flex items-center">
+              {i ? (
+                <span aria-hidden className="mr-2.5">
+                  ·
+                </span>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => send("stage:case", c.id)}
+                onFocus={() => send("stage:casefocus", c.id)}
+                onBlur={() => send("stage:casefocus", null)}
+                onPointerEnter={() => send("stage:casefocus", c.id)}
+                onPointerLeave={() => send("stage:casefocus", null)}
+              >
+                {c.title.toLowerCase()}
               </button>
             </span>
           ))}

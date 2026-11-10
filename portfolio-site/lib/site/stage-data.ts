@@ -3,6 +3,8 @@
  * Plain data, no three.js, so the admin console can edit it later. The bands are round 9's
  * (`CLOCK.bands` in terminal-data.ts); every band id there has a preset here.
  */
+import type { Entry } from "@/lib/content";
+
 export type StageLight = {
   color: string;
   intensity: number;
@@ -83,3 +85,34 @@ export const STAGE_PROPS: StageProp[] = [
   { id: "headphones", label: "sound", cmd: "sound", kind: "headphones" },
   { id: "sticky", label: "hire", cmd: "hire", kind: "sticky" },
 ];
+
+/** A case on the project shelf (S4): a public project, an in-development one, or the "+n more" case. */
+export type ShelfCase = { id: string; title: string; kind: "project" | "dev" | "more"; /** The project's slug (a project case opens `/engineer/<slug>`). */ slug?: string; /** Shown under the title on hover: the status of an in-development one, a count for "more". */ note?: string };
+
+/** Projects in development that have no page of their own yet (a dim case; a click opens `projects` in the terminal). */
+export const STAGE_DEV_PROJECTS: Array<{ id: string; title: string; note: string }> = [{ id: "api-test-center", title: "API Test Center", note: "in development" }];
+
+/** The shelf holds at most this many cases; more projects become a last "+n more" case. */
+export const SHELF_MAX = 8;
+
+/** The cases for a list of public projects (already ordered): projects first, then the dev ones, capped at SHELF_MAX. */
+export function shelfCases(projects: Array<{ slug: string; title: string }>): ShelfCase[] {
+  const all: ShelfCase[] = [
+    ...projects.map((p): ShelfCase => ({ id: `p:${p.slug}`, title: p.title, kind: "project", slug: p.slug })),
+    ...STAGE_DEV_PROJECTS.filter((d) => !projects.some((p) => p.title.toLowerCase() === d.title.toLowerCase())).map((d): ShelfCase => ({ id: `d:${d.id}`, title: d.title, kind: "dev", note: d.note })),
+  ];
+  if (all.length <= SHELF_MAX) return all;
+  const shown = all.slice(0, SHELF_MAX - 1);
+  const rest = all.length - shown.length;
+  return [...shown, { id: "more", title: `+${rest} more`, kind: "more", note: "open projects" }];
+}
+
+/** The shelf's cases from the content layer's entries: public projects in their order. */
+export function shelfFromEntries(entries: Entry[] | undefined): ShelfCase[] {
+  return shelfCases(
+    (entries ?? [])
+      .filter((e) => e.type === "project" && e.visibility === "public")
+      .sort((a, b) => a.order - b.order)
+      .map((e) => ({ slug: e.slug, title: e.title })),
+  );
+}
