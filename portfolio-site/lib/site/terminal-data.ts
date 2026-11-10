@@ -103,7 +103,7 @@ export const RESUME: TermResume = {
   education: [{ degree: "B.Tech, Computer Science and Engineering", school: "ITER, Siksha O Anusandhan University", year: "2024", note: "CGPA 7.75/10" }],
 };
 
-/** `hire --brief`: the forwardable fit sheet. `availability` and `compensation` are deliberate "· ask" placeholders until Ratul fills them in. */
+/** `hire --brief`: the forwardable fit sheet. `availability` says he is employed (Altimetrik); `compensation` is a deliberate "· ask" placeholder until Ratul fills it in. */
 export type TermHiring = {
   roles: string[];
   level: string;
@@ -125,7 +125,7 @@ export const HIRING: TermHiring = {
     plus: ["RabbitMQ", "GitHub Actions", "Azure AD", "Oracle EBS / NetSuite integrations"],
   },
   location: { base: "Bengaluru", modes: ["on-site", "hybrid", "remote"], relocate: true },
-  availability: "notice period · ask",
+  availability: "employed · Altimetrik · notice period applies · ask",
   compensation: "band · ask",
   visa: "Indian citizen · no sponsorship needed in India",
   proof: ["200+ users on the Shift Roster rebuild", "11 Python automations in production", "VMS query 5–10 min → 2–3 min"],

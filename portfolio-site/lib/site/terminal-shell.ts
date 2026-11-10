@@ -583,7 +583,7 @@ export function createShell(data: TerminalData): Shell {
     const github = url("github");
     const email = data.contact.find((c) => c.label === "mail")?.href.replace(/^mailto:/i, "");
     const resumeUrl = `https://${host}${h.links.resume}`;
-    type Row = { t: string; dim?: boolean; label?: string };
+    type Row = { t: string; dim?: boolean; /** Dim only the trailing "ask" word (the rest is a real value). */ askTail?: boolean; label?: string };
     const where = [h.location.base, h.location.modes.join(" / "), ...(h.location.relocate ? [S["hb.reloc"]] : [])].join(" · ");
     const secs: Array<{ label: string; rows: Row[] }> = [
       { label: S["hb.roles"], rows: [...h.roles.map((t) => ({ t })), { t: h.level, dim: true }] },
@@ -592,8 +592,8 @@ export function createShell(data: TerminalData): Shell {
       {
         label: S["hb.when"],
         rows: [
-          { label: S["hb.avail"], t: h.availability, dim: ask(h.availability) },
-          { label: S["hb.comp"], t: h.compensation, dim: ask(h.compensation) },
+          { label: S["hb.avail"], t: h.availability, askTail: ask(h.availability) },
+          { label: S["hb.comp"], t: h.compensation, askTail: ask(h.compensation) },
         ],
       },
       { label: S["hb.proof"], rows: h.proof.map((t) => ({ t })) },
@@ -615,9 +615,13 @@ export function createShell(data: TerminalData): Shell {
       head(sec.label);
       for (const r of sec.rows) {
         const lead = r.label ? `${r.label}  ` : "";
-        wrapText(r.t, w - 2 - lead.length).forEach((l, i) => {
-          if (r.label && i === 0) out.push({ kind: "parts", parts: [{ text: `${bar}${lead}` }, { text: l, tone: r.dim ? "dim" : undefined }] });
-          else out.push(text(`${bar}${" ".repeat(lead.length)}${l}`, r.dim));
+        const lines = wrapText(r.t, w - 2 - lead.length);
+        lines.forEach((l, i) => {
+          const tail = r.askTail && i === lines.length - 1 ? /^(.*?)(ask)$/i.exec(l) : null;
+          const pad = i === 0 ? lead : " ".repeat(lead.length);
+          if (tail) out.push({ kind: "parts", parts: [{ text: `${bar}${pad}${tail[1]}` }, { text: tail[2], tone: "dim" }] });
+          else if (r.label && i === 0) out.push({ kind: "parts", parts: [{ text: `${bar}${lead}` }, { text: l, tone: r.dim ? "dim" : undefined }] });
+          else out.push(text(`${bar}${pad}${l}`, r.dim));
         });
       }
     }
