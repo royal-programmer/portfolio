@@ -27,6 +27,7 @@ import { didYouMean } from "@/lib/site/terminal-suggest";
 import type { TermCommit, TerminalData } from "@/lib/site/terminal-data";
 import { LANG_NAMES, LANGS, STRINGS, type Lang, type StringKey, type TerminalStrings } from "@/lib/site/terminal-strings";
 import { clockCopy, say } from "@/lib/site/terminal-clock";
+import { OTHER_WORLDS, worldName } from "@/lib/site/terminal-worlds";
 
 export type MenuId = "views" | "projects" | "writing" | "themes" | "langs";
 export type MenuRow = { key: string; label: string; line: string };
@@ -150,6 +151,7 @@ export type Effect =
   | { kind: "install" }
   /** `stats [year|langs]`: the UI fetches the GitHub year and draws it. */
   | { kind: "stats"; mode: "all" | "year" | "langs" }
+  | { kind: "worlds" }
   | { kind: "sl" }
   /** `fit` with no text: the UI opens its paste box. */
   | { kind: "fit-box" }
@@ -213,6 +215,7 @@ const COMMANDS: CommandDef[] = [
   { name: "clear", group: "terminal", usage: "clear", long: true },
   { name: "cls", group: "terminal", usage: "cls" },
   { name: "portfolio", group: "read", usage: "portfolio", long: true },
+  { name: "worlds", group: "read", usage: "worlds" },
   { name: "now", group: "read", usage: "now" },
   { name: "hire", group: "read", usage: "hire [--brief]" },
   { name: "timeline", group: "read", usage: "timeline [--all]" },
@@ -257,7 +260,7 @@ const TIPS = [
 /** What `help` shows first: `start here`, then three short groups. `help --all` lists every command under the older four. */
 const HELP_START = ["portfolio", "hire", "help"];
 const HELP_GROUPS: Array<{ key: StringKey; names: string[] }> = [
-  { key: "group.read", names: ["about", "resume", "projects", "writing", "timeline", "now", "contact"] },
+  { key: "group.read", names: ["about", "resume", "projects", "writing", "timeline", "now", "worlds", "contact"] },
   { key: "group.live", names: ["stats", "git", "curl", "fit"] },
   { key: "group.terminal", names: ["theme", "lang", "pane", "clear", "exit"] },
 ];
@@ -683,6 +686,9 @@ export function createShell(data: TerminalData): Shell {
       for (const v of data.views) row(clip(`${v.id} — ${v.line}`));
       go(...data.views.map((v) => `view ${v.id}`));
     }
+    head(S["pf.worlds"]);
+    row(clip(OTHER_WORLDS.map(worldName).join(" · ")));
+    go("worlds");
     head(S["pf.contact"]);
     row(clip([...data.contact.filter((c) => !c.group).map((c) => c.label), "resume --pdf"].join(" · ")));
     go("contact", "mail", "share");
@@ -882,6 +888,8 @@ export function createShell(data: TerminalData): Shell {
         return { lines: cat(["~/contact"], st) };
       case "git":
         return git(args);
+      case "worlds":
+        return { lines: [], effect: { kind: "worlds" } };
       case "portfolio":
         return { lines: portfolio(env?.cols ?? 100) };
       case "hire":

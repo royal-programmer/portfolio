@@ -3186,6 +3186,31 @@ em.font-display,
 .terminal-os-rowgo .rg-r {
   white-space: nowrap;
 }
+/* `worlds`: a row per persona; the pulse line wraps under the name on a phone. */
+.terminal-root-body .terminal-os-world {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 1.5ch;
+}
+.terminal-os-world b {
+  min-width: 14ch;
+}
+.terminal-os-world i {
+  font-style: normal;
+}
+.terminal-os-world > span {
+  display: inline;
+}
+.terminal-os-world .terminal-root-link {
+  margin-left: auto;
+}
+.terminal-os-pane-world {
+  color: inherit;
+  text-decoration: none;
+}
+.terminal-os-pane-world:hover {
+  text-decoration: underline;
+}
 .terminal-os-status-r {
   display: flex;
   gap: 4px;
@@ -3589,7 +3614,4 @@ em.font-display,
     display: none;
   }
 }
-
-
-
 

@@ -28,6 +28,10 @@ import { isPrerendering, whenActive } from "@/lib/site/prerender";
 import { bandFor, clockCopy, hmIn, say, THEME_AUTO_KEY } from "@/lib/site/terminal-clock";
 import { isLang, LANG_HINTS, STRINGS, type Lang, type TerminalStrings } from "@/lib/site/terminal-strings";
 import { usePresence } from "@/lib/site/terminal-presence";
+import { OTHER_WORLDS, otherPulses, pulsesValid, pulseText, worldColor, worldName, WORLDS_KEY, WORLDS_TTL, type WorldsCache } from "@/lib/site/terminal-worlds";
+import { DISPLAY_ROOT, personaIdentity } from "@/lib/site/brand";
+import type { PersonaSlug } from "@/lib/content/types";
+import type { WorldPulse } from "@/lib/worlds/pulse";
 import { ghostFor } from "@/lib/site/terminal-suggest";
 import { forgetView, readView } from "@/lib/site/view-memory";
 import { themeCss } from "@/lib/site/terminal-themes";
@@ -69,6 +73,7 @@ type Entry =
   | { n: number; k: "files"; inline: boolean; items: FileItem[] }
   | { n: number; k: "cal"; title: string; weeks: Array<Array<number | null>>; today: number }
   | { n: number; k: "more" }
+  | { n: number; k: "world"; persona: PersonaSlug; tag: string; line: string; href: string }
   | { n: number; k: "heatmap"; weeks: HeatCell[][]; months: HeatMonth[]; narrow: boolean }
   | { n: number; k: "langbar"; langs: StatsData["languages"]; width: number }
   | { n: number; k: "neofetch"; rows: string[] }
@@ -362,6 +367,10 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   const [down, setDown] = useState(false);
   /** A new service worker took over while this page was open. */
   const [swUpdate, setSwUpdate] = useState(false);
+  /** What the other worlds are up to (pane Live lines; undefined: not looked at yet; null: unavailable, lines left out). */
+  const [worlds, setWorlds] = useState<WorldPulse[] | null | undefined>(undefined);
+  /** Which pulse the first of the pane's two world lines shows; it moves every 20 s. */
+  const [worldRot, setWorldRot] = useState(0);
   /** The `stats` data, read from this device's cache only (never fetched for the pane). */
   const [stats, setStats] = useState<StatsData | null>(null);
   /** Long output waits behind `-- more --`; `rest` is what has not been printed yet. */
@@ -716,6 +725,53 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     setGh(d);
     setDown(false);
     return { d, cached: false };
+  };
+
+  /** The other worlds' pulses: this device's copy for 30 min, else the route (cached for 30 min there too). */
+  const loadWorlds = async (ac: AbortController): Promise<WorldPulse[]> => {
+    try {
+      const c = JSON.parse(window.localStorage.getItem(WORLDS_KEY) ?? "null") as WorldsCache | null;
+      if (c && typeof c.t === "number" && pulsesValid(c.pulses) && Date.now() - c.t < WORLDS_TTL) return otherPulses(c.pulses);
+    } catch {}
+    const r = await fetch("/api/worlds/pulse", { signal: ac.signal });
+    if (!r.ok) throw new Error(`http ${r.status}`);
+    const j = (await r.json()) as { pulses?: unknown };
+    if (!pulsesValid(j.pulses)) throw new Error("shape");
+    try {
+      window.localStorage.setItem(WORLDS_KEY, JSON.stringify({ t: Date.now(), pulses: j.pulses } satisfies WorldsCache));
+    } catch {}
+    setDown(false);
+    return otherPulses(j.pulses);
+  };
+
+  /** `worlds`: one row per other persona. Without a connection the rows still show; only the pulse line is left out. */
+  const worldsRun = async () => {
+    if (curlAbort.current) return void line(T()["gh.already"]("worlds"), false, true, here());
+    const n = ++seq.current;
+    append([{ n, k: "out", text: T()["worlds.wait"], dim: true }]);
+    const ac = new AbortController();
+    curlAbort.current = ac;
+    let pulses: WorldPulse[] = [];
+    try {
+      pulses = await loadWorlds(ac);
+      setWorlds(pulses);
+    } catch {
+      if (ac.signal.aborted) {
+        if (!cancelled.current) patchEntry(n, { text: "^C", dim: true });
+        if (curlAbort.current === ac) curlAbort.current = null;
+        return;
+      }
+    }
+    if (curlAbort.current === ac) curlAbort.current = null;
+    if (cancelled.current) return;
+    const S = T();
+    const rows: Entry[] = OTHER_WORLDS.map((persona) => {
+      const id = personaIdentity(persona);
+      const p = pulses.find((x) => x.persona === persona);
+      return { n: ++seq.current, k: "world", persona, tag: id.handle ?? id.phrase, line: p ? pulseText(S, p, (ms) => ago(S, ms)) : "", href: personaHref(origin, persona).href };
+    });
+    setEntries((l) => l.filter((e) => e.n !== n));
+    append([...rows, { n: ++seq.current, k: "links", dim: true, prefix: S["worlds.foot"], items: [{ label: DISPLAY_ROOT, href: hubHref(origin).href }] }]);
   };
 
   /** One run of a GitHub command: a `fetching …` line that the result or the error replaces. */
@@ -1185,6 +1241,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     else if (fx.kind === "curl-github") void curlGithub();
     else if (fx.kind === "git-log") void gitLogLive(fx.oneline, fx.limit);
     else if (fx.kind === "stats") void statsRun(fx.mode);
+    else if (fx.kind === "worlds") void worldsRun();
     else if (fx.kind === "run") {
       // A tip's number: the real command runs next (`/` opens the palette).
       if (fx.cmd === "/") {
@@ -1652,6 +1709,31 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     };
   }, [ready, gh, cmd, entries.length]);
 
+  // Likewise for the other worlds' lines: once, 3 s after ready, unless the connection asks for less data or is down.
+  useEffect(() => {
+    if (!ready || worlds !== undefined || down) return;
+    const nav = navigator as Navigator & { connection?: { saveData?: boolean } };
+    if (nav.connection?.saveData) return void setWorlds(null);
+    const ac = new AbortController();
+    const id = window.setTimeout(() => {
+      loadWorlds(ac).then(
+        (p) => !ac.signal.aborted && setWorlds(p.length ? p : null),
+        () => !ac.signal.aborted && setWorlds(null),
+      );
+    }, 3000);
+    return () => {
+      window.clearTimeout(id);
+      ac.abort();
+    };
+  }, [ready, worlds, down, cmd, entries.length]);
+
+  // The two world lines swap for the next pair every 20 s (hard swap; reduced motion keeps the first two).
+  useEffect(() => {
+    if (!worlds || worlds.length <= 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const id = window.setInterval(() => setWorldRot((i) => (i + 2) % worlds.length), 20_000);
+    return () => window.clearInterval(id);
+  }, [worlds]);
+
   useEffect(() => {
     if (via || pwa) {
       try {
@@ -2044,6 +2126,15 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       <Heatmap key={e.n} weeks={e.weeks} months={e.months} narrow={e.narrow} />
     ) : e.k === "langbar" ? (
       <LangBar key={e.n} langs={e.langs} width={e.width} />
+    ) : e.k === "world" ? (
+      <span key={e.n} className="is-out terminal-os-world">
+        <b style={{ color: worldColor(e.persona) }}>{"● "}{worldName(e.persona)}</b>
+        <i className="is-dim">{e.tag}</i>
+        {e.line ? <span className="is-dim">{e.line}</span> : null}
+        <a className="terminal-root-link" href={e.href}>
+          {S["worlds.open"]}
+        </a>
+      </span>
     ) : e.k === "more" ? (
       <button key={e.n} type="button" className="terminal-root-more" onMouseDown={keepFocus} onClick={nextPage}>
         {S.more}
@@ -2331,7 +2422,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
           <button type="button" tabIndex={-1} className="terminal-os-pane-next" onMouseDown={keepFocus} onClick={() => submit(hintCmd)}>
             {nextTry ? S["pane.try"](hintCmd) : S["pane.alldone"]}
           </button>
-          {gh !== null || visitors >= 2 || down ? (
+          {gh !== null || visitors >= 2 || down || (!!worlds?.length && !down) ? (
             <>
               <h3>{S["pane.live"]}</h3>
               {down ? <p className="terminal-os-pane-live is-dim">{S["pane.offline"]}</p> : null}
@@ -2339,6 +2430,15 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
               {gh ? <p className="terminal-os-pane-live">{S["pane.repos"](Number(gh.user.public_repos) || 0)}</p> : null}
               {stats ? <p className="terminal-os-pane-live">{S["pane.contrib"](stats.total, stats.streak.current)}</p> : null}
               {visitors >= 2 ? <p className="terminal-os-pane-live">{S["pane.visitors"](visitors)}</p> : null}
+              {worlds?.length && !down
+                ? worlds.slice(0, 2).map((_, i) => worlds[(worldRot + i) % worlds.length]).map((p) => (
+                    <p key={p.persona} className="terminal-os-pane-live">
+                      <a className="terminal-os-pane-world" href={personaHref(origin, p.persona).href}>
+                        <b style={{ color: worldColor(p.persona) }}>{worldName(p.persona)}</b> · {pulseText(S, p, (ms) => ago(S, ms))}
+                      </a>
+                    </p>
+                  ))
+                : null}
             </>
           ) : null}
           <h3>{S["pane.keys"]}</h3>
