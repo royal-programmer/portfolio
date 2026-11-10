@@ -5,6 +5,11 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-10 — Round 6: the terminal as an installable, offline-capable PWA
+
+- Manifest per host, generated icons, `?via=pwa` arrival; hand-written `public/sw.js` with a build-time precache list; status-bar connectivity item, offline command lines, `install` command, tips row 9. Details: `17-persona-views.md` §11.
+- Verified in Chrome (isolated context) in dev with `xp-sw-dev=1`: controller set, precache filled, offline status bar and offline lines at 1280 and 393, update-ready item. **Not verified**: a cold offline reload hydrating the terminal under `next dev` (the cached HTML shell and every chunk load, but React did not hydrate; probably Turbopack dev needing its HMR socket), and the production precache list (`sw-manifest.mjs` was only run against a fixture, no `next build` was run). Check both on the next preview deploy. Lighthouse in the MCP no longer has a PWA category, so no installability score.
+
 ## 2026-11-10 — Round 11: the Series view becomes Netflix (branch `claude/netflix`)
 
 - **Rename.** View id `netflix` (name "Netflix"), route `/engineer/netflix`; `/engineer/series` redirects; a remembered
