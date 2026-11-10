@@ -2570,9 +2570,6 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
           <h3>{S["pane.where"]}</h3>
           <p className="terminal-os-pane-where">{shortPath(cwd)}</p>
           <h3>{S["pane.who"]}</h3>
-          <p className="terminal-os-pane-clock" suppressHydrationWarning>
-            {clockNow ? S["clock.pane"](say(S, lang, clockNow.getHours(), clockNow.getMinutes()), say(S, lang, hmIn(clockNow, data.clock.myTz).h, hmIn(clockNow, data.clock.myTz).m)) : " "}
-          </p>
           <p className="terminal-os-pane-name">{data.resume.name.toLowerCase()}</p>
           <p>{S["pane.role"](data.i18n?.[lang as "bn" | "hi"]?.role ?? (data.resume.title.split(" · ")[0] ?? "").toLowerCase(), data.i18n?.[lang as "bn" | "hi"]?.city ?? data.resume.location.split(",")[0].toLowerCase())}</p>
           <p className="terminal-os-pane-status">
@@ -2580,6 +2577,9 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
             {data.i18n?.[lang as "bn" | "hi"]?.status ?? data.status}
           </p>
           {data.now?.lines[0] ? <p className="terminal-os-pane-now">{S["pane.now"](data.i18n?.[lang as "bn" | "hi"]?.now[0] ?? data.now.lines[0])}</p> : null}
+          <p className="terminal-os-pane-clock" suppressHydrationWarning>
+            {clockNow ? S["clock.pane"](say(S, lang, clockNow.getHours(), clockNow.getMinutes()), say(S, lang, hmIn(clockNow, data.clock.myTz).h, hmIn(clockNow, data.clock.myTz).m)) : " "}
+          </p>
           <div className="terminal-os-pane-actions">
             {["hire", "resume --pdf", "mail"].map((c) => (
               <button key={c} type="button" tabIndex={-1} title={c === "hire" ? S["hb.tip"] : c === "resume --pdf" ? S["pane.resume.tip"] : undefined} onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit(c)}>
