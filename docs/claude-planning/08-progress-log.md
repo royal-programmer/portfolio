@@ -5,6 +5,12 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-10 — Round 5: `share` deep links and generated previews
+
+- `/og?cmd=<command>&theme=<id>` draws the real terminal output as a 1200x630 PNG; metadata on the Engineer page (`?run=`), views and hub points at it; `share [cmd]` prints the link, image URL, copy and share tokens. Details: 17-persona-views.md section 10.
+- Theme palettes moved to `lib/site/terminal-themes.ts` (CSS generated from it).
+- Open: sharp version clash (two copies in one process break `next/og`); pin app sharp to next's 0.34.5. The dev server had both loaded during testing, so `/og` was verified in a clean Node harness, not over HTTP.
+
 ## 2026-11-10 — Round 4: `stats`, the GitHub year as a heatmap
 
 - `/api/github/contributions` (GraphQL with `GITHUB_TOKEN`, else the public contributions HTML) and the `stats [year|langs]` command: heatmap, streaks, language bar; cached on-device 6 h; pane Live line. Design and caveats in `17-persona-views.md` §9.

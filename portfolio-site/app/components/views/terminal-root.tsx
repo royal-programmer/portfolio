@@ -1768,7 +1768,7 @@ export function TerminalRoot({ persona, color, via, items, views, data }: Termin
             <Fragment key={l.label}>
               {i ? " · " : ""}
               {l.act ? (
-                <span aria-live="polite">
+                <span aria-live="polite" style={{ display: "inline" }}>
                   <button type="button" className="terminal-root-link" onMouseDown={keepFocus} onClick={() => shareAct(e.n, l)}>
                     {l.act === "copy" && copied === e.n ? "copied ✓" : l.label}
                   </button>
