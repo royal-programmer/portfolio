@@ -24,6 +24,11 @@ async function hubMedia(): Promise<Partial<Record<string, string[]>>> {
   }
 }
 import { loadHomeContent } from "../load-home-content";
+import { loadEngineerTerminalData } from "../load-terminal-data";
+import { ogDescription } from "@/lib/site/og-lines";
+import { runParam, shareMetadata, siteOrigin } from "@/lib/site/share-meta";
+import { SUBDOMAIN_BY_PERSONA } from "@/lib/site/hosts";
+import { createShell } from "@/lib/site/terminal-shell";
 
 type PersonaPageProps = {
   params: Promise<{ persona: string }>;
@@ -34,8 +39,8 @@ export function generateStaticParams() {
   return LAUNCHED_PERSONAS.map((persona) => ({ persona }));
 }
 
-export async function generateMetadata({ params }: PersonaPageProps): Promise<Metadata> {
-  const { persona } = await params;
+export async function generateMetadata({ params, searchParams }: PersonaPageProps): Promise<Metadata> {
+  const [{ persona }, { run }] = await Promise.all([params, searchParams]);
   if (!isLaunchedPersona(persona)) {
     return {
       title: "Persona not found | Ratul Roy",
@@ -52,10 +57,22 @@ export async function generateMetadata({ params }: PersonaPageProps): Promise<Me
     };
   }
 
-  return {
-    title: `${record.label} | Ratul Roy`,
-    description: record.body,
-  };
+  const title = `${record.label} | Ratul Roy`;
+  if (persona !== "engineer") return { title, description: record.body };
+
+  // The Engineer's page is a terminal: a link with ?run=<command> previews that command's output (/og).
+  const origin = siteOrigin(SUBDOMAIN_BY_PERSONA[persona]);
+  const cmd = runParam(run);
+  if (cmd) {
+    try {
+      const data = await loadEngineerTerminalData();
+      const known = createShell(data).commands.some((c) => c.name === cmd.split(/\s+/)[0].toLowerCase());
+      if (known) return shareMetadata({ title: `$ ${cmd} · Ratul Roy`, description: ogDescription(data, cmd), cmd, origin, url: `${origin}/?run=${encodeURIComponent(cmd)}` });
+    } catch {
+      // The plain page metadata below still stands.
+    }
+  }
+  return shareMetadata({ title, description: record.body, cmd: "portfolio", origin });
 }
 
 export default async function PersonaPage({ params, searchParams }: PersonaPageProps) {

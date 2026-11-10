@@ -17,6 +17,8 @@ import { SERIES_PROFILES, buildSeries, type Series, type SeriesProfileId } from 
 import { terminalData } from "@/lib/site/terminal-data";
 import { SeriesView } from "../../components/views/series/series-view";
 import { loadHomeContent } from "../../load-home-content";
+import { shareMetadata, siteOrigin } from "@/lib/site/share-meta";
+import { SUBDOMAIN_BY_PERSONA } from "@/lib/site/hosts";
 
 type ProjectDetailProps = {
   params: Promise<{ persona: string; slug: string }>;
@@ -52,7 +54,8 @@ export async function generateMetadata({ params }: ProjectDetailProps): Promise<
   const view = getView(persona, slug);
   if (view) {
     const record = await getPersona(persona);
-    return { title: `${view.name} · ${record?.label ?? persona} | Ratul Roy`, description: view.line };
+    const origin = siteOrigin(SUBDOMAIN_BY_PERSONA[persona]);
+    return shareMetadata({ title: `${view.name} · ${record?.label ?? persona} | Ratul Roy`, description: view.line, cmd: `view ${view.id}`, origin, url: `${origin}/${view.id}` });
   }
   const entry = await getEntryBySlug(persona, slug);
   if (!entry) {
