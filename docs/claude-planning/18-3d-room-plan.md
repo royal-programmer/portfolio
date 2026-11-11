@@ -126,3 +126,13 @@ About 3 to 5 builder rounds for P0 to P5. The full plan with gizmo, uploads and 
 - Art quality, not code, sets the ceiling; some signature pieces may need a better asset.
 - The two reference sites were not inspected; confirm how they are built with devtools.
 - Supabase Storage free limits not checked; not needed while models ship from `public/`.
+
+## 9. Owner decisions, 2026-11-11 (after the critic)
+
+- **Best experience wins.** Where the plan says "clean stylised room first", Ratul chose the best
+  experience: P0 look-dev tests both the real-time route and cloud baking, and the better look
+  ships. Cloud baking (GitHub Actions, headless Blender) moves from "later" to "decide after P0".
+- **Drag handles are in.** The form editor (P2) is followed by the gizmo editor (drei
+  `TransformControls`, snap to grid and walls, undo) as P2b. Touch editing stays desktop-first.
+- **Swarm is a third view mode**, alongside **3D** and **Netflix**. It is its own view, not a
+  replacement for the Stage; the Engineer view picker lists Terminal, 3D, Netflix and Swarm.
