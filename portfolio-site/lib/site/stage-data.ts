@@ -150,3 +150,6 @@ export const STAGE_STORY_COPY = {
     ],
   },
 } as const;
+
+/** Photo mode (S6): the capture size, the orbit limits (degrees), the name strip and the file name. */
+export const STAGE_PHOTO = { w: 1200, h: 630, yaw: 25, pitch: 12, file: "ratulroy-stage.png", caption: { name: "Ratul Roy", role: "software engineer", url: "code.ratulroy.me" } } as const;

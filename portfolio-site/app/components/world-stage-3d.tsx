@@ -22,6 +22,7 @@ import { bandFor } from "@/lib/site/terminal-clock";
 import { CLOCK, terminalData } from "@/lib/site/terminal-data";
 import { paletteFor } from "@/lib/site/terminal-themes";
 import { StageProps } from "./stage/props";
+import { PhotoCapture, type CaptureFn, type PhotoState } from "./stage/photo";
 import { StageConstellation } from "./stage/constellation";
 import { StageShelf } from "./stage/shelf";
 import { buildConstellation } from "@/lib/site/stage-constellation";
@@ -104,6 +105,8 @@ type Scratch = {
   b: THREE.Vector3;
   la: THREE.Vector3;
   lb: THREE.Vector3;
+  /** Photo mode's orbit (S6), written by the overlay. */
+  photo: MutableRefObject<PhotoState> | null;
 };
 
 const smooth = (x: number) => x * x * (3 - 2 * x);
@@ -222,6 +225,20 @@ function driveStage(k: VrClock, s: VrState, tmp: Scratch, pose: Pose, place: { f
       camera.lookAt(tmp.look);
     }
   }
+  // Photo mode: the visitor's orbit (limited by the overlay), eased, about the point the camera is looking at.
+  const ph = tmp.photo?.current;
+  if (ph) {
+    const k = Math.min(1, dt * 6);
+    ph.y += (ph.ty - ph.y) * k;
+    ph.p += (ph.tp - ph.p) * k;
+    if (Math.abs(ph.y) > 1e-4 || Math.abs(ph.p) > 1e-4) {
+      tmp.a.copy(camera.position).sub(tmp.look);
+      tmp.b.set(1, 0, 0).applyQuaternion(camera.quaternion);
+      tmp.a.applyAxisAngle(tmp.b, ph.p).applyAxisAngle(tmp.la.set(0, 1, 0), ph.y);
+      camera.position.copy(tmp.look).add(tmp.a);
+      camera.lookAt(tmp.look);
+    }
+  }
   // Zoom into the screen: the camera glides from where the stage put it to an eye point in front of
   // the screen that makes the screen cover the frame; the page's overlay takes over for the last stretch.
   const z = tmp.zoom;
@@ -250,11 +267,11 @@ function driveStage(k: VrClock, s: VrState, tmp: Scratch, pose: Pose, place: { f
 }
 
 /** Drives the clock and stands the camera in front of the setup; the pointer turns it a little. */
-function Rig({ slug, zoomRef, story, onFrame, onZoomDone, onFirstFrame }: { slug: PersonaSlug; zoomRef: MutableRefObject<Scratch["zoom"] | null>; story?: MutableRefObject<StoryState>; onFrame?: (t: number) => void; onZoomDone?: () => void; onFirstFrame?: () => void }) {
+function Rig({ slug, zoomRef, story, photo, onFrame, onZoomDone, onFirstFrame }: { slug: PersonaSlug; zoomRef: MutableRefObject<Scratch["zoom"] | null>; story?: MutableRefObject<StoryState>; photo?: MutableRefObject<PhotoState>; onFrame?: (t: number) => void; onZoomDone?: () => void; onFirstFrame?: () => void }) {
   const { clock, state } = useVr();
   const size = useThree((s) => s.size);
   // Per-frame scratch (a ref: it is written every frame).
-  const scratch = useRef<Scratch>({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0, handle: false, box: new THREE.Box3(), boxAt: -1, corner: new THREE.Vector3(), fit: 1, zoom: { on: false, t0: 0, dur: 0.7, e: 0, fired: false }, screen: null, sp: new THREE.Vector3(), sn: new THREE.Vector3(), sq: new THREE.Quaternion(), ss: new THREE.Vector3(), eye: new THREE.Vector3(), pitch0: slug === "engineer" ? 0.4 : 0.1, story: null, ps: 0, extras: null, a: new THREE.Vector3(), b: new THREE.Vector3(), la: new THREE.Vector3(), lb: new THREE.Vector3() });
+  const scratch = useRef<Scratch>({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0, handle: false, box: new THREE.Box3(), boxAt: -1, corner: new THREE.Vector3(), fit: 1, zoom: { on: false, t0: 0, dur: 0.7, e: 0, fired: false }, screen: null, sp: new THREE.Vector3(), sn: new THREE.Vector3(), sq: new THREE.Quaternion(), ss: new THREE.Vector3(), eye: new THREE.Vector3(), pitch0: slug === "engineer" ? 0.4 : 0.1, story: null, ps: 0, extras: null, a: new THREE.Vector3(), b: new THREE.Vector3(), la: new THREE.Vector3(), lb: new THREE.Vector3(), photo: null });
   const pose = useMemo(() => climbPose(C), []);
   const framed = useRef(false);
   // Render on demand: nothing is drawn while the stage is off screen (the rest of the page is long).
@@ -278,6 +295,7 @@ function Rig({ slug, zoomRef, story, onFrame, onZoomDone, onFirstFrame }: { slug
     }
     zoomRef.current = tmp.zoom;
     tmp.story = story ?? null;
+    tmp.photo = photo ?? null;
     if (!tmp.handle) {
       tmp.handle = true;
       // Dev-only handle for tests.
@@ -327,7 +345,7 @@ function screenTheme(bandTheme: string): string {
   }
 }
 
-export default function WorldStage3D({ slug, t, entries, posts, story, onFirstFrame }: { slug: PersonaSlug; t: number; entries?: Entry[]; posts?: BlogPost[]; story?: MutableRefObject<StoryState>; onFirstFrame?: () => void }) {
+export default function WorldStage3D({ slug, t, entries, posts, story, photo, capture, onFirstFrame }: { slug: PersonaSlug; t: number; entries?: Entry[]; posts?: BlogPost[]; story?: MutableRefObject<StoryState>; photo?: MutableRefObject<PhotoState>; capture?: MutableRefObject<CaptureFn | null>; onFirstFrame?: () => void }) {
   const router = useRouter();
   const clock = useRef<VrClock>(createClock());
   const state = useRef<VrState>(createVrState());
@@ -613,6 +631,7 @@ export default function WorldStage3D({ slug, t, entries, posts, story, onFirstFr
           slug={slug}
           zoomRef={zoomRef}
           story={story}
+          photo={photo}
           onFrame={() => {
             // Stars answer the pointer only while the camera is looking at them.
             starsActive.current = Boolean(story?.current.on) && Math.abs((story?.current.p ?? 0) - 2) < 0.7;
@@ -629,6 +648,7 @@ export default function WorldStage3D({ slug, t, entries, posts, story, onFirstFr
           onZoomDone={navigate}
           onFirstFrame={onFirstFrame}
         />
+        {capture ? <PhotoCapture capture={capture} /> : null}
         <Setup slug={slug} world={world} media={media} stage={stage} />
       </VrContext.Provider>
     </Canvas>

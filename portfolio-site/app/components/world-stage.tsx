@@ -11,6 +11,8 @@ import type { BlogPost, Entry } from "@/lib/content";
 import type { PersonaSlug } from "@/lib/content/types";
 import { StageSilhouette } from "./stage/silhouette";
 import { StoryPanel, StoryRail } from "./stage/story";
+import { createPhoto, PhotoOverlay, type CaptureFn, type PhotoState } from "./stage/photo";
+import { personaHref } from "@/lib/site/persona-link";
 import type { StoryState } from "./world-stage-3d";
 import { shelfFromEntries, STAGE_PROPS, STAGE_STOPS, STAGE_TRAVEL } from "@/lib/site/stage-data";
 import { spectrumColor } from "@/lib/site/spectrum";
@@ -136,6 +138,12 @@ export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: 
     return () => mqs.forEach((m) => m.removeEventListener("change", ok));
   }, [props]);
   const state = useRef<StoryState>({ p: 0, on: false });
+  // Photo mode (S6): the orbit the overlay asks for, the capture function the canvas registers, the box the guide sits on.
+  const [photoOn, setPhotoOn] = useState(false);
+  const photo = useRef<PhotoState>(createPhoto());
+  const capture = useRef<CaptureFn | null>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const closePhoto = useCallback(() => setPhotoOn(false), []);
   const wrap = useRef<HTMLDivElement>(null);
   const stick = useRef<HTMLDivElement>(null);
   const rail = useRef<HTMLElement>(null);
@@ -205,6 +213,7 @@ export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: 
 
   const box = (
     <div
+      ref={boxRef}
       className={`world-stage relative w-full overflow-hidden rounded-3xl border ${live ? "stage-story-box" : "h-[46svh] min-h-[260px]"}`}
       style={{
         borderColor: "var(--surface-border)",
@@ -215,7 +224,7 @@ export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: 
     >
       {/* Server-rendered first paint: the desk's outline, until the first WebGL frame (or the line drawing) takes over. */}
       {slug === "engineer" ? <StageSilhouette color={c} gone={framed || (ready && experience !== "immersive")} /> : null}
-      {!ready ? null : experience === "immersive" ? <WorldStage3D slug={slug} t={t} entries={entries} posts={posts} story={state} onFirstFrame={() => setFramed(true)} /> : <StageLines slug={slug} t={t} />}
+      {!ready ? null : experience === "immersive" ? <WorldStage3D slug={slug} t={t} entries={entries} posts={posts} story={state} photo={photo} capture={capture} onFirstFrame={() => setFramed(true)} /> : <StageLines slug={slug} t={t} />}
     </div>
   );
   // The desk's props as text buttons, so keyboard and screen-reader users reach them; focus lights the prop.
@@ -233,6 +242,12 @@ export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: 
           </button>
         </span>
       ))}
+      <span aria-hidden className="mx-2.5">
+        |
+      </span>
+      <button type="button" onClick={() => setPhotoOn(true)} aria-haspopup="dialog">
+        photo
+      </button>
       {/* The project shelf's cases, as buttons: focus pulls the case out, Enter opens the project. */}
       <span aria-hidden className="mx-2.5">
         |
@@ -252,6 +267,7 @@ export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: 
     </div>
   ) : null;
 
+  const overlay = photoOn && props ? <PhotoOverlay boxRef={boxRef} photo={photo} capture={capture} accent={c} shareUrl={new URL(personaHref(window.location.origin, "engineer", "/?run=view%20stage").href, window.location.origin).href} onClose={closePhoto} /> : null;
   if (live) {
     return (
       <>
@@ -270,6 +286,7 @@ export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: 
           </div>
         </div>
         <StoryRail ref={rail} active={active} color={c} onGo={goStop} />
+        {overlay}
       </>
     );
   }
@@ -277,6 +294,7 @@ export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: 
     <>
       {box}
       {hud}
+      {overlay}
       {/* No camera travel (reduced motion, data saver): the three panels simply stack under the desk. */}
       {props ? (
         <div className="stage-static" style={{ ["--stage-c" as string]: c }}>
