@@ -76,6 +76,29 @@ export function WorldBoot({ slug, color, t, via, items, photo }: Props) {
     }
   }, [viaHub, finished, slug, lift]);
 
+  // Never stay on the boot: the sequence ends by its own timeline's callback, and a timeline that was paused with the page (a
+  // second Back restoring it from the back-forward cache, a tab hidden mid-boot) never calls it. A restored page, a history
+  // step, or the sequence overstaying its welcome lifts it.
+  useEffect(() => {
+    const unstick = () => lift();
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted) unstick();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") window.setTimeout(unstick, 2500);
+    };
+    window.addEventListener("pageshow", onShow);
+    window.addEventListener("popstate", unstick);
+    document.addEventListener("visibilitychange", onVisible);
+    const watchdog = window.setTimeout(unstick, 14000);
+    return () => {
+      window.removeEventListener("pageshow", onShow);
+      window.removeEventListener("popstate", unstick);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearTimeout(watchdog);
+    };
+  }, [lift]);
+
   useEffect(() => {
     if (state !== "lifting") return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;

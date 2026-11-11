@@ -44,13 +44,13 @@ export const STAGE_LIGHTING: Record<string, StageLighting> = {
     windowLight: { color: "#ffb27a", intensity: 0.75 },
   },
   day: {
-    key: { color: "#ffffff", intensity: 1.5, position: [-3, 4, 4] },
-    fill: { color: "#cfe0ff", intensity: 0.5, position: [4, 1, 3] },
-    rim: { color: "#ffffff", intensity: 0.8, position: [2, 3, -4] },
-    ambient: { color: "#ffffff", intensity: 0.35 },
+    key: { color: "#fff4e0", intensity: 2.1, position: [-3, 4, 4] },
+    fill: { color: "#cfe0ff", intensity: 0.7, position: [4, 1, 3] },
+    rim: { color: "#ffffff", intensity: 1.1, position: [2, 3, -4] },
+    ambient: { color: "#ffffff", intensity: 0.55 },
     screenGlow: 0.8,
     lampOn: false,
-    windowLight: { color: "#dfe9ff", intensity: 0.5 },
+    windowLight: { color: "#bcdcff", intensity: 1 },
   },
   evening: {
     key: { color: "#ffab5c", intensity: 1.3, position: [3, 2, 4] },
@@ -128,7 +128,7 @@ export const STAGE_STOPS: StageStop[] = [
   { id: "desk", label: "desk", side: "none" },
   { id: "shelf", label: "projects", eye: [0.9, 2.15, 2.3], look: [0.0, 2.0, -1.55], side: "left" },
   { id: "constellation", label: "stack", eye: [0.3, 1.5, 3.4], look: [0.3, 3.0, -0.6], side: "left" },
-  { id: "window", label: "contact", eye: [0.4, 1.25, 2.9], look: [1.7, 1.2, -1.85], side: "right" },
+  { id: "window", label: "contact", eye: [0.1, 1.55, 4.7], look: [2.3, 1.35, -1.85], side: "right" },
 ];
 
 /** Scroll distance per stop, in svh (a phone travels less). The sticky stage is one screen tall besides. */

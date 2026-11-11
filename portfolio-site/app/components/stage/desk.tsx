@@ -20,10 +20,17 @@ function windowTexture() {
   g.fillStyle = "#fff";
   g.fillRect(0, 0, 256, 160);
   // Panes: a soft gradient (brighter at the top) cut by the frame bars.
+  // The sky: deeper at the top, a pale horizon at the bottom, a soft sun glow; the band's colour multiplies it.
   const grad = g.createLinearGradient(0, 0, 0, 160);
-  grad.addColorStop(0, "rgba(255,255,255,1)");
-  grad.addColorStop(1, "rgba(255,255,255,0.55)");
+  grad.addColorStop(0, "rgba(150,190,255,1)");
+  grad.addColorStop(0.7, "rgba(235,244,255,1)");
+  grad.addColorStop(1, "rgba(255,250,235,1)");
   g.fillStyle = grad;
+  g.fillRect(0, 0, 256, 160);
+  const sun = g.createRadialGradient(190, 40, 0, 190, 40, 90);
+  sun.addColorStop(0, "rgba(255,255,255,0.95)");
+  sun.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = sun;
   g.fillRect(0, 0, 256, 160);
   g.fillStyle = "#101014";
   g.fillRect(0, 0, 256, 6);
