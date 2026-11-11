@@ -14,7 +14,7 @@ import { StoryPanel, StoryRail } from "./stage/story";
 import { createPhoto, PhotoOverlay, type CaptureFn, type PhotoState } from "./stage/photo";
 import { personaHref } from "@/lib/site/persona-link";
 import type { StoryState } from "./world-stage-3d";
-import { shelfFromEntries, STAGE_PROPS, STAGE_STOPS, STAGE_TRAVEL } from "@/lib/site/stage-data";
+import { shelfFromEntries, STAGE_PERF, STAGE_PROPS, STAGE_STOPS, STAGE_TRAVEL } from "@/lib/site/stage-data";
 import { spectrumColor } from "@/lib/site/spectrum";
 import { useExperience } from "../experience-provider";
 import { CONSTELLATIONS, strokeObject, strokesLength } from "./hub/constellations";
@@ -143,6 +143,22 @@ export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: 
   const photo = useRef<PhotoState>(createPhoto());
   const capture = useRef<CaptureFn | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
+  // The performance strip (S7): the tier and the measured fps for a few seconds, or all the time with ?debug=fps.
+  const [perf, setPerf] = useState<{ label: string; fps: number; stepped: boolean } | null>(null);
+  useEffect(() => {
+    let timer = 0;
+    const keep = new URLSearchParams(window.location.search).get("debug") === "fps";
+    const on = (e: Event) => {
+      setPerf((e as CustomEvent<{ label: string; fps: number; stepped: boolean }>).detail);
+      window.clearTimeout(timer);
+      if (!keep) timer = window.setTimeout(() => setPerf(null), STAGE_PERF.showS * 1000);
+    };
+    window.addEventListener("stage:perf", on);
+    return () => {
+      window.removeEventListener("stage:perf", on);
+      window.clearTimeout(timer);
+    };
+  }, []);
   const closePhoto = useCallback(() => setPhotoOn(false), []);
   const wrap = useRef<HTMLDivElement>(null);
   const stick = useRef<HTMLDivElement>(null);
@@ -248,6 +264,11 @@ export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: 
       <button type="button" onClick={() => setPhotoOn(true)} aria-haspopup="dialog">
         photo
       </button>
+      {perf ? (
+        <span role="status" className="stage-perf" style={{ flexBasis: "100%", textAlign: "center" }}>
+          {perf.stepped ? `stepped down to ${perf.label} for a smooth frame · change in the hub's gate` : `${perf.label} · ${perf.fps} fps`}
+        </span>
+      ) : null}
       {/* The project shelf's cases, as buttons: focus pulls the case out, Enter opens the project. */}
       <span aria-hidden className="mx-2.5">
         |

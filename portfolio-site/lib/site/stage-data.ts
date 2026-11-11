@@ -153,3 +153,20 @@ export const STAGE_STORY_COPY = {
 
 /** Photo mode (S6): the capture size, the orbit limits (degrees), the name strip and the file name. */
 export const STAGE_PHOTO = { w: 1200, h: 630, yaw: 25, pitch: 12, file: "ratulroy-stage.png", caption: { name: "Ratul Roy", role: "software engineer", url: "code.ratulroy.me" } } as const;
+
+/**
+ * Honest performance tiers (S7): what each graphics setting of the hub's gate (Performance / Balanced / Quality)
+ * buys on the stage. `dpr` caps the pixel ratio, `env` is the reflections' cube size, `stars` the constellation's
+ * star cap (desktop; a phone gets half), `screenFps` how often the laptop's live terminal redraws. The stage has no
+ * shadow maps and no post-processing pass, so there is nothing to switch for those.
+ */
+export type StageTierId = "performance" | "balanced" | "best";
+export const STAGE_TIERS: Record<StageTierId, { label: string; dpr: number; env: number; stars: number; screenFps: number }> = {
+  performance: { label: "Performance", dpr: 1, env: 128, stars: 14, screenFps: 3 },
+  balanced: { label: "Balanced", dpr: 1.5, env: 256, stars: 22, screenFps: 6 },
+  best: { label: "Quality", dpr: 1.75, env: 512, stars: 28, screenFps: 10 },
+};
+/** The tier one step lower (Performance stays). */
+export const TIER_BELOW: Record<StageTierId, StageTierId> = { best: "balanced", balanced: "performance", performance: "performance" };
+/** Measured over the first FPS_WINDOW_S seconds; below FPS_FLOOR on Quality or Balanced the stage steps down once. */
+export const STAGE_PERF = { windowS: 2, floor: 30, showS: 4 } as const;

@@ -10,7 +10,7 @@ import type { ThemePalette } from "@/lib/site/terminal-themes";
 
 export const SCREEN_PX = { w: 1024, h: 640 } as const;
 /** Redraw budget: one frame per this many milliseconds, at most. */
-const MIN_STEP_MS = 1000 / 6;
+const DEFAULT_STEP_MS = 1000 / 6;
 const FONT_PX = 16;
 const ROW_PX = 24;
 const PAD_X = 28;
@@ -24,6 +24,8 @@ export type TerminalScreen = {
   /** Advance the script (`seconds` since it started); redraws only if something changed. Returns true when it drew. */
   tick: (seconds: number, nowMs: number) => boolean;
   setPalette: (p: ThemePalette) => void;
+  /** The most redraws a second (the performance tier's). */
+  setFps: (fps: number) => void;
   /** True once the first frame has been drawn into the texture. */
   drawn: () => boolean;
   dispose: () => void;
@@ -123,10 +125,11 @@ export function createTerminalScreen(opts: { banner: OgLine[]; output: OgLine[];
     drawnOnce = true;
   };
 
+  let minStep = DEFAULT_STEP_MS;
   const self: TerminalScreen = {
     texture,
     tick(seconds, nowMs) {
-      if (drawnOnce && nowMs - last < MIN_STEP_MS) return false;
+      if (drawnOnce && nowMs - last < minStep) return false;
       const st = stepFor(seconds, banner.length, output.length);
       const cursor = Math.floor(seconds * 2) % 2 === 0 && st.out === 0;
       const k = `${st.banner}.${st.typed}.${st.out}.${cursor ? 1 : 0}.${palette.id}`;
@@ -135,6 +138,9 @@ export function createTerminalScreen(opts: { banner: OgLine[]; output: OgLine[];
       last = nowMs;
       draw(st, cursor);
       return true;
+    },
+    setFps(fps) {
+      minStep = 1000 / Math.max(1, fps);
     },
     setPalette(p) {
       palette = p;

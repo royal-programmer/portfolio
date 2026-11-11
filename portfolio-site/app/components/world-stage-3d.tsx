@@ -17,7 +17,8 @@ import type { PersonaSlug } from "@/lib/content/types";
 import { getViews } from "@/lib/content/views";
 import { ogLines } from "@/lib/site/og-lines";
 import { personaHref } from "@/lib/site/persona-link";
-import { shelfFromEntries, STAGE_PROPS, STAGE_STOPS, type ShelfCase, type StageProp } from "@/lib/site/stage-data";
+import { shelfFromEntries, STAGE_PERF, STAGE_PROPS, STAGE_STOPS, STAGE_TIERS, TIER_BELOW, type ShelfCase, type StageProp, type StageTierId } from "@/lib/site/stage-data";
+import { useExperience } from "../experience-provider";
 import { bandFor } from "@/lib/site/terminal-clock";
 import { CLOCK, terminalData } from "@/lib/site/terminal-data";
 import { paletteFor } from "@/lib/site/terminal-themes";
@@ -56,12 +57,12 @@ type HubMedia = Partial<Record<string, string[]>>;
 /** The scroll story's state, written by the page (world-stage.tsx) and read by the rig: `p` is the stop reached (0 = desk … 3 = window). */
 export type StoryState = { p: number; on: boolean };
 
-function StudioEnvironment({ onReady }: { onReady: () => void }) {
+function StudioEnvironment({ onReady, size }: { onReady: () => void; size: number }) {
   const get = useThree((s) => s.get);
   useEffect(() => {
     const { gl, scene } = get();
     const pmrem = new THREE.PMREMGenerator(gl);
-    const tex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    const tex = pmrem.fromScene(new RoomEnvironment(), 0.04, 0.1, 100, { size }).texture;
     scene.environment = tex;
     pmrem.dispose();
     onReady();
@@ -69,7 +70,7 @@ function StudioEnvironment({ onReady }: { onReady: () => void }) {
       scene.environment = null;
       tex.dispose();
     };
-  }, [get, onReady]);
+  }, [get, onReady, size]);
   return null;
 }
 
@@ -327,6 +328,7 @@ function Setup({ slug, world, media, stage }: { slug: PersonaSlug; world: World;
 }
 
 const THEME_KEY = "xp-term-theme";
+const TIER_ORDER: StageTierId[] = ["performance", "balanced", "best"];
 
 /** A performance mark, once (the first call wins), for measuring the stage's opening. */
 function mark(name: string) {
@@ -351,6 +353,46 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
   const state = useRef<VrState>(createVrState());
   const ctx = useMemo(() => ({ clock, state }), []);
   const world = useMemo<World>(() => ({ slug, t, c: C }), [slug, t]);
+  // The gate's graphics choice drives the stage (S7); a slow first two seconds steps it down once, for this visit only.
+  const { quality } = useExperience();
+  const saved: StageTierId = quality ?? "balanced";
+  const [stepped, setStepped] = useState<StageTierId | null>(null);
+  const tier: StageTierId = stepped && TIER_ORDER.indexOf(stepped) < TIER_ORDER.indexOf(saved) ? stepped : saved;
+  const cfg = STAGE_TIERS[tier];
+  const tierRef = useRef(tier);
+  useEffect(() => {
+    tierRef.current = tier;
+  }, [tier]);
+  const perf = useRef({ born: 0, last: 0, t0: 0, n: 0, done: false });
+  const measureFps = useCallback(() => {
+    const p = perf.current;
+    if (p.done) return;
+    const now = performance.now();
+    // A pause (off screen, hidden tab) restarts the window: only frames that were really asked for count.
+    // The first 1.5 s (shader compile, texture uploads, the page still hydrating) are a warm-up, not the machine's speed.
+    if (!p.born) p.born = now;
+    if (now - p.born < 1500) {
+      p.last = now;
+      return;
+    }
+    if (!p.t0 || now - p.last > 2000) {
+      p.t0 = now;
+      p.n = 0;
+      p.last = now;
+      return;
+    }
+    p.last = now;
+    p.n++;
+    const el = (now - p.t0) / 1000;
+    if (el < STAGE_PERF.windowS) return;
+    p.done = true;
+    const fps = Math.round(p.n / el);
+    const cur = tierRef.current;
+    const down = fps < STAGE_PERF.floor && cur !== "performance";
+    const next = down ? TIER_BELOW[cur] : cur;
+    if (down) setStepped(next);
+    window.dispatchEvent(new CustomEvent("stage:perf", { detail: { tier: next, label: STAGE_TIERS[next].label, fps, stepped: down } }));
+  }, []);
   const [media, setMedia] = useState<HubMedia>({});
   const [liveScreen, setLiveScreen] = useState<THREE.Texture | null>(null);
   // Flat accent parts until the studio's reflections exist; then the real materials (S8).
@@ -420,6 +462,10 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
       screen?.dispose();
     };
   }, [slug, entries, posts]);
+
+  useEffect(() => {
+    screenRef.current?.setFps(cfg.screenFps);
+  }, [cfg.screenFps, liveScreen]);
 
   // A new band re-themes the screen (a saved theme still wins).
   useEffect(() => {
@@ -513,9 +559,9 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
   const constellation = useMemo(() => {
     if (slug !== "engineer") return null;
     const d = terminalData(undefined, entries ?? [], posts ?? [], getViews("engineer"));
-    const max = window.matchMedia("(max-width: 767px)").matches ? 14 : 28;
+    const max = Math.round(cfg.stars / (window.matchMedia("(max-width: 767px)").matches ? 2 : 1));
     return buildConstellation({ stack: d.stack, skills: d.resume.skills.flatMap((g) => g.items), arch: d.arch, projects: d.projects }, max);
-  }, [slug, entries, posts]);
+  }, [slug, entries, posts, cfg.stars]);
   const starsActive = useRef(true);
   const onTap = useCallback((id: string) => {
     setTapId(id);
@@ -609,7 +655,7 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
 
   return (
     <Canvas
-      dpr={[1, 1.75]}
+      dpr={[1, cfg.dpr]}
       camera={{ position: [0, 0, 0], fov: 36, near: 0.05, far: 200 }}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
@@ -625,7 +671,7 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
       style={{ background: "transparent" }}
     >
       <VrContext.Provider value={ctx}>
-        <StudioEnvironment onReady={onEnvReady} />
+        <StudioEnvironment onReady={onEnvReady} size={cfg.env} />
         <StageLights band={band.id} look={look} instant={reducedMotion()} />
         <Rig
           slug={slug}
@@ -633,6 +679,7 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
           story={story}
           photo={photo}
           onFrame={() => {
+            measureFps();
             // Stars answer the pointer only while the camera is looking at them.
             starsActive.current = Boolean(story?.current.on) && Math.abs((story?.current.p ?? 0) - 2) < 0.7;
             screenRef.current?.tick(reducedMotion() ? 99 : clock.current.t, performance.now());
