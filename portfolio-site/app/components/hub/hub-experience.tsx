@@ -161,9 +161,16 @@ export function HubExperience({ chapters, upcoming, terminalItems = [], copy: co
   const normalEnter = useRef<((slug: string) => void) | null>(null);
   // Read once, before the provider strips it from the URL.
   const xpForced = useRef<boolean>(false);
+  const fromStage = useRef<string | null>(null);
   if (typeof window !== "undefined" && !xpForced.current) {
     const q = new URLSearchParams(window.location.search).get("xp");
     if (q === "normal" || q === "immersive") xpForced.current = true;
+    // Through the Stage's door: no gate, Normal mode, and the chapter it came from (see experience-provider.tsx).
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("via") === "stage" && sp.get("from")) {
+      xpForced.current = true;
+      fromStage.current = sp.get("from");
+    }
   }
   const blinkRaf = useRef(0);
   const eyeRef = useRef<SVGEllipseElement>(null);
@@ -224,6 +231,14 @@ export function HubExperience({ chapters, upcoming, terminalItems = [], copy: co
     // Run once when the provider is ready.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
+
+  // Arriving through the Stage's door: land on the chapter that world sits in (once the page has laid out).
+  useEffect(() => {
+    const slug = fromStage.current;
+    if (!decided || !slug) return;
+    const id = window.setTimeout(() => document.getElementById(slug)?.scrollIntoView({ behavior: "auto", block: "start" }), 450);
+    return () => window.clearTimeout(id);
+  }, [decided]);
 
   const sceneWanted = !!device?.webgl && status !== "failed" && (gate !== null || experience === "immersive");
   const immersiveLive = experience === "immersive" && status !== "failed" && atLeast(phase, "wear");

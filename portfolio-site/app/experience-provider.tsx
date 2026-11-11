@@ -64,7 +64,13 @@ export function ExperienceProvider({ children }: { children: React.ReactNode }) 
         window.history.replaceState(window.history.state, "", url.toString());
       }
     } catch {}
-    const saved = forced ?? readExperienceCookie();
+    // Through the Stage's door (`?via=stage&from=<world>`): the hub opens in Normal mode on that world's chapter. A visit, not a choice: nothing is written.
+    let viaStage = false;
+    try {
+      const q = new URLSearchParams(window.location.search);
+      viaStage = q.get("via") === "stage" && Boolean(q.get("from")) && (window.location.pathname === "/" || window.location.pathname === "/whoami");
+    } catch {}
+    const saved = viaStage ? "normal" : (forced ?? readExperienceCookie());
     const experience = saved ?? defaultExperience();
     stampExperience(experience);
     const quality = readQualityCookie();

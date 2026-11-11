@@ -261,6 +261,12 @@ export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: 
       <span aria-hidden className="mx-2.5">
         |
       </span>
+      <button type="button" onClick={() => send("stage:door", null)} onFocus={() => send("stage:doorfocus", true)} onBlur={() => send("stage:doorfocus", false)} onPointerEnter={() => send("stage:doorfocus", true)} onPointerLeave={() => send("stage:doorfocus", false)}>
+        door
+      </button>
+      <span aria-hidden className="mx-2.5">
+        ·
+      </span>
       <button type="button" onClick={() => setPhotoOn(true)} aria-haspopup="dialog">
         photo
       </button>

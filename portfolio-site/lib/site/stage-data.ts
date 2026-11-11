@@ -170,3 +170,21 @@ export const STAGE_TIERS: Record<StageTierId, { label: string; dpr: number; env:
 export const TIER_BELOW: Record<StageTierId, StageTierId> = { best: "balanced", balanced: "performance", performance: "performance" };
 /** Measured over the first FPS_WINDOW_S seconds; below FPS_FLOOR on Quality or Balanced the stage steps down once. */
 export const STAGE_PERF = { windowS: 2, floor: 30, showS: 4 } as const;
+
+/**
+ * The door at the room's edge (S10): where it stands (the desk assembly's frame), its size, how far it opens on hover and
+ * when clicked (degrees), the timings (ms) and where it leads. The strip under it shows the hub's colour spectrum.
+ */
+export const STAGE_DOOR = {
+  label: "the other worlds",
+  pos: [-3.2, 0, -0.6] as [number, number, number],
+  rotY: 0.32,
+  size: [0.95, 2.1] as [number, number],
+  hoverDeg: 20,
+  openDeg: 100,
+  openMs: 600,
+  travelMs: 400,
+  reducedFadeMs: 200,
+  void: "#07070a",
+  query: "via=stage&from=engineer",
+} as const;

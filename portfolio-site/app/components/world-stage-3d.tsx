@@ -17,12 +17,14 @@ import type { PersonaSlug } from "@/lib/content/types";
 import { getViews } from "@/lib/content/views";
 import { ogLines } from "@/lib/site/og-lines";
 import { personaHref } from "@/lib/site/persona-link";
-import { shelfFromEntries, STAGE_PERF, STAGE_PROPS, STAGE_STOPS, STAGE_TIERS, TIER_BELOW, type ShelfCase, type StageProp, type StageTierId } from "@/lib/site/stage-data";
+import { shelfFromEntries, STAGE_DOOR, STAGE_PERF, STAGE_PROPS, STAGE_STOPS, STAGE_TIERS, TIER_BELOW, type ShelfCase, type StageProp, type StageTierId } from "@/lib/site/stage-data";
 import { useExperience } from "../experience-provider";
 import { bandFor } from "@/lib/site/terminal-clock";
 import { CLOCK, terminalData } from "@/lib/site/terminal-data";
 import { paletteFor } from "@/lib/site/terminal-themes";
 import { StageProps } from "./stage/props";
+import { StageDoor, type DoorGo } from "./stage/door";
+import { hubHref } from "@/lib/site/persona-link";
 import { PhotoCapture, type CaptureFn, type PhotoState } from "./stage/photo";
 import { StageConstellation } from "./stage/constellation";
 import { StageShelf } from "./stage/shelf";
@@ -108,6 +110,9 @@ type Scratch = {
   lb: THREE.Vector3;
   /** Photo mode's orbit (S6), written by the overlay. */
   photo: MutableRefObject<PhotoState> | null;
+  /** The door (S10): the click's state, and the object that marks its centre. */
+  door: MutableRefObject<DoorGo> | null;
+  doorObj: THREE.Object3D | null;
 };
 
 const smooth = (x: number) => x * x * (3 - 2 * x);
@@ -146,7 +151,7 @@ function measureSetup(scene: THREE.Scene, box: THREE.Box3, tmp: THREE.Vector3) {
 type Pose = ReturnType<typeof climbPose>;
 
 /** One frame of the stage: advance the clock, keep the state at the chapter, stand the camera. */
-function driveStage(k: VrClock, s: VrState, tmp: Scratch, pose: Pose, place: { fwd: number; right: number; up: number }, size: { width: number; height: number }, camera: THREE.PerspectiveCamera, scene: THREE.Scene, rawDt: number, onZoomDone?: () => void) {
+function driveStage(k: VrClock, s: VrState, tmp: Scratch, pose: Pose, place: { fwd: number; right: number; up: number }, size: { width: number; height: number }, camera: THREE.PerspectiveCamera, scene: THREE.Scene, rawDt: number, onZoomDone?: () => void, onDoorDone?: () => void) {
   const dt = Math.min(rawDt, 0.1);
   k.dt = dt;
   k.t += dt;
@@ -240,6 +245,26 @@ function driveStage(k: VrClock, s: VrState, tmp: Scratch, pose: Pose, place: { f
       camera.lookAt(tmp.look);
     }
   }
+  // Through the door: once it has opened (openMs) the camera moves to the doorway and on through it (travelMs).
+  const dr = tmp.door?.current;
+  if (dr?.on && dr.t0 > -1e8) {
+    const door = (tmp.doorObj ??= scene.getObjectByName("stage-door") ?? null);
+    if (door) {
+      const p = Math.min(1, Math.max(0, (k.t - dr.t0 - STAGE_DOOR.openMs / 1000) / (STAGE_DOOR.travelMs / 1000)));
+      dr.e = smooth(p);
+      door.updateWorldMatrix(true, false);
+      door.matrixWorld.decompose(tmp.sp, tmp.sq, tmp.ss);
+      tmp.sn.set(0, 0, 1).applyQuaternion(tmp.sq);
+      tmp.eye.copy(tmp.sp).addScaledVector(tmp.sn, -0.5);
+      camera.position.lerp(tmp.eye, dr.e);
+      tmp.look.lerp(tmp.a.copy(tmp.sp).addScaledVector(tmp.sn, -3), dr.e);
+      camera.lookAt(tmp.look);
+      if (p >= 1 && !dr.fired) {
+        dr.fired = true;
+        onDoorDone?.();
+      }
+    }
+  }
   // Zoom into the screen: the camera glides from where the stage put it to an eye point in front of
   // the screen that makes the screen cover the frame; the page's overlay takes over for the last stretch.
   const z = tmp.zoom;
@@ -268,11 +293,11 @@ function driveStage(k: VrClock, s: VrState, tmp: Scratch, pose: Pose, place: { f
 }
 
 /** Drives the clock and stands the camera in front of the setup; the pointer turns it a little. */
-function Rig({ slug, zoomRef, story, photo, onFrame, onZoomDone, onFirstFrame }: { slug: PersonaSlug; zoomRef: MutableRefObject<Scratch["zoom"] | null>; story?: MutableRefObject<StoryState>; photo?: MutableRefObject<PhotoState>; onFrame?: (t: number) => void; onZoomDone?: () => void; onFirstFrame?: () => void }) {
+function Rig({ slug, zoomRef, story, photo, door, onDoorDone, onFrame, onZoomDone, onFirstFrame }: { slug: PersonaSlug; zoomRef: MutableRefObject<Scratch["zoom"] | null>; story?: MutableRefObject<StoryState>; photo?: MutableRefObject<PhotoState>; door?: MutableRefObject<DoorGo>; onDoorDone?: () => void; onFrame?: (t: number) => void; onZoomDone?: () => void; onFirstFrame?: () => void }) {
   const { clock, state } = useVr();
   const size = useThree((s) => s.size);
   // Per-frame scratch (a ref: it is written every frame).
-  const scratch = useRef<Scratch>({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0, handle: false, box: new THREE.Box3(), boxAt: -1, corner: new THREE.Vector3(), fit: 1, zoom: { on: false, t0: 0, dur: 0.7, e: 0, fired: false }, screen: null, sp: new THREE.Vector3(), sn: new THREE.Vector3(), sq: new THREE.Quaternion(), ss: new THREE.Vector3(), eye: new THREE.Vector3(), pitch0: slug === "engineer" ? 0.4 : 0.1, story: null, ps: 0, extras: null, a: new THREE.Vector3(), b: new THREE.Vector3(), la: new THREE.Vector3(), lb: new THREE.Vector3(), photo: null });
+  const scratch = useRef<Scratch>({ centre: new THREE.Vector3(), dir: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), px: 0, py: 0, handle: false, box: new THREE.Box3(), boxAt: -1, corner: new THREE.Vector3(), fit: 1, zoom: { on: false, t0: 0, dur: 0.7, e: 0, fired: false }, screen: null, sp: new THREE.Vector3(), sn: new THREE.Vector3(), sq: new THREE.Quaternion(), ss: new THREE.Vector3(), eye: new THREE.Vector3(), pitch0: slug === "engineer" ? 0.4 : 0.1, story: null, ps: 0, extras: null, a: new THREE.Vector3(), b: new THREE.Vector3(), la: new THREE.Vector3(), lb: new THREE.Vector3(), photo: null, door: null, doorObj: null });
   const pose = useMemo(() => climbPose(C), []);
   const framed = useRef(false);
   // Render on demand: nothing is drawn while the stage is off screen (the rest of the page is long).
@@ -297,12 +322,13 @@ function Rig({ slug, zoomRef, story, photo, onFrame, onZoomDone, onFirstFrame }:
     zoomRef.current = tmp.zoom;
     tmp.story = story ?? null;
     tmp.photo = photo ?? null;
+    tmp.door = door ?? null;
     if (!tmp.handle) {
       tmp.handle = true;
       // Dev-only handle for tests.
       if (process.env.NODE_ENV !== "production") (window as unknown as { __stage?: unknown }).__stage = { scene, camera, clock, state };
     }
-    driveStage(clock.current, state.current, tmp, pose, PLACE[slug], size, camera as THREE.PerspectiveCamera, scene, rawDt, onZoomDone);
+    driveStage(clock.current, state.current, tmp, pose, PLACE[slug], size, camera as THREE.PerspectiveCamera, scene, rawDt, onZoomDone, onDoorDone);
     onFrame?.(clock.current.t);
   });
   return null;
@@ -426,6 +452,8 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
   const zoomRef = useRef<Scratch["zoom"] | null>(null);
   const screenRef = useRef<TerminalScreen | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
+  const doorRef = useRef<DoorGo>({ on: false, t0: 0, e: 0, fired: false });
+  const [doorFocus, setDoorFocus] = useState(false);
   useEffect(() => {
     let live = true;
     fetch("/hub/media.json", { cache: "no-cache" })
@@ -487,6 +515,10 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
         z.fired = false;
         z.e = 0;
       }
+      const d = doorRef.current;
+      d.on = false;
+      d.fired = false;
+      d.e = 0;
     };
     window.addEventListener("pageshow", reset);
     return () => {
@@ -522,6 +554,32 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
     }
   }, [navigate]);
 
+  // The door to the other worlds (S10): it opens, the camera goes through, the screen washes to the hub's void, the hub opens on this chapter.
+  const toHub = useCallback(() => {
+    const hub = hubHref(window.location.origin);
+    window.location.assign(`${hub.href}?${STAGE_DOOR.query}`);
+  }, []);
+  const goDoor = useCallback(() => {
+    const d = doorRef.current;
+    if (d.on) return;
+    d.on = true;
+    d.fired = false;
+    d.t0 = clock.current.t;
+    const el = overlayRef.current;
+    if (el) {
+      el.style.transition = "none";
+      el.style.background = STAGE_DOOR.void;
+    }
+    if (reducedMotion()) {
+      // No travel: the door is only a fade, 200 ms.
+      d.t0 = -1e9;
+      if (el) {
+        el.style.transition = `opacity ${STAGE_DOOR.reducedFadeMs}ms linear`;
+        el.style.opacity = "1";
+      }
+      window.setTimeout(toHub, STAGE_DOOR.reducedFadeMs + 10);
+    }
+  }, [toHub]);
   // The desk's props: hover / HUD focus light one, a click (or the HUD button) runs its command.
   const [focusId, setFocusId] = useState<string | null>(null);
   const [tapId, setTapId] = useState<string | null>(null);
@@ -576,6 +634,10 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
       if (prop) runProp(prop);
     };
     const onSound = (e: Event) => setSoundOn(Boolean((e as CustomEvent<boolean>).detail));
+    const onDoor = () => goDoor();
+    const onDoorFocus = (e: Event) => setDoorFocus(Boolean((e as CustomEvent<boolean>).detail));
+    window.addEventListener("stage:door", onDoor);
+    window.addEventListener("stage:doorfocus", onDoorFocus);
     window.addEventListener("stage:focus", onFocus);
     window.addEventListener("stage:run", onRun);
     window.addEventListener("site:sound", onSound);
@@ -584,12 +646,14 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
       queueMicrotask(() => setSoundOn(saved));
     } catch {}
     return () => {
+      window.removeEventListener("stage:door", onDoor);
+      window.removeEventListener("stage:doorfocus", onDoorFocus);
       window.removeEventListener("stage:focus", onFocus);
       window.removeEventListener("stage:run", onRun);
       window.removeEventListener("site:sound", onSound);
       window.clearTimeout(tapTimer.current);
     };
-  }, [runProp]);
+  }, [runProp, goDoor]);
   // The project shelf (S4): hover / HUD focus pull a case out, a click opens its project.
   const cases = useMemo(() => shelfFromEntries(entries), [entries]);
   const [caseFocus, setCaseFocus] = useState<string | null>(null);
@@ -648,10 +712,11 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
           <>
             <StageProps items={STAGE_PROPS} accent={accent} focusId={focusId} soundOn={soundOn} onRun={runProp} tapId={tapId} onTap={onTap} />
             {constellation ? <StageConstellation data={constellation} accent={accent} active={starsActive} reduced={reducedMotion()} story={story} onRun={runCommand} /> : null}
+            <StageDoor accent={accent} focus={doorFocus} go={doorRef} onGo={goDoor} />
             <StageShelf items={cases} accent={accent} focusId={caseFocus} openId={openId} onOpen={openCase} onPick={setOpenId} reduced={reducedMotion()} />
           </>
         ) : undefined,
-    }), [liveScreen, envReady, go, look, slug, accent, focusId, soundOn, runProp, tapId, onTap, cases, caseFocus, openId, openCase, constellation, runCommand, story]);
+    }), [liveScreen, envReady, go, look, slug, accent, focusId, soundOn, runProp, tapId, onTap, cases, caseFocus, openId, openCase, constellation, runCommand, story, goDoor, doorFocus]);
 
   return (
     <Canvas
@@ -678,6 +743,8 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
           zoomRef={zoomRef}
           story={story}
           photo={photo}
+          door={doorRef}
+          onDoorDone={toHub}
           onFrame={() => {
             measureFps();
             // Stars answer the pointer only while the camera is looking at them.
@@ -690,6 +757,8 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
             }
             const z = zoomRef.current;
             const el = overlayRef.current;
+            const dd = doorRef.current;
+            if (dd.on && el && dd.t0 > -1e8) el.style.opacity = String(Math.max(0, Math.min(1, dd.e)));
             if (z && el && z.on) el.style.opacity = String(Math.max(0, Math.min(1, (z.e - 0.55) / 0.45)));
           }}
           onZoomDone={navigate}
