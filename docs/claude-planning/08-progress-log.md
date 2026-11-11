@@ -1424,3 +1424,7 @@ stripped service_role's table grants).
 ### Round 19 - Stage, part B (2026-11-11)
 
 - S4 project shelf (one instanced mesh of cases with an atlas for spine labels, hover pull, pull-out then a view-transition to the project header, HUD buttons), S5 skill constellation (Points + LineSegments, co-occurrence from `arch` diagrams and project stacks), S9 scroll-driven story (sticky stage, four camera stops, panels, dot rail, off-screen pause). Details: 17-persona-views.md section 19. Verified at 1280 and 393 in Chrome (dev server). Not done: admin forms for stops and copy; the `?` keyboard path into stars.
+
+### Round 20 - Stage, part C (2026-11-11)
+
+- S6 photo mode (1200 x 630 guide, orbit, on-demand capture with name strip, download / share), S7 performance tiers (gate quality drives dpr, reflections, stars, screen fps; measured fps strip; one automatic step down under 30 fps), S10 door to the other worlds (hub opens in Normal mode on the chapter), plus a boot-overlay unstick and a brighter daytime window. Details: 17-persona-views.md section 20; data list: 16-admin-console.md section 2.

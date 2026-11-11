@@ -91,6 +91,16 @@ today, to move.
 - Analytics provider + id (Cloudflare Web Analytics), maintenance mode with a message 🔜
 - Redirect rules (`www` → apex etc. are DNS today; path redirects here) 🔜
 
+### Stage: what is data (round 20)
+All in `lib/site/stage-data.ts`, plain data with no three.js, ready for forms 🔜:
+- Lighting presets per clock band (`STAGE_LIGHTING`: key / fill / rim / ambient, screen glow, lamp on, window colour and brightness).
+- Desk props (`STAGE_PROPS`: id, label, command, kind) and the project shelf (`STAGE_DEV_PROJECTS`, `SHELF_MAX`; public projects come from the content layer).
+- Constellation: star cap per tier (`STAGE_TIERS.stars`); the links are computed from the stack, resume skills, `arch` diagrams and projects (`lib/site/stage-constellation.ts`).
+- Scroll stops (`STAGE_STOPS`: eye, look, side, label), their scroll length (`STAGE_TRAVEL`) and the words beside them (`STAGE_STORY_COPY`).
+- Performance tiers (`STAGE_TIERS`: dpr cap, reflection size, stars, screen fps) and the step-down rule (`STAGE_PERF`).
+- Photo mode (`STAGE_PHOTO`: size, orbit limits, file name, the name strip's text).
+- The door (`STAGE_DOOR`: label, position, size, open angles and timings, where it leads).
+
 ### Theme
 - The spectrum's hue range and saturation, ink / void colours, surface border, the display's
   window chrome colours, the font pair (from a vetted list) 🔜
