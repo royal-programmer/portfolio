@@ -76,6 +76,11 @@ export function NetflixHireBar({ hire, opens, hold }: { hire: HireSheet; opens: 
         <small>{hire.availability}</small>
       </span>
       <span className="nf-hirebar-a">
+        {hire.book ? (
+          <a href={hire.book.href} target="_blank" rel="noreferrer">
+            {hire.book.label}
+          </a>
+        ) : null}
         {hire.email ? <a href={`mailto:${hire.email}`}>Email</a> : null}
         <button type="button" onClick={copy}>
           {copied ? "Copied" : "hire brief"}

@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { MAX_WAIT_MS, chapterTimes, type Chapter } from "@/lib/site/netflix-trailer";
 import { TYPE_CPS } from "@/lib/site/netflix-trailer";
+import type { BookCall } from "@/lib/site/netflix-data";
 import type { TermLink } from "@/lib/site/terminal-data";
 import { t } from "@/lib/site/terminal-strings";
 import { adCancel, adSpeak } from "./netflix-ad";
@@ -30,6 +31,7 @@ export function Trailer({
   repo,
   contact,
   dev,
+  book,
   guided,
   onDone,
 }: {
@@ -41,6 +43,7 @@ export function Trailer({
   repo?: string;
   contact: TermLink[];
   dev?: boolean;
+  book?: BookCall;
   /** The Recruiter cut: the first three chapters, then `onDone`, no end card. */
   guided: boolean;
   /** The story has been played through (the end card reached, or the guided chapters finished). */
@@ -212,7 +215,7 @@ export function Trailer({
       ) : null}
 
       {chapter.kind === "end" ? (
-        <ProjectEnd live={live} repo={repo} contact={contact} dev={dev} onReplay={() => dispatch({ type: "go", to: 0 })} />
+        <ProjectEnd live={live} repo={repo} contact={contact} dev={dev} book={book} onReplay={() => dispatch({ type: "go", to: 0 })} />
       ) : chapter.kind === "beat" && clip ? (
         <p className="nf-tr-sub" aria-live="off">
           {chapter.text}

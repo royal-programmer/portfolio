@@ -529,7 +529,7 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
           </div>
         ) : (
           <>
-            <NetflixHero series={show} profile={profile} status={status} fast={fast} firstRowId={firstRow} features={features} onOpen={(item, play) => open(item, null, play)} held={modal !== null} sound={sound} recap={recap} onRecapEnd={endRecap} cc={cc} subData={subData} />
+            <NetflixHero series={show} profile={profile} status={status} fast={fast} firstRowId={firstRow} features={features} onOpen={(item, play) => open(item, null, play)} held={modal !== null} sound={sound} recap={recap} onRecapEnd={endRecap} cc={cc} subData={subData} book={hire.book} />
             <NetflixRows show={show} rows={ratedRows} contact={contact} env={env} onRecap={profile === "story" ? playRecap : undefined} />
           </>
         )}
@@ -557,7 +557,7 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
       />
       <NetflixHireBar hire={hire} opens={opens} hold={modal !== null || sheetOpen || !!autopilot.state} />
       {sheetOpen ? <NetflixHireSheet lang={lang} hire={hire} onClose={closeSheet} /> : null}
-      {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} autoPlay={modal.play} playMs={modal.playMs} cast={castList} profile={profile} now={now} contact={contact} onCast={castFromModal} onClose={close} onSwap={swap} onShow={onShow} /> : null}
+      {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} autoPlay={modal.play} playMs={modal.playMs} cast={castList} profile={profile} now={now} contact={contact} book={hire.book} onCast={castFromModal} onClose={close} onSwap={swap} onShow={onShow} /> : null}
     </>
   );
 }

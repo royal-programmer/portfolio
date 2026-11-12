@@ -153,6 +153,11 @@ export function NetflixHireSheet({ lang, hire, onClose }: { lang: Lang; hire: Hi
           </div>
           <pre>{hire.brief}</pre>
         </div>
+        {hire.book ? (
+          <a className="nf-sheet-act" href={hire.book.href} target="_blank" rel="noreferrer">
+            <span>{hire.book.label}</span>
+          </a>
+        ) : null}
         <a className="nf-sheet-act" href={hire.resume} download>
           <span>{t("nf.hire.resume", lang)}</span>
           <small>PDF</small>

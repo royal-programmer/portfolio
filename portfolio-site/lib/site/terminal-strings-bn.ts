@@ -444,6 +444,8 @@ export const bn: TerminalStrings = {
   "nf.binge.now": "এখনই চালান",
   "nf.binge.cancel": "বাতিল",
   "nf.binge.toggle": "পরেরটি নিজে চলুক",
+  "nf.resume": "আপনি এখানে থেমেছিলেন: {where}",
+  "nf.book": "কল বুক করুন",
   "nf.close": "বন্ধ করুন",
   "nf.full": "পুরো আকারে",
   "nf.previously": "আগের পর্বে…",

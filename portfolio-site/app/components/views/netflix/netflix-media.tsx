@@ -7,7 +7,7 @@
  * loaded after a hover or tap and only its metadata, and reduced motion shows posters only.
  */
 import { useEffect, useRef, useState } from "react";
-import type { ProjectMedia } from "@/lib/site/netflix-data";
+import type { BookCall, ProjectMedia } from "@/lib/site/netflix-data";
 import { LQIP } from "@/lib/site/netflix-lqip";
 import type { TermLink } from "@/lib/site/terminal-data";
 import { t } from "@/lib/site/terminal-strings";
@@ -222,7 +222,7 @@ export function ClipsRow({ media, title, playLabel }: { media: ProjectMedia; tit
 }
 
 /** What follows a project's Play: the live address and the code, or `In development` with the code and a hello. Never navigates by itself. */
-export function ProjectEnd({ live, repo, contact, dev, onReplay }: { live?: string; repo?: string; contact: TermLink[]; /** Says `In development` even when there is an address. */ dev?: boolean; onReplay: () => void }) {
+export function ProjectEnd({ live, repo, contact, dev, book, onReplay }: { book?: BookCall; live?: string; repo?: string; contact: TermLink[]; /** Says `In development` even when there is an address. */ dev?: boolean; onReplay: () => void }) {
   const mail = contact.find((c) => c.label === "mail")?.href;
   return (
     <div className="nf-pend" role="group" aria-label={live ? t("nf.end.visit", "en") : t("nf.end.dev", "en")}>
@@ -241,6 +241,11 @@ export function ProjectEnd({ live, repo, contact, dev, onReplay }: { live?: stri
         {mail ? (
           <a className="nf-btn nf-btn-glass" href={mail}>
             {t("nf.end.hello", "en")}
+          </a>
+        ) : null}
+        {book ? (
+          <a className="nf-btn nf-btn-glass" href={book.href} target="_blank" rel="noreferrer">
+            {book.label}
           </a>
         ) : null}
         <button type="button" className="nf-btn nf-btn-glass" onClick={onReplay}>

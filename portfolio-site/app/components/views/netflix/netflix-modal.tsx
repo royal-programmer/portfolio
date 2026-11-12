@@ -7,7 +7,7 @@
  * meta row, description, the season's episodes, "More like this" and About. Everything is swapped in place.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { NF_ADJECTIVES, castOf, endCardOf, factsOf, metricLabel, moreLike, previouslyLine, type CastMember, type NetflixProfileId, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
+import { NF_ADJECTIVES, castOf, endCardOf, factsOf, metricLabel, moreLike, previouslyLine, type BookCall, type CastMember, type NetflixProfileId, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
 import { DISPLAY_ROOT } from "@/lib/site/brand";
 import { netflixShareLink } from "@/lib/site/netflix-og";
 import { caseEligible, caseSlug } from "@/lib/site/netflix-case";
@@ -47,6 +47,8 @@ type Props = {
   /** What the end-of-season card shows (N10): what I am doing now, and how to reach me. */
   now?: { month: string; lines: string[] };
   contact?: TermLink[];
+  /** The book-a-call link (F6), when there is one. */
+  book?: BookCall;
   onCast?: (key: string) => void;
   onClose: () => void;
   onSwap: (item: NfItem) => void;
@@ -54,7 +56,7 @@ type Props = {
   onShow: (item: NfItem, playedThrough: boolean) => void;
 };
 
-export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, profile = "story", now: nowInfo, contact = [], onCast, onClose, onSwap, onShow }: Props) {
+export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, profile = "story", now: nowInfo, contact = [], book, onCast, onClose, onSwap, onShow }: Props) {
   const facts = useMemo(() => factsOf(item), [item]);
   const itemCast = useMemo(() => (cast ? castOf(item, cast) : []), [item, cast]);
   const overlay = useRef<HTMLDivElement>(null);
@@ -369,12 +371,12 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
       <div className="nf-backdrop" ref={backdrop} onClick={requestClose} aria-hidden />
       <div className="nf-m" ref={panel} role="dialog" aria-modal="true" aria-label={showEnd && end ? end.complete : facts.title}>
         {showEnd && end ? (
-          <EndCard end={end} now={nowInfo} contact={contact} onClose={requestClose} onNext={end.nextFirst ? () => onSwap(end.nextFirst as NfItem) : undefined} />
+          <EndCard end={end} now={nowInfo} contact={contact} book={book} onClose={requestClose} onNext={end.nextFirst ? () => onSwap(end.nextFirst as NfItem) : undefined} />
         ) : (
           <>
         <div className="nf-m-top" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
           <div className="nf-m-handle" aria-hidden />
-          <Billboard key={item.id} facts={facts} playing={playing} contact={contact} guided={playMs != null} onTrailerDone={trailerDone} playMs={playMs} sub={cc.on && cc.lang ? epSub(facts.tone, facts.season, facts.n, cc.lang) : undefined} ad={ad} lang={cc.lang} onFinish={finished}>
+          <Billboard key={item.id} facts={facts} playing={playing} contact={contact} book={book} guided={playMs != null} onTrailerDone={trailerDone} playMs={playMs} sub={cc.on && cc.lang ? epSub(facts.tone, facts.season, facts.n, cc.lang) : undefined} ad={ad} lang={cc.lang} onFinish={finished}>
             {countFor === item.id && nextEp ? <BingeCard title={nextEp.kind === "episode" ? nextEp.e.title : ""} onNow={playNext} onCancel={cancelNext} /> : null}
             <button type="button" className="nf-m-x" aria-label="Close" onClick={requestClose}>
               <span aria-hidden>×</span>
@@ -618,7 +620,7 @@ function Previously({ label, text }: { label: string; text: string }) {
 
 /* ---------- N10: the end-of-season card ---------- */
 
-function EndCard({ end, now, contact, onClose, onNext }: { end: ReturnType<typeof endCardOf>; now?: { month: string; lines: string[] }; contact: TermLink[]; onClose: () => void; onNext?: () => void }) {
+function EndCard({ end, now, contact, book, onClose, onNext }: { book?: BookCall; end: ReturnType<typeof endCardOf>; now?: { month: string; lines: string[] }; contact: TermLink[]; onClose: () => void; onNext?: () => void }) {
   const exit = useViewExit();
   const forName = useForName();
   const link = (label: string) => contact.find((c) => c.label === label)?.href;
@@ -648,6 +650,11 @@ function EndCard({ end, now, contact, onClose, onNext }: { end: ReturnType<typeo
           <button type="button" className="nf-btn nf-btn-play" onClick={onNext}>
             <span aria-hidden>▶</span> Watch next season
           </button>
+        ) : null}
+        {book ? (
+          <a className="nf-btn nf-btn-glass" href={book.href} target="_blank" rel="noreferrer">
+            {book.label}
+          </a>
         ) : null}
         {mail ? (
           <a className="nf-btn nf-btn-glass" href={mail}>
@@ -727,7 +734,7 @@ function BingeCard({ title, onNow, onCancel }: { title: string; onNow: () => voi
 
 /* ---------- Billboard ---------- */
 
-function Billboard({ facts, playing, contact, guided, onTrailerDone, playMs, sub, ad, lang, onFinish, children }: { facts: NfFacts; playing: boolean; contact: TermLink[]; guided: boolean; onTrailerDone: () => void; playMs?: number; sub?: string; ad: ReturnType<typeof useAd>; lang?: string | null; onFinish: () => void; children: React.ReactNode }) {
+function Billboard({ facts, playing, contact, book, guided, onTrailerDone, playMs, sub, ad, lang, onFinish, children }: { facts: NfFacts; playing: boolean; contact: TermLink[]; book?: BookCall; guided: boolean; onTrailerDone: () => void; playMs?: number; sub?: string; ad: ReturnType<typeof useAd>; lang?: string | null; onFinish: () => void; children: React.ReactNode }) {
   return (
     <div className="nf-bb" data-playing={playing || undefined}>
       <div className="nf-bb-art" aria-hidden>
@@ -735,7 +742,7 @@ function Billboard({ facts, playing, contact, guided, onTrailerDone, playMs, sub
         {facts.media ? <NfPoster media={facts.media} eager /> : null}
       </div>
       <div className="nf-bb-shade" aria-hidden />
-      {playing && facts.kind === "project" ? <ProjectTrailer facts={facts} contact={contact} guided={guided} ad={ad} onDone={onTrailerDone} /> : null}
+      {playing && facts.kind === "project" ? <ProjectTrailer facts={facts} contact={contact} book={book} guided={guided} ad={ad} onDone={onTrailerDone} /> : null}
       {playing && facts.kind !== "project" ? <Teleprompter text={`${facts.title}. ${facts.blurb ?? ""}`.trim()} sub={sub} ad={ad} lang={lang} ms={playMs ?? 6000} onDone={onFinish} /> : null}
       <h2 className="nf-bb-title" data-hidden={playing || undefined}>
         {facts.title}
@@ -751,7 +758,7 @@ function Billboard({ facts, playing, contact, guided, onTrailerDone, playMs, sub
 }
 
 /** A project's trailer (F1): its chapters from the story data. The Recruiter cut plays the first three at a 1.25x hold and skips the end card. */
-function ProjectTrailer({ facts, contact, guided, ad, onDone }: { facts: NfFacts; contact: TermLink[]; guided: boolean; ad: ReturnType<typeof useAd>; onDone: () => void }) {
+function ProjectTrailer({ facts, contact, book, guided, ad, onDone }: { facts: NfFacts; contact: TermLink[]; book?: BookCall; guided: boolean; ad: ReturnType<typeof useAd>; onDone: () => void }) {
   const chapters = useMemo(
     () =>
       trailerChapters(
@@ -760,7 +767,7 @@ function ProjectTrailer({ facts, contact, guided, ad, onDone }: { facts: NfFacts
       ),
     [facts, guided],
   );
-  return <Trailer chapters={chapters} holdScale={guided ? 1.25 : 1} adOn={ad.on} adTag="en-IN" live={facts.live} repo={facts.repo} contact={contact} dev={facts.story?.status === "in-development"} guided={guided} onDone={onDone} />;
+  return <Trailer chapters={chapters} holdScale={guided ? 1.25 : 1} adOn={ad.on} adTag="en-IN" live={facts.live} repo={facts.repo} contact={contact} dev={facts.story?.status === "in-development"} book={book} guided={guided} onDone={onDone} />;
 }
 
 /** Types the text over six seconds (all at once, then a short hold, under reduced motion). */

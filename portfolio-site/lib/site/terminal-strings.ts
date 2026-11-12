@@ -469,6 +469,8 @@ const en = {
   "nf.binge.now": "Play now",
   "nf.binge.cancel": "Cancel",
   "nf.binge.toggle": "Autoplay next",
+  "nf.resume": "You left off at {where}",
+  "nf.book": "Book a call",
   "nf.close": "Close",
   "nf.full": "Full size",
   "nf.previously": "Previously on…",

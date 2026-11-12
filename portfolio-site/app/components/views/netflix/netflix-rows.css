@@ -64,6 +64,13 @@
   font-size: 1.2rem;
   font-weight: 600;
 }
+.nf-row-resume {
+  margin: -0.25rem 0 0.4rem;
+  padding: 0 16px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.8rem;
+  color: var(--nf-dim);
+}
 .nf-count {
   font-weight: 400;
   color: var(--nf-dim);

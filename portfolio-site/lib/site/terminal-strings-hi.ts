@@ -444,6 +444,8 @@ export const hi: TerminalStrings = {
   "nf.binge.now": "अभी चलाएं",
   "nf.binge.cancel": "रद्द करें",
   "nf.binge.toggle": "अगला अपने आप चले",
+  "nf.resume": "आप यहाँ रुके थे: {where}",
+  "nf.book": "कॉल बुक करें",
   "nf.close": "बंद करें",
   "nf.full": "पूरे आकार में",
   "nf.previously": "पिछले एपिसोड में…",

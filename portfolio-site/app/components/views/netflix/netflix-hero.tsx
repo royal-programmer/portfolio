@@ -6,7 +6,7 @@
  * the trailer plays by itself, silent, with a Skip pill.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { factsOf, metricLabel, type Episode, type NetflixShow, type NetflixProfileId, type NfItem } from "@/lib/site/netflix-data";
+import { factsOf, metricLabel, type BookCall, type Episode, type NetflixShow, type NetflixProfileId, type NfItem } from "@/lib/site/netflix-data";
 import { factSub, latestSub, nextSub, statusSub, type NfLine, type SubData, type SubLang } from "@/lib/site/netflix-subs";
 import { AdButton, CcButton } from "./netflix-cc";
 import { useAd, useAdSpeech } from "./netflix-ad";
@@ -38,6 +38,8 @@ type Props = {
   /** Subtitles (N8): the toggle and the translated facts they come from. */
   cc: { on: boolean; lang: SubLang | null; toggle: () => void };
   subData: SubData;
+  /** The book-a-call link (F6), when there is one. */
+  book?: BookCall;
 };
 
 /** The pitch, built from the hero facts, the two newest main-branch episodes and the status line. */
@@ -55,7 +57,7 @@ function trailerLines(series: NetflixShow, status: string, subs: { lang: SubLang
 const FEATURE_MS = 7000;
 const TONE_COLOR: Record<string, string> = { main: "var(--nf-accent)", learn: "#2ab7b0", side: "#8b6cf0", life: "#8a8a96", project: "var(--nf-accent)", post: "var(--nf-accent)" };
 
-export function NetflixHero({ series, profile, status, fast, firstRowId, features, onOpen, held, sound, recap, onRecapEnd, cc, subData }: Props) {
+export function NetflixHero({ series, profile, status, fast, firstRowId, features, onOpen, held, sound, recap, onRecapEnd, cc, subData, book }: Props) {
   const forName = useForName();
   const ad = useAd(cc.lang);
   const [playing, setPlaying] = useState(false);
@@ -189,6 +191,11 @@ export function NetflixHero({ series, profile, status, fast, firstRowId, feature
               <button type="button" className="nf-btn nf-btn-glass" onClick={() => onOpen(cur.item, false)}>
                 <span aria-hidden>ⓘ</span> More info
               </button>
+              {book ? (
+                <a className="nf-btn nf-btn-glass" href={book.href} target="_blank" rel="noreferrer">
+                  {book.label}
+                </a>
+              ) : null}
             </>
           ) : null}
           <span className="nf-actions-extra">

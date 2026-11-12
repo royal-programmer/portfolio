@@ -9,6 +9,7 @@ import { TrendingRow } from "./netflix-trending";
 import { CertRow } from "./netflix-certs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { factsOf, metricLabel, type CastMember, type CertSeason, type Episode, type NetflixShow, type NfItem, type ProjectCard, type SkillCard } from "@/lib/site/netflix-data";
+import { t } from "@/lib/site/terminal-strings";
 import type { TermLink } from "@/lib/site/terminal-data";
 import { PROFILES } from "@/lib/site/profiles";
 import { useViewExit } from "../view-shell";
@@ -181,12 +182,18 @@ function Row({ row, env }: { row: Extract<DisplayRow, { items: NfItem[] }>; env:
 
   const by = (dir: 1 | -1) => scroller.current?.scrollBy({ left: dir * scroller.current.clientWidth * 0.8, behavior: behavior() });
   const hasEpisodes = row.items.some((i) => i.kind === "episode");
+  // F6: the Continue watching row says where the visitor left off, from the first card (already derived data).
+  const first = row.id === "continue" ? row.items[0] : undefined;
+  const resume = first ? (first.kind === "episode" ? `S${first.e.season} E${first.e.n}` : factsOf(first).title) : null;
 
   return (
     <section className="nf-row" id={`nf-row-${row.id}`} aria-labelledby={`nf-h-${row.id}`} data-ep={hasEpisodes ? "" : undefined}>
       <h2 className="nf-row-title" id={`nf-h-${row.id}`}>
         {row.title} <span className="nf-count">&middot; {row.items.length}</span>
       </h2>
+      {resume ? (
+        <p className="nf-row-resume">{t("nf.resume", "en").replace("{where}", resume)}</p>
+      ) : null}
       <div className="nf-row-body">
         {edge.l ? (
           <button type="button" className="nf-edge nf-edge-l" aria-label={`${row.title}: earlier`} onClick={() => by(-1)}>

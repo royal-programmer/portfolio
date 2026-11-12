@@ -785,7 +785,15 @@ export function endCardOf(season: number, index: Map<string, NfItem>, nowMonth?:
 
 /* ---------- C4: the phone Hire sheet ---------- */
 
-export type HireSheet = { email?: string; resume: string; brief: string; /** The one availability line (`hiring.availability`). */ availability: string };
+/** The book-a-call link (F6). Data, empty until Ratul gives the link: while `href` is empty no button renders and nothing mentions it. */
+export type BookCall = { label: string; href: string };
+export const BOOK_CALL: BookCall = { label: "Book a call", href: "" };
+/** The link when there is one (https only), else undefined. */
+export function bookOf(b: BookCall = BOOK_CALL): BookCall | undefined {
+  return /^https:\/\//i.test(b.href.trim()) ? { label: b.label, href: b.href.trim() } : undefined;
+}
+
+export type HireSheet = { book?: BookCall; email?: string; resume: string; brief: string; /** The one availability line (`hiring.availability`). */ availability: string };
 
 /** When the contextual Hire bar appears (D5): after this many opened titles or this long on the page; a dismissal is remembered this many days. Data. */
 export const HIRE_BAR = { afterOpens: 2, afterMs: 45_000, rememberDays: 7 } as const;
@@ -809,7 +817,7 @@ export function hireSheetOf(data: TerminalData): HireSheet {
     ...(["linkedin", "github"] as const).flatMap((k) => (link(k) ? [`  ${k.padEnd(9)} ${link(k)}`] : [])),
     `  resume    ${h.links.site}${h.links.resume}`,
   ];
-  return { email, resume: h.links.resume, brief: lines.join("\n"), availability: h.availability };
+  return { book: bookOf(), email, resume: h.links.resume, brief: lines.join("\n"), availability: h.availability };
 }
 
 /* ---------- C5: Previously on... ---------- */
