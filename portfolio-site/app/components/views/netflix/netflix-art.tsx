@@ -14,7 +14,7 @@ type Props = { seed: string; tone: string; shape?: ArtShape; metric?: Metric; /*
 export const NfArt = memo(function NfArt({ seed, tone, shape = "wide", metric, big, live }: Props) {
   const a = artFor(seed, tone, shape);
   return (
-    <span className="nf-art2" aria-hidden data-big={big || undefined} data-live={live || undefined} data-shape={shape}>
+    <span className="nf-art2" aria-hidden data-big={big || undefined} data-live={live || undefined} data-shape={shape} style={{ "--at": a.tint } as React.CSSProperties}>
       <svg viewBox={`0 0 ${a.w} ${a.h}`} preserveAspectRatio="xMidYMid slice" focusable="false">
         {a.paths.map((p, i) => (
           <path key={i} d={p.d} className={`nf-art2-${p.kind}`} style={{ opacity: p.opacity }} strokeWidth={p.width} />

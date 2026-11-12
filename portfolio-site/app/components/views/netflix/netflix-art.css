@@ -1,6 +1,6 @@
 /* Generated key art (17-persona-views.md §21, C1): one inline SVG per card, coloured by the card's --b. */
 .nf-art2 {
-  --ab: var(--b, var(--nf-accent));
+  --ab: color-mix(in srgb, var(--b, var(--nf-accent)) 40%, var(--at, transparent));
   position: absolute;
   inset: 0;
   z-index: 0;
