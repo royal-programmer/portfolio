@@ -561,6 +561,9 @@
 .nf-m-bar .nf-cc {
   margin-left: auto;
 }
+.nf-m-bar .nf-ad {
+  margin-left: 0.5rem;
+}
 .nf-m-bar .nf-m-vol {
   margin-left: 0.5rem;
 }

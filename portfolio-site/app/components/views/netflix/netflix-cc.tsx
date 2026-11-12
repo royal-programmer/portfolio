@@ -1,5 +1,6 @@
 "use client";
 
+import type { useAd } from "./netflix-ad";
 import { CC_HINT, LANG_LABEL, type SubLang } from "@/lib/site/netflix-subs";
 
 /** The CC toggle (N8): `CC` plus the active language's label; with English it says how to pick one. */
@@ -20,6 +21,34 @@ export function CcButton({ cc, small, hint }: { cc: { on: boolean; lang: SubLang
         ) : null}
       </button>
       {hint && !cc.lang ? <span className="nf-cc-hint">{CC_HINT}</span> : null}
+    </>
+  );
+}
+
+/** The AD toggle (D4), beside CC: `AD`, pressed while audio description is on; a note says when no voice matches. */
+export function AdButton({ ad, small }: { ad: ReturnType<typeof useAd>; small?: boolean }) {
+  if (!ad.supported) return null;
+  const label = ad.on ? "Audio description on" : "Audio description off";
+  return (
+    <>
+      <button
+        type="button"
+        className={`nf-round nf-ad${small ? " nf-round-s" : ""}`}
+        aria-pressed={ad.on}
+        aria-label={label}
+        title={label}
+        onClick={(e) => {
+          e.stopPropagation();
+          ad.toggle();
+        }}
+      >
+        <span aria-hidden>AD</span>
+      </button>
+      {ad.on && ad.note ? (
+        <span className="nf-ad-note" role="status">
+          {ad.note}
+        </span>
+      ) : null}
     </>
   );
 }

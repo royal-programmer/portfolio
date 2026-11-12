@@ -876,7 +876,8 @@
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   font-size: 0.85em;
 }
-.nf-cc {
+.nf-cc,
+.nf-ad {
   width: auto;
   min-width: 44px;
   padding: 0 10px;
@@ -886,16 +887,25 @@
   font-weight: 700;
   letter-spacing: 0.02em;
 }
-.nf-cc[aria-pressed="false"] {
+.nf-cc[aria-pressed="false"],
+.nf-ad[aria-pressed="false"] {
   opacity: 0.6;
 }
-.nf-cc[aria-pressed="true"] {
+.nf-cc[aria-pressed="true"],
+.nf-ad[aria-pressed="true"] {
   background: #fff;
   color: #141419;
 }
 .nf-cc-lang {
   font-size: 0.8rem;
   font-weight: 600;
+}
+.nf-ad-note {
+  flex: none;
+  max-width: 16rem;
+  color: var(--nf-dim);
+  font-size: 0.72rem;
+  line-height: 1.25;
 }
 .nf-cc-hint {
   flex: none;

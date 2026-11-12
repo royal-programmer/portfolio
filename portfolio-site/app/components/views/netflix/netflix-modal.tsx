@@ -16,7 +16,8 @@ import { epSub } from "@/lib/site/netflix-subs";
 import { t } from "@/lib/site/terminal-strings";
 import { useViewExit } from "../view-shell";
 import { useForName } from "./use-for-name";
-import { CcButton } from "./netflix-cc";
+import { AdButton, CcButton } from "./netflix-cc";
+import { adCancel, useAd, useAdSpeech } from "./netflix-ad";
 import { chime } from "./netflix-sound";
 import { NfArt } from "./netflix-art";
 import { useCc, useLikes, useMyList, useSound } from "./netflix-store";
@@ -58,6 +59,7 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
   const closing = useRef(false);
   const sound = useSound();
   const cc = useCc();
+  const ad = useAd(cc.lang);
   const list = useMyList();
   const likes = useLikes();
   const [play, setPlay] = useState<{ id: string; on: boolean }>({ id: item.id, on: !!autoPlay });
@@ -120,6 +122,7 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
   const requestClose = useCallback(() => {
     if (closing.current) return;
     closing.current = true;
+    adCancel();
     const ms = reduced() ? 80 : 160;
     backdrop.current?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, fill: "forwards" });
     const a = panel.current?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, fill: "forwards" });
@@ -343,7 +346,7 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
           <>
         <div className="nf-m-top" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
           <div className="nf-m-handle" aria-hidden />
-          <Billboard key={item.id} facts={facts} playing={playing} playMs={playMs} sub={cc.on && cc.lang ? epSub(facts.tone, facts.season, facts.n, cc.lang) : undefined} lang={cc.lang} onFinish={finished}>
+          <Billboard key={item.id} facts={facts} playing={playing} playMs={playMs} sub={cc.on && cc.lang ? epSub(facts.tone, facts.season, facts.n, cc.lang) : undefined} ad={ad} lang={cc.lang} onFinish={finished}>
             <button type="button" className="nf-m-x" aria-label="Close" onClick={requestClose}>
               <span aria-hidden>×</span>
             </button>
@@ -390,6 +393,7 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
                 ) : null}
               </div>
               <CcButton cc={cc} />
+              <AdButton ad={ad} />
               <button
                 type="button"
                 className="nf-round nf-m-vol"
@@ -635,14 +639,14 @@ function EndCard({ end, now, contact, onClose, onNext }: { end: ReturnType<typeo
 
 /* ---------- Billboard ---------- */
 
-function Billboard({ facts, playing, playMs, sub, lang, onFinish, children }: { facts: NfFacts; playing: boolean; playMs?: number; sub?: string; lang?: string | null; onFinish: () => void; children: React.ReactNode }) {
+function Billboard({ facts, playing, playMs, sub, ad, lang, onFinish, children }: { facts: NfFacts; playing: boolean; playMs?: number; sub?: string; ad: ReturnType<typeof useAd>; lang?: string | null; onFinish: () => void; children: React.ReactNode }) {
   return (
     <div className="nf-bb" data-playing={playing || undefined}>
       <div className="nf-bb-art" aria-hidden>
         <NfArt seed={facts.id} tone={facts.tone} metric={facts.metric} big live />
       </div>
       <div className="nf-bb-shade" aria-hidden />
-      {playing ? <Teleprompter text={`${facts.title}. ${facts.blurb ?? ""}`.trim()} sub={sub} lang={lang} ms={playMs ?? 6000} onDone={onFinish} /> : null}
+      {playing ? <Teleprompter text={`${facts.title}. ${facts.blurb ?? ""}`.trim()} sub={sub} ad={ad} lang={lang} ms={playMs ?? 6000} onDone={onFinish} /> : null}
       <h2 className="nf-bb-title" data-hidden={playing || undefined}>
         {facts.title}
       </h2>
@@ -652,7 +656,10 @@ function Billboard({ facts, playing, playMs, sub, lang, onFinish, children }: { 
 }
 
 /** Types the text over six seconds (all at once, then a short hold, under reduced motion). */
-function Teleprompter({ text, sub, lang, ms, onDone }: { text: string; sub?: string; lang?: string | null; ms: number; onDone: () => void }) {
+function Teleprompter({ text, sub, ad, lang, ms, onDone }: { text: string; sub?: string; ad: ReturnType<typeof useAd>; lang?: string | null; ms: number; onDone: () => void }) {
+  // D4: the synopsis is English, so it is spoken with the English voice; a natural end lets it finish.
+  const natural = useRef(false);
+  useAdSpeech({ on: ad.on, tag: "en-IN" }, text, () => natural.current);
   const calm = useMemo(() => reduced(), []);
   const [chars, setChars] = useState(calm ? text.length : 0);
   const done = useRef(onDone);
@@ -661,6 +668,7 @@ function Teleprompter({ text, sub, lang, ms, onDone }: { text: string; sub?: str
   });
   useEffect(() => {
     if (calm) {
+      natural.current = true;
       const t = window.setTimeout(() => done.current(), 2000);
       return () => window.clearTimeout(t);
     }
@@ -671,6 +679,7 @@ function Teleprompter({ text, sub, lang, ms, onDone }: { text: string; sub?: str
       const c = Math.min(text.length, Math.floor(((now - t0) / ms) * text.length));
       setChars(c);
       if (c >= text.length) {
+        natural.current = true;
         hold = window.setTimeout(() => done.current(), 800);
         return;
       }

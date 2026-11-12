@@ -8,7 +8,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { factsOf, metricLine, type Episode, type NetflixShow, type NetflixProfileId, type NfItem } from "@/lib/site/netflix-data";
 import { factSub, latestSub, nextSub, statusSub, type NfLine, type SubData, type SubLang } from "@/lib/site/netflix-subs";
-import { CcButton } from "./netflix-cc";
+import { AdButton, CcButton } from "./netflix-cc";
+import { useAd, useAdSpeech } from "./netflix-ad";
 import { tick as tickSound } from "./netflix-sound";
 import { NfArt } from "./netflix-art";
 import { useForName } from "./use-for-name";
@@ -55,6 +56,7 @@ const TONE_COLOR: Record<string, string> = { main: "var(--nf-accent)", learn: "#
 
 export function NetflixHero({ series, profile, status, fast, firstRowId, features, onOpen, held, sound, recap, onRecapEnd, cc, subData }: Props) {
   const forName = useForName();
+  const ad = useAd(cc.lang);
   const [playing, setPlaying] = useState(false);
   const [auto, setAuto] = useState(false);
   const autoDone = useRef(false);
@@ -208,6 +210,7 @@ export function NetflixHero({ series, profile, status, fast, firstRowId, feature
               <span aria-hidden>{sound.on ? "🔊" : "🔇"}</span>
             </button>
             <CcButton cc={cc} />
+            <AdButton ad={ad} />
           </span>
         </div>
         {n > 1 ? (
@@ -234,9 +237,10 @@ export function NetflixHero({ series, profile, status, fast, firstRowId, feature
 
       {playing || recap ? (
         <Trailer
-          lines={recap ? recap.lines : trailerLines(series, status, cc.on && cc.lang ? { lang: cc.lang, data: subData } : null)}
+          lines={recap ? recap.lines : trailerLines(series, status, (cc.on || ad.on) && cc.lang ? { lang: cc.lang, data: subData } : null)}
           showSubs={cc.on && !!cc.lang}
           cc={cc}
+          ad={ad}
           ms={recap ? 20_000 : 14_000}
           fast={fast || reducedMotion()}
           auto={auto && !recap}
@@ -249,12 +253,16 @@ export function NetflixHero({ series, profile, status, fast, firstRowId, feature
   );
 }
 
-function Trailer({ lines: entries, showSubs, cc, ms, fast, auto, onEnd, sound }: { lines: NfLine[]; showSubs: boolean; cc: Props["cc"]; ms: number; fast: boolean; auto: boolean; onEnd: (scroll: boolean, focus?: boolean) => void; sound: { on: boolean; toggle: () => void } }) {
+function Trailer({ lines: entries, showSubs, cc, ad, ms, fast, auto, onEnd, sound }: { lines: NfLine[]; showSubs: boolean; cc: Props["cc"]; ad: ReturnType<typeof useAd>; ms: number; fast: boolean; auto: boolean; onEnd: (scroll: boolean, focus?: boolean) => void; sound: { on: boolean; toggle: () => void } }) {
   const soundOn = useRef(sound.on);
   useEffect(() => {
     soundOn.current = sound.on;
   });
   const lines = useMemo(() => entries.map((l) => l.text), [entries]);
+  // D4: the whole pitch is spoken (the translation when the terminal speaks bn or hi and one exists). A natural end lets it finish; skip, Esc and toggle-off cancel it.
+  const natural = useRef(false);
+  const spoken = useMemo(() => entries.filter((l) => !l.text.startsWith("$ ")).map((l) => (ad.tag !== "en-IN" && l.sub ? l.sub : l.text)).join(" "), [entries, ad.tag]);
+  useAdSpeech(ad, spoken, () => natural.current);
   const total = useMemo(() => lines.reduce((n, l) => n + l.length + 1, 0), [lines]);
   const [chars, setChars] = useState(fast ? total : 0);
   const root = useRef<HTMLDivElement>(null);
@@ -278,6 +286,7 @@ function Trailer({ lines: entries, showSubs, cc, ms, fast, auto, onEnd, sound }:
       }
       setChars(c);
       if (c >= total) {
+        natural.current = true;
         window.setTimeout(() => onEnd(!auto, !auto), 900);
         return;
       }
@@ -323,6 +332,7 @@ function Trailer({ lines: entries, showSubs, cc, ms, fast, auto, onEnd, sound }:
           <span style={{ width: `${Math.round((chars / total) * 100)}%` }} />
         </div>
         <CcButton cc={cc} small hint />
+        <AdButton ad={ad} small />
         <button
           type="button"
           className="nf-round nf-round-s nf-trailer-vol"
