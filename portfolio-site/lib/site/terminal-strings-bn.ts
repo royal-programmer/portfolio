@@ -427,6 +427,7 @@ export const bn: TerminalStrings = {
   "nf.end.visit": "প্রজেক্ট দেখুন",
   "nf.end.code": "কোড দেখুন",
   "nf.end.dev": "তৈরি হচ্ছে",
+  "nf.status.livebuilding": "চালু · এখনও তৈরি হচ্ছে",
   "nf.end.hello": "হ্যালো বলুন",
   "nf.shots": "স্ক্রিন",
   "nf.clips": "ক্লিপ",

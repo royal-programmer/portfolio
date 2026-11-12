@@ -33,7 +33,7 @@ export type TrailerFacts = {
   story?: ProjectStory;
   media?: ProjectMedia;
   /** Words from the strings files. */
-  labels: { built: string; dev: string; live: string };
+  labels: { built: string; dev: string; live: string; liveBuilding: string };
 };
 
 /**
@@ -43,7 +43,7 @@ export type TrailerFacts = {
 export function trailerChapters(f: TrailerFacts, guided = false): Chapter[] {
   const s = f.story ?? {};
   const status = s.status ?? (f.live ? "live" : "in-development");
-  const statusLabel = status === "live" ? f.labels.live : f.labels.dev;
+  const statusLabel = status === "live" ? f.labels.live : status === "live-building" ? f.labels.liveBuilding : f.labels.dev;
   const out: Chapter[] = [];
   out.push({ id: "title", kind: "title", text: [f.title, s.description ?? f.summary ?? "", statusLabel].filter(Boolean).join("\n") });
   const why = [s.audience, s.problem].filter(Boolean).join(" ");

@@ -762,7 +762,7 @@ function ProjectTrailer({ facts, contact, book, guided, ad, onDone }: { facts: N
   const chapters = useMemo(
     () =>
       trailerChapters(
-        { title: facts.title, summary: facts.blurb, stack: facts.stack, live: facts.live, story: facts.story, media: facts.media, labels: { built: t("nf.tr.built", "en"), dev: t("nf.end.dev", "en"), live: t("nf.status.live", "en") } },
+        { title: facts.title, summary: facts.blurb, stack: facts.stack, live: facts.live, story: facts.story, media: facts.media, labels: { built: t("nf.tr.built", "en"), dev: t("nf.end.dev", "en"), live: t("nf.status.live", "en"), liveBuilding: t("nf.status.livebuilding", "en") } },
         guided,
       ),
     [facts, guided],

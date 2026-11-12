@@ -452,6 +452,7 @@ const en = {
   "nf.end.visit": "Visit project",
   "nf.end.code": "View code",
   "nf.end.dev": "In development",
+  "nf.status.livebuilding": "Live · still being built",
   "nf.end.hello": "Say hello",
   "nf.shots": "Screens",
   "nf.clips": "Clips",

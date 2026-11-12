@@ -72,7 +72,7 @@ export type ProjectCard = {
 
 /** `clip` is a clip id from `media.clips`; `clipMs` cuts a long clip (default 8 s). */
 export type ProjectBeat = { text: string; clip?: string; clipMs?: number };
-export type ProjectStatus = "in-development" | "live";
+export type ProjectStatus = "in-development" | "live" | "live-building";
 export type ProjectStory = { description?: string; audience?: string; problem?: string; beats?: ProjectBeat[]; status?: ProjectStatus };
 
 /**
@@ -81,15 +81,15 @@ export type ProjectStory = { description?: string; audience?: string; problem?: 
  */
 const PROJECT_STORY: Record<string, ProjectStory> = {
   "api-test-center": {
-    description: "API and performance testing on your own computer.",
+    description: "A free app to send, check and load-test APIs, on your own computer.",
     audience: "For developers and testers who check an API before it ships.",
-    problem: "Checking an API usually means one tool for a single request and another for load. This one does both from the same request, and keeps every result on your computer.",
+    problem: "Checking an API usually means one tool for a single request and another for load. This one does both from the same request, works from the command line in CI, and lets an AI agent run the tests too.",
     beats: [
       { text: "Send a request and see the checks on status, JSON, body, headers and time pass or fail.", clip: "send", clipMs: 7000 },
       { text: "Run a load test, through k6, from that same request.", clip: "load-test", clipMs: 8000 },
       { text: "Every run is saved on your computer, so you can keep it and compare it later.", clip: "history", clipMs: 7000 },
     ],
-    status: "in-development",
+    status: "live-building",
   },
 };
 
