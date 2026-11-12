@@ -11,6 +11,8 @@ import { factSub, latestSub, nextSub, statusSub, type NfLine, type SubData, type
 import { CcButton } from "./netflix-cc";
 import { tick as tickSound } from "./netflix-sound";
 import { NfArt } from "./netflix-art";
+import { useForName } from "./use-for-name";
+import { t } from "@/lib/site/terminal-strings";
 
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -52,6 +54,7 @@ const FEATURE_MS = 7000;
 const TONE_COLOR: Record<string, string> = { main: "var(--nf-accent)", learn: "#2ab7b0", side: "#8b6cf0", life: "#8a8a96", project: "var(--nf-accent)", post: "var(--nf-accent)" };
 
 export function NetflixHero({ series, profile, status, fast, firstRowId, features, onOpen, held, sound, recap, onRecapEnd, cc, subData }: Props) {
+  const forName = useForName();
   const [playing, setPlaying] = useState(false);
   const [auto, setAuto] = useState(false);
   const autoDone = useRef(false);
@@ -148,7 +151,7 @@ export function NetflixHero({ series, profile, status, fast, firstRowId, feature
       <div className="nf-hero-shade" aria-hidden />
 
       <div className="nf-hero-copy">
-        <p className="nf-kicker">{series.hero.kicker}</p>
+        <p className="nf-kicker">{forName ? t("nf.for.kicker", "en").replace("{name}", forName) : series.hero.kicker}</p>
         <h1 className="nf-title">{series.hero.title}</h1>
         <p className="nf-tagline">{series.tagline}</p>
         <p className="nf-blurb">{series.hero.blurb}</p>

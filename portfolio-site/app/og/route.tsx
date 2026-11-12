@@ -214,7 +214,8 @@ function NetflixBody({ card, accent }: { card: NetflixCard; accent: string }): R
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 56, height: 56, borderRadius: 12, background: b, color: "#0b0b0f", fontSize: 38 }}>R</div>
         <div style={{ display: "flex", marginLeft: 20, fontSize: 22, color: "rgba(243,241,236,.72)" }}>a series by Ratul Roy</div>
       </div>
-      <div style={{ display: "flex", marginTop: 36, fontSize: 104, lineHeight: 1, color: b === accent ? "#f3f1ec" : b, letterSpacing: -4 }}>{card.numeral}</div>
+      {card.pickedFor ? <div style={{ display: "flex", marginTop: 28, fontSize: 30, color: "rgba(243,241,236,.9)" }}>{`Picked for ${card.pickedFor}`}</div> : null}
+      <div style={{ display: "flex", marginTop: card.pickedFor ? 14 : 36, fontSize: 104, lineHeight: 1, color: b === accent ? "#f3f1ec" : b, letterSpacing: -4 }}>{card.numeral}</div>
       <div style={{ display: "flex", marginTop: 18, fontSize: size, lineHeight: 1.1, maxWidth: 1050 }}>{card.title}</div>
       <div style={{ display: "flex", marginTop: 20, fontSize: 24, lineHeight: 1.35, maxWidth: 1000, maxHeight: 66, overflow: "hidden", color: "rgba(243,241,236,.82)" }}>{card.line}</div>
       <div style={{ display: "flex", position: "absolute", left: 72, bottom: 40, fontSize: 24, color: "rgba(243,241,236,.7)" }}>{`${HOST}/netflix`}</div>
@@ -245,7 +246,7 @@ export async function GET(req: Request) {
     const data = await loadEngineerTerminalData();
     const nf = /^netflix:(.{1,90})$/i.exec((q.get("cmd") ?? "").trim());
     if (nf) {
-      const card = netflixCard(data, nf[1]);
+      const card = netflixCard(data, nf[1], q.get("for") ?? undefined);
       if (card) {
         const { personas } = await loadHomeContent();
         return await respond(<NetflixBody card={card} accent={personas.find((p) => p.slug === "engineer")?.accent ?? "#3b82f6"} />);

@@ -1127,3 +1127,42 @@
     animation: none;
   }
 }
+
+/* "Make a link for someone" in the Profiles menu, and the greeting lines (D1). */
+.nf-pmenu-for {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 10px 8px 6px;
+  border-top: 1px solid var(--nf-line);
+}
+.nf-pmenu-for label {
+  font-size: 0.78rem;
+  color: var(--nf-mute, rgba(243, 241, 236, 0.7));
+}
+.nf-pmenu-for input {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--nf-line);
+  border-radius: 4px;
+  background: #0b0b0f;
+  color: var(--nf-ink);
+  font: inherit;
+  font-size: 16px;
+}
+.nf-pmenu-for button {
+  border: 1px solid var(--nf-line);
+}
+.nf-pmenu-for button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.nf-sheet-hi,
+.nf-end-hi {
+  margin: 0 0 6px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--nf-accent) 60%, #fff);
+}

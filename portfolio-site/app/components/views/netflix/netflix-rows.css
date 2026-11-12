@@ -898,3 +898,74 @@ button.nf-cast[aria-pressed="true"] {
     font-size: 28vw;
   }
 }
+
+/* ---------- Trending now (D2) ---------- */
+.nf-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.7rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5bd68a;
+}
+.nf-live i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: nf-live 1.8s ease-in-out infinite;
+}
+@keyframes nf-live {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nf-live i {
+    animation: none;
+  }
+}
+.nf-tcard {
+  position: relative;
+  flex: none;
+  width: min(280px, 72vw);
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #14141b;
+  scroll-snap-align: start;
+}
+.nf-tcard-a {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 12px;
+  color: var(--nf-ink);
+  text-decoration: none;
+  background: linear-gradient(0deg, rgba(8, 8, 12, 0.92), rgba(8, 8, 12, 0) 70%);
+}
+.nf-tcard-msg {
+  font-weight: 600;
+  font-size: 0.9rem;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.nf-tcard-meta {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.7rem;
+  color: rgba(243, 241, 236, 0.75);
+}
+.nf-tcard-a:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -3px;
+}

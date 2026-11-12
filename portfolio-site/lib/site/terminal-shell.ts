@@ -23,6 +23,7 @@ import {
 } from "@/lib/site/terminal-fs";
 import { fitMatch, FIT_MAX } from "@/lib/site/terminal-fit";
 import { layoutArch, type ArchRun } from "@/lib/site/terminal-arch";
+import { cleanFor, forLink } from "@/lib/site/netflix-for";
 import { didYouMean } from "@/lib/site/terminal-suggest";
 import type { TermCommit, TerminalData } from "@/lib/site/terminal-data";
 import { LANG_NAMES, LANGS, STRINGS, type Lang, type StringKey, type TerminalStrings } from "@/lib/site/terminal-strings";
@@ -715,6 +716,21 @@ export function createShell(data: TerminalData): Shell {
       // Default: the command before this one (not share itself), else the whole portfolio.
       const prev = [...st.history].reverse().find((h) => cmdName(h) !== "share" && NAMES.includes(cmdName(h)));
       cmd = prev ? prev.trim().replace(/\s+/g, " ").replace(/^\//, "") : "portfolio";
+    }
+    // `share netflix --for "Acme"`: the Netflix view's link made for a person (17-persona-views.md §22, D1).
+    const forM = /^netflix\s+--for\s+(?:"([^"]*)"|'([^']*)'|(.+))$/i.exec(cmd);
+    if (forM) {
+      const who = cleanFor(forM[1] ?? forM[2] ?? forM[3]);
+      if (!who) return [text(S["err.share"](args.join(" ").trim()))];
+      const o = `https://${host}`;
+      const url = forLink(o, "recruiter", who);
+      const img = `${o}/og?cmd=${encodeURIComponent("netflix:home")}&for=${encodeURIComponent(who)}`;
+      return [
+        text(S["share.head"](`netflix --for "${who}"`), true),
+        { kind: "links", prefix: "link   ", items: [{ label: url, href: url }] },
+        { kind: "links", prefix: "image  ", items: [{ label: img, href: img }] },
+        { kind: "links", prefix: "       ", items: [{ label: S["share.copy"], act: "copy", url }, { label: S["share.share"], act: "share", url, title: `Picked for ${who} · Ratul Roy` }] },
+      ];
     }
     // Same shape the `?run=` handler accepts: a known command, plain characters, short.
     if (!/^[a-z][a-z0-9 ._~/-]{0,40}$/i.test(cmd) || !NAMES.includes(cmdName(cmd)))

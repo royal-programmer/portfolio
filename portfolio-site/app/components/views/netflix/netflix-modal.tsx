@@ -14,6 +14,7 @@ import type { TermLink } from "@/lib/site/terminal-data";
 import { epSub } from "@/lib/site/netflix-subs";
 import { t } from "@/lib/site/terminal-strings";
 import { useViewExit } from "../view-shell";
+import { useForName } from "./use-for-name";
 import { CcButton } from "./netflix-cc";
 import { chime } from "./netflix-sound";
 import { NfArt } from "./netflix-art";
@@ -539,6 +540,7 @@ function Previously({ label, text }: { label: string; text: string }) {
 
 function EndCard({ end, now, contact, onClose, onNext }: { end: ReturnType<typeof endCardOf>; now?: { month: string; lines: string[] }; contact: TermLink[]; onClose: () => void; onNext?: () => void }) {
   const exit = useViewExit();
+  const forName = useForName();
   const link = (label: string) => contact.find((c) => c.label === label)?.href;
   const mail = link("mail");
   const linkedin = link("linkedin");
@@ -548,6 +550,7 @@ function EndCard({ end, now, contact, onClose, onNext }: { end: ReturnType<typeo
       <button type="button" className="nf-m-x" aria-label="Close" onClick={onClose}>
         <span aria-hidden>×</span>
       </button>
+      {forName ? <p className="nf-end-hi">{t("nf.for.hi", "en").replace("{name}", forName)}</p> : null}
       <h2 id="nf-end-h">{end.complete}</h2>
       <p className="nf-end-next">{end.next}</p>
       {now?.lines.length ? (

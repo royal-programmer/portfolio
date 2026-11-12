@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { HireSheet } from "@/lib/site/netflix-data";
 import { t, type Lang } from "@/lib/site/terminal-strings";
+import { useForName } from "./use-for-name";
 
 const FOCUSABLE = 'button:not([disabled]), a[href]';
 
@@ -55,6 +56,7 @@ export function NetflixTabBar({ lang, active, listDot, onHome, onSearch, onList,
 }
 
 export function NetflixHireSheet({ lang, hire, onClose }: { lang: Lang; hire: HireSheet; onClose: () => void }) {
+  const forName = useForName();
   const box = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
   const timer = useRef(0);
@@ -135,6 +137,7 @@ export function NetflixHireSheet({ lang, hire, onClose }: { lang: Lang; hire: Hi
           <span aria-hidden />
         </div>
         <h2 className="nf-sheet-title">{t("nf.hire.title", lang)}</h2>
+        {forName ? <p className="nf-sheet-hi">{t("nf.for.hi", lang).replace("{name}", forName)}</p> : null}
         {hire.email ? (
           <a className="nf-sheet-act" href={`mailto:${hire.email}`}>
             <span>{t("nf.hire.email", lang)}</span>

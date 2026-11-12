@@ -359,7 +359,9 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
     const topRow: DisplayRow[] = profile === "story" ? [] : [{ id: "top10", title: TOP10_ROW_TITLE, items: top10Of(show), top10: true }];
     const base = show.rows.map((r): DisplayRow => (r.kind === "contact" ? { id: r.id, title: r.title, contact: true } : r.kind === "cast" ? { id: r.id, title: r.title, cast: r.items } : { id: r.id, title: r.title, items: rowItems(r) }));
     // Developer: right after Projects (the first row); Recruiter: before the work rows, after Continue / Because / My List.
-    const withTop = profile === "developer" ? [base[0], ...topRow, ...base.slice(1)] : [...topRow, ...base];
+    // D2: "Trending now" from live public commits: Developer's second row, Recruiter's right after Top 10 (never in Story).
+    const trend: DisplayRow[] = profile === "story" ? [] : [{ id: "trending", title: "Trending now", trending: true }];
+    const withTop = profile === "developer" ? [base[0], ...trend, ...topRow, ...base.slice(1)] : [...topRow, ...trend, ...base];
     return [
       ...(cont.length ? [{ id: "continue", title: "Continue watching", items: cont } as DisplayRow] : []),
       ...because,
@@ -372,7 +374,7 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
   const shownRows = useMemo<DisplayRow[]>(() => {
     if (!castKey) return rows;
     return rows.flatMap((r): DisplayRow[] => {
-      if ("contact" in r || "cast" in r) return [r];
+      if ("contact" in r || "cast" in r || "trending" in r) return [r];
       const items = r.items.filter((it) => mentionsCast(it, castKey));
       return items.length ? [{ ...r, items }] : [];
     });
@@ -505,7 +507,7 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
 
   return (
     <>
-      <NetflixTopbar title={show.title} searchToken={searchToken} glyph={profileMeta?.glyph ?? "R"} tone={TONES[profile]} query={query} onQuery={onQuery} onPasteText={onPasteText} onHome={toTop} onSeries={toRows} onMyList={toList} onProfiles={onSwitch} onClearHistory={askClear} onReplay={onReplay} onKeys={() => setKeysOpen(true)} />
+      <NetflixTopbar title={show.title} searchToken={searchToken} glyph={profileMeta?.glyph ?? "R"} tone={TONES[profile]} query={query} onQuery={onQuery} onPasteText={onPasteText} onHome={toTop} onSeries={toRows} onMyList={toList} onProfiles={onSwitch} onClearHistory={askClear} onReplay={onReplay} onKeys={() => setKeysOpen(true)} profile={profile} />
       <div className="nf-visually-hidden" role="status" aria-live="polite">
         {said}
       </div>

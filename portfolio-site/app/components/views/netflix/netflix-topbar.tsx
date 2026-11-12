@@ -6,6 +6,8 @@
  * it keeps the mark, the search and the profile tile.
  */
 import { useEffect, useRef, useState } from "react";
+import { cleanFor, forLink, FOR_MAX, typeFor } from "@/lib/site/netflix-for";
+import { t } from "@/lib/site/terminal-strings";
 
 type Props = {
   /** Shown beside the mark on phones, where the top bar is just the title and the profile tile. */
@@ -27,9 +29,23 @@ type Props = {
   onReplay?: () => void;
   /** `Keyboard shortcuts` in the Profiles menu (N9). */
   onKeys?: () => void;
+  /** The active profile id, for "Make a link for someone" (D1). */
+  profile?: string;
 };
 
-export function NetflixTopbar({ title, searchToken = 0, glyph, tone, query, onQuery, onPasteText, onHome, onSeries, onMyList, onProfiles, onClearHistory, onReplay, onKeys }: Props) {
+export function NetflixTopbar({ title, searchToken = 0, glyph, tone, query, onQuery, onPasteText, onHome, onSeries, onMyList, onProfiles, onClearHistory, onReplay, onKeys, profile }: Props) {
+  const [forDraft, setForDraft] = useState("");
+  const [forCopied, setForCopied] = useState(false);
+  const copyFor = async () => {
+    const link = forLink(window.location.origin, profile ?? "recruiter", forDraft);
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      window.prompt("Link", link);
+    }
+    setForCopied(true);
+    window.setTimeout(() => setForCopied(false), 2200);
+  };
   const [solid, setSolid] = useState(false);
   const [menu, setMenu] = useState(false);
   const menuBox = useRef<HTMLDivElement>(null);
@@ -175,6 +191,21 @@ export function NetflixTopbar({ title, searchToken = 0, glyph, tone, query, onQu
                 <button type="button" role="menuitem" onClick={choose(onClearHistory)}>
                   Clear watch history
                 </button>
+              ) : null}
+              {profile ? (
+                <form
+                  className="nf-pmenu-for"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void copyFor();
+                  }}
+                >
+                  <label htmlFor="nf-for-in">{t("nf.for.make", "en")}</label>
+                  <input id="nf-for-in" type="text" inputMode="text" autoComplete="off" maxLength={FOR_MAX} value={forDraft} placeholder={t("nf.for.ph", "en")} onChange={(e) => setForDraft(typeFor(e.target.value))} />
+                  <button type="submit" disabled={!cleanFor(forDraft)}>
+                    {forCopied ? t("nf.for.copied", "en") : t("nf.for.copy", "en")}
+                  </button>
+                </form>
               ) : null}
             </div>
           ) : null}
