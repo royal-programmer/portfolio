@@ -318,7 +318,7 @@ export interface Strategy {
 
 export interface ContentQueryOptions {
   /**
-   * Include `private`/`unlisted` rows. ONLY the authenticated capture/admin
+   * Include `private`/`unlisted` rows. ONLY the authenticated admin
    * surfaces pass this. The public site never does, so it can never receive
    * private data even if the UI has a bug — RLS is the second line of defence.
    */

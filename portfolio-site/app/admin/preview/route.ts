@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
-  if (!(await isAdmin())) return NextResponse.redirect(new URL("/capture/login?next=/admin", url));
+  if (!(await isAdmin())) return NextResponse.redirect(new URL("/admin/login?next=/admin", url));
 
   const hostHeader = request.headers.get("host");
   const parsed = parseHost(hostHeader);

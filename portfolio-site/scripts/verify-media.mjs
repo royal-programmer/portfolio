@@ -14,7 +14,7 @@
  *
  * NOTE: this validates the pipeline + public/private serving. The browser
  * direct-upload path additionally needs migration 0007's RLS policies applied
- * (so the admin *session* is authorized) — exercise that from /capture/admin.
+ * (so the admin *session* is authorized) — exercise that from /admin/engineer/projects.
  *
  * Run:  node scripts/verify-media.mjs      (from portfolio-site/)
  * Prints PASS/FAIL only — never prints key values.

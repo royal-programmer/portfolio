@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { getBrowserClient } from "@/lib/db/browser";
-import { registerUploadedMedia } from "../actions";
+import { registerUploadedMedia } from "../entry-actions";
 import { ACCEPTED_IMAGE_TYPES, MAX_ORIGINAL_BYTES, ORIGINALS_BUCKET } from "@/lib/media/config";
 
 type Item = {

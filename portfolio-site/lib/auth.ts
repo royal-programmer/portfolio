@@ -1,5 +1,5 @@
 /**
- * Auth guards for protected (capture/admin) routes.
+ * Auth guards for protected (/admin) routes.
  * Server-only.
  */
 import { redirect } from "next/navigation";
@@ -18,6 +18,6 @@ export function safeNext(next: string | null | undefined): string | null {
 export async function requireAdmin(next?: string): Promise<void> {
   if (!(await isAdmin())) {
     const to = safeNext(next);
-    redirect(to ? `/capture/login?next=${encodeURIComponent(to)}` : "/capture/login");
+    redirect(to ? `/admin/login?next=${encodeURIComponent(to)}` : "/admin/login");
   }
 }

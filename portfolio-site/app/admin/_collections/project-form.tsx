@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { createProject, type ActionState } from "../actions";
+import { createProject, type ActionState } from "../entry-actions";
 import { MediaUploader } from "./media-uploader";
 
 const inputCls = "rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2";

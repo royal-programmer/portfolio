@@ -1,7 +1,7 @@
 /**
  * Browser Supabase client (session-bound).
  *
- * Used ONLY for direct-to-storage uploads from the admin capture UI: the
+ * Used ONLY for direct-to-storage uploads from the admin UI: the
  * browser streams the ORIGINAL straight to Supabase Storage, bypassing the
  * Next/Vercel serverless request-body limit (~4.5MB). The upload is authorized
  * by the logged-in admin's session cookie + storage RLS (`is_admin()`), so no

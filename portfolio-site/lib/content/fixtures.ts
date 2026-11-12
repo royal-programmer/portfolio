@@ -10,7 +10,7 @@
  * marked "(sample)" so they are never mistaken for real portfolio pieces.
  *
  * Owned by the data layer (Claude). Do not hand-edit as real content — real
- * content will be entered through the capture/admin surfaces once wired.
+ * content will be entered through the admin once wired.
  */
 import type { BaseEntry, BlogPost, Persona, Strategy } from "./types";
 
