@@ -620,3 +620,22 @@
   }
 }
 
+
+/* C5: Previously on... */
+.nf-m-prev {
+  margin: 0 0 0.6rem;
+  padding: 0.45rem 0.7rem;
+  border-left: 3px solid var(--b);
+  background: rgba(255, 255, 255, 0.05);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #d6d4cf;
+}
+.nf-m-prev b {
+  font-weight: 600;
+  color: var(--nf-ink);
+}
+.nf-m-prev-ghost {
+  visibility: hidden;
+}

@@ -312,3 +312,9 @@
     overflow: hidden;
   }
 }
+.nf-bb .nf-art2[data-big] .nf-art2-m {
+  top: 22cqh;
+}
+.nf-hero-copy {
+  width: min(46rem, 100%);
+}

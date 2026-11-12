@@ -7,11 +7,12 @@
  * meta row, description, the season's episodes, "More like this" and About. Everything is swapped in place.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { NF_ADJECTIVES, castOf, endCardOf, factsOf, moreLike, type CastMember, type NetflixProfileId, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
+import { NF_ADJECTIVES, castOf, endCardOf, factsOf, moreLike, previouslyLine, type CastMember, type NetflixProfileId, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
 import { DISPLAY_ROOT } from "@/lib/site/brand";
 import { netflixShareLink } from "@/lib/site/netflix-og";
 import type { TermLink } from "@/lib/site/terminal-data";
 import { epSub } from "@/lib/site/netflix-subs";
+import { t } from "@/lib/site/terminal-strings";
 import { useViewExit } from "../view-shell";
 import { CcButton } from "./netflix-cc";
 import { chime } from "./netflix-sound";
@@ -268,6 +269,7 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
     [index, item.kind, season],
   );
   const more = useMemo(() => moreLike(item, index, 6), [item, index]);
+  const previously = useMemo(() => previouslyLine(item, index), [item, index]);
   // The item's own season in Episodes order, whatever season the picker shows: Next walks it, the last one ends on the card.
   const own = useMemo(
     () => (item.kind === "episode" ? [...index.values()].flatMap((o) => (o.kind === "episode" && o.e.season === item.e.season ? [o] : [])).sort((a, b) => (a.kind === "episode" && b.kind === "episode" ? a.e.n - b.e.n : 0)) : []),
@@ -374,6 +376,7 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
               {facts.grade ? <span className="nf-grade">{facts.grade}</span> : null}
               <span className="nf-hd">{facts.branchLabel}</span>
             </div>
+            {previously ? <Previously key={item.id} label={t("nf.previously", cc.on && cc.lang ? cc.lang : "en")} text={previously} /> : null}
             {facts.blurb ? <p className="nf-m-desc">{facts.blurb}</p> : null}
             {facts.stack.length ? (
               <ul className="nf-m-chips" role="list" aria-label="Stack">
@@ -505,6 +508,30 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
         )}
       </div>
     </div>
+  );
+}
+
+/** C5: "Previously on…" types the earlier episode's title and figure. It sits beside the controls, never in front of them, and reserves its own height. */
+function Previously({ label, text }: { label: string; text: string }) {
+  const calm = useMemo(() => reduced(), []);
+  const [chars, setChars] = useState(calm ? text.length : 0);
+  useEffect(() => {
+    if (calm) return;
+    let n = 0;
+    const id = window.setInterval(() => {
+      n += 1;
+      setChars(n);
+      if (n >= text.length) window.clearInterval(id);
+    }, 28);
+    return () => window.clearInterval(id);
+  }, [calm, text]);
+  return (
+    <p className="nf-m-prev" aria-label={`${label} ${text}`}>
+      <span aria-hidden>
+        <b>{label}</b> <span className="nf-m-prev-t">{text.slice(0, chars)}</span>
+        <span className="nf-m-prev-ghost">{text.slice(chars)}</span>
+      </span>
+    </p>
   );
 }
 

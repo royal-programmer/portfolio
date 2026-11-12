@@ -679,3 +679,14 @@ export function hireSheetOf(data: TerminalData): HireSheet {
   ];
   return { email, resume: h.links.resume, brief: lines.join("\n") };
 }
+
+/* ---------- C5: Previously on... ---------- */
+
+/** The line a modal types above the synopsis: the previous episode of the same season, with its figure. First episodes (and non-episodes) have none. */
+export function previouslyLine(item: NfItem, index: Map<string, NfItem>): string | null {
+  if (item.kind !== "episode" || item.e.n <= 1) return null;
+  for (const o of index.values()) {
+    if (o.kind === "episode" && o.e.season === item.e.season && o.e.n === item.e.n - 1) return [clip(o.e.title, 80), o.e.metric ? metricLine(o.e.metric) : ""].filter(Boolean).join(" · ");
+  }
+  return null;
+}
