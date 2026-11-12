@@ -449,6 +449,15 @@ const en = {
   "nf.hire.copied": "Copied",
   "nf.hire.resume": "Download résumé PDF",
   "nf.hire.close": "Close",
+  "nf.end.visit": "Visit project",
+  "nf.end.code": "View code",
+  "nf.end.dev": "In development",
+  "nf.end.hello": "Say hello",
+  "nf.shots": "Screens",
+  "nf.clips": "Clips",
+  "nf.clip.play": "Play clip",
+  "nf.close": "Close",
+  "nf.full": "Full size",
   "nf.previously": "Previously on…",
 } as const satisfies Record<string, string | readonly string[] | ((...a: never[]) => string)>;
 

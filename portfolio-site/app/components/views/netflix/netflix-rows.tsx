@@ -14,6 +14,7 @@ import { PROFILES } from "@/lib/site/profiles";
 import { useViewExit } from "../view-shell";
 import { tick } from "./netflix-sound";
 import { NfArt } from "./netflix-art";
+import { NfPoster } from "./netflix-media";
 
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const behavior = (): ScrollBehavior => (reducedMotion() ? "auto" : "smooth");
@@ -268,6 +269,7 @@ function TopCard({ item, rank, env }: { item: NfItem; rank: number; env: CardEnv
       </span>
       <button type="button" className="nf-t10-card" data-nf-card={item.id} onClick={(ev) => env.open(item, ev.currentTarget)}>
         <NfArt seed={item.id} tone={tone} shape="tall" />
+        {f.media ? <NfPoster media={f.media} /> : null}
         <span className="nf-visually-hidden">{`Number ${rank}: `}</span>
         <span className="nf-t10-title">{f.title}</span>
         {f.metric ? <span className="nf-metric">{metricLabel(f.metric)}</span> : null}
@@ -399,6 +401,7 @@ function PosterCard({ c, item, env }: { c: ProjectCard; item: NfItem; env: CardE
   return (
     <li className="nf-poster" data-kind={item.kind}>
       <NfArt seed={item.id} tone={item.kind} shape="tall" />
+      {c.media ? <NfPoster media={c.media} /> : null}
       {env.startHere?.has(item.id) ? <span className="nf-start">Start here</span> : null}
       <FitBadge env={env} id={item.id} />
       <button type="button" className="nf-poster-title nf-stretch" data-nf-card={item.id} onClick={(ev) => env.open(item, ev.currentTarget)}>

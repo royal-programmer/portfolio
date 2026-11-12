@@ -839,7 +839,9 @@ button.nf-cast[aria-pressed="true"] {
   z-index: 1;
   flex: none;
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
   width: 150px;
   aspect-ratio: 2 / 3;
   padding: 10px;

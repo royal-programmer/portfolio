@@ -20,6 +20,7 @@ import { AdButton, CcButton } from "./netflix-cc";
 import { adCancel, useAd, useAdSpeech } from "./netflix-ad";
 import { chime } from "./netflix-sound";
 import { NfArt } from "./netflix-art";
+import { ClipsRow, NfPoster, ProjectEnd, ProjectReel, ScreensRow, reelSteps } from "./netflix-media";
 import { useCc, useLikes, useMyList, useSound } from "./netflix-store";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -67,6 +68,8 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
   // N10: the id of the last episode whose end card is showing.
   const [endFor, setEndFor] = useState<string | null>(null);
   const showEnd = endFor === item.id;
+  // E4: the id of the project whose Play just ended (its end card shows Visit project / View code).
+  const [projEnd, setProjEnd] = useState<string | null>(null);
   const [seasonPick, setSeasonPick] = useState<{ id: string; season: number } | null>(null);
   const [now] = useState(() => Date.now());
 
@@ -195,11 +198,9 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
   };
 
   /* ----- Play ----- */
+  // E4: Play never leaves the page. A project plays its reel, then shows an end card with the links.
   const togglePlay = () => {
-    if (!playing && item.kind === "project" && facts.live) {
-      window.open(facts.live, "_blank", "noopener,noreferrer");
-      return;
-    }
+    if (!playing) setProjEnd(null);
     setPlay({ id: item.id, on: !playing });
   };
   const finished = () => {
@@ -207,6 +208,7 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
     onShow(item, true);
     // The teleprompter ending on a season's last episode rolls the credits (not in the guided play, which closes the card itself).
     if (isLast && playMs == null) setEndFor(item.id);
+    if (item.kind === "project" && playMs == null) setProjEnd(item.id);
   };
 
   /* ----- keyboard: Esc, Tab trap, Space toggles Play ----- */
@@ -346,7 +348,7 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
           <>
         <div className="nf-m-top" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
           <div className="nf-m-handle" aria-hidden />
-          <Billboard key={item.id} facts={facts} playing={playing} playMs={playMs} sub={cc.on && cc.lang ? epSub(facts.tone, facts.season, facts.n, cc.lang) : undefined} ad={ad} lang={cc.lang} onFinish={finished}>
+          <Billboard key={item.id} facts={facts} playing={playing} ended={projEnd === item.id && !playing ? <ProjectEnd live={facts.live} repo={facts.repo} contact={contact} onReplay={togglePlay} /> : null} playMs={playMs} sub={cc.on && cc.lang ? epSub(facts.tone, facts.season, facts.n, cc.lang) : undefined} ad={ad} lang={cc.lang} onFinish={finished}>
             <button type="button" className="nf-m-x" aria-label="Close" onClick={requestClose}>
               <span aria-hidden>×</span>
             </button>
@@ -517,6 +519,9 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
           </section>
         ) : null}
 
+        {facts.media ? <ScreensRow media={facts.media} title={t("nf.shots", "en")} /> : null}
+        {facts.media ? <ClipsRow media={facts.media} title={t("nf.clips", "en")} playLabel={t("nf.clip.play", "en")} /> : null}
+
         {more.length ? (
           <section className="nf-m-sec" aria-labelledby="nf-m-more">
             <h3 id="nf-m-more">More like this</h3>
@@ -639,19 +644,22 @@ function EndCard({ end, now, contact, onClose, onNext }: { end: ReturnType<typeo
 
 /* ---------- Billboard ---------- */
 
-function Billboard({ facts, playing, playMs, sub, ad, lang, onFinish, children }: { facts: NfFacts; playing: boolean; playMs?: number; sub?: string; ad: ReturnType<typeof useAd>; lang?: string | null; onFinish: () => void; children: React.ReactNode }) {
+function Billboard({ facts, playing, ended, playMs, sub, ad, lang, onFinish, children }: { facts: NfFacts; playing: boolean; ended?: React.ReactNode; playMs?: number; sub?: string; ad: ReturnType<typeof useAd>; lang?: string | null; onFinish: () => void; children: React.ReactNode }) {
   return (
     <div className="nf-bb" data-playing={playing || undefined}>
       <div className="nf-bb-art" aria-hidden>
         <NfArt seed={facts.id} tone={facts.tone} big live />
+        {facts.media ? <NfPoster media={facts.media} eager /> : null}
       </div>
       <div className="nf-bb-shade" aria-hidden />
-      {playing ? <Teleprompter text={`${facts.title}. ${facts.blurb ?? ""}`.trim()} sub={sub} ad={ad} lang={lang} ms={playMs ?? 6000} onDone={onFinish} /> : null}
-      <h2 className="nf-bb-title" data-hidden={playing || undefined}>
+      {playing && facts.kind === "project" ? <ProjectReel steps={reelSteps({ title: facts.title, blurb: facts.blurb, stack: facts.stack, metricLabel: facts.metric ? metricLabel(facts.metric) : undefined }, facts.media)} ms={playMs ?? 6000} adOn={ad.on} onDone={onFinish} /> : null}
+      {playing && facts.kind !== "project" ? <Teleprompter text={`${facts.title}. ${facts.blurb ?? ""}`.trim()} sub={sub} ad={ad} lang={lang} ms={playMs ?? 6000} onDone={onFinish} /> : null}
+      {ended}
+      <h2 className="nf-bb-title" data-hidden={playing || !!ended || undefined}>
         {facts.title}
       </h2>
       {facts.metric ? (
-        <p className="nf-bb-metric" data-hidden={playing || undefined}>
+        <p className="nf-bb-metric" data-hidden={playing || !!ended || undefined}>
           {metricLabel(facts.metric)}
         </p>
       ) : null}

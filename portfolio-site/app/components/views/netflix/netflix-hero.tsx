@@ -12,6 +12,7 @@ import { AdButton, CcButton } from "./netflix-cc";
 import { useAd, useAdSpeech } from "./netflix-ad";
 import { tick as tickSound } from "./netflix-sound";
 import { NfArt } from "./netflix-art";
+import { NfPoster } from "./netflix-media";
 import { useForName } from "./use-for-name";
 import { t } from "@/lib/site/terminal-strings";
 
@@ -149,6 +150,7 @@ export function NetflixHero({ series, profile, status, fast, firstRowId, feature
     >
       <div className="nf-art" aria-hidden>
         {cur && f ? <NfArt key={cur.item.id} seed={cur.item.id} tone={tone} big live /> : null}
+        {cur && f?.media ? <NfPoster key={`p-${cur.item.id}`} media={f.media} eager /> : null}
       </div>
       <div className="nf-hero-shade" aria-hidden />
 

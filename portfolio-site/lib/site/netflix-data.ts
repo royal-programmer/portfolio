@@ -58,6 +58,42 @@ export type ProjectCard = {
   href?: string;
   kind: "project" | "post";
   metric?: Metric;
+  /** Real product imagery (E2): a poster, screenshots and short clips. Only some projects have it. */
+  media?: ProjectMedia;
+};
+
+/** A project's own imagery, as data (this moves to the media table in round 24). Paths are under `public/`. */
+export type ProjectMedia = {
+  poster: { src: string; w: number; h: number; alt: string };
+  screens: Array<{ id: string; label: string; src: string; w: number; h: number }>;
+  clips: Array<{ id: string; label: string; poster: string; src: string }>;
+};
+
+/**
+ * Real imagery per project slug (E2). Files are made by `scripts/netflix-media.mjs` from the product's own assets: the
+ * poster and screenshots as 1280-wide WebP, the clips and their posters as they are. Plain labels, no claims.
+ */
+export const PROJECT_MEDIA: Record<string, ProjectMedia> = {
+  "api-test-center": {
+    poster: { src: "/projects/api-test-center/poster.webp", w: 1280, h: 800, alt: "API Test Center: a GET request with a load test running" },
+    screens: [
+      { id: "builder", label: "Report builder", src: "/projects/api-test-center/screens/builder.webp", w: 1280, h: 800 },
+      { id: "chain", label: "Run first: reuse a sign-in token", src: "/projects/api-test-center/screens/chain.webp", w: 1280, h: 800 },
+      { id: "charts", label: "Charts", src: "/projects/api-test-center/screens/charts.webp", w: 1280, h: 800 },
+      { id: "report", label: "Load report", src: "/projects/api-test-center/screens/report.webp", w: 1280, h: 800 },
+      { id: "send", label: "Send a request", src: "/projects/api-test-center/screens/send.webp", w: 1280, h: 800 },
+      { id: "help", label: "Help in plain words", src: "/projects/api-test-center/screens/help.webp", w: 1280, h: 800 },
+    ],
+    clips: [
+      { id: "send", label: "Send a request", poster: "/projects/api-test-center/clips/send.jpg", src: "/projects/api-test-center/clips/send.webm" },
+      { id: "load-test", label: "Run a load test", poster: "/projects/api-test-center/clips/load-test.jpg", src: "/projects/api-test-center/clips/load-test.webm" },
+      { id: "sign-in", label: "Sign in first, then reuse the token", poster: "/projects/api-test-center/clips/sign-in.jpg", src: "/projects/api-test-center/clips/sign-in.webm" },
+      { id: "collection", label: "Run a collection", poster: "/projects/api-test-center/clips/collection.jpg", src: "/projects/api-test-center/clips/collection.webm" },
+      { id: "history", label: "History", poster: "/projects/api-test-center/clips/history.jpg", src: "/projects/api-test-center/clips/history.webm" },
+      { id: "upload", label: "Upload a file", poster: "/projects/api-test-center/clips/upload.jpg", src: "/projects/api-test-center/clips/upload.webm" },
+      { id: "websocket", label: "WebSocket", poster: "/projects/api-test-center/clips/websocket.jpg", src: "/projects/api-test-center/clips/websocket.webm" },
+    ],
+  },
 };
 
 /** A technology on the cast row (N5): how many episodes / projects mention it. `key` is the canonical lower-case name. */
@@ -226,6 +262,7 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
     href: `/engineer/${p.slug}`,
     kind: "project",
     metric: metricOf(p.title, p.summary),
+    media: PROJECT_MEDIA[p.slug],
   }));
   const postCards: ProjectCard[] = data.posts.map((p) => ({ id: `post-${p.slug}`, title: p.title, summary: p.excerpt, stack: [], year: p.date?.slice(0, 4), kind: "post", metric: metricOf(p.title, p.excerpt) }));
 
@@ -388,6 +425,10 @@ export type NfFacts = {
   repo?: string;
   href?: string;
   letter: string;
+  /** Real imagery (E2), for projects that have it. */
+  media?: ProjectMedia;
+  /** "episode" | "project" | "post" | "skill". */
+  kind?: NfItem["kind"];
 };
 
 export function factsOf(item: NfItem): NfFacts {
@@ -410,10 +451,11 @@ export function factsOf(item: NfItem): NfFacts {
       year: String(e.season),
       href: e.href,
       letter: e.title.trim().charAt(0).toUpperCase(),
+      kind: "episode",
     };
   }
   if (item.kind === "skill") {
-    return { id: item.id, title: item.s.name, blurb: `${item.s.name}, in the ${item.s.group} group of the résumé's skills.`, tone: "skill", branchLabel: item.s.group, tags: [item.s.group], stack: [], letter: item.s.name.trim().charAt(0).toUpperCase() };
+    return { id: item.id, title: item.s.name, blurb: `${item.s.name}, in the ${item.s.group} group of the résumé's skills.`, tone: "skill", branchLabel: item.s.group, tags: [item.s.group], stack: [], letter: item.s.name.trim().charAt(0).toUpperCase(), kind: "skill" };
   }
   const c = item.c;
   return {
@@ -430,6 +472,8 @@ export function factsOf(item: NfItem): NfFacts {
     repo: c.repo,
     href: c.href,
     letter: c.title.trim().charAt(0).toUpperCase(),
+    media: c.media,
+    kind: item.kind,
   };
 }
 

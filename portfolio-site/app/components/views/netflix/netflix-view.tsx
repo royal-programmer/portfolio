@@ -10,6 +10,7 @@ import "./netflix.css";
 import "./netflix-rows.css";
 import "./netflix-modal.css";
 import "./netflix-art.css";
+import "./netflix-media.css";
 import { NetflixHero } from "./netflix-hero";
 import { NetflixGrid, NetflixRows, type CardEnv, type DisplayRow } from "./netflix-rows";
 import { NetflixModal } from "./netflix-modal";
