@@ -1440,3 +1440,8 @@ stripped service_role's table grants).
 - Everything under `/admin`: `/admin/login` (magic link via `signInWithOtp`, `shouldCreateUser: false`, uniform reply, 3 per 10 min per IP; password kept), `/admin/auth/callback`, one guard in `app/admin/(console)/layout.tsx`. No `/capture` paths remain; the capture actions moved to `app/admin/entry-actions.ts`, the project form and uploader to `app/admin/_collections/`.
 - Admin grouped by persona (`nav.ts`, `collections.ts`), home with the now / coming map, master-detail Projects and Media (create, edit, duplicate, delete, photos), signed-in-as and sign out, non-admin banner. Admin host is one constant (`lib/site/admin-host.ts`).
 - Not verified: anything behind a session (the console itself) and real email delivery. Ratul sets two Supabase options (16-admin-console.md section 6).
+
+### Round 23 - Netflix, part D (2026-11-12)
+
+- X1 varied art (geometry families and tints per tone and seed), X2 re-checks (Top 10 numeral clip fixed), D1 `?for=` links (hero, Hire sheet, end card, `share netflix --for`, OG card, Profiles menu field), D2 Trending now from live public commits, D3 case study PDF, D4 audio description, D5 contextual Hire bar, D6 server-rendered text, JSON-LD, accessibility fixes. Details in 17-persona-views.md section 22.
+- Not verified: speech in a real bn-IN / hi-IN voice (the test browser has no such voice), axe-core directly (see section 22).
