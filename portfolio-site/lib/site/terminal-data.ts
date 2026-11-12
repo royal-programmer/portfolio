@@ -82,7 +82,7 @@ export const RESUME: TermResume = {
         "Redesigned the relational database; self-service configuration of shift timings, allowances, payroll freeze periods and report criteria; Azure AD group-based authorization in UI and API.",
         "Per-employee publish isolation and version-conflict detection; failed external syncs retry without republishing.",
         "Three synchronization services (HR, transport, scheduled reconciliation) with idempotency keys, acknowledgements, retries, alerts and logged reprocessing.",
-        "Owns 11 Python automations across finance, project sync and background verification; RabbitMQ producer–consumer integrations.",
+        "Maintains 11 Python automations across finance, project sync and background verification; RabbitMQ producer–consumer integrations.",
         "Cut VMS query time from 5–10 minutes to 2–3 by reworking complex joins; fixed recurring SQL refresh overloads.",
         "Project and Attendance Process APIs over Oracle EBS and NetSuite in Python/FastAPI, with async fetching, source-side filtering, pagination and pooled connections.",
         "Configurable reports with column selection, filters and preview-before-export; documented architecture and APIs for handover.",
@@ -124,7 +124,7 @@ export type TermHiring = {
 
 export const HIRING: TermHiring = {
   roles: ["Software Engineer", "Full-stack Engineer", "Backend Engineer (.NET / Python)"],
-  level: "2 yrs · mid-level · owns features end to end",
+  level: "2 yrs · mid-level · works on features end to end",
   stack: {
     core: ["C#", ".NET", "React", "TypeScript", "Python", "FastAPI", "SQL Server", "PostgreSQL"],
     plus: ["RabbitMQ", "GitHub Actions", "Azure AD", "Oracle EBS / NetSuite integrations"],
@@ -166,7 +166,7 @@ export const TIMELINE: TermCommit[] = [
   { date: "2024-07-01", subject: "Graduate: B.Tech, Computer Science and Engineering, ITER (SOA University)", branch: "learn", tag: "b.tech", body: ["CGPA 7.75/10"] },
   { date: "2024-10-01", subject: "Join SLK as Engineer", branch: "main", tag: "slk", body: ["Full stack, APIs, automation, production support."] },
   { date: "2025-03-28", subject: "Move to SLK Digital", branch: "main" },
-  { date: "2025-06-01", subject: "Take ownership of 11 Python automations and the RabbitMQ integrations", branch: "main", body: ["Finance, project sync, background verification; scheduled and API-triggered."] },
+  { date: "2025-06-01", subject: "Take over 11 Python automations and the RabbitMQ integrations", branch: "main", body: ["Finance, project sync, background verification; scheduled and API-triggered."] },
   { date: "2025-09-01", subject: "Ship the Project and Attendance Process APIs over Oracle EBS and NetSuite", branch: "main", body: ["Python/FastAPI, async fetching, source-side filtering, pooled connections."] },
   { date: "2025-12-01", subject: "Cut VMS query time from 5–10 minutes to 2–3", branch: "main" },
   { date: "2026-02-01", subject: "Build the CI/CD template generator; five pipelines for Shift Roster", branch: "main" },

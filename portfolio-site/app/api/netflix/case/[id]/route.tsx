@@ -1,11 +1,12 @@
 import { Document, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import { registerFonts } from "@/lib/resume/render";
 import { caseOf, caseSlug } from "@/lib/site/netflix-case";
+import { metricLabel } from "@/lib/site/netflix-data";
 import { DISPLAY_ROOT } from "@/lib/site/brand";
 import { loadEngineerTerminalData } from "@/app/load-terminal-data";
 
 /**
- * A one-page case study PDF for one project or episode (17-persona-views.md §22, D3): the title, the metric large,
+ * A one-page case study PDF for one project or episode (17-persona-views.md §22, D3): the title, the figure as a quiet line,
  * the synopsis, the stack, the links and a footer with the profile link (no QR). Same renderer and fonts as the résumé.
  * Cached for a day.
  */
@@ -19,8 +20,7 @@ const s = StyleSheet.create({
   page: { fontFamily: "Inter", fontSize: 11, lineHeight: 1.5, color: INK, paddingTop: 56, paddingBottom: 64, paddingHorizontal: 56 },
   kicker: { fontSize: 9, fontWeight: 600, letterSpacing: 1.4, textTransform: "uppercase", color: ACCENT },
   title: { fontSize: 24, fontWeight: 600, lineHeight: 1.2, marginTop: 8 },
-  metric: { fontSize: 64, fontWeight: 600, lineHeight: 1.05, marginTop: 30, color: ACCENT },
-  metricLabel: { fontSize: 10, fontWeight: 600, letterSpacing: 1.6, textTransform: "uppercase", color: MUTED, marginTop: 2 },
+  metric: { fontSize: 11, lineHeight: 1.3, marginTop: 14, color: MUTED },
   rule: { borderBottomWidth: 1.2, borderBottomColor: ACCENT, marginTop: 22, marginBottom: 6 },
   h: { fontSize: 9, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", marginTop: 16, marginBottom: 4 },
   body: { fontSize: 12, lineHeight: 1.55 },
@@ -47,12 +47,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
           <Text style={s.kicker}>{`${data.resume.name}  ·  case study`}</Text>
           <Text style={s.title}>{f.title}</Text>
           <Text style={[s.muted, { marginTop: 4 }]}>{meta}</Text>
-          {f.metric ? (
-            <View>
-              <Text style={s.metric}>{f.metric.value}</Text>
-              <Text style={s.metricLabel}>{f.metric.label}</Text>
-            </View>
-          ) : null}
+          {f.metric ? <Text style={s.metric}>{metricLabel(f.metric)}</Text> : null}
           <View style={s.rule} />
           {f.blurb ? (
             <View>

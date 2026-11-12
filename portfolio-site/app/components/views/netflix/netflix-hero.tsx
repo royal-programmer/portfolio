@@ -6,7 +6,7 @@
  * the trailer plays by itself, silent, with a Skip pill.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { factsOf, metricLine, type Episode, type NetflixShow, type NetflixProfileId, type NfItem } from "@/lib/site/netflix-data";
+import { factsOf, metricLabel, type Episode, type NetflixShow, type NetflixProfileId, type NfItem } from "@/lib/site/netflix-data";
 import { factSub, latestSub, nextSub, statusSub, type NfLine, type SubData, type SubLang } from "@/lib/site/netflix-subs";
 import { AdButton, CcButton } from "./netflix-cc";
 import { useAd, useAdSpeech } from "./netflix-ad";
@@ -148,7 +148,7 @@ export function NetflixHero({ series, profile, status, fast, firstRowId, feature
       }}
     >
       <div className="nf-art" aria-hidden>
-        {cur && f ? <NfArt key={cur.item.id} seed={cur.item.id} tone={tone} metric={f.metric} big live /> : null}
+        {cur && f ? <NfArt key={cur.item.id} seed={cur.item.id} tone={tone} big live /> : null}
       </div>
       <div className="nf-hero-shade" aria-hidden />
 
@@ -175,7 +175,7 @@ export function NetflixHero({ series, profile, status, fast, firstRowId, feature
               Featured · {at + 1} of {n}
             </p>
             <h2 className="nf-feat-title">{f.title}</h2>
-            {f.metric ? <p className="nf-feat-metric">{metricLine(f.metric)}</p> : null}
+            {f.metric ? <p className="nf-feat-metric">{metricLabel(f.metric)}</p> : null}
           </div>
         ) : null}
         <div className="nf-actions">

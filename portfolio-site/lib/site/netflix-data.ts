@@ -18,8 +18,12 @@ export const NETFLIX_PROFILES: readonly NetflixProfile[] = [
 
 export const isNetflixProfile = (s: string | null | undefined): s is NetflixProfileId => NETFLIX_PROFILES.some((p) => p.id === s);
 
-/** The big impact figure on a card's art (C1): `value` is the focal text, `label` the small word under it. */
-export type Metric = { value: string; label: string };
+/**
+ * A figure from the item's own text (C1, E1): `value` and `label` read `200+ active users`; `context` is the plain
+ * words that say where it comes from (`internal tool`). It is shown as a small quiet label, never as a headline
+ * number. An explicit text, never invented.
+ */
+export type Metric = { value: string; label: string; context?: string };
 
 export type Episode = {
   id: string;
@@ -92,18 +96,18 @@ export const RECRUITER_CUT: ReadonlyArray<{ episode?: { title: RegExp; tag?: str
 ];
 
 
-/* ---------- C1: the big impact figure ---------- */
+/* ---------- C1: the figure on a card (a quiet label since E1) ---------- */
 
 /**
  * Explicit overrides, checked first: a title (and tag, when given) mapped to its figure, or to `null` to say
  * "no figure". Every value here is a number that already appears in the item's own text (the timeline, the
- * hiring proof lines); this table only pins the wording of the art.
+ * hiring proof lines); this table only pins the wording of the label.
  */
 export const METRIC_OVERRIDES: ReadonlyArray<{ title: RegExp; tag?: string; metric: Metric | null }> = [
-  { title: /shift roster/i, tag: "v2.0", metric: { value: "200+", label: "users" } },
-  { title: /11 python automations/i, metric: { value: "11", label: "automations" } },
-  { title: /vms query/i, metric: { value: "5–10 → 2–3", label: "min" } },
-  { title: /7 openai partneru/i, metric: { value: "7", label: "certs" } },
+  { title: /shift roster/i, tag: "v2.0", metric: { value: "200+", label: "active users", context: "internal tool" } },
+  { title: /11 python automations/i, metric: { value: "11", label: "automations", context: "finance and sync" } },
+  { title: /vms query/i, metric: { value: "5–10 → 2–3", label: "min", context: "query time" } },
+  { title: /7 openai partneru/i, metric: { value: "7", label: "credentials", context: "OpenAI PartnerU" } },
 ];
 
 const NUM = String.raw`\d[\d,]*(?:\.\d+)?`;
@@ -120,7 +124,7 @@ const METRIC_RULES: ReadonlyArray<{ re: RegExp; make: (m: RegExpExecArray) => Me
   { re: new RegExp(String.raw`(${RANGE})\s*min(?:ute)?s?\s+(?:to|→|->)\s+(${RANGE})`, "i"), make: (m) => ({ value: `${m[1]} → ${m[2]}`, label: "min" }) },
   { re: new RegExp(String.raw`(${NUM}\+?)\s+(?:active\s+)?users\b`, "i"), make: (m) => ({ value: m[1], label: "users" }) },
   { re: new RegExp(String.raw`\b(\d+|${Object.keys(WORD_NUM).join("|")})\s+(?:python\s+)?automations\b`, "i"), make: (m) => ({ value: num(m[1]), label: "automations" }) },
-  { re: new RegExp(String.raw`\b(\d+)\s+(?:[\w-]+\s+){0,2}(?:credentials|certifications|certs)\b`, "i"), make: (m) => ({ value: m[1], label: "certs" }) },
+  { re: new RegExp(String.raw`\b(\d+)\s+(?:[\w-]+\s+){0,2}(?:credentials|certifications|certs)\b`, "i"), make: (m) => ({ value: m[1], label: "credentials" }) },
   { re: new RegExp(String.raw`(${NUM}K?\+?)\s+(?:employee-)?(?:shift\s+)?records\b`, "i"), make: (m) => ({ value: m[1], label: "records" }) },
 ];
 
@@ -158,8 +162,14 @@ export const FEATURED: Record<NetflixProfileId, ReadonlyArray<{ label: string; e
   ],
 };
 
-/** `5–10 min to 2–3 min` for a before/after figure, `200+ users` for the rest. */
+/** `5–10 min to 2–3 min` for a before/after figure, `200+ active users` for the rest. */
 export const metricLine = (m: Metric): string => (m.value.includes(" → ") ? m.value.split(" → ").map((v) => `${v} ${m.label}`).join(" to ") : `${m.value} ${m.label}`);
+
+/**
+ * The quiet label under a title (E1): the figure with its context in plain words. A before/after figure leads with its
+ * context (`query time 5–10 min to 2–3 min`); a count follows it (`200+ active users · internal tool`).
+ */
+export const metricLabel = (m: Metric): string => (m.value.includes(" → ") ? [m.context, metricLine(m)].filter(Boolean).join(" ") : [metricLine(m), m.context].filter(Boolean).join(" · "));
 
 const monthIndex = (date: string) => {
   const [y, m] = date.split("-");
@@ -310,13 +320,13 @@ export const rowItems = (row: NetflixRow): NfItem[] => {
 
 /** Three adjectives per branch / kind, shown as "This series is". Labels, not data about Ratul's work. */
 export const NF_ADJECTIVES: Record<string, [string, string, string]> = {
-  main: ["Hands-on", "Production", "Measured"],
-  learn: ["Curious", "Rigorous", "Foundational"],
-  side: ["Playful", "Experimental", "Self-driven"],
+  main: ["Hands-on", "In production", "Measured"],
+  learn: ["Curious", "Steady", "Foundational"],
+  side: ["Playful", "Experimental", "Hands-on"],
   life: ["Personal", "Formative", "Human"],
   project: ["Built", "Shipped", "Open"],
   post: ["Written", "Reflective", "Plain"],
-  skill: ["Practiced", "Daily", "Reliable"],
+  skill: ["Practiced", "Familiar", "Ongoing"],
 };
 
 export const NF_BRANCH_LABEL: Record<Episode["branch"], string> = { main: "work", learn: "learning", side: "side quest", life: "life" };
@@ -410,7 +420,7 @@ export function moreLike(item: NfItem, index: Map<string, NfItem>, max = 6): NfI
 }
 
 
-/* ---------- C2: Top 10 by impact ---------- */
+/* ---------- C2: Top 10, ranked by scope ---------- */
 
 /**
  * The ranking formula, all weights here. score = metric + recency + branch + kind:
@@ -420,40 +430,40 @@ export function moreLike(item: NfItem, index: Map<string, NfItem>, max = 6): NfI
  *  - ties break by date, newest first, then by id.
  * Skills have no date or figure and are not ranked.
  */
-export const IMPACT = { metric: 100, recency: 30, from: "2020-08", branch: { main: 20, side: 10, learn: 6, life: 0, project: 14, post: 2 } as Record<string, number> };
+export const SCOPE = { metric: 100, recency: 30, from: "2020-08", branch: { main: 20, side: 10, learn: 6, life: 0, project: 14, post: 2 } as Record<string, number> };
 
-const impactDate = (it: NfItem) => (it.kind === "episode" ? it.e.date : it.kind === "skill" ? "" : it.c.year ? `${it.c.year}-06` : "");
-const impactMetric = (it: NfItem) => (it.kind === "episode" ? it.e.metric : it.kind === "skill" ? undefined : it.c.metric);
+const scopeDate = (it: NfItem) => (it.kind === "episode" ? it.e.date : it.kind === "skill" ? "" : it.c.year ? `${it.c.year}-06` : "");
+const scopeMetric = (it: NfItem) => (it.kind === "episode" ? it.e.metric : it.kind === "skill" ? undefined : it.c.metric);
 
-/** Ranked best first. Items are the rankable ones only (no skills, no life episodes); never filters by metric. */
-export function impactRank(items: NfItem[]): NfItem[] {
+/** Ranked by scope, largest first. Items are the rankable ones only (no skills, no life episodes); never filters by metric. */
+export function scopeRank(items: NfItem[]): NfItem[] {
   const pool = items.filter((it) => it.kind !== "skill" && !(it.kind === "episode" && it.e.branch === "life"));
-  const dates = pool.map(impactDate).filter(Boolean).map(monthIndex);
-  const lo = monthIndex(IMPACT.from);
+  const dates = pool.map(scopeDate).filter(Boolean).map(monthIndex);
+  const lo = monthIndex(SCOPE.from);
   const hi = Math.max(lo + 1, ...dates);
   const score = (it: NfItem) => {
-    const d = impactDate(it);
-    const rec = d ? Math.max(0, Math.min(1, (monthIndex(d) - lo) / (hi - lo))) * IMPACT.recency : 0;
+    const d = scopeDate(it);
+    const rec = d ? Math.max(0, Math.min(1, (monthIndex(d) - lo) / (hi - lo))) * SCOPE.recency : 0;
     const key = it.kind === "episode" ? it.e.branch : it.kind;
-    return (impactMetric(it) ? IMPACT.metric : 0) + rec + (IMPACT.branch[key] ?? 0);
+    return (scopeMetric(it) ? SCOPE.metric : 0) + rec + (SCOPE.branch[key] ?? 0);
   };
   const scored = new Map(pool.map((it) => [it.id, score(it)]));
-  return [...pool].sort((a, b) => (scored.get(b.id) ?? 0) - (scored.get(a.id) ?? 0) || (impactDate(a) < impactDate(b) ? 1 : impactDate(a) > impactDate(b) ? -1 : a.id < b.id ? -1 : 1));
+  return [...pool].sort((a, b) => (scored.get(b.id) ?? 0) - (scored.get(a.id) ?? 0) || (scopeDate(a) < scopeDate(b) ? 1 : scopeDate(a) > scopeDate(b) ? -1 : a.id < b.id ? -1 : 1));
 }
 
-/** The ten cards of a profile's "Top 10 by impact" row: the rankable items in its rows, deduplicated. */
+/** The ten cards of a profile's "Top 10" row: the rankable items in its rows, deduplicated. */
 export function top10Of(show: NetflixShow): NfItem[] {
   const seen = new Set<string>();
   const pool = show.rows.flatMap(rowItems).filter((it) => !seen.has(it.id) && !!seen.add(it.id));
-  return impactRank(pool).slice(0, 10);
+  return scopeRank(pool).slice(0, 10);
 }
 
 /** Does this profile get the row, and where: Recruiter first, Developer after Projects (an index into `rows`). */
-export const TOP10_ROW_TITLE = "Top 10 by impact";
+export const TOP10_ROW_TITLE = "Top 10";
 
 /** The episode that wears the "Top 10" badge: Shift Roster, v2.0. */
 export function topEpisodeId(shows: NetflixShow[]): string | null {
-  const top = new Set(impactRank([...indexItems(shows).values()]).slice(0, 10).map((i) => i.id));
+  const top = new Set(scopeRank([...indexItems(shows).values()]).slice(0, 10).map((i) => i.id));
   for (const s of shows)
     for (const r of s.rows)
       if (r.kind === "episodes") {
@@ -689,7 +699,7 @@ export function hireSheetOf(data: TerminalData): HireSheet {
 export function previouslyLine(item: NfItem, index: Map<string, NfItem>): string | null {
   if (item.kind !== "episode" || item.e.n <= 1) return null;
   for (const o of index.values()) {
-    if (o.kind === "episode" && o.e.season === item.e.season && o.e.n === item.e.n - 1) return [clip(o.e.title, 80), o.e.metric ? metricLine(o.e.metric) : ""].filter(Boolean).join(" · ");
+    if (o.kind === "episode" && o.e.season === item.e.season && o.e.n === item.e.n - 1) return [clip(o.e.title, 80), o.e.metric ? metricLabel(o.e.metric) : ""].filter(Boolean).join(" · ");
   }
   return null;
 }

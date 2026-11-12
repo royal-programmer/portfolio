@@ -35,37 +35,6 @@
   fill: none;
   stroke: currentColor;
 }
-/* The impact figure: the art's focal text, sized from the art's own box. */
-.nf-art2-m {
-  position: absolute;
-  left: 7cqw;
-  top: 8cqh;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15em;
-  max-width: 88cqw;
-  color: #fff;
-  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.45);
-}
-.nf-art2-m b {
-  font-family: var(--font-display), serif;
-  font-weight: 800;
-  font-size: min(32cqh, calc(120cqw / var(--len)));
-  line-height: 0.95;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
-}
-.nf-art2-m i {
-  font-family: var(--font-geist-mono), monospace;
-  font-style: normal;
-  font-size: clamp(0.55rem, 7cqh, 1.1rem);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.82);
-}
-.nf-art2[data-shape="tall"] .nf-art2-m b {
-  font-size: min(17cqh, calc(120cqw / var(--len)));
-}
 .nf-art2[data-live] .nf-art2-fill {
   transform-origin: 70% 100%;
   animation: nf-drift 24s ease-in-out infinite alternate;
@@ -87,17 +56,6 @@
 .nf-bb-art {
   opacity: 1;
 }
-.nf-art2[data-big] .nf-art2-m {
-  left: auto;
-  right: 6cqw;
-  top: 14cqh;
-  align-items: flex-end;
-  text-align: right;
-}
-.nf-art2[data-big] .nf-art2-m b {
-  font-size: min(30cqh, calc(80cqw / var(--len)));
-}
-
 /* ---------- Hero: featured carousel (C3) ---------- */
 .nf-hero .nf-art {
   opacity: 1;
@@ -106,10 +64,6 @@
 }
 .nf-hero .nf-art .nf-art2 {
   background: linear-gradient(120deg, color-mix(in srgb, var(--b) 46%, #0b0b0f), color-mix(in srgb, var(--b) 14%, #0b0b0f) 70%);
-}
-/* The figure is a text line in the copy on wide screens, the art's own focal text on phones. */
-.nf-hero .nf-art2-m {
-  display: none;
 }
 .nf-hero[data-playing] .nf-art {
   opacity: 0.55;
@@ -148,14 +102,13 @@
   font-size: clamp(1.4rem, 2.6vw, 2rem);
   line-height: 1.1;
 }
+/* E1: a quiet label, not a headline number. */
 .nf-feat-metric {
-  margin: 0.25rem 0 0;
-  font-family: var(--font-display), serif;
-  font-weight: 800;
-  font-size: clamp(1.9rem, 4vw, 3.2rem);
-  line-height: 1;
-  letter-spacing: -0.02em;
-  color: color-mix(in srgb, var(--b) 40%, #fff);
+  margin: 0.3rem 0 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.78);
 }
 .nf-actions {
   flex-wrap: wrap;
@@ -219,17 +172,6 @@
     min-height: min(84svh, 680px);
     padding: 64px 16px 18px;
   }
-  .nf-hero .nf-art2-m {
-    display: flex;
-    left: 6cqw;
-    right: auto;
-    top: 13cqh;
-    align-items: flex-start;
-    text-align: left;
-  }
-  .nf-hero .nf-art2[data-big] .nf-art2-m b {
-    font-size: min(17cqh, calc(104cqw / var(--len)));
-  }
   .nf-hero-shade {
     background: linear-gradient(0deg, var(--nf-bg) 4%, rgba(11, 11, 15, 0.7) 40%, rgba(11, 11, 15, 0) 75%);
   }
@@ -242,7 +184,6 @@
   .nf-facts,
   .nf-open,
   .nf-actions-extra,
-  .nf-feat-metric,
   .nf-feat-kicker {
     display: none;
   }
@@ -311,9 +252,6 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-}
-.nf-bb .nf-art2[data-big] .nf-art2-m {
-  top: 22cqh;
 }
 .nf-hero-copy {
   width: min(46rem, 100%);

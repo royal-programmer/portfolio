@@ -7,7 +7,7 @@
  */
 import { TrendingRow } from "./netflix-trending";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { factsOf, type CastMember, type Episode, type NetflixShow, type NfItem, type ProjectCard, type SkillCard } from "@/lib/site/netflix-data";
+import { factsOf, metricLabel, type CastMember, type Episode, type NetflixShow, type NfItem, type ProjectCard, type SkillCard } from "@/lib/site/netflix-data";
 import type { TermLink } from "@/lib/site/terminal-data";
 import { PROFILES } from "@/lib/site/profiles";
 import { useViewExit } from "../view-shell";
@@ -266,9 +266,10 @@ function TopCard({ item, rank, env }: { item: NfItem; rank: number; env: CardEnv
         {rank}
       </span>
       <button type="button" className="nf-t10-card" data-nf-card={item.id} onClick={(ev) => env.open(item, ev.currentTarget)}>
-        <NfArt seed={item.id} tone={tone} shape="tall" metric={f.metric} />
+        <NfArt seed={item.id} tone={tone} shape="tall" />
         <span className="nf-visually-hidden">{`Number ${rank}: `}</span>
         <span className="nf-t10-title">{f.title}</span>
+        {f.metric ? <span className="nf-metric">{metricLabel(f.metric)}</span> : null}
         <Bar value={env.progress[item.id]} />
       </button>
     </li>
@@ -359,8 +360,9 @@ function EpisodeCard({ e, item, env }: { e: Episode; item: NfItem; env: CardEnv 
         ) : null}
         {env.startHere?.has(item.id) ? <span className="nf-start">Start here</span> : null}
         <FitBadge env={env} id={item.id} />
-        <NfArt seed={item.id} tone={e.branch} metric={e.metric} />
+        <NfArt seed={item.id} tone={e.branch} />
         <span className="nf-card-title">{e.title}</span>
+        {e.metric ? <span className="nf-metric">{metricLabel(e.metric)}</span> : null}
         <span className="nf-card-strip">{[`S${e.season} E${e.n}`, e.runtime, e.tag, e.grade].filter(Boolean).join(" · ")}</span>
         {top ? <span className="nf-visually-hidden">, Top 10</span> : null}
         {teaser.text !== null ? (
@@ -395,12 +397,13 @@ function EpisodeCard({ e, item, env }: { e: Episode; item: NfItem; env: CardEnv 
 function PosterCard({ c, item, env }: { c: ProjectCard; item: NfItem; env: CardEnv }) {
   return (
     <li className="nf-poster" data-kind={item.kind}>
-      <NfArt seed={item.id} tone={item.kind} shape="tall" metric={c.metric} />
+      <NfArt seed={item.id} tone={item.kind} shape="tall" />
       {env.startHere?.has(item.id) ? <span className="nf-start">Start here</span> : null}
       <FitBadge env={env} id={item.id} />
       <button type="button" className="nf-poster-title nf-stretch" data-nf-card={item.id} onClick={(ev) => env.open(item, ev.currentTarget)}>
         {c.title}
       </button>
+      {c.metric ? <span className="nf-metric">{metricLabel(c.metric)}</span> : null}
       {c.summary ? <p className="nf-poster-sum">{c.summary}</p> : null}
       {c.stack.length ? (
         <ul className="nf-chips-mini" role="list">

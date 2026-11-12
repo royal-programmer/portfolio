@@ -7,7 +7,7 @@
  * meta row, description, the season's episodes, "More like this" and About. Everything is swapped in place.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { NF_ADJECTIVES, castOf, endCardOf, factsOf, moreLike, previouslyLine, type CastMember, type NetflixProfileId, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
+import { NF_ADJECTIVES, castOf, endCardOf, factsOf, metricLabel, moreLike, previouslyLine, type CastMember, type NetflixProfileId, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
 import { DISPLAY_ROOT } from "@/lib/site/brand";
 import { netflixShareLink } from "@/lib/site/netflix-og";
 import { caseEligible, caseSlug } from "@/lib/site/netflix-case";
@@ -527,7 +527,7 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
                   <li key={o.id}>
                     <button type="button" className="nf-mcard" data-tone={f.tone} onClick={() => onSwap(o)}>
                       <span className="nf-mcard-art" aria-hidden>
-                        <NfArt seed={o.id} tone={f.tone} metric={f.metric} />
+                        <NfArt seed={o.id} tone={f.tone} />
                       </span>
                       <span className="nf-mcard-meta">
                         <span className="nf-mcard-title">{f.title}</span>
@@ -643,13 +643,18 @@ function Billboard({ facts, playing, playMs, sub, ad, lang, onFinish, children }
   return (
     <div className="nf-bb" data-playing={playing || undefined}>
       <div className="nf-bb-art" aria-hidden>
-        <NfArt seed={facts.id} tone={facts.tone} metric={facts.metric} big live />
+        <NfArt seed={facts.id} tone={facts.tone} big live />
       </div>
       <div className="nf-bb-shade" aria-hidden />
       {playing ? <Teleprompter text={`${facts.title}. ${facts.blurb ?? ""}`.trim()} sub={sub} ad={ad} lang={lang} ms={playMs ?? 6000} onDone={onFinish} /> : null}
       <h2 className="nf-bb-title" data-hidden={playing || undefined}>
         {facts.title}
       </h2>
+      {facts.metric ? (
+        <p className="nf-bb-metric" data-hidden={playing || undefined}>
+          {metricLabel(facts.metric)}
+        </p>
+      ) : null}
       {children}
     </div>
   );

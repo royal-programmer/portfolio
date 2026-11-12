@@ -969,3 +969,18 @@ button.nf-cast[aria-pressed="true"] {
   outline: 2px solid #fff;
   outline-offset: -3px;
 }
+
+/* E1: the figure is a small quiet label under the title, with its context in plain words. */
+.nf-metric {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.68rem;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.66);
+  text-align: left;
+}
+.nf-poster .nf-metric {
+  margin-top: -0.15rem;
+}
