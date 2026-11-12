@@ -40,9 +40,9 @@ export const TrendingRow = memo(function TrendingRow({ id, title }: { id: string
       <div className="nf-row-body">
         <ul className="nf-scroller" role="list">
           {state.commits.map((c) => (
-            <li key={c.id} className="nf-tcard" data-branch="side">
+            <li key={c.id} className="nf-tcard">
               <NfArt seed={c.id} tone={c.repo.length % 2 ? "project" : "side"} />
-              <a className="nf-tcard-a nf-stretch" href={c.url} target="_blank" rel="noreferrer">
+              <a className="nf-tcard-a" href={c.url} target="_blank" rel="noreferrer">
                 <span className="nf-tcard-msg">{c.message}</span>
                 <span className="nf-tcard-meta">
                   {c.repo} · {ago(c.at, now)}
