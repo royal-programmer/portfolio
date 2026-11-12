@@ -1275,8 +1275,41 @@
   .nf-hirebar-t small {
     display: none;
   }
+  /* Phones: the dot and the three actions; the words would not fit beside them. */
+  .nf-hirebar-t {
+    font-size: 0;
+    gap: 0;
+  }
   .nf-hirebar-a a,
   .nf-hirebar-a button {
-    padding: 0 10px;
+    padding: 0 12px;
+    white-space: nowrap;
   }
+  /* The view's "back to terminal" pill rides above the bar while it is up. */
+  body:has(.nf-hirebar) .view-exit {
+    bottom: calc(142px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* No-JS: the server-rendered titles read as a plain page (the app itself needs scripts). */
+.nf-noscript {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+  color: var(--nf-ink);
+}
+.nf-noscript ul {
+  padding: 0;
+  list-style: none;
+}
+.nf-noscript li {
+  margin: 1.2rem 0;
+}
+.nf-noscript h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.nf-noscript p {
+  margin: 0.2rem 0;
+  color: var(--nf-dim);
 }

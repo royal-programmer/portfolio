@@ -16,6 +16,7 @@ import { NetflixModal } from "./netflix-modal";
 import { NetflixTopbar } from "./netflix-topbar";
 import { NetflixHireSheet, NetflixTabBar } from "./netflix-tabbar";
 import { NetflixHireBar } from "./netflix-hirebar";
+import { NetflixSeo } from "./netflix-seo";
 import { AUTOPILOT_TYPE_MS, AutopilotRail, autopilotSeen, useAutopilot } from "./netflix-autopilot";
 import { JD_MIN, netflixFit, sortByFit } from "@/lib/site/netflix-fit";
 import type { FitPool } from "@/lib/site/terminal-fit";
@@ -137,7 +138,8 @@ export function NetflixView(props: NetflixViewProps) {
   }, []);
 
   return (
-    <div className="nf-root" style={{ "--nf-accent": accent } as React.CSSProperties} data-profile={profile ?? ""}>
+    <main className="nf-root" style={{ "--nf-accent": accent } as React.CSSProperties} data-profile={profile ?? ""}>
+      <NetflixSeo series={series} contact={props.contact} />
       {profile === undefined ? null : profile === null ? (
         <ProfileGate onPick={pick} notify={notify} />
       ) : (
@@ -160,7 +162,7 @@ export function NetflixView(props: NetflixViewProps) {
           ) : null}
         </div>
       ) : null}
-    </div>
+    </main>
   );
 }
 
@@ -184,7 +186,7 @@ function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => voi
   };
 
   return (
-    <main className="nf-gate">
+    <div className="nf-gate">
       <h1 className="nf-gate-title">{edit ? "Manage Profiles:" : "Who’s watching?"}</h1>
       <div className="nf-profiles" role="group" aria-label="Profiles">
         {NETFLIX_PROFILES.map((p, i) => (
@@ -218,7 +220,7 @@ function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => voi
       <button type="button" className="nf-manage" aria-pressed={edit} onClick={() => setEdit((v) => !v)}>
         {edit ? "Done" : "Manage Profiles"}
       </button>
-    </main>
+    </div>
   );
 }
 

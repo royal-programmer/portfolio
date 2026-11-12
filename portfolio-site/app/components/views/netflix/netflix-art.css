@@ -318,3 +318,13 @@
 .nf-hero-copy {
   width: min(46rem, 100%);
 }
+
+/* Forced colours: the decorative lines would all turn to one busy colour, so only the figure stays. */
+@media (forced-colors: active) {
+  .nf-art2 svg {
+    display: none;
+  }
+  .nf-art2 {
+    background: Canvas;
+  }
+}

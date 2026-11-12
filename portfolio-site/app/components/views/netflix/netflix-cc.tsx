@@ -28,7 +28,7 @@ export function CcButton({ cc, small, hint }: { cc: { on: boolean; lang: SubLang
 /** The AD toggle (D4), beside CC: `AD`, pressed while audio description is on; a note says when no voice matches. */
 export function AdButton({ ad, small }: { ad: ReturnType<typeof useAd>; small?: boolean }) {
   if (!ad.supported) return null;
-  const label = ad.on ? "Audio description on" : "Audio description off";
+  const label = "AD, audio description";
   return (
     <>
       <button

@@ -265,8 +265,9 @@ function TopCard({ item, rank, env }: { item: NfItem; rank: number; env: CardEnv
       <span className="nf-t10-n" aria-hidden data-two={rank >= 10 || undefined}>
         {rank}
       </span>
-      <button type="button" className="nf-t10-card" data-nf-card={item.id} aria-label={`Number ${rank}: ${f.title}`} onClick={(ev) => env.open(item, ev.currentTarget)}>
+      <button type="button" className="nf-t10-card" data-nf-card={item.id} onClick={(ev) => env.open(item, ev.currentTarget)}>
         <NfArt seed={item.id} tone={tone} shape="tall" metric={f.metric} />
+        <span className="nf-visually-hidden">{`Number ${rank}: `}</span>
         <span className="nf-t10-title">{f.title}</span>
         <Bar value={env.progress[item.id]} />
       </button>
@@ -349,7 +350,7 @@ function EpisodeCard({ e, item, env }: { e: Episode; item: NfItem; env: CardEnv 
 
   return (
     <li className="nf-ep" ref={li} data-branch={e.branch} onPointerEnter={enter} onPointerLeave={leave}>
-      <button type="button" className="nf-card" data-nf-card={item.id} aria-label={`${e.title}, season ${e.season} episode ${e.n}${top ? ", Top 10" : ""}`} onClick={(ev) => env.open(item, ev.currentTarget)}>
+      <button type="button" className="nf-card" data-nf-card={item.id} onClick={(ev) => env.open(item, ev.currentTarget)}>
         {top ? (
           <span className="nf-top" aria-hidden>
             <span>TOP</span>
@@ -361,6 +362,7 @@ function EpisodeCard({ e, item, env }: { e: Episode; item: NfItem; env: CardEnv 
         <NfArt seed={item.id} tone={e.branch} metric={e.metric} />
         <span className="nf-card-title">{e.title}</span>
         <span className="nf-card-strip">{[`S${e.season} E${e.n}`, e.runtime, e.tag, e.grade].filter(Boolean).join(" · ")}</span>
+        {top ? <span className="nf-visually-hidden">, Top 10</span> : null}
         {teaser.text !== null ? (
           <span className="nf-teaser" aria-hidden>
             {teaser.text}
