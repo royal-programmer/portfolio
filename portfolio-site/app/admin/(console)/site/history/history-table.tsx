@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { revertToHistory } from "../actions";
+import { revertToHistory } from "../../../actions";
 
 export type HistoryRow = { id: number; key: string; action: string; by: string | null; at: string; summary: string; canRevert: boolean };
 
