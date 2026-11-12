@@ -150,7 +150,7 @@ export function NetflixHero({ series, profile, status, fast, firstRowId, feature
     >
       <div className="nf-art" aria-hidden>
         {cur && f ? <NfArt key={cur.item.id} seed={cur.item.id} tone={tone} big live /> : null}
-        {cur && f?.media ? <NfPoster key={`p-${cur.item.id}`} media={f.media} eager /> : null}
+        {cur && f?.media ? <NfPoster key={`p-${cur.item.id}`} media={f.media} eager priority /> : null}
       </div>
       <div className="nf-hero-shade" aria-hidden />
 

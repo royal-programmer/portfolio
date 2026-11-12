@@ -8,19 +8,24 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { ProjectMedia } from "@/lib/site/netflix-data";
+import { LQIP } from "@/lib/site/netflix-lqip";
 import type { TermLink } from "@/lib/site/terminal-data";
 import { t } from "@/lib/site/terminal-strings";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/** A blur-up placeholder (F5): a 20 px copy of the image as the img's own background, replaced by the image once it has decoded. */
+const blurUp = (src: string): React.CSSProperties | undefined => (LQIP[src] ? { backgroundImage: `url(${LQIP[src]})`, backgroundSize: "cover" } : undefined);
+
 /** The project's poster, as the card or billboard art. A missing file hides itself and the generated art behind it shows. */
-export function NfPoster({ media, eager }: { media: ProjectMedia; eager?: boolean }) {
+/** `eager` loads it now; `priority` (the hero art only) also asks for it first. Everything else is lazy. */
+export function NfPoster({ media, eager, priority }: { media: ProjectMedia; eager?: boolean; priority?: boolean }) {
   const [bad, setBad] = useState(false);
   if (bad) return null;
   const p = media.poster;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- a fixed local file with its size set; next/image would add a resizer hop for nothing
-    <img className="nf-photo" src={p.src} alt="" width={p.w} height={p.h} loading={eager ? "eager" : "lazy"} decoding="async" onError={() => setBad(true)} />
+    <img className="nf-photo" src={p.src} alt="" width={p.w} height={p.h} loading={eager ? "eager" : "lazy"} fetchPriority={priority ? "high" : undefined} decoding="async" style={blurUp(p.src)} onError={() => setBad(true)} />
   );
 }
 
@@ -87,7 +92,7 @@ export function ScreensRow({ media, title }: { media: ProjectMedia; title: strin
           <li key={s.id}>
             <button type="button" className="nf-shot" onClick={(e) => setOpen({ i, el: e.currentTarget })} aria-label={`${s.label}: ${t("nf.full", "en")}`}>
               {/* eslint-disable-next-line @next/next/no-img-element -- local file, size set */}
-              <img src={s.src} alt="" width={s.w} height={s.h} loading="lazy" decoding="async" onError={() => setGone((g) => new Set(g).add(s.id))} />
+              <img src={s.src} alt="" width={s.w} height={s.h} loading="lazy" decoding="async" style={blurUp(s.src)} onError={() => setGone((g) => new Set(g).add(s.id))} />
               <span>{s.label}</span>
             </button>
           </li>
@@ -190,7 +195,7 @@ function ClipTile({ clip, playLabel }: { clip: ProjectMedia["clips"][number]; pl
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- local file, 16:10 */}
-      <img src={clip.poster} alt="" width={1280} height={800} loading="lazy" decoding="async" onError={() => setBad(true)} />
+      <img src={clip.poster} alt="" width={1280} height={800} loading="lazy" decoding="async" style={blurUp(clip.poster)} onError={() => setBad(true)} />
       {on && !calm ? <video ref={vid} src={clip.src} muted loop playsInline preload="metadata" aria-hidden onError={() => setOn(false)} /> : null}
       <span className="nf-clip-badge" aria-hidden>
         {on ? "❚❚" : "▶"}
