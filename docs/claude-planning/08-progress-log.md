@@ -1445,3 +1445,8 @@ stripped service_role's table grants).
 
 - X1 varied art (geometry families and tints per tone and seed), X2 re-checks (Top 10 numeral clip fixed), D1 `?for=` links (hero, Hire sheet, end card, `share netflix --for`, OG card, Profiles menu field), D2 Trending now from live public commits, D3 case study PDF, D4 audio description, D5 contextual Hire bar, D6 server-rendered text, JSON-LD, accessibility fixes. Details in 17-persona-views.md section 22.
 - Not verified: speech in a real bn-IN / hi-IN voice (the test browser has no such voice), axe-core directly (see section 22).
+
+### Round 25 - Netflix, part E (2026-11-12)
+
+- E1 quiet labels with context, `Top 10` by scope, phrase audit; E3 certifications as a series; E5 instant link maker with fallback, one Profiles door, `share --for` help, red R tab icon per view; E2 and E4 code (poster, Screens and Clips rows, Play then Visit end card). Details and the phrase list in `17-persona-views.md` section 24.
+- Open: the product assets still need to be copied (`node scripts/netflix-media.mjs` from `portfolio-site/`); until then posters and galleries hide themselves. Ratul has not confirmed the demo data in those assets is fake (all localhost, `demo-api`, sample products; one poster shows the placeholder `ACME Ltd`).
