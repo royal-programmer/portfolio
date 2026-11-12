@@ -7,6 +7,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { cleanFor, forLink, FOR_MAX, typeFor } from "@/lib/site/netflix-for";
+import { VIEW_ICONS } from "@/lib/site/view-icons";
 import { t } from "@/lib/site/terminal-strings";
 
 type Props = {
@@ -124,7 +125,7 @@ export function NetflixTopbar({ title, searchToken = 0, glyph, tone, query, onQu
 
   return (
     <header className="nf-bar" data-solid={solid || undefined} data-searching={expanded || undefined}>
-      <button type="button" className="nf-bar-mark" onClick={onHome} aria-label="Home">
+      <button type="button" className="nf-bar-mark" style={{ color: VIEW_ICONS.netflix.fg }} onClick={onHome} aria-label="Home">
         R
       </button>
       {title ? <span className="nf-bar-title">{title}</span> : null}
