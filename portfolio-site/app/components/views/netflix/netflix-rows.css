@@ -752,3 +752,55 @@ button.nf-cast[aria-pressed="true"] {
   font-size: 0.9rem;
 }
 
+
+/* ---------- Generated art behind the cards (C1) ---------- */
+.nf-card::after,
+.nf-poster::after,
+.nf-skill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(0deg, rgba(8, 8, 12, 0.92) 0%, rgba(8, 8, 12, 0.55) 34%, rgba(8, 8, 12, 0) 66%);
+}
+.nf-card-title,
+.nf-card-strip {
+  z-index: 1;
+}
+.nf-top,
+.nf-fit,
+.nf-start,
+.nf-prog {
+  z-index: 3;
+}
+.nf-poster {
+  justify-content: flex-end;
+  background: #14141b;
+}
+.nf-poster::after {
+  background: linear-gradient(0deg, rgba(8, 8, 12, 0.95) 0%, rgba(8, 8, 12, 0.78) 42%, rgba(8, 8, 12, 0) 72%);
+}
+.nf-poster > :not(.nf-art2) {
+  z-index: 1;
+}
+.nf-poster .nf-chips-mini {
+  margin-top: 0;
+}
+.nf-poster-sum {
+  -webkit-line-clamp: 3;
+}
+.nf-skill {
+  position: relative;
+  overflow: hidden;
+  background: #16161d;
+}
+.nf-skill::after {
+  background: linear-gradient(0deg, rgba(8, 8, 12, 0.7), rgba(8, 8, 12, 0.35));
+}
+.nf-skill > :not(.nf-art2) {
+  z-index: 1;
+}
+.nf-card .nf-top {
+  left: auto;
+  right: 10px;
+}

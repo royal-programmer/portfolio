@@ -18,6 +18,9 @@ export const NETFLIX_PROFILES: readonly NetflixProfile[] = [
 
 export const isNetflixProfile = (s: string | null | undefined): s is NetflixProfileId => NETFLIX_PROFILES.some((p) => p.id === s);
 
+/** The big impact figure on a card's art (C1): `value` is the focal text, `label` the small word under it. */
+export type Metric = { value: string; label: string };
+
 export type Episode = {
   id: string;
   /** The year. */
@@ -34,6 +37,8 @@ export type Episode = {
   grade?: string;
   /** A project / view link when the episode is one. */
   href?: string;
+  /** A figure found in the title or synopsis (`metricOf`); never invented. */
+  metric?: Metric;
 };
 
 export type SkillCard = { id: string; name: string; group: string };
@@ -48,6 +53,7 @@ export type ProjectCard = {
   /** Internal page, when there is one. */
   href?: string;
   kind: "project" | "post";
+  metric?: Metric;
 };
 
 /** A technology on the cast row (N5): how many episodes / projects mention it. `key` is the canonical lower-case name. */
@@ -83,6 +89,51 @@ export const RECRUITER_CUT: ReadonlyArray<{ episode?: { title: RegExp; tag?: str
   { project: "api-test-center", episode: { title: /api test center/i } },
 ];
 
+
+/* ---------- C1: the big impact figure ---------- */
+
+/**
+ * Explicit overrides, checked first: a title (and tag, when given) mapped to its figure, or to `null` to say
+ * "no figure". Every value here is a number that already appears in the item's own text (the timeline, the
+ * hiring proof lines); this table only pins the wording of the art.
+ */
+export const METRIC_OVERRIDES: ReadonlyArray<{ title: RegExp; tag?: string; metric: Metric | null }> = [
+  { title: /shift roster/i, tag: "v2.0", metric: { value: "200+", label: "users" } },
+  { title: /11 python automations/i, metric: { value: "11", label: "automations" } },
+  { title: /vms query/i, metric: { value: "5–10 → 2–3", label: "min" } },
+  { title: /7 openai partneru/i, metric: { value: "7", label: "certs" } },
+];
+
+const NUM = String.raw`\d[\d,]*(?:\.\d+)?`;
+const RANGE = String.raw`${NUM}(?:\s?[–-]\s?${NUM})?`;
+const WORD_NUM: Record<string, string> = { one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10", eleven: "11", twelve: "12" };
+const num = (s: string) => WORD_NUM[s.toLowerCase()] ?? s;
+
+/**
+ * The regex rules, tried in this order over "title. synopsis" (the first rule that matches wins, wherever it sits
+ * in the text): a before/after time (`5–10 minutes to 2–3` -> `5–10 → 2–3 min`), a user count, a count of
+ * automations, a count of credentials, a count of records. No match: no figure, pure art.
+ */
+const METRIC_RULES: ReadonlyArray<{ re: RegExp; make: (m: RegExpExecArray) => Metric }> = [
+  { re: new RegExp(String.raw`(${RANGE})\s*min(?:ute)?s?\s+(?:to|→|->)\s+(${RANGE})`, "i"), make: (m) => ({ value: `${m[1]} → ${m[2]}`, label: "min" }) },
+  { re: new RegExp(String.raw`(${NUM}\+?)\s+(?:active\s+)?users\b`, "i"), make: (m) => ({ value: m[1], label: "users" }) },
+  { re: new RegExp(String.raw`\b(\d+|${Object.keys(WORD_NUM).join("|")})\s+(?:python\s+)?automations\b`, "i"), make: (m) => ({ value: num(m[1]), label: "automations" }) },
+  { re: new RegExp(String.raw`\b(\d+)\s+(?:[\w-]+\s+){0,2}(?:credentials|certifications|certs)\b`, "i"), make: (m) => ({ value: m[1], label: "certs" }) },
+  { re: new RegExp(String.raw`(${NUM}K?\+?)\s+(?:employee-)?(?:shift\s+)?records\b`, "i"), make: (m) => ({ value: m[1], label: "records" }) },
+];
+
+/** The item's figure: an override when one names it, else the first regex rule that matches its text. */
+export function metricOf(title: string, synopsis?: string, tag?: string): Metric | undefined {
+  const o = METRIC_OVERRIDES.find((x) => x.title.test(title) && (!x.tag || x.tag === tag));
+  if (o) return o.metric ?? undefined;
+  const text = `${title}. ${synopsis ?? ""}`;
+  for (const rule of METRIC_RULES) {
+    const m = rule.re.exec(text);
+    if (m) return rule.make(m);
+  }
+  return undefined;
+}
+
 const monthIndex = (date: string) => {
   const [y, m] = date.split("-");
   return Number(y) * 12 + (Number(m) || 1) - 1;
@@ -110,6 +161,7 @@ export function buildEpisodes(data: TerminalData, projects: Array<{ slug: string
       runtime: months >= 24 ? `${Math.round(months / 12)} yr` : months >= 1 ? `${months} mo` : "1 ep",
       grade: c.grade,
       href: c.tag && slugs.has(c.tag) ? `/engineer/${c.tag}` : undefined,
+      metric: metricOf(c.subject, c.body?.join(" "), c.tag),
     };
   });
 }
@@ -135,8 +187,9 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
     year: p.year,
     href: `/engineer/${p.slug}`,
     kind: "project",
+    metric: metricOf(p.title, p.summary),
   }));
-  const postCards: ProjectCard[] = data.posts.map((p) => ({ id: `post-${p.slug}`, title: p.title, summary: p.excerpt, stack: [], year: p.date?.slice(0, 4), kind: "post" }));
+  const postCards: ProjectCard[] = data.posts.map((p) => ({ id: `post-${p.slug}`, title: p.title, summary: p.excerpt, stack: [], year: p.date?.slice(0, 4), kind: "post", metric: metricOf(p.title, p.excerpt) }));
 
   const inStack = new Set(data.stack.map((s) => s.toLowerCase()));
   const skills: SkillCard[] = data.resume.skills.flatMap((g) => g.items.map((name) => ({ id: `skill-${name}`, name, group: g.group })));
@@ -238,7 +291,9 @@ export const NF_BRANCH_LABEL: Record<Episode["branch"], string> = { main: "work"
 
 /** What the modal needs from an item, flattened. */
 export type NfFacts = {
+  id: string;
   title: string;
+  metric?: Metric;
   blurb?: string;
   /** "main" | "learn" | … for episodes; the kind for the rest. */
   tone: string;
@@ -262,6 +317,8 @@ export function factsOf(item: NfItem): NfFacts {
   if (item.kind === "episode") {
     const e = item.e;
     return {
+      id: item.id,
+      metric: e.metric,
       title: e.title,
       blurb: e.synopsis,
       tone: e.branch,
@@ -279,10 +336,12 @@ export function factsOf(item: NfItem): NfFacts {
     };
   }
   if (item.kind === "skill") {
-    return { title: item.s.name, blurb: `${item.s.name}, in the ${item.s.group} group of the résumé's skills.`, tone: "skill", branchLabel: item.s.group, tags: [item.s.group], stack: [], letter: item.s.name.trim().charAt(0).toUpperCase() };
+    return { id: item.id, title: item.s.name, blurb: `${item.s.name}, in the ${item.s.group} group of the résumé's skills.`, tone: "skill", branchLabel: item.s.group, tags: [item.s.group], stack: [], letter: item.s.name.trim().charAt(0).toUpperCase() };
   }
   const c = item.c;
   return {
+    id: item.id,
+    metric: c.metric,
     title: c.title,
     blurb: c.summary,
     tone: item.kind,

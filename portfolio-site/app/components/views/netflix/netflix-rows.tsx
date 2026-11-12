@@ -11,6 +11,7 @@ import type { TermLink } from "@/lib/site/terminal-data";
 import { PROFILES } from "@/lib/site/profiles";
 import { useViewExit } from "../view-shell";
 import { tick } from "./netflix-sound";
+import { NfArt } from "./netflix-art";
 
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const behavior = (): ScrollBehavior => (reducedMotion() ? "auto" : "smooth");
@@ -340,11 +341,9 @@ function EpisodeCard({ e, item, env }: { e: Episode; item: NfItem; env: CardEnv 
         ) : null}
         {env.startHere?.has(item.id) ? <span className="nf-start">Start here</span> : null}
         <FitBadge env={env} id={item.id} />
-        <span className="nf-num" aria-hidden>
-          S{e.season} E{e.n}
-        </span>
+        <NfArt seed={item.id} tone={e.branch} metric={e.metric} />
         <span className="nf-card-title">{e.title}</span>
-        <span className="nf-card-strip">{[e.runtime, e.tag, e.grade].filter(Boolean).join(" · ")}</span>
+        <span className="nf-card-strip">{[`S${e.season} E${e.n}`, e.runtime, e.tag, e.grade].filter(Boolean).join(" · ")}</span>
         {teaser.text !== null ? (
           <span className="nf-teaser" aria-hidden>
             {teaser.text}
@@ -376,7 +375,8 @@ function EpisodeCard({ e, item, env }: { e: Episode; item: NfItem; env: CardEnv 
 
 function PosterCard({ c, item, env }: { c: ProjectCard; item: NfItem; env: CardEnv }) {
   return (
-    <li className="nf-poster">
+    <li className="nf-poster" data-kind={item.kind}>
+      <NfArt seed={item.id} tone={item.kind} shape="tall" metric={c.metric} />
       {env.startHere?.has(item.id) ? <span className="nf-start">Start here</span> : null}
       <FitBadge env={env} id={item.id} />
       <button type="button" className="nf-poster-title nf-stretch" data-nf-card={item.id} onClick={(ev) => env.open(item, ev.currentTarget)}>
@@ -413,6 +413,7 @@ function SkillTile({ s, item, env }: { s: SkillCard; item: NfItem; env: CardEnv 
   return (
     <li className="nf-skill-li">
       <button type="button" className="nf-skill" data-nf-card={item.id} title={s.group} onClick={(ev) => env.open(item, ev.currentTarget)}>
+        <NfArt seed={item.id} tone="skill" />
         <FitBadge env={env} id={item.id} />
         <span className="nf-skill-name">{s.name}</span>
         <span className="nf-skill-group">{s.group}</span>

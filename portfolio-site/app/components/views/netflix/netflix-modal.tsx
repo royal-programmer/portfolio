@@ -15,6 +15,7 @@ import { epSub } from "@/lib/site/netflix-subs";
 import { useViewExit } from "../view-shell";
 import { CcButton } from "./netflix-cc";
 import { chime } from "./netflix-sound";
+import { NfArt } from "./netflix-art";
 import { useCc, useLikes, useMyList, useSound } from "./netflix-store";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -27,7 +28,6 @@ type Props = {
   index: Map<string, NfItem>;
   /** The card's rectangle, for the grow-from-card opening. Null: opened from a link. */
   origin: DOMRect | null;
-  portraitText: string;
   /** Start playing as soon as it opens (the card's play button). */
   autoPlay?: boolean;
   /** How long Play's teleprompter types for (the guided play passes a long one); default six seconds. */
@@ -46,7 +46,7 @@ type Props = {
   onShow: (item: NfItem, playedThrough: boolean) => void;
 };
 
-export function NetflixModal({ item, index, origin, portraitText, autoPlay, playMs, cast, profile = "story", now: nowInfo, contact = [], onCast, onClose, onSwap, onShow }: Props) {
+export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, profile = "story", now: nowInfo, contact = [], onCast, onClose, onSwap, onShow }: Props) {
   const facts = useMemo(() => factsOf(item), [item]);
   const itemCast = useMemo(() => (cast ? castOf(item, cast) : []), [item, cast]);
   const overlay = useRef<HTMLDivElement>(null);
@@ -313,7 +313,7 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, play
           <>
         <div className="nf-m-top" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
           <div className="nf-m-handle" aria-hidden />
-          <Billboard key={item.id} facts={facts} portraitText={portraitText} playing={playing} playMs={playMs} sub={cc.on && cc.lang ? epSub(facts.tone, facts.season, facts.n, cc.lang) : undefined} lang={cc.lang} onFinish={finished}>
+          <Billboard key={item.id} facts={facts} playing={playing} playMs={playMs} sub={cc.on && cc.lang ? epSub(facts.tone, facts.season, facts.n, cc.lang) : undefined} lang={cc.lang} onFinish={finished}>
             <button type="button" className="nf-m-x" aria-label="Close" onClick={requestClose}>
               <span aria-hidden>×</span>
             </button>
@@ -480,7 +480,7 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, play
                   <li key={o.id}>
                     <button type="button" className="nf-mcard" data-tone={f.tone} onClick={() => onSwap(o)}>
                       <span className="nf-mcard-art" aria-hidden>
-                        <span>{f.letter}</span>
+                        <NfArt seed={o.id} tone={f.tone} metric={f.metric} />
                       </span>
                       <span className="nf-mcard-meta">
                         <span className="nf-mcard-title">{f.title}</span>
@@ -566,18 +566,12 @@ function EndCard({ end, now, contact, onClose, onNext }: { end: ReturnType<typeo
 
 /* ---------- Billboard ---------- */
 
-function Billboard({ facts, portraitText, playing, playMs, sub, lang, onFinish, children }: { facts: NfFacts; portraitText: string; playing: boolean; playMs?: number; sub?: string; lang?: string | null; onFinish: () => void; children: React.ReactNode }) {
-  const epTone = facts.tone === "main" || facts.tone === "learn" || facts.tone === "side" || facts.tone === "life";
+function Billboard({ facts, playing, playMs, sub, lang, onFinish, children }: { facts: NfFacts; playing: boolean; playMs?: number; sub?: string; lang?: string | null; onFinish: () => void; children: React.ReactNode }) {
   return (
     <div className="nf-bb" data-playing={playing || undefined}>
       <div className="nf-bb-art" aria-hidden>
-        {portraitText ? <pre>{portraitText}</pre> : <span className="nf-shimmer" />}
+        <NfArt seed={facts.id} tone={facts.tone} metric={facts.metric} big live />
       </div>
-      {epTone ? null : (
-        <span className="nf-bb-letter" aria-hidden>
-          {facts.letter}
-        </span>
-      )}
       <div className="nf-bb-shade" aria-hidden />
       {playing ? <Teleprompter text={`${facts.title}. ${facts.blurb ?? ""}`.trim()} sub={sub} lang={lang} ms={playMs ?? 6000} onDone={onFinish} /> : null}
       <h2 className="nf-bb-title" data-hidden={playing || undefined}>

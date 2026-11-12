@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./netflix.css";
 import "./netflix-rows.css";
 import "./netflix-modal.css";
+import "./netflix-art.css";
 import { NetflixHero } from "./netflix-hero";
 import { NetflixGrid, NetflixRows, type CardEnv, type DisplayRow } from "./netflix-rows";
 import { NetflixModal } from "./netflix-modal";
@@ -532,7 +533,7 @@ function NetflixBody({ show, series, profile, status, portrait, fitPool, subData
           </>
         )}
       </div>
-      {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} portraitText={text} autoPlay={modal.play} playMs={modal.playMs} cast={castList} profile={profile} now={now} contact={contact} onCast={castFromModal} onClose={close} onSwap={swap} onShow={onShow} /> : null}
+      {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} autoPlay={modal.play} playMs={modal.playMs} cast={castList} profile={profile} now={now} contact={contact} onCast={castFromModal} onClose={close} onSwap={swap} onShow={onShow} /> : null}
     </>
   );
 }
