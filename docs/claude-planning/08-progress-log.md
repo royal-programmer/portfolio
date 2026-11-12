@@ -5,6 +5,12 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-12 - Round 21: Netflix, part C
+
+- C1 generated key art with the impact figure on every card and the modal billboard; C2 `Top 10 by impact` (documented rank formula); C3 the hero featured carousel (three titles per profile, art behind the trailer, tabs with progress); C4 phone app feel (bottom tab bar, Hire sheet, portrait poster hero, strings in en, bn, hi); C5 "Previously on…" in the modal. Details and the metric rules: 17-persona-views.md section 21.
+- Decisions the brief did not define: the rank formula (figure 100, recency 0..30 from 2020-08, branch weights, project 14, post 2; skills and life episodes unranked), the metric regex order (time before/after, users, automations, credentials, records), the Developer and full-story `FEATURED` sets, `Trailer` as a separate hero button now that Play opens the feature, and no ASCII portrait in the hero.
+
+
 ## 2026-11-10 — Round 8: `hire --brief`
 
 Forwardable one-screen fit sheet from a new `hiring` data block; `copy` token puts the sheet on the clipboard (72 cols); `mail --fit` pre-fills the message and tags the lead `hire-brief`. Details: 17-persona-views.md section 13. Availability and compensation are `· ask` placeholders until Ratul fills them. Not done: Series view and hub unchanged; the sheet's role/stack/proof lines stay English in bn and hi.
