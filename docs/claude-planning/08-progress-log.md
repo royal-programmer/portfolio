@@ -1450,3 +1450,8 @@ stripped service_role's table grants).
 
 - E1 quiet labels with context, `Top 10` by scope, phrase audit; E3 certifications as a series; E5 instant link maker with fallback, one Profiles door, `share --for` help, red R tab icon per view; E2 and E4 code (poster, Screens and Clips rows, Play then Visit end card). Details and the phrase list in `17-persona-views.md` section 24.
 - Open: the product assets still need to be copied (`node scripts/netflix-media.mjs` from `portfolio-site/`); until then posters and galleries hide themselves. Ratul has not confirmed the demo data in those assets is fake (all localhost, `demo-api`, sample products; one poster shows the placeholder `ACME Ltd`).
+
+### Round 26 - Netflix, part F (2026-11-12)
+
+- F1 chaptered trailer for a project's Play (title, who and why, clip beats with subtitles, built with, end card; about 43 s for API Test Center, clips cut at `clipMs`), F2 story fields as data (`storyOf`), F3 Next episode in 5 and Autoplay next, F4 hover clips on project cards, F5 blur-up placeholders and hero-only high priority, F6 resume line and Book a call (hidden until a link is set), F7 back to terminal on a direct route. Details in `17-persona-views.md` section 25.
+- Open: Ratul's Book a call link (`BOOK_CALL.href`); the "Popular with visitors" row needs an open log that does not exist; LCP in milliseconds needs a production build.
