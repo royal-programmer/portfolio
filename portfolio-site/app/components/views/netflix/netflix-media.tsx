@@ -3,14 +3,13 @@
 /**
  * Real product imagery in the Netflix view (17-persona-views.md §24, E2 and E4): the poster that replaces generated art,
  * the Screens and Clips rows of a project's modal, and Play for a project (a short reel of facts and clip posters that
- * ends on a card with Visit project and View code). Light on purpose: images are lazy with their size set, a clip is only
+ * is now the trailer, `netflix-trailer.tsx`; this file keeps its end card). Light on purpose: images are lazy with their size set, a clip is only
  * loaded after a hover or tap and only its metadata, and reduced motion shows posters only.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ProjectMedia } from "@/lib/site/netflix-data";
 import type { TermLink } from "@/lib/site/terminal-data";
 import { t } from "@/lib/site/terminal-strings";
-import { useAdSpeech } from "./netflix-ad";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -169,90 +168,12 @@ export function ClipsRow({ media, title, playLabel }: { media: ProjectMedia; tit
   );
 }
 
-/* ---------- Play for a project: facts and clip posters, then the end card ---------- */
-
-export type ReelStep = { kind: "text"; text: string } | { kind: "poster"; src: string; label: string };
-
-/**
- * The reel's steps (E4): the facts and the clip posters, alternating (text, poster, text, poster). Pure: the same
- * data in, the same steps out. With no clips it is the facts only.
- */
-export function reelSteps(facts: { title: string; blurb?: string; stack: string[]; metricLabel?: string }, media?: ProjectMedia): ReelStep[] {
-  const first = `${facts.title}. ${facts.blurb ?? ""}`.trim();
-  const second = [facts.stack.length ? facts.stack.slice(0, 5).join(" · ") : "", facts.metricLabel ?? ""].filter(Boolean).join("  |  ");
-  const texts = [first, second].filter(Boolean);
-  const clips = (media?.clips ?? []).slice(0, texts.length);
-  const out: ReelStep[] = [];
-  texts.forEach((text, k) => {
-    out.push({ kind: "text", text });
-    const c = clips[k];
-    if (c) out.push({ kind: "poster", src: c.poster, label: c.label });
-  });
-  return out;
-}
-
-/** Text steps hold twice as long as poster steps; the whole reel lasts `ms` (six seconds by default). */
-export function ProjectReel({ steps, ms, adOn, onDone }: { steps: ReelStep[]; ms: number; adOn: boolean; onDone: () => void }) {
-  const weights = useMemo(() => steps.map((s) => (s.kind === "text" ? 2 : 1)), [steps]);
-  const total = weights.reduce((a, b) => a + b, 0) || 1;
-  const calm = useMemo(() => reduced(), []);
-  const [at, setAt] = useState(0);
-  const [typed, setTyped] = useState({ at: 0, n: 0 });
-  const done = useRef(onDone);
-  useEffect(() => {
-    done.current = onDone;
-  });
-  const natural = useRef(false);
-  useAdSpeech({ on: adOn, tag: "en-IN" }, steps.flatMap((s) => (s.kind === "text" ? [s.text] : [])).join(" "), () => natural.current);
-
-  useEffect(() => {
-    const step = steps[at];
-    if (!step) {
-      natural.current = true;
-      done.current();
-      return;
-    }
-    const dur = (weights[at] / total) * ms;
-    let raf = 0;
-    if (step.kind === "text" && !calm) {
-      const t0 = performance.now();
-      const type = (now: number) => {
-        const c = Math.min(step.text.length, Math.floor(((now - t0) / (dur * 0.7)) * step.text.length));
-        setTyped({ at, n: c });
-        if (c < step.text.length) raf = requestAnimationFrame(type);
-      };
-      raf = requestAnimationFrame(type);
-    }
-    const next = window.setTimeout(() => setAt((n) => n + 1), calm ? Math.max(dur, 1400) : dur);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.clearTimeout(next);
-    };
-  }, [at, steps, weights, total, ms, calm]);
-
-  const step = steps[at];
-  if (!step) return null;
-  const chars = step.kind === "text" ? (calm ? step.text.length : typed.at === at ? typed.n : 0) : 0;
-  return step.kind === "poster" ? (
-    <div className="nf-reel nf-reel-poster" aria-live="off">
-      {/* eslint-disable-next-line @next/next/no-img-element -- local file */}
-      <img src={step.src} alt="" width={1280} height={800} decoding="async" />
-      <span>{step.label}</span>
-    </div>
-  ) : (
-    <p className="nf-tele2 nf-reel" aria-live="off">
-      {step.text.slice(0, chars)}
-      {chars < step.text.length ? <span className="nf-caret">▌</span> : null}
-    </p>
-  );
-}
-
 /** What follows a project's Play: the live address and the code, or `In development` with the code and a hello. Never navigates by itself. */
-export function ProjectEnd({ live, repo, contact, onReplay }: { live?: string; repo?: string; contact: TermLink[]; onReplay: () => void }) {
+export function ProjectEnd({ live, repo, contact, dev, onReplay }: { live?: string; repo?: string; contact: TermLink[]; /** Says `In development` even when there is an address. */ dev?: boolean; onReplay: () => void }) {
   const mail = contact.find((c) => c.label === "mail")?.href;
   return (
     <div className="nf-pend" role="group" aria-label={live ? t("nf.end.visit", "en") : t("nf.end.dev", "en")}>
-      {!live ? <p className="nf-pend-dev">{t("nf.end.dev", "en")}</p> : null}
+      {!live || dev ? <p className="nf-pend-dev">{t("nf.end.dev", "en")}</p> : null}
       <div className="nf-pend-actions">
         {live ? (
           <a className="nf-btn nf-btn-play" href={live} target="_blank" rel="noreferrer">
@@ -264,13 +185,13 @@ export function ProjectEnd({ live, repo, contact, onReplay }: { live?: string; r
             {t("nf.end.code", "en")}
           </a>
         ) : null}
-        {!live && mail ? (
+        {mail ? (
           <a className="nf-btn nf-btn-glass" href={mail}>
             {t("nf.end.hello", "en")}
           </a>
         ) : null}
         <button type="button" className="nf-btn nf-btn-glass" onClick={onReplay}>
-          <span aria-hidden>↺</span> Replay
+          <span aria-hidden>↺</span> {t("nf.tr.replay", "en")}
         </button>
       </div>
     </div>

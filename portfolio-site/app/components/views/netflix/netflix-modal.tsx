@@ -20,7 +20,9 @@ import { AdButton, CcButton } from "./netflix-cc";
 import { adCancel, useAd, useAdSpeech } from "./netflix-ad";
 import { chime } from "./netflix-sound";
 import { NfArt } from "./netflix-art";
-import { ClipsRow, NfPoster, ProjectEnd, ProjectReel, ScreensRow, reelSteps } from "./netflix-media";
+import { ClipsRow, NfPoster, ScreensRow } from "./netflix-media";
+import { trailerChapters } from "@/lib/site/netflix-trailer";
+import { Trailer } from "./netflix-trailer";
 import { useCc, useLikes, useMyList, useSound } from "./netflix-store";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -68,8 +70,6 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
   // N10: the id of the last episode whose end card is showing.
   const [endFor, setEndFor] = useState<string | null>(null);
   const showEnd = endFor === item.id;
-  // E4: the id of the project whose Play just ended (its end card shows Visit project / View code).
-  const [projEnd, setProjEnd] = useState<string | null>(null);
   const [seasonPick, setSeasonPick] = useState<{ id: string; season: number } | null>(null);
   const [now] = useState(() => Date.now());
 
@@ -198,9 +198,8 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
   };
 
   /* ----- Play ----- */
-  // E4: Play never leaves the page. A project plays its reel, then shows an end card with the links.
+  // E4, F1: Play never leaves the page. A project plays its trailer, which ends on its own end card with the links.
   const togglePlay = () => {
-    if (!playing) setProjEnd(null);
     setPlay({ id: item.id, on: !playing });
   };
   const finished = () => {
@@ -208,7 +207,11 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
     onShow(item, true);
     // The teleprompter ending on a season's last episode rolls the credits (not in the guided play, which closes the card itself).
     if (isLast && playMs == null) setEndFor(item.id);
-    if (item.kind === "project" && playMs == null) setProjEnd(item.id);
+  };
+  // F1: a project's trailer reached its end card (or, in the guided play, its third chapter): played through.
+  const trailerDone = () => {
+    if (playMs != null) finished();
+    else onShow(item, true);
   };
 
   /* ----- keyboard: Esc, Tab trap, Space toggles Play ----- */
@@ -348,7 +351,7 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
           <>
         <div className="nf-m-top" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
           <div className="nf-m-handle" aria-hidden />
-          <Billboard key={item.id} facts={facts} playing={playing} ended={projEnd === item.id && !playing ? <ProjectEnd live={facts.live} repo={facts.repo} contact={contact} onReplay={togglePlay} /> : null} playMs={playMs} sub={cc.on && cc.lang ? epSub(facts.tone, facts.season, facts.n, cc.lang) : undefined} ad={ad} lang={cc.lang} onFinish={finished}>
+          <Billboard key={item.id} facts={facts} playing={playing} contact={contact} guided={playMs != null} onTrailerDone={trailerDone} playMs={playMs} sub={cc.on && cc.lang ? epSub(facts.tone, facts.season, facts.n, cc.lang) : undefined} ad={ad} lang={cc.lang} onFinish={finished}>
             <button type="button" className="nf-m-x" aria-label="Close" onClick={requestClose}>
               <span aria-hidden>×</span>
             </button>
@@ -644,7 +647,7 @@ function EndCard({ end, now, contact, onClose, onNext }: { end: ReturnType<typeo
 
 /* ---------- Billboard ---------- */
 
-function Billboard({ facts, playing, ended, playMs, sub, ad, lang, onFinish, children }: { facts: NfFacts; playing: boolean; ended?: React.ReactNode; playMs?: number; sub?: string; ad: ReturnType<typeof useAd>; lang?: string | null; onFinish: () => void; children: React.ReactNode }) {
+function Billboard({ facts, playing, contact, guided, onTrailerDone, playMs, sub, ad, lang, onFinish, children }: { facts: NfFacts; playing: boolean; contact: TermLink[]; guided: boolean; onTrailerDone: () => void; playMs?: number; sub?: string; ad: ReturnType<typeof useAd>; lang?: string | null; onFinish: () => void; children: React.ReactNode }) {
   return (
     <div className="nf-bb" data-playing={playing || undefined}>
       <div className="nf-bb-art" aria-hidden>
@@ -652,20 +655,32 @@ function Billboard({ facts, playing, ended, playMs, sub, ad, lang, onFinish, chi
         {facts.media ? <NfPoster media={facts.media} eager /> : null}
       </div>
       <div className="nf-bb-shade" aria-hidden />
-      {playing && facts.kind === "project" ? <ProjectReel steps={reelSteps({ title: facts.title, blurb: facts.blurb, stack: facts.stack, metricLabel: facts.metric ? metricLabel(facts.metric) : undefined }, facts.media)} ms={playMs ?? 6000} adOn={ad.on} onDone={onFinish} /> : null}
+      {playing && facts.kind === "project" ? <ProjectTrailer facts={facts} contact={contact} guided={guided} ad={ad} onDone={onTrailerDone} /> : null}
       {playing && facts.kind !== "project" ? <Teleprompter text={`${facts.title}. ${facts.blurb ?? ""}`.trim()} sub={sub} ad={ad} lang={lang} ms={playMs ?? 6000} onDone={onFinish} /> : null}
-      {ended}
-      <h2 className="nf-bb-title" data-hidden={playing || !!ended || undefined}>
+      <h2 className="nf-bb-title" data-hidden={playing || undefined}>
         {facts.title}
       </h2>
       {facts.metric ? (
-        <p className="nf-bb-metric" data-hidden={playing || !!ended || undefined}>
+        <p className="nf-bb-metric" data-hidden={playing || undefined}>
           {metricLabel(facts.metric)}
         </p>
       ) : null}
       {children}
     </div>
   );
+}
+
+/** A project's trailer (F1): its chapters from the story data. The Recruiter cut plays the first three at a 1.25x hold and skips the end card. */
+function ProjectTrailer({ facts, contact, guided, ad, onDone }: { facts: NfFacts; contact: TermLink[]; guided: boolean; ad: ReturnType<typeof useAd>; onDone: () => void }) {
+  const chapters = useMemo(
+    () =>
+      trailerChapters(
+        { title: facts.title, summary: facts.blurb, stack: facts.stack, live: facts.live, story: facts.story, media: facts.media, labels: { built: t("nf.tr.built", "en"), dev: t("nf.end.dev", "en"), live: t("nf.status.live", "en") } },
+        guided,
+      ),
+    [facts, guided],
+  );
+  return <Trailer chapters={chapters} holdScale={guided ? 1.25 : 1} adOn={ad.on} adTag="en-IN" live={facts.live} repo={facts.repo} contact={contact} dev={facts.story?.status === "in-development"} guided={guided} onDone={onDone} />;
 }
 
 /** Types the text over six seconds (all at once, then a short hold, under reduced motion). */

@@ -162,32 +162,7 @@
   z-index: 2;
 }
 
-/* Play for a project (E4): the reel over the billboard, then the end card */
-.nf-reel-poster {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: grid;
-  place-items: center;
-  background: rgba(0, 0, 0, 0.7);
-}
-.nf-reel-poster img {
-  width: min(86%, 560px);
-  height: auto;
-  border-radius: 6px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
-}
-.nf-reel-poster span {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 5.4rem;
-  text-align: center;
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 0.8rem;
-  color: #fff;
-  text-shadow: 0 1px 8px #000;
-}
+/* Play for a project (F1): the trailer in chapters, then the end card */
 .nf-pend {
   position: absolute;
   left: 2.5rem;
@@ -220,5 +195,171 @@
 @media (forced-colors: active) {
   .nf-photo {
     forced-color-adjust: none;
+  }
+}
+
+.nf-tr {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  cursor: pointer;
+}
+.nf-tr-stage {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+.nf-tr-stage video,
+.nf-tr-stage img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.nf-tr-text {
+  position: absolute;
+  inset: 3.5rem 2.5rem auto;
+  max-height: calc(100% - 10.7rem);
+  padding: 16px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: clamp(0.8rem, 1.7vw, 1.1rem);
+  line-height: 1.6;
+  color: var(--nf-ink);
+}
+.nf-tr-text p {
+  margin: 0 0 0.5em;
+  white-space: pre-wrap;
+}
+.nf-tr-name {
+  font-family: var(--font-display), serif;
+  font-weight: 800;
+  font-size: clamp(1.4rem, 3.6vw, 2.4rem);
+  line-height: 1.15;
+}
+.nf-tr-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.nf-tr-chips li {
+  padding: 3px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  font-size: 0.82em;
+}
+.nf-tr-sub {
+  position: absolute;
+  left: 2.5rem;
+  right: 2.5rem;
+  bottom: 7rem;
+  margin: 0 auto;
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 12px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.72);
+  text-align: center;
+  font-size: clamp(0.85rem, 1.7vw, 1.1rem);
+  line-height: 1.4;
+  color: #fff;
+}
+.nf-tr-ctl {
+  position: absolute;
+  left: 2.5rem;
+  right: 2.5rem;
+  bottom: 4.5rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.nf-tr-ctl > button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(20, 20, 25, 0.8);
+  color: #fff;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.nf-tr-ctl > button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.nf-tr-dots {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  margin: 0 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.nf-tr-dots li {
+  flex: 1;
+  height: 16px;
+  display: flex;
+  align-items: center;
+}
+.nf-tr-dots button {
+  width: 100%;
+  height: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+}
+.nf-tr-dots li[data-state="done"] button {
+  background: #fff;
+}
+.nf-tr-dots li[data-state="now"] button {
+  background: linear-gradient(90deg, #fff calc(var(--p, 0) * 100%), rgba(255, 255, 255, 0.3) 0);
+}
+.nf-tr-paused {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.75rem;
+  color: #fff;
+}
+.nf-tr[data-kind="end"] {
+  cursor: default;
+}
+@media (max-width: 720px) {
+  .nf-tr-text {
+    inset: 3.2rem 1.1rem auto;
+    max-height: calc(100% - 9.6rem);
+    padding: 10px 12px;
+    font-size: 0.74rem;
+    line-height: 1.5;
+  }
+  .nf-tr-sub {
+    left: 1.1rem;
+    right: 1.1rem;
+    bottom: 6.2rem;
+    font-size: 0.78rem;
+  }
+  .nf-tr-ctl {
+    left: 1.1rem;
+    right: 1.1rem;
+    bottom: 4rem;
+  }
+}
+.nf-tr .nf-pend {
+  bottom: 7rem;
+}
+@media (max-width: 720px) {
+  .nf-tr .nf-pend {
+    bottom: 6.2rem;
   }
 }

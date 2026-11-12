@@ -40,7 +40,7 @@ export function adCancel() {
 }
 
 /** Speak `text` in `tag` (cancels what was being said). Returns false when it could not (unsupported, or no gesture yet). */
-export function adSpeak(text: string, tag: string): boolean {
+export function adSpeak(text: string, tag: string, onEnd?: () => void): boolean {
   if (!adSupported() || !text.trim() || !gesture()) return false;
   const synth = window.speechSynthesis;
   synth.cancel();
@@ -49,6 +49,10 @@ export function adSpeak(text: string, tag: string): boolean {
   u.lang = voice?.lang ?? tag;
   if (voice) u.voice = voice;
   u.rate = 1;
+  if (onEnd) {
+    u.onend = onEnd;
+    u.onerror = onEnd;
+  }
   if (!voice && synth.getVoices().length) {
     note = `No ${tag} voice is installed here; using the browser default.`;
     emit();
