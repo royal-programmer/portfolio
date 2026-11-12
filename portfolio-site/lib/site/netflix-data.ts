@@ -68,6 +68,7 @@ export type NetflixRow =
   | { id: string; title: string; kind: "episodes"; items: Episode[] }
   | { id: string; title: string; kind: "cards"; items: ProjectCard[] }
   | { id: string; title: string; kind: "skills"; items: SkillCard[] }
+  | { id: string; title: string; kind: "series"; items: CertSeason[] }
   | { id: string; title: string; kind: "contact"; items: [] };
 
 export type NetflixShow = {
@@ -236,8 +237,6 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
   const castRows: NetflixRow[] = cast.length ? [{ id: "cast", title: "Cast · the stack", kind: "cast", items: cast }] : [];
   const main = episodes.filter((e) => e.branch === "main").sort(newestFirst);
   const side = episodes.filter((e) => e.branch === "side").sort(newestFirst);
-  const collegeFrom = data.periods.find((p) => p.id === "college")?.from ?? "2020-08";
-  const learning = episodes.filter((e) => e.branch === "learn" && e.date >= collegeFrom).sort(newestFirst);
 
   const parts = data.uptime.split(" · ").map((s) => s.trim()).filter(Boolean);
 
@@ -256,7 +255,7 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
       projects,
       { id: "skills", title: "Skills", kind: "skills", items: skills },
       ...castRows,
-      { id: "certs", title: "Certifications", kind: "episodes", items: learning },
+      { id: "certs", title: "Certifications", kind: "series", items: buildCertSeries(data.resume.certifications) },
       tbc,
     ];
   } else if (profile === "developer") {
@@ -301,6 +300,42 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
     recruiterCut: profile === "recruiter" ? resolveCut(episodes, projectCards) : [],
     featured: resolveSteps(FEATURED[profile], episodes, projectCards),
   };
+}
+
+/* ---------- E3: certificates as a series ---------- */
+
+/** A credential, shown as an episode. `issued` and `validThrough` only when the data states them; `verify` only when a link exists. */
+export type CertEpisode = { id: string; issuer: string; name: string; issued?: string; validThrough?: string; verify?: string };
+/** An issuer, shown as a season. */
+export type CertSeason = { id: string; label: string; hue: string; episodes: CertEpisode[] };
+
+/** The seasons' order, names and badge colours. The first rule that matches the résumé's issuer wins; the last catches the rest. Data. */
+export const CERT_SEASONS: ReadonlyArray<{ id: string; match: RegExp; label: string; hue: string }> = [
+  { id: "openai", match: /openai/i, label: "OpenAI PartnerU", hue: "#10a37f" },
+  { id: "cisco", match: /cisco/i, label: "Cisco Networking Academy", hue: "#049fd9" },
+  { id: "ibm", match: /(?:^|[^a-z])ibm(?:[^a-z]|$)/i, label: "IBM", hue: "#4f6dff" },
+  { id: "other", match: /./, label: "Other", hue: "#b08a3a" },
+];
+
+const CERT_ISSUED = /\s*·\s*([A-Z][a-z]{2} \d{4})\s*$/;
+const CERT_VALID = /valid through\s+([^;·]+?)\s*$/i;
+
+/**
+ * Group the résumé's certifications into seasons by issuer (E3). It takes the plain list, so it keeps working when the
+ * list moves to records. Dates come only from the text (`· Jul 2022`, `valid through Jul–Aug 2027`); nothing is invented.
+ */
+export function buildCertSeries(certs: ReadonlyArray<{ issuer: string; line: string; items?: string[]; verify?: string }>): CertSeason[] {
+  const seasons = new Map<string, CertSeason>();
+  for (const c of certs) {
+    const rule = CERT_SEASONS.find((r) => r.match.test(c.issuer)) ?? CERT_SEASONS[CERT_SEASONS.length - 1];
+    const season = seasons.get(rule.id) ?? { id: rule.id, label: rule.label, hue: rule.hue, episodes: [] };
+    seasons.set(rule.id, season);
+    const issued = CERT_ISSUED.exec(c.line)?.[1];
+    const validThrough = CERT_VALID.exec(c.line)?.[1];
+    const names = c.items?.length ? c.items : [c.line.replace(CERT_ISSUED, "").trim()];
+    for (const name of names) season.episodes.push({ id: `cert-${rule.id}-${season.episodes.length + 1}`, issuer: rule.label, name, issued, validThrough, verify: c.verify });
+  }
+  return CERT_SEASONS.flatMap((r) => seasons.get(r.id) ?? []);
 }
 
 /* ---------- The modal's unified item (17-persona-views.md §7) ---------- */

@@ -6,8 +6,9 @@
  * (netflix-modal.tsx); desktop episode cards also grow on hover with play, add, like and more under the title.
  */
 import { TrendingRow } from "./netflix-trending";
+import { CertRow } from "./netflix-certs";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { factsOf, metricLabel, type CastMember, type Episode, type NetflixShow, type NfItem, type ProjectCard, type SkillCard } from "@/lib/site/netflix-data";
+import { factsOf, metricLabel, type CastMember, type CertSeason, type Episode, type NetflixShow, type NfItem, type ProjectCard, type SkillCard } from "@/lib/site/netflix-data";
 import type { TermLink } from "@/lib/site/terminal-data";
 import { PROFILES } from "@/lib/site/profiles";
 import { useViewExit } from "../view-shell";
@@ -17,7 +18,7 @@ import { NfArt } from "./netflix-art";
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const behavior = (): ScrollBehavior => (reducedMotion() ? "auto" : "smooth");
 
-export type DisplayRow = { id: string; title: string; items: NfItem[]; /** C2: the Top 10 shelf, with numerals. */ top10?: true } | { id: string; title: string; contact: true } | { id: string; title: string; cast: CastMember[] } | { id: string; title: string; trending: true };
+export type DisplayRow = { id: string; title: string; items: NfItem[]; /** C2: the Top 10 shelf, with numerals. */ top10?: true } | { id: string; title: string; contact: true } | { id: string; title: string; cast: CastMember[] } | { id: string; title: string; trending: true } | { id: string; title: string; certs: CertSeason[] };
 
 /** What every card needs from the view: open the modal, the local lists, the rank badge, the sound. */
 export type CardEnv = {
@@ -77,7 +78,7 @@ export function NetflixRows({ show, rows, contact, env, onRecap }: Props) {
         </div>
       ) : null}
       <div className="nf-rows" id="nf-rows-top">
-        {rows.map((row) => ("contact" in row ? <ContinuedRow key={row.id} row={row} contact={contact} /> : "cast" in row ? <CastRow key={row.id} row={row} env={env} /> : "trending" in row ? <TrendingRow key={row.id} id={row.id} title={row.title} /> : <Row key={row.id} row={row} env={env} />))}
+        {rows.map((row) => ("contact" in row ? <ContinuedRow key={row.id} row={row} contact={contact} /> : "cast" in row ? <CastRow key={row.id} row={row} env={env} /> : "trending" in row ? <TrendingRow key={row.id} id={row.id} title={row.title} /> : "certs" in row ? <CertRow key={row.id} id={row.id} title={row.title} seasons={row.certs} /> : <Row key={row.id} row={row} env={env} />))}
       </div>
       <footer className="nf-footer">Every row is data &middot; views are picked in the terminal &middot; &copy; 2026 Ratul Roy</footer>
     </>

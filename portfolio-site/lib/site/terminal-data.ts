@@ -47,7 +47,7 @@ export type TermResume = {
   skills: Array<{ group: string; items: string[] }>;
   experience: TermRole[];
   personalProjects: Array<{ name: string; status: string; line: string; url?: string }>;
-  certifications: Array<{ issuer: string; line: string; items?: string[] }>;
+  certifications: Array<{ issuer: string; line: string; items?: string[]; /** A public page that verifies the credential, when one exists (never guessed). */ verify?: string }>;
   education: Array<{ degree: string; school: string; year: string; note?: string }>;
   /** Indices into `experience[0].bullets` that make the one-page PDF (`/resume.pdf`); the terminal shows all of them. */
   pdfBullets?: number[];
