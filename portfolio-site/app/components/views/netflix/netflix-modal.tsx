@@ -10,6 +10,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { NF_ADJECTIVES, castOf, endCardOf, factsOf, moreLike, previouslyLine, type CastMember, type NetflixProfileId, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
 import { DISPLAY_ROOT } from "@/lib/site/brand";
 import { netflixShareLink } from "@/lib/site/netflix-og";
+import { caseEligible, caseSlug } from "@/lib/site/netflix-case";
 import type { TermLink } from "@/lib/site/terminal-data";
 import { epSub } from "@/lib/site/netflix-subs";
 import { t } from "@/lib/site/terminal-strings";
@@ -128,8 +129,34 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
 
   /* ----- N6: Share: copies the watch-party link (the system sheet on phones) ----- */
   const [copied, setCopied] = useState(false);
+  const [dl, setDl] = useState<"" | "busy" | "fail">("");
+  const dlTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(dlTimer.current), []);
   const copiedTimer = useRef(0);
   useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
+  // D3: the one-page case study PDF, for a project or episode with a metric or a long synopsis.
+  const download = async () => {
+    if (dl === "busy") return;
+    setDl("busy");
+    try {
+      const r = await fetch(`/api/netflix/case/${encodeURIComponent(item.id)}`);
+      if (!r.ok) throw new Error(String(r.status));
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `ratul-roy-${caseSlug(facts.title)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      setDl("");
+    } catch {
+      setDl("fail");
+      window.clearTimeout(dlTimer.current);
+      dlTimer.current = window.setTimeout(() => setDl(""), 4000);
+    }
+  };
+
   const share = async () => {
     const host = window.location.hostname;
     const origin = host === "localhost" || host.endsWith(".localhost") ? window.location.origin : `https://code.${DISPLAY_ROOT}`;
@@ -333,6 +360,11 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
                 link copied
               </span>
             ) : null}
+            {dl === "fail" ? (
+              <span className="nf-m-copied" role="alert">
+                could not build the case study
+              </span>
+            ) : null}
             <div className="nf-m-bar">
               <div className="nf-m-btns">
                 <button type="button" className="nf-btn nf-btn-play" onClick={togglePlay} aria-pressed={playing}>
@@ -349,6 +381,13 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
                 <button type="button" className="nf-round" aria-label={liked ? "Remove your thumbs-up" : "I like this"} aria-pressed={liked} title="I like this" onClick={() => likes.toggle(item.id)}>
                   <span aria-hidden>👍</span>
                 </button>
+                {caseEligible(facts, item.kind) ? (
+                  <button type="button" className="nf-round nf-m-dl" aria-label="Download the case study (PDF)" title="Download case study" aria-busy={dl === "busy"} onClick={download}>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M12 4v11M7 11l5 5 5-5M5 20h14" />
+                    </svg>
+                  </button>
+                ) : null}
               </div>
               <CcButton cc={cc} />
               <button
