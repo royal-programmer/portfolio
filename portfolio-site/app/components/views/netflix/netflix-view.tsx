@@ -22,7 +22,7 @@ import { KeysOverlay, useNetflixKeys } from "./netflix-keys";
 import { chime } from "./netflix-sound";
 import { clearHistory, useCc, useLikes, useMyList, useProgress, useSound } from "./netflix-store";
 import { generatePortrait } from "@/lib/site/portrait-gen";
-import { NETFLIX_PROFILES, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
+import { NETFLIX_PROFILES, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, top10Of, TOP10_ROW_TITLE, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
 import type { TermLink, TerminalData } from "@/lib/site/terminal-data";
 
 export type NetflixViewProps = {
@@ -370,13 +370,17 @@ function NetflixBody({ show, series, profile, status, portrait, fitPool, subData
     const seen = new Set<string>();
     const poolItems = show.rows.flatMap(rowItems).filter((it) => !seen.has(it.id) && !!seen.add(it.id));
     const because = becauseRows(progress.recent, poolItems, index, new Set(cont.map((c) => c.id))).map((b): DisplayRow => ({ id: b.id, title: b.title, items: b.items }));
+    const topRow: DisplayRow[] = profile === "story" ? [] : [{ id: "top10", title: TOP10_ROW_TITLE, items: top10Of(show), top10: true }];
+    const base = show.rows.map((r): DisplayRow => (r.kind === "contact" ? { id: r.id, title: r.title, contact: true } : r.kind === "cast" ? { id: r.id, title: r.title, cast: r.items } : { id: r.id, title: r.title, items: rowItems(r) }));
+    // Developer: right after Projects (the first row); Recruiter: before the work rows, after Continue / Because / My List.
+    const withTop = profile === "developer" ? [base[0], ...topRow, ...base.slice(1)] : [...topRow, ...base];
     return [
       ...(cont.length ? [{ id: "continue", title: "Continue watching", items: cont } as DisplayRow] : []),
       ...because,
       ...(mine.length ? [{ id: "mylist", title: "My List", items: mine } as DisplayRow] : []),
-      ...show.rows.map((r): DisplayRow => (r.kind === "contact" ? { id: r.id, title: r.title, contact: true } : r.kind === "cast" ? { id: r.id, title: r.title, cast: r.items } : { id: r.id, title: r.title, items: rowItems(r) })),
+      ...withTop,
     ];
-  }, [index, progress.recent, list.ids, show.rows]);
+  }, [index, progress.recent, list.ids, show, profile]);
 
   // N5: with a technology picked, every row keeps only the cards that mention it (rows left empty go).
   const shownRows = useMemo<DisplayRow[]>(() => {

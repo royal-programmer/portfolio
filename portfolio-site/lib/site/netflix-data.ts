@@ -248,7 +248,11 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
 
   // Newest season first on the bar, like the brief's chips (2026 … 2002); the other profiles list their rows.
   if (profile === "story") nav = [...years.map((y) => ({ id: `s${y}`, label: String(y) })), ...castRows.map(() => ({ id: "cast", label: "Cast" }))];
-  else nav = rows.filter((r) => r.kind !== "contact").map((r) => ({ id: r.id, label: r.title }));
+  else {
+    nav = rows.filter((r) => r.kind !== "contact").map((r) => ({ id: r.id, label: r.title }));
+    // The Top 10 row is added by the view (it sits after Continue / Because): first for Recruiter, after Projects for Developer.
+    nav.splice(profile === "recruiter" ? 0 : 1, 0, { id: "top10", label: "Top 10" });
+  }
 
   return {
     title: data.resume.name,
@@ -377,13 +381,56 @@ export function moreLike(item: NfItem, index: Map<string, NfItem>, max = 6): NfI
   return pool.slice(0, max);
 }
 
+
+/* ---------- C2: Top 10 by impact ---------- */
+
+/**
+ * The ranking formula, all weights here. score = metric + recency + branch + kind:
+ *  - metric: +100 when the item has a figure (`metricOf`), else 0 (it ranks lower, never hidden);
+ *  - recency: 0..30, linear from `from` (college start) to the newest date among the ranked items;
+ *  - branch: main 20, side 10, learn 6, life 0 (episodes); project 14, post 2 (cards);
+ *  - ties break by date, newest first, then by id.
+ * Skills have no date or figure and are not ranked.
+ */
+export const IMPACT = { metric: 100, recency: 30, from: "2020-08", branch: { main: 20, side: 10, learn: 6, life: 0, project: 14, post: 2 } as Record<string, number> };
+
+const impactDate = (it: NfItem) => (it.kind === "episode" ? it.e.date : it.kind === "skill" ? "" : it.c.year ? `${it.c.year}-06` : "");
+const impactMetric = (it: NfItem) => (it.kind === "episode" ? it.e.metric : it.kind === "skill" ? undefined : it.c.metric);
+
+/** Ranked best first. Items are the rankable ones only (no skills, no life episodes); never filters by metric. */
+export function impactRank(items: NfItem[]): NfItem[] {
+  const pool = items.filter((it) => it.kind !== "skill" && !(it.kind === "episode" && it.e.branch === "life"));
+  const dates = pool.map(impactDate).filter(Boolean).map(monthIndex);
+  const lo = monthIndex(IMPACT.from);
+  const hi = Math.max(lo + 1, ...dates);
+  const score = (it: NfItem) => {
+    const d = impactDate(it);
+    const rec = d ? Math.max(0, Math.min(1, (monthIndex(d) - lo) / (hi - lo))) * IMPACT.recency : 0;
+    const key = it.kind === "episode" ? it.e.branch : it.kind;
+    return (impactMetric(it) ? IMPACT.metric : 0) + rec + (IMPACT.branch[key] ?? 0);
+  };
+  const scored = new Map(pool.map((it) => [it.id, score(it)]));
+  return [...pool].sort((a, b) => (scored.get(b.id) ?? 0) - (scored.get(a.id) ?? 0) || (impactDate(a) < impactDate(b) ? 1 : impactDate(a) > impactDate(b) ? -1 : a.id < b.id ? -1 : 1));
+}
+
+/** The ten cards of a profile's "Top 10 by impact" row: the rankable items in its rows, deduplicated. */
+export function top10Of(show: NetflixShow): NfItem[] {
+  const seen = new Set<string>();
+  const pool = show.rows.flatMap(rowItems).filter((it) => !seen.has(it.id) && !!seen.add(it.id));
+  return impactRank(pool).slice(0, 10);
+}
+
+/** Does this profile get the row, and where: Recruiter first, Developer after Projects (an index into `rows`). */
+export const TOP10_ROW_TITLE = "Top 10 by impact";
+
 /** The episode that wears the "Top 10" badge: Shift Roster, v2.0. */
 export function topEpisodeId(shows: NetflixShow[]): string | null {
+  const top = new Set(impactRank([...indexItems(shows).values()]).slice(0, 10).map((i) => i.id));
   for (const s of shows)
     for (const r of s.rows)
       if (r.kind === "episodes") {
         const hit = r.items.find((e) => e.tag === "v2.0" && /shift roster/i.test(e.title)) ?? r.items.find((e) => /shift roster/i.test(e.title));
-        if (hit) return hit.id;
+        if (hit) return top.has(hit.id) ? hit.id : null;
       }
   return null;
 }

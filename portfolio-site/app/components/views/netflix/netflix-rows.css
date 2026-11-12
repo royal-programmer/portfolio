@@ -804,3 +804,83 @@ button.nf-cast[aria-pressed="true"] {
   left: auto;
   right: 10px;
 }
+
+/* ---------- Top 10 shelf (C2): big outlined numerals hugging the card ---------- */
+.nf-t10 {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  width: auto;
+}
+.nf-t10-n {
+  flex: none;
+  width: 150px;
+  margin-right: -26px;
+  font-family: var(--font-display), serif;
+  font-weight: 800;
+  font-size: 200px;
+  line-height: 0.78;
+  letter-spacing: -0.12em;
+  padding-right: 22px;
+  text-align: right;
+  color: #0b0b0f;
+  -webkit-text-stroke: 4px #8d8b87;
+  user-select: none;
+  position: relative;
+  z-index: 0;
+}
+.nf-t10-n[data-two] {
+  width: 200px;
+  font-size: 150px;
+  margin-right: -16px;
+}
+.nf-t10-card {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  width: 150px;
+  aspect-ratio: 2 / 3;
+  padding: 10px;
+  border: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #14141b;
+  color: var(--nf-ink);
+  text-align: left;
+  cursor: pointer;
+}
+.nf-t10-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(8, 8, 12, 0.92), rgba(8, 8, 12, 0) 60%);
+}
+.nf-t10-title {
+  position: relative;
+  z-index: 1;
+  font-weight: 600;
+  font-size: 0.82rem;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.nf-t10:hover .nf-t10-card {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+}
+@media (max-width: 720px) {
+  .nf-t10-n {
+    width: 26vw;
+    font-size: 40vw;
+  }
+  .nf-t10-n[data-two] {
+    width: 36vw;
+    font-size: 30vw;
+  }
+  .nf-t10-card {
+    width: 38vw;
+  }
+}

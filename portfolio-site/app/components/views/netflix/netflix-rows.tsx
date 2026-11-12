@@ -6,7 +6,7 @@
  * (netflix-modal.tsx); desktop episode cards also grow on hover with play, add, like and more under the title.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CastMember, Episode, NetflixShow, NfItem, ProjectCard, SkillCard } from "@/lib/site/netflix-data";
+import { factsOf, type CastMember, type Episode, type NetflixShow, type NfItem, type ProjectCard, type SkillCard } from "@/lib/site/netflix-data";
 import type { TermLink } from "@/lib/site/terminal-data";
 import { PROFILES } from "@/lib/site/profiles";
 import { useViewExit } from "../view-shell";
@@ -16,7 +16,7 @@ import { NfArt } from "./netflix-art";
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const behavior = (): ScrollBehavior => (reducedMotion() ? "auto" : "smooth");
 
-export type DisplayRow = { id: string; title: string; items: NfItem[] } | { id: string; title: string; contact: true } | { id: string; title: string; cast: CastMember[] };
+export type DisplayRow = { id: string; title: string; items: NfItem[]; /** C2: the Top 10 shelf, with numerals. */ top10?: true } | { id: string; title: string; contact: true } | { id: string; title: string; cast: CastMember[] };
 
 /** What every card needs from the view: open the modal, the local lists, the rank badge, the sound. */
 export type CardEnv = {
@@ -191,9 +191,7 @@ function Row({ row, env }: { row: Extract<DisplayRow, { items: NfItem[] }>; env:
           </button>
         ) : null}
         <ul className="nf-scroller" role="list" ref={scroller} onScroll={measure}>
-          {row.items.map((it) => (
-            <Card key={it.id} item={it} env={env} />
-          ))}
+          {row.items.map((it, i) => (row.top10 ? <TopCard key={it.id} item={it} rank={i + 1} env={env} /> : <Card key={it.id} item={it} env={env} />))}
         </ul>
         {edge.r ? (
           <button type="button" className="nf-edge nf-edge-r" aria-label={`${row.title}: later`} onClick={() => by(1)}>
@@ -255,6 +253,24 @@ function Card({ item, env }: { item: NfItem; env: CardEnv }) {
   if (item.kind === "episode") return <EpisodeCard e={item.e} item={item} env={env} />;
   if (item.kind === "skill") return <SkillTile s={item.s} item={item} env={env} />;
   return <PosterCard c={item.c} item={item} env={env} />;
+}
+
+/** A Top 10 shelf card (C2): the outlined numeral hugs the left edge, the generated poster sits to its right. */
+function TopCard({ item, rank, env }: { item: NfItem; rank: number; env: CardEnv }) {
+  const f = factsOf(item);
+  const tone = item.kind === "episode" ? item.e.branch : item.kind;
+  return (
+    <li className="nf-t10" data-branch={item.kind === "episode" ? item.e.branch : undefined}>
+      <span className="nf-t10-n" aria-hidden data-two={rank >= 10 || undefined}>
+        {rank}
+      </span>
+      <button type="button" className="nf-t10-card" data-nf-card={item.id} aria-label={`Number ${rank}: ${f.title}`} onClick={(ev) => env.open(item, ev.currentTarget)}>
+        <NfArt seed={item.id} tone={tone} shape="tall" metric={f.metric} />
+        <span className="nf-t10-title">{f.title}</span>
+        <Bar value={env.progress[item.id]} />
+      </button>
+    </li>
+  );
 }
 
 const Bar = ({ value }: { value?: number }) =>
