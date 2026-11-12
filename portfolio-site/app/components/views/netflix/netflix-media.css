@@ -360,7 +360,20 @@
 }
 @media (max-width: 720px) {
   .nf-tr .nf-pend {
-    bottom: 6.2rem;
+    bottom: 5.4rem;
+    gap: 4px;
+  }
+  .nf-tr .nf-pend-dev {
+    font-size: 1rem;
+  }
+  .nf-tr .nf-pend-actions {
+    gap: 6px;
+  }
+  .nf-tr .nf-pend-actions .nf-btn {
+    flex: 1 1 40%;
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 0.85rem;
   }
 }
 

@@ -18,7 +18,7 @@ import { adCancel, adSpeak } from "./netflix-ad";
 import { ProjectEnd } from "./netflix-media";
 
 type State = { at: number; t: number; clip: boolean; ad: boolean; done: boolean };
-type Action = { type: "tick"; dt: number } | { type: "clip" } | { type: "ad" } | { type: "go"; to: number };
+type Action = { type: "tick"; dt: number } | { type: "clip" } | { type: "ad" } | { type: "go"; to: number } | { type: "step"; d: 1 | -1 };
 
 const calmNow = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -56,6 +56,7 @@ export function Trailer({
     (s: State, a: Action): State => {
       const fresh = (to: number): State => ({ at: to, t: 0, clip: false, ad: !adOn, done: false });
       if (a.type === "go") return fresh(Math.max(0, Math.min(last, a.to)));
+      if (a.type === "step") return fresh(Math.max(0, Math.min(last, s.at + a.d)));
       if (a.type === "clip") return s.clip ? s : { ...s, clip: true };
       if (a.type === "ad") return s.ad ? s : { ...s, ad: true };
       const c = chapters[s.at];
@@ -167,12 +168,12 @@ export function Trailer({
       } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         e.preventDefault();
         e.stopPropagation();
-        dispatch({ type: "go", to: at + (e.key === "ArrowRight" ? 1 : -1) });
+        dispatch({ type: "step", d: e.key === "ArrowRight" ? 1 : -1 });
       }
     };
     window.addEventListener("keydown", key, true);
     return () => window.removeEventListener("keydown", key, true);
-  }, [at]);
+  }, []);
 
   if (!chapter) return null;
   const times = chapterTimes(chapter, holdScale);
