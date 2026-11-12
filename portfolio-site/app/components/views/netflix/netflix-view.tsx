@@ -21,7 +21,6 @@ import { seasonSub, type NfLine, type SubData } from "@/lib/site/netflix-subs";
 import { KeysOverlay, useNetflixKeys } from "./netflix-keys";
 import { chime } from "./netflix-sound";
 import { clearHistory, useCc, useLikes, useMyList, useProgress, useSound } from "./netflix-store";
-import { generatePortrait } from "@/lib/site/portrait-gen";
 import { NETFLIX_PROFILES, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, top10Of, TOP10_ROW_TITLE, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
 import type { TermLink, TerminalData } from "@/lib/site/terminal-data";
 
@@ -221,7 +220,7 @@ function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => voi
 
 type ModalState = { id: string; origin: DOMRect | null; play: boolean; playMs?: number };
 
-function NetflixBody({ show, series, profile, status, portrait, fitPool, subData, now, fast, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
+function NetflixBody({ show, series, profile, status, fitPool, subData, now, fast, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
   const shows = useMemo(() => Object.values(series), [series]);
   const index = useMemo(() => indexItems(shows), [shows]);
   const topId = useMemo(() => topEpisodeId(shows), [shows]);
@@ -230,28 +229,6 @@ function NetflixBody({ show, series, profile, status, portrait, fitPool, subData
   const progress = useProgress();
   const sound = useSound();
   const cc = useCc();
-
-  /* ----- the portrait, drawn once (the title stays the LCP); skeleton rows until then ----- */
-  const [text, setText] = useState("");
-  const [waited, setWaited] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    const run = () =>
-      generatePortrait(portrait, "blocks", 160).then(
-        (a) => !cancelled && setText(a.lines.map((l) => l.map((r) => r.t).join("")).join("\n")),
-        () => {},
-      );
-    const w = window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
-    const idle = w.requestIdleCallback ? w.requestIdleCallback(run, { timeout: 1500 }) : window.setTimeout(run, 300);
-    const t = window.setTimeout(() => setWaited(true), 700);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-      if (w.requestIdleCallback) w.cancelIdleCallback?.(idle);
-      else window.clearTimeout(idle);
-    };
-  }, [portrait]);
-  const ready = text !== "" || waited;
 
   /* ----- the modal: ?title= opens it, closing strips it ----- */
   const trigger = useRef<{ el: HTMLElement | null; id: string } | null>(null);
@@ -497,7 +474,7 @@ function NetflixBody({ show, series, profile, status, portrait, fitPool, subData
   const stopCut = autopilot.stop;
   const lastToken = useRef(0);
   useEffect(() => {
-    if (!autoToken || autoToken === lastToken.current || !ready || profile !== "recruiter") return;
+    if (!autoToken || autoToken === lastToken.current || profile !== "recruiter") return;
     lastToken.current = autoToken;
     if (reducedMotion) {
       notify("Look for the Start here badges on three cards");
@@ -506,7 +483,7 @@ function NetflixBody({ show, series, profile, status, portrait, fitPool, subData
     // Let the rows paint and the visitor see the page first.
     const t = window.setTimeout(startCut, 1400);
     return () => window.clearTimeout(t);
-  }, [autoToken, ready, profile, reducedMotion, startCut, notify]);
+  }, [autoToken, profile, reducedMotion, startCut, notify]);
   // Leaving the page's recruiter cut (another profile, a search) ends the play.
   useEffect(() => {
     if (profile !== "recruiter" || q) stopCut();
@@ -514,7 +491,7 @@ function NetflixBody({ show, series, profile, status, portrait, fitPool, subData
 
   const profileMeta = NETFLIX_PROFILES.find((p) => p.id === profile);
   const modalItem = modal ? index.get(modal.id) : undefined;
-  const more = topId ? index.get(topId) : undefined;
+  const features = useMemo(() => show.featured.flatMap((f) => { const item = index.get(f.id); return item ? [{ item, label: f.label }] : []; }), [show.featured, index]);
   const firstRow = show.rows[0]?.id;
 
   return (
@@ -532,30 +509,12 @@ function NetflixBody({ show, series, profile, status, portrait, fitPool, subData
           </div>
         ) : (
           <>
-            <NetflixHero series={show} profile={profile} status={status} text={text} fast={fast} firstRowId={firstRow} onMore={more ? () => open(more, null) : undefined} sound={sound} recap={recap} onRecapEnd={endRecap} cc={cc} subData={subData} />
-            {ready ? <NetflixRows show={show} rows={ratedRows} contact={contact} env={env} onRecap={profile === "story" ? playRecap : undefined} /> : <SkeletonRows />}
+            <NetflixHero series={show} profile={profile} status={status} fast={fast} firstRowId={firstRow} features={features} onOpen={(item, play) => open(item, null, play)} held={modal !== null} sound={sound} recap={recap} onRecapEnd={endRecap} cc={cc} subData={subData} />
+            <NetflixRows show={show} rows={ratedRows} contact={contact} env={env} onRecap={profile === "story" ? playRecap : undefined} />
           </>
         )}
       </div>
       {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} autoPlay={modal.play} playMs={modal.playMs} cast={castList} profile={profile} now={now} contact={contact} onCast={castFromModal} onClose={close} onSwap={swap} onShow={onShow} /> : null}
     </>
-  );
-}
-
-/** Shimmering placeholder rows while the portrait draws. */
-function SkeletonRows() {
-  return (
-    <div className="nf-rows nf-skeleton" aria-hidden>
-      {[0, 1].map((r) => (
-        <div className="nf-row" key={r}>
-          <span className="nf-sk-title nf-shimmer" />
-          <div className="nf-sk-row">
-            {Array.from({ length: 6 }, (_, i) => (
-              <span className="nf-sk-card nf-shimmer" key={i} />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
   );
 }

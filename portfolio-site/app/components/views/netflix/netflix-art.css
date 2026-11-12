@@ -97,3 +97,206 @@
 .nf-art2[data-big] .nf-art2-m b {
   font-size: min(30cqh, calc(80cqw / var(--len)));
 }
+
+/* ---------- Hero: featured carousel (C3) ---------- */
+.nf-hero .nf-art {
+  opacity: 1;
+  display: block;
+  color: inherit;
+}
+.nf-hero .nf-art .nf-art2 {
+  background: linear-gradient(120deg, color-mix(in srgb, var(--b) 46%, #0b0b0f), color-mix(in srgb, var(--b) 14%, #0b0b0f) 70%);
+}
+/* The figure is a text line in the copy on wide screens, the art's own focal text on phones. */
+.nf-hero .nf-art2-m {
+  display: none;
+}
+.nf-hero[data-playing] .nf-art {
+  opacity: 0.55;
+}
+.nf-hero-copy {
+  transition: none;
+}
+[data-playing] .nf-hero-copy {
+  opacity: 1;
+  pointer-events: auto;
+}
+[data-playing] .nf-hero-copy > :not(.nf-feat-tabs) {
+  opacity: 0;
+  pointer-events: none;
+}
+.nf-hero .nf-trailer {
+  padding-bottom: 96px;
+}
+.nf-feat {
+  margin-top: 0.4rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--nf-line);
+}
+.nf-feat-kicker {
+  margin: 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--nf-dim);
+}
+.nf-feat-title {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-display), serif;
+  font-weight: 700;
+  font-size: clamp(1.4rem, 2.6vw, 2rem);
+  line-height: 1.1;
+}
+.nf-feat-metric {
+  margin: 0.25rem 0 0;
+  font-family: var(--font-display), serif;
+  font-weight: 800;
+  font-size: clamp(1.9rem, 4vw, 3.2rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: color-mix(in srgb, var(--b) 40%, #fff);
+}
+.nf-actions {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.nf-actions-extra {
+  display: contents;
+}
+.nf-feat-tabs {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+  max-width: 34rem;
+}
+.nf-feat-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.35rem 0 0;
+  border: 0;
+  background: none;
+  color: var(--nf-dim);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.74rem;
+  text-align: left;
+  cursor: pointer;
+}
+.nf-feat-tab[aria-selected="true"],
+.nf-feat-tab:hover {
+  color: var(--nf-ink);
+}
+.nf-feat-bar {
+  display: block;
+  height: 3px;
+  margin-top: auto;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+.nf-feat-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--nf-ink);
+  animation: nf-fill linear forwards;
+}
+.nf-feat-fill[data-calm] {
+  width: 100%;
+  animation: none;
+}
+@keyframes nf-fill {
+  to {
+    width: 100%;
+  }
+}
+@media (max-width: 768px) {
+  .nf-hero {
+    min-height: min(84svh, 680px);
+    padding: 64px 16px 18px;
+  }
+  .nf-hero .nf-art2-m {
+    display: flex;
+    left: 6cqw;
+    right: auto;
+    top: 13cqh;
+    align-items: flex-start;
+    text-align: left;
+  }
+  .nf-hero .nf-art2[data-big] .nf-art2-m b {
+    font-size: min(17cqh, calc(104cqw / var(--len)));
+  }
+  .nf-hero-shade {
+    background: linear-gradient(0deg, var(--nf-bg) 4%, rgba(11, 11, 15, 0.7) 40%, rgba(11, 11, 15, 0) 75%);
+  }
+  .nf-hero-copy {
+    margin-left: 0;
+    gap: 0.5rem;
+  }
+  .nf-tagline,
+  .nf-blurb,
+  .nf-facts,
+  .nf-open,
+  .nf-actions-extra,
+  .nf-feat-metric,
+  .nf-feat-kicker {
+    display: none;
+  }
+  .nf-kicker {
+    font-size: 0.66rem;
+  }
+  .nf-hero .nf-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: 0;
+  }
+  .nf-feat {
+    border-top: 0;
+    padding-top: 0;
+  }
+  .nf-feat-title {
+    font-size: 2rem;
+  }
+  .nf-hero .nf-actions {
+    flex-direction: row;
+    gap: 0.6rem;
+  }
+  .nf-hero .nf-btn {
+    flex: 1;
+    width: auto;
+    padding: 0 1rem;
+  }
+  .nf-feat-tabs {
+    gap: 0.5rem;
+    max-width: none;
+  }
+  .nf-feat-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .nf-feat-tab {
+    min-height: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+  .nf-feat-bar {
+    margin-top: 0;
+  }
+  .nf-hero .nf-trailer {
+    padding: 64px 16px 80px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nf-feat-fill {
+    animation: none;
+    width: 100%;
+  }
+}

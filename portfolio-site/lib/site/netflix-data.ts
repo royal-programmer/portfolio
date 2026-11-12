@@ -77,6 +77,8 @@ export type NetflixShow = {
   rows: NetflixRow[];
   /** The Recruiter cut (N3): card ids in play order, resolved from `RECRUITER_CUT`. Empty on the other profiles. */
   recruiterCut: string[];
+  /** The hero carousel (C3): up to three card ids with their tab labels, resolved from `FEATURED`. */
+  featured: Array<{ id: string; label: string }>;
 };
 
 /**
@@ -133,6 +135,31 @@ export function metricOf(title: string, synopsis?: string, tag?: string): Metric
   }
   return undefined;
 }
+
+/**
+ * The hero carousel's three titles per profile (C3). Each is matched against the data like the Recruiter cut:
+ * a project card by slug, else an episode by title (and tag); `label` is the tab text.
+ */
+export const FEATURED: Record<NetflixProfileId, ReadonlyArray<{ label: string; episode?: { title: RegExp; tag?: string }; project?: string }>> = {
+  recruiter: [
+    { label: "Shift Roster", episode: { title: /shift roster/i, tag: "v2.0" } },
+    { label: "11 automations", episode: { title: /11 python automations/i } },
+    { label: "API Test Center", project: "api-test-center", episode: { title: /api test center/i } },
+  ],
+  developer: [
+    { label: "API Test Center", project: "api-test-center", episode: { title: /api test center/i } },
+    { label: "11 automations", episode: { title: /11 python automations/i } },
+    { label: "Shift Roster", episode: { title: /shift roster/i, tag: "v2.0" } },
+  ],
+  story: [
+    { label: "Shift Roster", episode: { title: /shift roster/i, tag: "v2.0" } },
+    { label: "VMS query", episode: { title: /vms query/i } },
+    { label: "This terminal", episode: { title: /build this terminal/i } },
+  ],
+};
+
+/** `5–10 min to 2–3 min` for a before/after figure, `200+ users` for the rest. */
+export const metricLine = (m: Metric): string => (m.value.includes(" → ") ? m.value.split(" → ").map((v) => `${v} ${m.label}`).join(" to ") : `${m.value} ${m.label}`);
 
 const monthIndex = (date: string) => {
   const [y, m] = date.split("-");
@@ -262,6 +289,7 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
     nav,
     rows,
     recruiterCut: profile === "recruiter" ? resolveCut(episodes, projectCards) : [],
+    featured: resolveSteps(FEATURED[profile], episodes, projectCards),
   };
 }
 
@@ -479,19 +507,22 @@ export function becauseRows(recent: string[], pool: NfItem[], index: Map<string,
 
 /* ---------- N3: the Recruiter cut ---------- */
 
-function resolveCut(episodes: Episode[], projects: ProjectCard[]): string[] {
-  const ids: string[] = [];
-  for (const step of RECRUITER_CUT) {
+type CutStep = { label?: string; episode?: { title: RegExp; tag?: string }; project?: string };
+
+function resolveSteps<T extends CutStep>(steps: ReadonlyArray<T>, episodes: Episode[], projects: ProjectCard[]): Array<{ id: string; label: string }> {
+  const out: Array<{ id: string; label: string }> = [];
+  for (const step of steps) {
     const card = step.project ? projects.find((p) => p.id === `project-${step.project}`) : undefined;
-    if (card) {
-      ids.push(card.id);
-      continue;
-    }
     const spec = step.episode;
     const ep = spec ? (episodes.find((e) => spec.title.test(e.title) && (!spec.tag || e.tag === spec.tag)) ?? episodes.find((e) => spec.title.test(e.title))) : undefined;
-    if (ep) ids.push(ep.id);
+    const id = card?.id ?? ep?.id;
+    if (id) out.push({ id, label: step.label ?? "" });
   }
-  return ids;
+  return out;
+}
+
+function resolveCut(episodes: Episode[], projects: ProjectCard[]): string[] {
+  return resolveSteps(RECRUITER_CUT, episodes, projects).map((s) => s.id);
 }
 
 /* ---------- N4: season recap ---------- */

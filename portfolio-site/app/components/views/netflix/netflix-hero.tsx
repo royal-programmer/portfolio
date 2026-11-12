@@ -6,10 +6,11 @@
  * the trailer plays by itself, silent, with a Skip pill.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Episode, NetflixShow, NetflixProfileId } from "@/lib/site/netflix-data";
+import { factsOf, metricLine, type Episode, type NetflixShow, type NetflixProfileId, type NfItem } from "@/lib/site/netflix-data";
 import { factSub, latestSub, nextSub, statusSub, type NfLine, type SubData, type SubLang } from "@/lib/site/netflix-subs";
 import { CcButton } from "./netflix-cc";
 import { tick as tickSound } from "./netflix-sound";
+import { NfArt } from "./netflix-art";
 
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -17,10 +18,13 @@ type Props = {
   series: NetflixShow;
   profile: NetflixProfileId;
   status: string;
-  /** The portrait as text (drawn once by the view), or "" while it draws. */
-  text: string;
   fast: boolean;
-  onMore?: () => void;
+  /** The carousel's titles (C3), resolved by the view from `show.featured`. */
+  features: Array<{ item: NfItem; label: string }>;
+  /** Open a featured title: its modal, with the teleprompter when `play`. */
+  onOpen: (item: NfItem, play: boolean) => void;
+  /** A modal is open: the carousel holds still. */
+  held?: boolean;
   sound: { on: boolean; toggle: () => void };
   /** Where Play / skip lands: the first row's id. */
   firstRowId?: string;
@@ -44,11 +48,28 @@ function trailerLines(series: NetflixShow, status: string, subs: { lang: SubLang
   return lines.slice(0, 8);
 }
 
-export function NetflixHero({ series, profile, status, text, fast, firstRowId, onMore, sound, recap, onRecapEnd, cc, subData }: Props) {
+const FEATURE_MS = 7000;
+const TONE_COLOR: Record<string, string> = { main: "var(--nf-accent)", learn: "#2ab7b0", side: "#8b6cf0", life: "#8a8a96", project: "var(--nf-accent)", post: "var(--nf-accent)" };
+
+export function NetflixHero({ series, profile, status, fast, firstRowId, features, onOpen, held, sound, recap, onRecapEnd, cc, subData }: Props) {
   const [playing, setPlaying] = useState(false);
   const [auto, setAuto] = useState(false);
   const autoDone = useRef(false);
-  const playRef = useRef<HTMLButtonElement>(null);
+  const trailerBtn = useRef<HTMLButtonElement>(null);
+  // C3: the carousel. Hover, focus and touch hold it; so do the trailer, a recap and an open modal.
+  const [idx, setIdx] = useState(0);
+  const [hover, setHover] = useState(false);
+  const [focus, setFocus] = useState(false);
+  const [touch, setTouch] = useState(false);
+  const touchTimer = useRef(0);
+  const swipe = useRef<{ x: number; y: number } | null>(null);
+  const calm = useMemo(() => reducedMotion(), []);
+  const n = features.length;
+  const at = Math.min(idx, Math.max(0, n - 1));
+  const cur = features[at];
+  const paused = hover || focus || touch || playing || !!recap || !!held;
+  const go = useCallback((to: number) => setIdx(((to % n) + n) % n), [n]);
+  useEffect(() => () => window.clearTimeout(touchTimer.current), []);
 
   // Three idle seconds on the top of the page: the trailer plays itself (once, silent, not under reduced motion).
   useEffect(() => {
@@ -79,17 +100,50 @@ export function NetflixHero({ series, profile, status, text, fast, firstRowId, o
     (scroll: boolean, focus = true) => {
       setPlaying(false);
       if (recap) return onRecapEnd?.();
-      if (!scroll) return focus ? playRef.current?.focus() : undefined;
+      if (!scroll) return focus ? trailerBtn.current?.focus() : undefined;
       const el = firstRowId ? document.getElementById(`nf-row-${firstRowId}`) : null;
       el?.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "start" });
     },
     [firstRowId, recap, onRecapEnd],
   );
 
+  const f = cur ? factsOf(cur.item) : null;
+  const tone = f?.tone ?? "main";
+  const onTabKey = (e: React.KeyboardEvent, i: number) => {
+    const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!d) return;
+    e.preventDefault();
+    go(i + d);
+    requestAnimationFrame(() => document.querySelectorAll<HTMLElement>(".nf-feat-tab")[(((i + d) % n) + n) % n]?.focus());
+  };
+
   return (
-    <header className="nf-hero" data-playing={playing || !!recap || undefined}>
+    <header
+      className="nf-hero"
+      data-playing={playing || !!recap || undefined}
+      style={{ "--b": TONE_COLOR[tone] ?? "var(--nf-accent)" } as React.CSSProperties}
+      onPointerEnter={(e) => e.pointerType === "mouse" && setHover(true)}
+      onPointerLeave={() => setHover(false)}
+      onFocus={() => setFocus(true)}
+      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setFocus(false)}
+      onTouchStart={(e) => {
+        window.clearTimeout(touchTimer.current);
+        setTouch(true);
+        swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }}
+      onTouchEnd={(e) => {
+        const s0 = swipe.current;
+        swipe.current = null;
+        if (s0 && n > 1) {
+          const dx = e.changedTouches[0].clientX - s0.x;
+          const dy = e.changedTouches[0].clientY - s0.y;
+          if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) go(at + (dx < 0 ? 1 : -1));
+        }
+        touchTimer.current = window.setTimeout(() => setTouch(false), 4000);
+      }}
+    >
       <div className="nf-art" aria-hidden>
-        {text ? <pre className="nf-art-pre">{text}</pre> : <span className="nf-shimmer" />}
+        {cur && f ? <NfArt key={cur.item.id} seed={cur.item.id} tone={tone} metric={f.metric} big live /> : null}
       </div>
       <div className="nf-hero-shade" aria-hidden />
 
@@ -99,9 +153,9 @@ export function NetflixHero({ series, profile, status, text, fast, firstRowId, o
         <p className="nf-tagline">{series.tagline}</p>
         <p className="nf-blurb">{series.hero.blurb}</p>
         <ul className="nf-facts">
-          {series.hero.facts.map((f) => (
-            <li key={f} className="nf-fact">
-              {f}
+          {series.hero.facts.map((fact) => (
+            <li key={fact} className="nf-fact">
+              {fact}
             </li>
           ))}
         </ul>
@@ -110,33 +164,69 @@ export function NetflixHero({ series, profile, status, text, fast, firstRowId, o
             <span className="nf-dot" aria-hidden /> open to work
           </p>
         ) : null}
+        {cur && f ? (
+          <div className="nf-feat">
+            <p className="nf-feat-kicker">
+              Featured · {at + 1} of {n}
+            </p>
+            <h2 className="nf-feat-title">{f.title}</h2>
+            {f.metric ? <p className="nf-feat-metric">{metricLine(f.metric)}</p> : null}
+          </div>
+        ) : null}
         <div className="nf-actions">
-          <button
-            ref={playRef}
-            type="button"
-            className="nf-btn nf-btn-play"
-            onClick={() => {
-              onRecapEnd?.();
-              setAuto(false);
-              autoDone.current = true;
-              setPlaying(true);
-            }}
-          >
-            <span aria-hidden>▶</span> Play
-          </button>
-          {onMore ? (
-            <button type="button" className="nf-btn nf-btn-glass" onClick={onMore}>
-              <span aria-hidden>ⓘ</span> More info
-            </button>
+          {cur ? (
+            <>
+              <button type="button" className="nf-btn nf-btn-play" onClick={() => onOpen(cur.item, true)}>
+                <span aria-hidden>▶</span> Play
+              </button>
+              <button type="button" className="nf-btn nf-btn-glass" onClick={() => onOpen(cur.item, false)}>
+                <span aria-hidden>ⓘ</span> More info
+              </button>
+            </>
           ) : null}
-          <a className="nf-btn nf-btn-glass" href="/Ratul_Roy_Resume.pdf" target="_blank" rel="noreferrer">
-            View résumé
-          </a>
-          <button type="button" className="nf-round nf-vol" aria-label={sound.on ? "Mute" : "Unmute"} aria-pressed={sound.on} onClick={sound.toggle}>
-            <span aria-hidden>{sound.on ? "🔊" : "🔇"}</span>
-          </button>
-          <CcButton cc={cc} />
+          <span className="nf-actions-extra">
+            <button
+              ref={trailerBtn}
+              type="button"
+              className="nf-btn nf-btn-glass"
+              onClick={() => {
+                onRecapEnd?.();
+                setAuto(false);
+                autoDone.current = true;
+                setPlaying(true);
+              }}
+            >
+              Trailer
+            </button>
+            <a className="nf-btn nf-btn-glass" href="/Ratul_Roy_Resume.pdf" target="_blank" rel="noreferrer">
+              View résumé
+            </a>
+            <button type="button" className="nf-round nf-vol" aria-label={sound.on ? "Mute" : "Unmute"} aria-pressed={sound.on} onClick={sound.toggle}>
+              <span aria-hidden>{sound.on ? "🔊" : "🔇"}</span>
+            </button>
+            <CcButton cc={cc} />
+          </span>
         </div>
+        {n > 1 ? (
+          <div className="nf-feat-tabs" role="tablist" aria-label="Featured titles">
+            {features.map((ft, i) => (
+              <button key={ft.item.id} type="button" role="tab" className="nf-feat-tab" aria-selected={i === at} tabIndex={i === at ? 0 : -1} onClick={() => go(i)} onKeyDown={(e) => onTabKey(e, i)}>
+                <span className="nf-feat-label">{ft.label}</span>
+                <span className="nf-feat-bar" aria-hidden>
+                  {i === at ? (
+                    <i
+                      key={`${at}-${calm}`}
+                      className="nf-feat-fill"
+                      data-calm={calm || undefined}
+                      style={{ animationDuration: `${FEATURE_MS}ms`, animationPlayState: paused ? "paused" : "running" }}
+                      onAnimationEnd={() => !calm && go(at + 1)}
+                    />
+                  ) : null}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {playing || recap ? (
