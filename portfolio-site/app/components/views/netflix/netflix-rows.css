@@ -885,15 +885,16 @@ button.nf-cast[aria-pressed="true"] {
   }
 }
 @media (max-width: 720px) {
+  /* The negative letter-spacing pushes the last glyph past the box, so the padding pays it back and the card never clips a numeral. */
   .nf-t10-n {
-    width: 34vw;
-    margin-right: -8vw;
-    padding-right: 6vw;
+    width: 40vw;
+    margin-right: -6vw;
+    padding-right: 11vw;
     font-size: 36vw;
   }
   .nf-t10-n[data-two] {
-    width: 46vw;
-    padding-right: 6vw;
+    width: 52vw;
+    padding-right: 11vw;
     font-size: 28vw;
   }
 }
