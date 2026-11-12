@@ -1428,3 +1428,9 @@ stripped service_role's table grants).
 ### Round 20 - Stage, part C (2026-11-11)
 
 - S6 photo mode (1200 x 630 guide, orbit, on-demand capture with name strip, download / share), S7 performance tiers (gate quality drives dpr, reflections, stars, screen fps; measured fps strip; one automatic step down under 30 fps), S10 door to the other worlds (hub opens in Normal mode on the chapter), plus a boot-overlay unstick and a brighter daytime window. Details: 17-persona-views.md section 20; data list: 16-admin-console.md section 2.
+
+### Round 22 - admin sign-in and one admin root (2026-11-12)
+
+- Everything under `/admin`: `/admin/login` (magic link via `signInWithOtp`, `shouldCreateUser: false`, uniform reply, 3 per 10 min per IP; password kept), `/admin/auth/callback`, one guard in `app/admin/(console)/layout.tsx`. No `/capture` paths remain; the capture actions moved to `app/admin/entry-actions.ts`, the project form and uploader to `app/admin/_collections/`.
+- Admin grouped by persona (`nav.ts`, `collections.ts`), home with the now / coming map, master-detail Projects and Media (create, edit, duplicate, delete, photos), signed-in-as and sign out, non-admin banner. Admin host is one constant (`lib/site/admin-host.ts`).
+- Not verified: anything behind a session (the console itself) and real email delivery. Ratul sets two Supabase options (16-admin-console.md section 6).

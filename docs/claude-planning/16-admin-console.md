@@ -6,7 +6,7 @@ management, everything. Keep in mind and build accordingly."
 
 This doc is the standing contract for that. Every new feature from here on ships with its knobs in
 the data layer, not in code constants, so the admin can reach them. What already exists is the
-capture app (`/capture/login`, `/capture/admin`: Supabase Auth, the `admins` table, entry +
+admin login and entries (`/admin/login`, `/admin/engineer/projects`: Supabase Auth, the `admins` table, entry +
 media upload for engineer projects). The console grows out of it.
 
 ## 1. Principles
@@ -171,9 +171,44 @@ the HMAC-signed `xp-preview` cookie (30 min, shared root domain) and redirects w
 Netflix, Switches) and `/admin/history`. Forms are generated from the schemas (`lib/settings/form.tsx`); the
 Timeline, Diagrams, Themes (contrast check) and Views editors add a live preview. Save writes the draft;
 Publish copies draft to live, logs, and `updateTag`s the key; Discard; History Revert puts `before` into the
-draft. Unauthenticated `/admin` redirects to `/capture/login?next=/admin`.
+draft. Unauthenticated `/admin` redirects to `/admin/login?next=/admin`.
 
 **Add a key.** Schema in `schema.ts` + `SCHEMAS` + `GROUPS`, default in `defaults.ts`, read with
 `getSetting`, run `node scripts/settings-roundtrip.mjs`. **Apply 0011:** paste the file into the Supabase SQL
 editor (`supabase/README.md`, "Applying 0011"); until then everything runs on the code defaults and `/admin`
 shows a banner and cannot save.
+
+## 6. Flow (round 22)
+
+Everything lives under `/admin`; there is no `/capture` path any more (the old capture app was folded in).
+
+**Route map.** `/admin` home (signed in as, Preview site, records per world, what is editable now / coming) ·
+`/admin/login` sign-in (the only page outside the guard) · `/admin/auth/callback` magic-link landing ·
+`/admin/site/<section>` (identity, hub, persona copy, switches, history, previews) · `/admin/<persona>` persona home
+(data overview, New buttons) · `/admin/<persona>/<collection>` master-detail content (Engineer: `projects`, `media`; coming:
+`experience`, `certifications`, `education`, `writing`, which still come from the RESUME constant in `lib/site/terminal-data.ts`) ·
+`/admin/<persona>/views` and `/admin/<persona>/copy` (typed Zod forms, with draft, preview, publish, history and revert unchanged).
+The map is two constants: `app/admin/nav.ts` (groups, sections) and `app/admin/collections.ts` (collections: id, label, kind, fields,
+uploads). One check guards the console: `app/admin/(console)/layout.tsx`; a signed-in non-admin sees a banner saying so with a link to
+`/admin/login`. Every server action still re-checks `isAdmin()`. Old flat `/admin/<settings group>` paths redirect to the new ones.
+The admin host is one constant, `lib/site/admin-host.ts` (`ADMIN_HOST_LABEL`, null = apex); persona hosts redirect `/admin` to it.
+
+**Master-detail.** Each collection page has the record list on the left (search, visibility filter), the editor on the right (New,
+edit, duplicate, delete with confirm, attach photos through the existing media pipeline; PDFs are not accepted by it yet). On phones the
+list is the page, the editor is a full-screen sheet and a floating Quick add opens a new record. Drag-order is not built (the entries
+table has an order column, no UI yet).
+
+**Sign-in.** `/admin/login`: **Email me a sign-in link** (remembered in `localStorage` `xp-admin-email`) calls
+`signInWithOtp({ shouldCreateUser: false, emailRedirectTo: <apex>/admin/auth/callback?next=… })`, so a stranger can never create an account.
+The reply is always "If that address is an admin, a link is on its way", with an in-memory limit of 3 sends per IP per 10 minutes. The
+callback exchanges the `code` (or `token_hash` + `type`) for the session cookie and goes to `next` (default `/admin`); a failure returns to
+`/admin/login?error=…`. The password form stays as the backup.
+
+**Two Supabase settings Ratul must set** (Dashboard):
+
+1. Authentication, URL Configuration: Site URL `https://ratulroy.me`; Redirect URLs `https://ratulroy.me/**` and
+   `http://ratulroy.localhost:3000/**`.
+2. Authentication, Sign In / Providers: turn **off** "Allow new users to sign up".
+
+Google (later): a button beside the link form calling `signInWithOAuth({ provider: "google", options: { redirectTo } })` with the same
+callback. The spot is marked in `app/admin/login/login-form.tsx` and `app/admin/entry-actions.ts`. Not built.
