@@ -1455,3 +1455,9 @@ stripped service_role's table grants).
 
 - F1 chaptered trailer for a project's Play (title, who and why, clip beats with subtitles, built with, end card; about 43 s for API Test Center, clips cut at `clipMs`), F2 story fields as data (`storyOf`), F3 Next episode in 5 and Autoplay next, F4 hover clips on project cards, F5 blur-up placeholders and hero-only high priority, F6 resume line and Book a call (hidden until a link is set), F7 back to terminal on a direct route. Details in `17-persona-views.md` section 25.
 - Open: Ratul's Book a call link (`BOOK_CALL.href`); the "Popular with visitors" row needs an open log that does not exist; LCP in milliseconds needs a production build.
+
+### Round 24 - records out of the code (2026-11-13)
+
+- D1 record types, Zod schemas and migration `0012_content_records.sql` (written, not applied; copy in `tmp/`); D2 typed readers and pure assemblers; D3 `scripts/import-content.mjs` and `scripts/content-roundtrip.mjs`; D4 consumers switched behind `CONTENT_SOURCE=db|code` (default `code`, frozen copy in `lib/site/legacy-content.ts`). Skills carry links to project, experience and certification slugs. Project story, media and the book-a-call link are records and settings; `storyOf` and `mediaOf` are the single readers.
+- Importer dry run: 46 records (experience 1, education 1, certification 4, skill_group 3, milestone 7, timeline_event 17, diagram 4, profile_link 9), 1 project patch (api-test-center story and media), 3 settings plus `netflix.bookCall`.
+- Open (Ratul): run migration 0012, then `node scripts/import-content.mjs --apply`, check the site with `CONTENT_SOURCE=db`, then flip the flag and delete the legacy file in a later commit. Not verified: `db` mode in a browser against real rows (no network to the database from this session); the stage's skill constellation still reads the code fallbacks.

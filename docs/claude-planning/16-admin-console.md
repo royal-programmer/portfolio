@@ -212,3 +212,18 @@ callback exchanges the `code` (or `token_hash` + `type`) for the session cookie 
 
 Google (later): a button beside the link form calling `signInWithOAuth({ provider: "google", options: { redirectTo } })` with the same
 callback. The spot is marked in `app/admin/login/login-form.tsx` and `app/admin/entry-actions.ts`. Not built.
+
+## 7. Content importer (round 24)
+
+`scripts/import-content.mjs` seeds the engineer records from the frozen copy. Run from `portfolio-site/` after applying `supabase/migrations/0012_content_records.sql` (new `entry_type` values) in the Supabase SQL editor.
+
+```
+node scripts/import-content.mjs                          # dry run: validates, prints counts per type
+node scripts/import-content.mjs --apply                  # writes what is missing, visibility public
+node scripts/import-content.mjs --apply --overwrite      # also replaces rows that already exist
+```
+
+- Idempotent: each record has a stable slug (`experience-altimetrik`, `timeline-2026-09-01-...`, `diagram-shift-roster`, `link-github`) and is upserted by `(persona_slug, slug)`. Without `--overwrite` an existing row (your admin edits) is left alone.
+- Project story and media are merged into the existing project row (`api-test-center`); a missing project is reported and skipped, never created.
+- Settings: `engineer.resume` (header), `engineer.hiring`, `engineer.clock` are written only when the key has no row; `netflix` only gains `bookCall`. Each write adds a `settings_history` row.
+- Needs `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`; nothing is printed. Keep it in the repo for future re-seeds. Then set `CONTENT_SOURCE=db` (Vercel and `.env.local`) once the site looks right.
