@@ -14,7 +14,7 @@ import { PROFILES } from "@/lib/site/profiles";
 import { useViewExit } from "../view-shell";
 import { tick } from "./netflix-sound";
 import { NfArt } from "./netflix-art";
-import { NfPoster } from "./netflix-media";
+import { NfPoster, useHoverClip } from "./netflix-media";
 
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const behavior = (): ScrollBehavior => (reducedMotion() ? "auto" : "smooth");
@@ -398,10 +398,12 @@ function EpisodeCard({ e, item, env }: { e: Episode; item: NfItem; env: CardEnv 
 }
 
 function PosterCard({ c, item, env }: { c: ProjectCard; item: NfItem; env: CardEnv }) {
+  const hover = useHoverClip(c.media?.clips[0]);
   return (
-    <li className="nf-poster" data-kind={item.kind}>
+    <li className="nf-poster" data-kind={item.kind} onPointerEnter={hover.onPointerEnter} onPointerLeave={hover.onPointerLeave}>
       <NfArt seed={item.id} tone={item.kind} shape="tall" />
       {c.media ? <NfPoster media={c.media} /> : null}
+      {hover.video}
       {env.startHere?.has(item.id) ? <span className="nf-start">Start here</span> : null}
       <FitBadge env={env} id={item.id} />
       <button type="button" className="nf-poster-title nf-stretch" data-nf-card={item.id} onClick={(ev) => env.open(item, ev.currentTarget)}>

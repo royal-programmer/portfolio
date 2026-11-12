@@ -24,6 +24,54 @@ export function NfPoster({ media, eager }: { media: ProjectMedia; eager?: boolea
   );
 }
 
+/* ---------- Hover clip on a project card (F4) ---------- */
+
+let activeHover: (() => void) | null = null;
+const HOVER_MS = 600;
+
+/**
+ * A project card with clips plays its first clip, muted, after 600 ms of mouse hover; it stops and resets on leave. One at a
+ * time. Never on touch, under reduced motion or when the browser asks to save data. The poster stays as the fallback.
+ */
+export function useHoverClip(clip: ProjectMedia["clips"][number] | undefined) {
+  const [on, setOn] = useState(false);
+  const timer = useRef(0);
+  const stop = useRef(() => {});
+  useEffect(() => {
+    stop.current = () => {
+      window.clearTimeout(timer.current);
+      setOn(false);
+    };
+    const s = stop.current;
+    return () => {
+      s();
+      if (activeHover === s) activeHover = null;
+    };
+  }, []);
+  const allowed = () => {
+    if (!clip || reduced()) return false;
+    const c = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+    return !c?.saveData;
+  };
+  return {
+    on,
+    onPointerEnter: (e: React.PointerEvent) => {
+      if (e.pointerType !== "mouse" || !allowed()) return;
+      window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => {
+        activeHover?.();
+        activeHover = stop.current;
+        setOn(true);
+      }, HOVER_MS);
+    },
+    onPointerLeave: () => {
+      stop.current();
+      if (activeHover === stop.current) activeHover = null;
+    },
+    video: on && clip ? <video className="nf-hclip" src={clip.src} muted loop playsInline autoPlay preload="metadata" aria-hidden onError={() => stop.current()} /> : null,
+  };
+}
+
 /* ---------- Screens ---------- */
 
 export function ScreensRow({ media, title }: { media: ProjectMedia; title: string }) {
