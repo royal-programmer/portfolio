@@ -13,7 +13,7 @@ import { placeOnSpectrum } from "@/lib/site/spectrum";
 import { HomePage } from "../../components/home-page";
 import { WorldBoot } from "../../components/world-boot";
 import { ViewShell } from "../../components/views/view-shell";
-import { NETFLIX_PROFILES, buildNetflix, isNetflixProfile, type NetflixShow, type NetflixProfileId } from "@/lib/site/netflix-data";
+import { NETFLIX_PROFILES, hireSheetOf, buildNetflix, isNetflixProfile, type NetflixShow, type NetflixProfileId } from "@/lib/site/netflix-data";
 import { netflixCard, netflixShareLink } from "@/lib/site/netflix-og";
 import { loadEngineerTerminalData } from "../../load-terminal-data";
 import { I18N, terminalData } from "@/lib/site/terminal-data";
@@ -195,7 +195,7 @@ async function PersonaViewPage({ persona, view, fromTerminal, via }: { persona: 
     const tr = data.i18n ?? I18N;
     return (
       <ViewShell persona={persona} view={view} stripVia={fromTerminal}>
-        <NetflixView accent={accent} series={series} contact={data.contact} status={data.status} portrait={data.portrait} subData={{ uptime: data.uptime, i18n: { bn: { uptime: tr.bn.uptime, status: tr.bn.status }, hi: { uptime: tr.hi.uptime, status: tr.hi.status } } }} now={data.now} fitPool={{ stack: data.stack, resume: { skills: data.resume.skills } }} fast={via === "normal"} />
+        <NetflixView accent={accent} series={series} hire={hireSheetOf(data)} contact={data.contact} status={data.status} portrait={data.portrait} subData={{ uptime: data.uptime, i18n: { bn: { uptime: tr.bn.uptime, status: tr.bn.status }, hi: { uptime: tr.hi.uptime, status: tr.hi.status } } }} now={data.now} fitPool={{ stack: data.stack, resume: { skills: data.resume.skills } }} fast={via === "normal"} />
       </ViewShell>
     );
   }

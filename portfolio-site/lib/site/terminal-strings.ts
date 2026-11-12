@@ -430,6 +430,18 @@ const en = {
   "nf.b.project": "project",
   "nf.b.post": "writing",
   "nf.b.skill": "skill",
+  "nf.tab.home": "Home",
+  "nf.tab.search": "Search",
+  "nf.tab.list": "My List",
+  "nf.tab.hire": "Hire",
+  "nf.hire.title": "Hire Ratul",
+  "nf.hire.email": "Email",
+  "nf.hire.brief": "hire --brief summary",
+  "nf.hire.copy": "Copy",
+  "nf.hire.copied": "Copied",
+  "nf.hire.resume": "Download résumé PDF",
+  "nf.hire.close": "Close",
+  "nf.previously": "Previously on…",
 } as const satisfies Record<string, string | readonly string[] | ((...a: never[]) => string)>;
 
 /** The shape every language has to fill. Widened: string literals become `string`. */

@@ -8,6 +8,10 @@
 import { useEffect, useRef, useState } from "react";
 
 type Props = {
+  /** Shown beside the mark on phones, where the top bar is just the title and the profile tile. */
+  title?: string;
+  /** Bumped by the phone tab bar's Search tab: opens the search box. */
+  searchToken?: number;
   glyph: string;
   tone: string;
   query: string;
@@ -25,7 +29,7 @@ type Props = {
   onKeys?: () => void;
 };
 
-export function NetflixTopbar({ glyph, tone, query, onQuery, onPasteText, onHome, onSeries, onMyList, onProfiles, onClearHistory, onReplay, onKeys }: Props) {
+export function NetflixTopbar({ title, searchToken = 0, glyph, tone, query, onQuery, onPasteText, onHome, onSeries, onMyList, onProfiles, onClearHistory, onReplay, onKeys }: Props) {
   const [solid, setSolid] = useState(false);
   const [menu, setMenu] = useState(false);
   const menuBox = useRef<HTMLDivElement>(null);
@@ -67,16 +71,25 @@ export function NetflixTopbar({ glyph, tone, query, onQuery, onPasteText, onHome
     setOpen(true);
     requestAnimationFrame(() => input.current?.focus());
   };
+  const lastToken = useRef(0);
+  useEffect(() => {
+    if (!searchToken || searchToken === lastToken.current) return;
+    lastToken.current = searchToken;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the tab bar lives outside this component and asks for the box
+    setOpen(true);
+    requestAnimationFrame(() => input.current?.focus());
+  }, [searchToken]);
   const clear = () => {
     onQuery("");
     setOpen(false);
   };
 
   return (
-    <header className="nf-bar" data-solid={solid || undefined}>
+    <header className="nf-bar" data-solid={solid || undefined} data-searching={expanded || undefined}>
       <button type="button" className="nf-bar-mark" onClick={onHome} aria-label="Home">
         R
       </button>
+      {title ? <span className="nf-bar-title">{title}</span> : null}
       <nav className="nf-bar-nav" aria-label="Sections">
         <button type="button" onClick={onHome}>
           Home

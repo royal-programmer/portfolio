@@ -300,3 +300,15 @@
     width: 100%;
   }
 }
+.nf-actions .nf-vol {
+  margin-left: 0;
+}
+@media (max-width: 768px) {
+  .nf-feat-title {
+    font-size: 1.75rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}

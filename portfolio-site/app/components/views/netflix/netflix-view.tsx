@@ -14,6 +14,7 @@ import { NetflixHero } from "./netflix-hero";
 import { NetflixGrid, NetflixRows, type CardEnv, type DisplayRow } from "./netflix-rows";
 import { NetflixModal } from "./netflix-modal";
 import { NetflixTopbar } from "./netflix-topbar";
+import { NetflixHireSheet, NetflixTabBar } from "./netflix-tabbar";
 import { AUTOPILOT_TYPE_MS, AutopilotRail, autopilotSeen, useAutopilot } from "./netflix-autopilot";
 import { JD_MIN, netflixFit, sortByFit } from "@/lib/site/netflix-fit";
 import type { FitPool } from "@/lib/site/terminal-fit";
@@ -21,11 +22,13 @@ import { seasonSub, type NfLine, type SubData } from "@/lib/site/netflix-subs";
 import { KeysOverlay, useNetflixKeys } from "./netflix-keys";
 import { chime } from "./netflix-sound";
 import { clearHistory, useCc, useLikes, useMyList, useProgress, useSound } from "./netflix-store";
-import { NETFLIX_PROFILES, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, top10Of, TOP10_ROW_TITLE, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
+import { NETFLIX_PROFILES, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, top10Of, type HireSheet, TOP10_ROW_TITLE, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
 import type { TermLink, TerminalData } from "@/lib/site/terminal-data";
 
 export type NetflixViewProps = {
   accent: string;
+  /** The phone Hire sheet's contents (C4). */
+  hire: HireSheet;
   /** The three cuts, built on the server from the one dataset. */
   series: Record<NetflixProfileId, NetflixShow>;
   contact: TermLink[];
@@ -220,7 +223,7 @@ function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => voi
 
 type ModalState = { id: string; origin: DOMRect | null; play: boolean; playMs?: number };
 
-function NetflixBody({ show, series, profile, status, fitPool, subData, now, fast, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
+function NetflixBody({ show, series, profile, status, hire, fitPool, subData, now, fast, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
   const shows = useMemo(() => Object.values(series), [series]);
   const index = useMemo(() => indexItems(shows), [shows]);
   const topId = useMemo(() => topEpisodeId(shows), [shows]);
@@ -243,10 +246,16 @@ function NetflixBody({ show, series, profile, status, fitPool, subData, now, fas
 
   const restore = useRef(false);
   const modalOpen = modal !== null;
+  // C4: the phone Hire sheet and the tab bar's Search signal.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [searchToken, setSearchToken] = useState(0);
+  const [tab, setTab] = useState<"home" | "search" | "list" | "hire">("home");
+  const lang = cc.on && cc.lang ? cc.lang : "en";
+  const closeSheet = useCallback(() => setSheetOpen(false), []);
   // N9: remote-control keys, and the `?` overlay that lists them.
   const [keysOpen, setKeysOpen] = useState(false);
   const said = useNetflixKeys({
-    modalOpen,
+    modalOpen: modalOpen || sheetOpen,
     keysOpen,
     toggleKeys: () => setKeysOpen((v) => !v),
     toggleMute: () => {
@@ -496,13 +505,13 @@ function NetflixBody({ show, series, profile, status, fitPool, subData, now, fas
 
   return (
     <>
-      <NetflixTopbar glyph={profileMeta?.glyph ?? "R"} tone={TONES[profile]} query={query} onQuery={onQuery} onPasteText={onPasteText} onHome={toTop} onSeries={toRows} onMyList={toList} onProfiles={onSwitch} onClearHistory={askClear} onReplay={onReplay} onKeys={() => setKeysOpen(true)} />
+      <NetflixTopbar title={show.title} searchToken={searchToken} glyph={profileMeta?.glyph ?? "R"} tone={TONES[profile]} query={query} onQuery={onQuery} onPasteText={onPasteText} onHome={toTop} onSeries={toRows} onMyList={toList} onProfiles={onSwitch} onClearHistory={askClear} onReplay={onReplay} onKeys={() => setKeysOpen(true)} />
       <div className="nf-visually-hidden" role="status" aria-live="polite">
         {said}
       </div>
       {keysOpen ? <KeysOverlay onClose={() => setKeysOpen(false)} /> : null}
       {autopilot.state ? <AutopilotRail state={autopilot.state} onSkip={autopilot.skip} onStop={autopilot.stop} /> : null}
-      <div className="nf-page" aria-hidden={modal ? true : undefined} inert={modal ? true : undefined}>
+      <div className="nf-page" aria-hidden={modal || sheetOpen ? true : undefined} inert={modal || sheetOpen ? true : undefined}>
         {q ? (
           <div className="nf-results">
             <NetflixGrid items={results} env={env} query={query.trim()} />
@@ -514,6 +523,28 @@ function NetflixBody({ show, series, profile, status, fitPool, subData, now, fas
           </>
         )}
       </div>
+      <NetflixTabBar
+        lang={lang}
+        active={q ? "search" : tab}
+        listDot={list.ids.length > 0}
+        onHome={() => {
+          setTab("home");
+          toTop();
+        }}
+        onSearch={() => {
+          setTab("search");
+          setSearchToken((n) => n + 1);
+        }}
+        onList={() => {
+          setTab("list");
+          toList();
+        }}
+        onHire={() => {
+          setTab("hire");
+          setSheetOpen(true);
+        }}
+      />
+      {sheetOpen ? <NetflixHireSheet lang={lang} hire={hire} onClose={closeSheet} /> : null}
       {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} autoPlay={modal.play} playMs={modal.playMs} cast={castList} profile={profile} now={now} contact={contact} onCast={castFromModal} onClose={close} onSwap={swap} onShow={onShow} /> : null}
     </>
   );

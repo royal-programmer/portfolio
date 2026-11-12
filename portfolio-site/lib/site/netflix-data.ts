@@ -653,3 +653,29 @@ export function endCardOf(season: number, index: Map<string, NfItem>, nowMonth?:
   }
   return { complete: `Season ${season} complete`, next, nextFirst };
 }
+
+/* ---------- C4: the phone Hire sheet ---------- */
+
+export type HireSheet = { email?: string; resume: string; brief: string };
+
+/** What the Hire sheet offers, from the existing contact and `hiring` data: the mail address, the résumé path and the `hire --brief` text. */
+export function hireSheetOf(data: TerminalData): HireSheet {
+  const h = data.hiring;
+  const link = (kind: string) => data.contact.find((c) => c.label === kind && /^https:\/\//i.test(c.href))?.href;
+  const email = data.contact.find((c) => c.label === "mail")?.href.replace(/^mailto:/i, "");
+  const lines = [
+    `$ hire --brief · ${data.resume.name}`,
+    `Roles: ${h.roles.join(" / ")}`,
+    `Level: ${h.level}`,
+    `Stack: ${[...h.stack.core, ...h.stack.plus].join(", ")}`,
+    `Where: ${[h.location.base, h.location.modes.join(" / "), ...(h.location.relocate ? ["open to relocate"] : [])].join(" · ")}`,
+    `Availability: ${h.availability}`,
+    "Proof:",
+    ...h.proof.map((p) => `  - ${p}`),
+    "Reach:",
+    ...(email ? [`  mail      ${email}`] : []),
+    ...(["linkedin", "github"] as const).flatMap((k) => (link(k) ? [`  ${k.padEnd(9)} ${link(k)}`] : [])),
+    `  resume    ${h.links.site}${h.links.resume}`,
+  ];
+  return { email, resume: h.links.resume, brief: lines.join("\n") };
+}
