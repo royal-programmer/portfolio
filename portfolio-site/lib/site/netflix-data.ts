@@ -656,7 +656,10 @@ export function endCardOf(season: number, index: Map<string, NfItem>, nowMonth?:
 
 /* ---------- C4: the phone Hire sheet ---------- */
 
-export type HireSheet = { email?: string; resume: string; brief: string };
+export type HireSheet = { email?: string; resume: string; brief: string; /** The one availability line (`hiring.availability`). */ availability: string };
+
+/** When the contextual Hire bar appears (D5): after this many opened titles or this long on the page; a dismissal is remembered this many days. Data. */
+export const HIRE_BAR = { afterOpens: 2, afterMs: 45_000, rememberDays: 7 } as const;
 
 /** What the Hire sheet offers, from the existing contact and `hiring` data: the mail address, the résumé path and the `hire --brief` text. */
 export function hireSheetOf(data: TerminalData): HireSheet {
@@ -677,7 +680,7 @@ export function hireSheetOf(data: TerminalData): HireSheet {
     ...(["linkedin", "github"] as const).flatMap((k) => (link(k) ? [`  ${k.padEnd(9)} ${link(k)}`] : [])),
     `  resume    ${h.links.site}${h.links.resume}`,
   ];
-  return { email, resume: h.links.resume, brief: lines.join("\n") };
+  return { email, resume: h.links.resume, brief: lines.join("\n"), availability: h.availability };
 }
 
 /* ---------- C5: Previously on... ---------- */

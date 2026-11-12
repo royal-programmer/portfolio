@@ -15,6 +15,7 @@ import { NetflixGrid, NetflixRows, type CardEnv, type DisplayRow } from "./netfl
 import { NetflixModal } from "./netflix-modal";
 import { NetflixTopbar } from "./netflix-topbar";
 import { NetflixHireSheet, NetflixTabBar } from "./netflix-tabbar";
+import { NetflixHireBar } from "./netflix-hirebar";
 import { AUTOPILOT_TYPE_MS, AutopilotRail, autopilotSeen, useAutopilot } from "./netflix-autopilot";
 import { JD_MIN, netflixFit, sortByFit } from "@/lib/site/netflix-fit";
 import type { FitPool } from "@/lib/site/terminal-fit";
@@ -272,8 +273,10 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
     el?.focus({ preventScroll: true });
   }, [modalOpen]);
 
+  const [opens, setOpens] = useState(0);
   const open = useCallback<CardEnv["open"]>((item, el, play = false) => {
     trigger.current = { el, id: item.id };
+    setOpens((n) => n + 1);
     setModal({ id: item.id, origin: el?.getBoundingClientRect() ?? null, play });
     setTitleParam(item.id);
   }, []);
@@ -546,6 +549,7 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
           setSheetOpen(true);
         }}
       />
+      <NetflixHireBar hire={hire} opens={opens} hold={modal !== null || sheetOpen || !!autopilot.state} />
       {sheetOpen ? <NetflixHireSheet lang={lang} hire={hire} onClose={closeSheet} /> : null}
       {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} autoPlay={modal.play} playMs={modal.playMs} cast={castList} profile={profile} now={now} contact={contact} onCast={castFromModal} onClose={close} onSwap={swap} onShow={onShow} /> : null}
     </>

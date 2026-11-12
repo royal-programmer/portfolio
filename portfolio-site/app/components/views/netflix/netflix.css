@@ -1176,3 +1176,107 @@
   letter-spacing: 0.08em;
   color: color-mix(in srgb, var(--nf-accent) 60%, #fff);
 }
+
+/* ---------- Contextual Hire bar (D5) ---------- */
+.nf-hirebar {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  padding: 8px 8px 8px 16px;
+  border: 1px solid var(--nf-line);
+  border-radius: 999px;
+  background: rgba(16, 16, 22, 0.96);
+  color: var(--nf-ink);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  transform: translateX(-50%);
+  animation: nf-hirebar-in 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes nf-hirebar-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 24px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nf-hirebar {
+    animation: none;
+  }
+}
+.nf-hirebar-t {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.nf-hirebar-t i {
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #5bd68a;
+}
+.nf-hirebar-t small {
+  font-weight: 400;
+  color: var(--nf-dim);
+  font-size: 0.78rem;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nf-hirebar-a {
+  display: flex;
+  gap: 6px;
+}
+.nf-hirebar-a a,
+.nf-hirebar-a button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--nf-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--nf-ink);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.nf-hirebar-a a:hover,
+.nf-hirebar-a button:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+.nf-hirebar-x {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--nf-ink);
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+@media (max-width: 768px) {
+  .nf-hirebar {
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 8px);
+    gap: 8px;
+    padding-left: 12px;
+  }
+  .nf-hirebar-t small {
+    display: none;
+  }
+  .nf-hirebar-a a,
+  .nf-hirebar-a button {
+    padding: 0 10px;
+  }
+}
