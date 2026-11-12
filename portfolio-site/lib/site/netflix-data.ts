@@ -60,7 +60,42 @@ export type ProjectCard = {
   metric?: Metric;
   /** Real product imagery (E2): a poster, screenshots and short clips. Only some projects have it. */
   media?: ProjectMedia;
+  /** The project's story (F2): who it is for, why it exists, what it does in beats, and where it stands. */
+  audience?: string;
+  problem?: string;
+  /** What it does, one beat each; `clip` is an id from `media.clips`. */
+  beats?: ProjectBeat[];
+  status?: ProjectStatus;
+  /** One line that replaces the summary in the trailer's title chapter. */
+  description?: string;
 };
+
+export type ProjectBeat = { text: string; clip?: string };
+export type ProjectStatus = "in-development" | "live";
+export type ProjectStory = { description?: string; audience?: string; problem?: string; beats?: ProjectBeat[]; status?: ProjectStatus };
+
+/**
+ * The story fields per project slug (F2). Plain, factual, no claims beyond the product's own README. This is the one
+ * function that reads them (`storyOf`), so moving them to records (round 24) changes only that function.
+ */
+const PROJECT_STORY: Record<string, ProjectStory> = {
+  "api-test-center": {
+    description: "API and performance testing on your own computer.",
+    audience: "For developers and testers who check an API before it ships.",
+    problem: "Checking an API usually means one tool for a single request and another for load. This one does both from the same request, and keeps every result on your computer.",
+    beats: [
+      { text: "Send a request and see the checks on status, JSON, body, headers and time pass or fail.", clip: "send" },
+      { text: "Run a load test, through k6, from that same request.", clip: "load-test" },
+      { text: "Every run is saved on your computer, so you can keep it and compare it later.", clip: "history" },
+    ],
+    status: "in-development",
+  },
+};
+
+/** The story of a project by slug; an empty story when none is written (the trailer then falls back to title, summary and stack). */
+export function storyOf(slug: string): ProjectStory {
+  return PROJECT_STORY[slug] ?? {};
+}
 
 /** A project's own imagery, as data (this moves to the media table in round 24). Paths are under `public/`. */
 export type ProjectMedia = {
@@ -263,6 +298,7 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
     kind: "project",
     metric: metricOf(p.title, p.summary),
     media: PROJECT_MEDIA[p.slug],
+    ...storyOf(p.slug),
   }));
   const postCards: ProjectCard[] = data.posts.map((p) => ({ id: `post-${p.slug}`, title: p.title, summary: p.excerpt, stack: [], year: p.date?.slice(0, 4), kind: "post", metric: metricOf(p.title, p.excerpt) }));
 
@@ -427,6 +463,8 @@ export type NfFacts = {
   letter: string;
   /** Real imagery (E2), for projects that have it. */
   media?: ProjectMedia;
+  /** The project's story (F2), for the trailer. */
+  story?: ProjectStory;
   /** "episode" | "project" | "post" | "skill". */
   kind?: NfItem["kind"];
 };
@@ -473,6 +511,7 @@ export function factsOf(item: NfItem): NfFacts {
     href: c.href,
     letter: c.title.trim().charAt(0).toUpperCase(),
     media: c.media,
+    story: { description: c.description, audience: c.audience, problem: c.problem, beats: c.beats, status: c.status },
     kind: item.kind,
   };
 }
