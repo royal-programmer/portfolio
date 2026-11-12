@@ -23,6 +23,7 @@ import { NfArt } from "./netflix-art";
 import { ClipsRow, NfPoster, ScreensRow } from "./netflix-media";
 import { trailerChapters } from "@/lib/site/netflix-trailer";
 import { Trailer } from "./netflix-trailer";
+import { BINGE_SECONDS, bingeActive, cancelBinge, setBinge } from "@/lib/site/netflix-binge";
 import { useCc, useLikes, useMyList, useSound } from "./netflix-store";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -70,6 +71,9 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
   // N10: the id of the last episode whose end card is showing.
   const [endFor, setEndFor] = useState<string | null>(null);
   const showEnd = endFor === item.id;
+  // F3: the id of the episode whose "Next episode in 5" card is counting down, and the Autoplay next toggle.
+  const [countFor, setCountFor] = useState<string | null>(null);
+  const [bingeOn, setBingeOn] = useState(() => bingeActive(reduced()));
   const [seasonPick, setSeasonPick] = useState<{ id: string; season: number } | null>(null);
   const [now] = useState(() => Date.now());
 
@@ -207,6 +211,24 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
     onShow(item, true);
     // The teleprompter ending on a season's last episode rolls the credits (not in the guided play, which closes the card itself).
     if (isLast && playMs == null) setEndFor(item.id);
+    // F3: after an episode that has a next one, count down to it (never in the guided play).
+    else if (item.kind === "episode" && playMs == null && bingeOn && nextEp) setCountFor(item.id);
+  };
+  const playNext = () => {
+    if (!nextEp) return;
+    setCountFor(null);
+    setPlay({ id: nextEp.id, on: true });
+    onSwap(nextEp);
+  };
+  const cancelNext = () => {
+    cancelBinge();
+    setBingeOn(false);
+    setCountFor(null);
+  };
+  const toggleBinge = () => {
+    setBinge(!bingeOn);
+    setBingeOn(!bingeOn);
+    setCountFor(null);
   };
   // F1: a project's trailer reached its end card (or, in the guided play, its third chapter): played through.
   const trailerDone = () => {
@@ -312,6 +334,7 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
     [index, item],
   );
   const isLast = item.kind === "episode" && own.length > 0 && own[own.length - 1].id === item.id;
+  const nextEp = item.kind === "episode" ? own[own.findIndex((o) => o.id === item.id) + 1] : undefined;
   const end = useMemo(() => (item.kind === "episode" ? endCardOf(item.e.season, index, nowInfo?.month) : null), [item, index, nowInfo?.month]);
   const step = (dir: 1 | -1) => {
     if (item.kind !== "episode") return;
@@ -352,6 +375,7 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
         <div className="nf-m-top" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
           <div className="nf-m-handle" aria-hidden />
           <Billboard key={item.id} facts={facts} playing={playing} contact={contact} guided={playMs != null} onTrailerDone={trailerDone} playMs={playMs} sub={cc.on && cc.lang ? epSub(facts.tone, facts.season, facts.n, cc.lang) : undefined} ad={ad} lang={cc.lang} onFinish={finished}>
+            {countFor === item.id && nextEp ? <BingeCard title={nextEp.kind === "episode" ? nextEp.e.title : ""} onNow={playNext} onCancel={cancelNext} /> : null}
             <button type="button" className="nf-m-x" aria-label="Close" onClick={requestClose}>
               <span aria-hidden>×</span>
             </button>
@@ -397,6 +421,11 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
                   </button>
                 ) : null}
               </div>
+              {item.kind === "episode" ? (
+                <button type="button" className="nf-round nf-m-binge" aria-label={t("nf.binge.toggle", "en")} aria-pressed={bingeOn} title={t("nf.binge.toggle", "en")} onClick={toggleBinge}>
+                  <span aria-hidden>⏭</span>
+                </button>
+              ) : null}
               <CcButton cc={cc} />
               <AdButton ad={ad} />
               <button
@@ -642,6 +671,57 @@ function EndCard({ end, now, contact, onClose, onNext }: { end: ReturnType<typeo
         ) : null}
       </div>
     </section>
+  );
+}
+
+/* ---------- F3: the next-episode countdown ---------- */
+
+/** "Next episode in 5" over the lower billboard: Play now, Cancel. Enter plays now, Esc cancels (and does not close the card). */
+function BingeCard({ title, onNow, onCancel }: { title: string; onNow: () => void; onCancel: () => void }) {
+  const [n, setN] = useState(BINGE_SECONDS);
+  const now = useRef(onNow);
+  const cancel = useRef(onCancel);
+  useEffect(() => {
+    now.current = onNow;
+    cancel.current = onCancel;
+  });
+  useEffect(() => {
+    const id = window.setInterval(() => setN((v) => v - 1), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  useEffect(() => {
+    if (n <= 0) now.current();
+  }, [n]);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        cancel.current();
+      } else if (e.key === "Enter" && !(e.target as HTMLElement | null)?.closest("button, a")) {
+        e.preventDefault();
+        e.stopPropagation();
+        now.current();
+      }
+    };
+    window.addEventListener("keydown", key, true);
+    return () => window.removeEventListener("keydown", key, true);
+  }, []);
+  return (
+    <div className="nf-binge" role="group" aria-label={t("nf.binge.in", "en").replace("{n}", String(Math.max(0, n)))}>
+      <p className="nf-binge-t" aria-live="polite">
+        {t("nf.binge.in", "en").replace("{n}", String(Math.max(0, n)))}
+      </p>
+      {title ? <p className="nf-binge-n">{title}</p> : null}
+      <div className="nf-binge-b">
+        <button type="button" className="nf-btn nf-btn-play" onClick={onNow} autoFocus>
+          <span aria-hidden>▶</span> {t("nf.binge.now", "en")}
+        </button>
+        <button type="button" className="nf-btn nf-btn-glass" onClick={onCancel}>
+          {t("nf.binge.cancel", "en")}
+        </button>
+      </div>
+    </div>
   );
 }
 

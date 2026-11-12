@@ -654,3 +654,56 @@
 .nf-m-prev-ghost {
   visibility: hidden;
 }
+
+/* Autoplay next (F3): the countdown card slides over the lower billboard */
+.nf-binge {
+  position: absolute;
+  left: 2.5rem;
+  right: 2.5rem;
+  bottom: 5rem;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: rgba(10, 10, 14, 0.92);
+  animation: nf-binge-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+.nf-binge p {
+  margin: 0;
+}
+.nf-binge-t {
+  font-family: var(--font-display), serif;
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+.nf-binge-n {
+  flex: 1 1 12rem;
+  min-width: 0;
+  color: var(--nf-dim);
+  font-size: 0.85rem;
+}
+.nf-binge-b {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+@keyframes nf-binge-in {
+  from {
+    transform: translateY(120%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nf-binge {
+    animation: none;
+  }
+}
+@media (max-width: 720px) {
+  .nf-binge {
+    left: 1.1rem;
+    right: 1.1rem;
+    bottom: 4.4rem;
+  }
+}
