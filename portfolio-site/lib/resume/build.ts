@@ -4,7 +4,7 @@
  */
 import type { Entry, Persona } from "@/lib/content/types";
 import { DISPLAY_ROOT } from "@/lib/site/brand";
-import { TIMELINE, terminalData } from "@/lib/site/terminal-data";
+import { terminalData, type TerminalConfig } from "@/lib/site/terminal-data";
 
 export type ResumeDoc = {
   name: string;
@@ -32,8 +32,9 @@ const monthYear = (d: string) => {
 };
 const strip = (href: string) => href.replace(/^mailto:/, "").replace(/^https?:\/\/(www\.)?/, "");
 
-export function buildResume(persona: Persona | undefined, entries: Entry[], now = new Date()): ResumeDoc {
-  const data = terminalData(persona, entries, [], []);
+export function buildResume(persona: Persona | undefined, entries: Entry[], now = new Date(), cfg: TerminalConfig = {}): ResumeDoc {
+  const data = terminalData(persona, entries, [], [], cfg);
+  const TIMELINE = data.timeline;
   const r = data.resume;
   const links = ["mail", "github", "linkedin"].flatMap((l) => {
     const c = data.contact.find((x) => x.label === l && x.group !== "elsewhere");
@@ -41,7 +42,7 @@ export function buildResume(persona: Persona | undefined, entries: Entry[], now 
   });
   links.push(DISPLAY_ROOT);
 
-  const role = r.experience[0];
+  const role = r.experience[0] ?? { role: "", company: "", period: "", headline: "", bullets: [] };
   const picks = r.pdfBullets ?? role.bullets.map((_, i) => i).slice(0, 6);
   const milestones = TIMELINE.filter((t) => t.branch === "main" && t.tag)
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -55,7 +56,7 @@ export function buildResume(persona: Persona | undefined, entries: Entry[], now 
   const btech = tl("b.tech");
   const e0 = r.education[0];
   const education = [
-    { title: e0.degree, detail: e0.school, year: e0.year, grade: btech?.body?.[0] ?? e0.note },
+    e0 ? { title: e0.degree, detail: e0.school, year: e0.year, grade: btech?.body?.[0] ?? e0.note } : null,
     school("class 12"),
     school("class 10"),
   ].filter((x): x is NonNullable<typeof x> => !!x);

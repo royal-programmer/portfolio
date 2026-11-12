@@ -7,7 +7,9 @@ import { PERSONA_VIEWS } from "@/lib/content/views";
 import type { PersonaSlug } from "@/lib/content/types";
 import { HUB_COPY, PERSONA_IDENTITY_SOURCE } from "@/lib/site/brand";
 import { NETFLIX_PROFILES, NF_ADJECTIVES } from "@/lib/site/netflix-data";
-import { ARCH, DEFAULT_TERMINAL, I18N, PROJECT_ARCH, RESUME, TIMELINE, TIMELINE_PERIODS } from "@/lib/site/terminal-data";
+import { LEGACY } from "@/lib/site/legacy-content";
+import { fromDb } from "@/lib/content/source";
+import { ARCH, CLOCK, DEFAULT_TERMINAL, HIRING, I18N, PROJECT_ARCH, RESUME, TIMELINE, TIMELINE_PERIODS } from "@/lib/site/terminal-data";
 import { THEME_PALETTES } from "@/lib/site/terminal-themes";
 import type { SettingKey, Settings } from "./schema";
 
@@ -36,7 +38,10 @@ export const DEFAULTS: Settings = {
     character: [...HUB_COPY.character],
   },
   "engineer.terminal": DEFAULT_TERMINAL,
-  "engineer.resume": RESUME as Settings["engineer.resume"],
+  // Under db the lists are records; the setting then carries only the header (empty until the import).
+  "engineer.resume": (fromDb ? { name: "", title: "", location: "", summary: "", personalProjects: [] } : RESUME) as Settings["engineer.resume"],
+  "engineer.hiring": HIRING,
+  "engineer.clock": CLOCK,
   "engineer.i18n": I18N,
   "engineer.timeline": { entries: TIMELINE, periods: TIMELINE_PERIODS },
   "engineer.arch": { diagrams: ARCH, projectArch: PROJECT_ARCH },
@@ -48,7 +53,7 @@ export const DEFAULTS: Settings = {
     leadForm: true,
     maintenance: { enabled: false, message: "Back in a moment." },
   },
-  netflix: { profiles: [...NETFLIX_PROFILES], adjectives: NF_ADJECTIVES },
+  netflix: { profiles: [...NETFLIX_PROFILES], adjectives: NF_ADJECTIVES, ...(fromDb ? {} : { bookCall: LEGACY.BOOK_CALL }) },
 };
 
 export const defaultFor = <K extends SettingKey>(key: K): Settings[K] => DEFAULTS[key];

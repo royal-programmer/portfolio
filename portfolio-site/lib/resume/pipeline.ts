@@ -5,6 +5,7 @@
 import { access } from "node:fs/promises";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { loadHomeContent } from "@/app/load-home-content";
+import { loadTerminalConfig } from "@/lib/settings/load";
 import { buildResume, type ResumeDoc } from "./build";
 import { FONT_FILES, registerFonts, resumeElement } from "./render";
 import { keepBuild } from "./store";
@@ -59,8 +60,8 @@ export async function runBuild(onStage: (e: StageEvent) => void, signal?: AbortS
   };
 
   const doc: ResumeDoc = await step("collect", async () => {
-    const { personas, engineerEntries } = await loadHomeContent();
-    return buildResume(personas.find((p) => p.slug === "engineer"), engineerEntries);
+    const [{ personas, engineerEntries }, { cfg }] = await Promise.all([loadHomeContent(), loadTerminalConfig()]);
+    return buildResume(personas.find((p) => p.slug === "engineer"), engineerEntries, new Date(), cfg);
   });
   const element = await step("layout", () => resumeElement(doc));
   await step("fonts", async () => {

@@ -1,3 +1,4 @@
+import { loadTerminalConfig } from "@/lib/settings/load";
 import { loadHomeContent } from "../load-home-content";
 import { buildResume } from "@/lib/resume/build";
 import { renderResume } from "@/lib/resume/render";
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
     if (!b) return new Response("That build has expired. Run `resume --build` again.", { status: 410, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
     return new Response(new Uint8Array(b.bytes), { headers: pdfHeaders(download, `Ratul_Roy_Resume_${b.date}.pdf`, "private, no-store") });
   }
-  const { personas, engineerEntries } = await loadHomeContent();
-  const pdf = await renderResume(buildResume(personas.find((p) => p.slug === "engineer"), engineerEntries));
+  const [{ personas, engineerEntries }, { cfg }] = await Promise.all([loadHomeContent(), loadTerminalConfig()]);
+  const pdf = await renderResume(buildResume(personas.find((p) => p.slug === "engineer"), engineerEntries, new Date(), cfg));
   return new Response(new Uint8Array(pdf), { headers: pdfHeaders(download, "Ratul_Roy_Resume.pdf", "public, max-age=3600, s-maxage=86400") });
 }

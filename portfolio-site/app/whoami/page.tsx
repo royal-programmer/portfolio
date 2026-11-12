@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ALL_PERSONAS, listEntries, listPersonas } from "@/lib/content";
+import { loadProfiles } from "@/lib/content/records";
 import { getSettingValues } from "@/lib/settings/read";
 import { shareMetadata, siteOrigin } from "@/lib/site/share-meta";
 import { placeOnSpectrum } from "@/lib/site/spectrum";
@@ -48,5 +49,5 @@ export default async function WhoAmIPage({ searchParams }: { searchParams: Promi
   }));
   const upcoming: HubUpcoming[] = upcomingSlugs.map((slug) => ({ slug, t: placed.get(slug) ?? 0.5 }));
 
-  return <HubExperience chapters={chapters} upcoming={upcoming} terminalItems={terminalItems} copy={copy} email={identity.email} />;
+  return <HubExperience chapters={chapters} upcoming={upcoming} terminalItems={terminalItems} copy={copy} email={identity.email} profiles={await loadProfiles()} />;
 }

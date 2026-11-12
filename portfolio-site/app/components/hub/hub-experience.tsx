@@ -26,7 +26,7 @@ import Lenis from "lenis";
 import type { PersonaSlug } from "@/lib/content/types";
 import { ambient } from "@/lib/site/ambient-sound";
 import { DISPLAY_ROOT, HUB_COPY, personaIdentity } from "@/lib/site/brand";
-import { PROFILES } from "@/lib/site/profiles";
+import type { TermProfile } from "@/lib/site/profiles";
 import { analyseDevice, type DeviceReport } from "@/lib/site/device";
 import type { Quality } from "@/lib/site/experience";
 import { PersonaLink, personaHref } from "@/lib/site/persona-link";
@@ -50,7 +50,7 @@ gsap.registerPlugin(ScrollTrigger, SplitText);
 export type HubChapter = { slug: PersonaSlug; t: number; body: string; points: string[] };
 export type HubUpcoming = { slug: PersonaSlug; t: number };
 export type HubCopy = { headline: string; intro: string; throughTitle: string; moreTitle: string; closingTitle: string; closingBody: string; character: readonly string[] };
-type Props = { chapters: HubChapter[]; upcoming: HubUpcoming[]; /** Published engineer project slugs (the terminal's `ls`). */ terminalItems?: string[]; /** Admin-console copy (`hub.copy`); the code defaults when absent. */ copy?: HubCopy; email?: string };
+type Props = { chapters: HubChapter[]; upcoming: HubUpcoming[]; /** Published engineer project slugs (the terminal's `ls`). */ terminalItems?: string[]; /** Admin-console copy (`hub.copy`); the code defaults when absent. */ copy?: HubCopy; email?: string; /** The profile links (`profile_link` records, or the frozen copy in code mode); the footer shows the work and social rows. */ profiles?: TermProfile[] };
 
 type SectionKind =
   | { kind: "hero" }
@@ -91,7 +91,7 @@ class SceneBoundary extends Component<{ onFail: () => void; children: ReactNode 
   }
 }
 
-export function HubExperience({ chapters, upcoming, terminalItems = [], copy: copyProp, email: emailProp }: Props) {
+export function HubExperience({ chapters, upcoming, terminalItems = [], copy: copyProp, email: emailProp, profiles = [] }: Props) {
   const copy: HubCopy = copyProp ?? HUB_COPY;
   const email = emailProp ?? HUB_COPY.email;
   const xp = useExperience();
@@ -1142,7 +1142,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [], copy: co
                 <p className="mt-4 font-mono text-xs text-[var(--ink-faint)]">{email}</p>
                 {/* The same data as the terminal's `profiles`: work and social rows, plus GitHub. */}
                 <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1 font-mono text-xs">
-                  {PROFILES.filter((p) => p.href && (p.group === "work" || p.group === "social" || p.id === "github")).map((p) => (
+                  {profiles.filter((p) => p.href && (p.group === "work" || p.group === "social" || p.id === "github")).map((p) => (
                     <li key={p.id}>
                       <a href={p.href} target="_blank" rel="noreferrer" className="hit inline-flex min-h-8 items-center text-[var(--ink-dim)] underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline">
                         {p.label}

@@ -5,13 +5,15 @@
 import { getViews } from "@/lib/content/views";
 import type { LaunchedPersona, PersonaView } from "@/lib/content/types";
 import type { TerminalConfig } from "@/lib/site/terminal-data";
+import { fromDb } from "@/lib/content/source";
+import { loadRecords } from "@/lib/content/records";
 import { getSettingValues } from "./read";
 
-const TERMINAL_KEYS = ["identity", "engineer.terminal", "engineer.resume", "engineer.i18n", "engineer.timeline", "engineer.arch", "engineer.themes", "engineer.views"] as const;
+const TERMINAL_KEYS = ["identity", "engineer.terminal", "engineer.resume", "engineer.i18n", "engineer.timeline", "engineer.arch", "engineer.themes", "engineer.views", "engineer.hiring", "engineer.clock", "netflix"] as const;
 
 /** What `terminalData()` takes (each key independently falls back to the code), plus the enabled views. */
 export async function loadTerminalConfig(): Promise<{ cfg: TerminalConfig; views: PersonaView[] }> {
-  const s = await getSettingValues(TERMINAL_KEYS);
+  const [s, records] = await Promise.all([getSettingValues(TERMINAL_KEYS), fromDb ? loadRecords() : Promise.resolve(undefined)]);
   const cfg: TerminalConfig = {
     identity: s.identity,
     terminal: s["engineer.terminal"],
@@ -20,6 +22,11 @@ export async function loadTerminalConfig(): Promise<{ cfg: TerminalConfig; views
     timeline: s["engineer.timeline"],
     arch: s["engineer.arch"],
     themes: s["engineer.themes"],
+    hiring: s["engineer.hiring"],
+    clock: s["engineer.clock"],
+    netflix: s.netflix,
+    // Only under CONTENT_SOURCE=db: without records the frozen copy answers, exactly as before.
+    ...(records ? { records } : {}),
   };
   return { cfg, views: s["engineer.views"].views.filter((v) => v.enabled) };
 }

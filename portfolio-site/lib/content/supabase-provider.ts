@@ -21,6 +21,7 @@ import type {
   PersonaSlug,
   Visibility,
 } from "./types";
+import { RECORD_TYPES } from "./types";
 
 // Minimal row typings for what we select.
 type Row = Record<string, unknown>;
@@ -123,6 +124,8 @@ function mapBlogPost(r: Row): BlogPost {
   };
 }
 
+/** Record types are never listed as pages: `listRecords` (records.ts) is their only reader. */
+const NOT_RECORDS = `(${RECORD_TYPES.join(",")})`;
 const ENTRY_SELECT = "*, media(*), entry_groups(groups(*))";
 
 export const supabaseProvider: ContentApi = {
@@ -153,6 +156,7 @@ export const supabaseProvider: ContentApi = {
       .from("entries")
       .select(ENTRY_SELECT)
       .eq("persona_slug", persona)
+      .not("type", "in", NOT_RECORDS)
       .order("order", { ascending: true });
     // Public listings show only public rows (unlisted are reachable by link,
     // never listed). Admin listings see everything.

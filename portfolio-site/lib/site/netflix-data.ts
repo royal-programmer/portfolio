@@ -3,9 +3,11 @@
  * posts, contact) arranged as a show. Pure, no React. A profile is an ordering of the same data, not
  * different data; the only literals here are labels.
  */
-import type { BlogPost, Entry } from "@/lib/content/types";
+import { fromDb } from "@/lib/content/source";
+import type { BlogPost, Entry, ProjectBeat, ProjectMedia, ProjectStatus, ProjectStory } from "@/lib/content/types";
+import { LEGACY } from "@/lib/site/legacy-content";
 import { personaIdentity } from "@/lib/site/brand";
-import type { TermCommit, TerminalData } from "@/lib/site/terminal-data";
+import type { TermCommit, TermProject, TerminalData } from "@/lib/site/terminal-data";
 
 export type NetflixProfileId = "recruiter" | "developer" | "story";
 export type NetflixProfile = { id: NetflixProfileId; name: string; line: string; /** One character, drawn in the tile's accent. */ glyph: string };
@@ -70,67 +72,20 @@ export type ProjectCard = {
   description?: string;
 };
 
-/** `clip` is a clip id from `media.clips`; `clipMs` cuts a long clip (default 8 s). */
-export type ProjectBeat = { text: string; clip?: string; clipMs?: number };
-export type ProjectStatus = "in-development" | "live" | "live-building";
-export type ProjectStory = { description?: string; audience?: string; problem?: string; beats?: ProjectBeat[]; status?: ProjectStatus };
+export type { ProjectBeat, ProjectMedia, ProjectStatus, ProjectStory } from "@/lib/content/types";
 
 /**
- * The story fields per project slug (F2). Plain, factual, no claims beyond the product's own README. This is the one
- * function that reads them (`storyOf`), so moving them to records (round 24) changes only that function.
+ * The story of a project (F2): the project record's own `story`, else (code mode only) the frozen copy by slug, else an
+ * empty story (the trailer then falls back to title, summary and stack). The one function that reads story fields.
  */
-const PROJECT_STORY: Record<string, ProjectStory> = {
-  "api-test-center": {
-    description: "A free app to send, check and load-test APIs, on your own computer.",
-    audience: "For developers and testers who check an API before it ships.",
-    problem: "Checking an API usually means one tool for a single request and another for load. This one does both from the same request, works from the command line in CI, and lets an AI agent run the tests too.",
-    beats: [
-      { text: "Send a request and see the checks on status, JSON, body, headers and time pass or fail.", clip: "send", clipMs: 7000 },
-      { text: "Run a load test, through k6, from that same request.", clip: "load-test", clipMs: 8000 },
-      { text: "Every run is saved on your computer, so you can keep it and compare it later.", clip: "history", clipMs: 7000 },
-    ],
-    status: "live-building",
-  },
-};
-
-/** The story of a project by slug; an empty story when none is written (the trailer then falls back to title, summary and stack). */
-export function storyOf(slug: string): ProjectStory {
-  return PROJECT_STORY[slug] ?? {};
+export function storyOf(p: Pick<TermProject, "slug" | "story">): ProjectStory {
+  return p.story ?? (fromDb ? {} : LEGACY.PROJECT_STORY[p.slug]) ?? {};
 }
 
-/** A project's own imagery, as data (this moves to the media table in round 24). Paths are under `public/`. */
-export type ProjectMedia = {
-  poster: { src: string; w: number; h: number; alt: string };
-  screens: Array<{ id: string; label: string; src: string; w: number; h: number }>;
-  clips: Array<{ id: string; label: string; poster: string; src: string }>;
-};
-
-/**
- * Real imagery per project slug (E2). Files are made by `scripts/netflix-media.mjs` from the product's own assets: the
- * poster and screenshots as 1280-wide WebP, the clips and their posters as they are. Plain labels, no claims.
- */
-export const PROJECT_MEDIA: Record<string, ProjectMedia> = {
-  "api-test-center": {
-    poster: { src: "/projects/api-test-center/poster.webp", w: 1280, h: 800, alt: "API Test Center: a GET request with a load test running" },
-    screens: [
-      { id: "builder", label: "Report builder", src: "/projects/api-test-center/screens/builder.webp", w: 1280, h: 800 },
-      { id: "chain", label: "Run first: reuse a sign-in token", src: "/projects/api-test-center/screens/chain.webp", w: 1280, h: 800 },
-      { id: "charts", label: "Charts", src: "/projects/api-test-center/screens/charts.webp", w: 1280, h: 800 },
-      { id: "report", label: "Load report", src: "/projects/api-test-center/screens/report.webp", w: 1280, h: 800 },
-      { id: "send", label: "Send a request", src: "/projects/api-test-center/screens/send.webp", w: 1280, h: 800 },
-      { id: "help", label: "Help in plain words", src: "/projects/api-test-center/screens/help.webp", w: 1280, h: 800 },
-    ],
-    clips: [
-      { id: "send", label: "Send a request", poster: "/projects/api-test-center/clips/send.jpg", src: "/projects/api-test-center/clips/send.webm" },
-      { id: "load-test", label: "Run a load test", poster: "/projects/api-test-center/clips/load-test.jpg", src: "/projects/api-test-center/clips/load-test.webm" },
-      { id: "sign-in", label: "Sign in first, then reuse the token", poster: "/projects/api-test-center/clips/sign-in.jpg", src: "/projects/api-test-center/clips/sign-in.webm" },
-      { id: "collection", label: "Run a collection", poster: "/projects/api-test-center/clips/collection.jpg", src: "/projects/api-test-center/clips/collection.webm" },
-      { id: "history", label: "History", poster: "/projects/api-test-center/clips/history.jpg", src: "/projects/api-test-center/clips/history.webm" },
-      { id: "upload", label: "Upload a file", poster: "/projects/api-test-center/clips/upload.jpg", src: "/projects/api-test-center/clips/upload.webm" },
-      { id: "websocket", label: "WebSocket", poster: "/projects/api-test-center/clips/websocket.jpg", src: "/projects/api-test-center/clips/websocket.webm" },
-    ],
-  },
-};
+/** A project's poster, screenshots and clips (E2): the record's `media`, else (code mode only) the frozen copy by slug. The one reader. */
+export function mediaOf(p: Pick<TermProject, "slug" | "media">): ProjectMedia | undefined {
+  return p.media ?? (fromDb ? undefined : LEGACY.PROJECT_MEDIA[p.slug]);
+}
 
 /** A technology on the cast row (N5): how many episodes / projects mention it. `key` is the canonical lower-case name. */
 export type CastMember = { id: string; key: string; name: string; count: number };
@@ -298,8 +253,8 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
     href: `/engineer/${p.slug}`,
     kind: "project",
     metric: metricOf(p.title, p.summary),
-    media: PROJECT_MEDIA[p.slug],
-    ...storyOf(p.slug),
+    media: mediaOf(p),
+    ...storyOf(p),
   }));
   const postCards: ProjectCard[] = data.posts.map((p) => ({ id: `post-${p.slug}`, title: p.title, summary: p.excerpt, stack: [], year: p.date?.slice(0, 4), kind: "post", metric: metricOf(p.title, p.excerpt) }));
 
@@ -785,12 +740,11 @@ export function endCardOf(season: number, index: Map<string, NfItem>, nowMonth?:
 
 /* ---------- C4: the phone Hire sheet ---------- */
 
-/** The book-a-call link (F6). Data, empty until Ratul gives the link: while `href` is empty no button renders and nothing mentions it. */
+/** The book-a-call link (F6). Data (`netflix.bookCall`), empty until Ratul gives the link: while `href` is empty no button renders and nothing mentions it. */
 export type BookCall = { label: string; href: string };
-export const BOOK_CALL: BookCall = { label: "Book a call", href: "" };
 /** The link when there is one (https only), else undefined. */
-export function bookOf(b: BookCall = BOOK_CALL): BookCall | undefined {
-  return /^https:\/\//i.test(b.href.trim()) ? { label: b.label, href: b.href.trim() } : undefined;
+export function bookOf(b?: BookCall): BookCall | undefined {
+  return b && /^https:\/\//i.test(b.href.trim()) ? { label: b.label, href: b.href.trim() } : undefined;
 }
 
 export type HireSheet = { book?: BookCall; email?: string; resume: string; brief: string; /** The one availability line (`hiring.availability`). */ availability: string };
@@ -817,7 +771,7 @@ export function hireSheetOf(data: TerminalData): HireSheet {
     ...(["linkedin", "github"] as const).flatMap((k) => (link(k) ? [`  ${k.padEnd(9)} ${link(k)}`] : [])),
     `  resume    ${h.links.site}${h.links.resume}`,
   ];
-  return { book: bookOf(), email, resume: h.links.resume, brief: lines.join("\n"), availability: h.availability };
+  return { book: bookOf(data.book), email, resume: h.links.resume, brief: lines.join("\n"), availability: h.availability };
 }
 
 /* ---------- C5: Previously on... ---------- */

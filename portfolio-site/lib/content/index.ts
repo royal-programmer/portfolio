@@ -12,7 +12,7 @@
 import { hasSupabaseEnv } from "../db/client";
 import { stubProvider } from "./stub-provider";
 import { supabaseProvider } from "./supabase-provider";
-import type { ContentApi } from "./types";
+import { isRecordType, type ContentApi } from "./types";
 
 /**
  * Provider selection is by environment:
@@ -61,9 +61,15 @@ export const getPersona: ContentApi["getPersona"] = (slug, opts) =>
   activeProvider.getPersona(slug, opts);
 export const listEntries: ContentApi["listEntries"] = (persona, opts) =>
   resilient(`entries:${persona}:${JSON.stringify(opts ?? {})}`, () => activeProvider.listEntries(persona, opts), []);
-export const getEntry: ContentApi["getEntry"] = (id, opts) => activeProvider.getEntry(id, opts);
-export const getEntryBySlug: ContentApi["getEntryBySlug"] = (persona, slug, opts) =>
-  activeProvider.getEntryBySlug(persona, slug, opts);
+// A record (experience, timeline event, ...) is never a page: a direct read of one answers "not found".
+export const getEntry: ContentApi["getEntry"] = async (id, opts) => {
+  const e = await activeProvider.getEntry(id, opts);
+  return e && !isRecordType(e.type) ? e : null;
+};
+export const getEntryBySlug: ContentApi["getEntryBySlug"] = async (persona, slug, opts) => {
+  const e = await activeProvider.getEntryBySlug(persona, slug, opts);
+  return e && !isRecordType(e.type) ? e : null;
+};
 export const listBlogPosts: ContentApi["listBlogPosts"] = (persona, opts) =>
   resilient(`posts:${persona}:${JSON.stringify(opts ?? {})}`, () => activeProvider.listBlogPosts(persona, opts), []);
 export const getBlogPost: ContentApi["getBlogPost"] = (persona, slug, opts) =>

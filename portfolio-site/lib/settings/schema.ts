@@ -56,6 +56,24 @@ export const hubCopySchema = z.strictObject({
 // ---- engineer.terminal --------------------------------------------------------------------------
 const termLink = z.strictObject({ label: str(40), href: link(), group: z.enum(["elsewhere"]).optional() });
 const clockBand = z.strictObject({ id: str(20), from: z.number().int().min(0).max(24), to: z.number().int().min(0).max(24), theme: str(20), greet: str(80), hint: str(160) });
+const clockShape = (min: number) => z.strictObject({
+  bands: z.array(clockBand).min(min).max(12),
+  weekend: z.strictObject({ greet: str(80), hint: str(160) }),
+  myTz: str(60),
+});
+const hiringShape = z.strictObject({
+  roles: chips(80),
+  level: str(160),
+  stack: z.strictObject({ core: chips(40), plus: chips(60) }),
+  location: z.strictObject({ base: str(80), modes: chips(30), relocate: z.boolean() }),
+  availability: str(200),
+  compensation: str(120),
+  visa: str(200),
+  proof: z.array(str(240)).max(10),
+  /** Other places a recruiter can find me that have no public link. */
+  alsoOn: chips(40).optional(),
+  links: z.strictObject({ resume: str(300), site: str(300) }),
+});
 export const terminalSchema = z.strictObject({
   who: str(120),
   stack: chips(30),
@@ -68,22 +86,8 @@ export const terminalSchema = z.strictObject({
     crop: z.tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)]),
   }),
   now: z.strictObject({ month: month(), lines: z.array(str(200)).max(8) }),
-  clock: z.strictObject({
-    bands: z.array(clockBand).min(1).max(12),
-    weekend: z.strictObject({ greet: str(80), hint: str(160) }),
-    myTz: str(60),
-  }),
-  hiring: z.strictObject({
-    roles: chips(80),
-    level: str(160),
-    stack: z.strictObject({ core: chips(40), plus: chips(60) }),
-    location: z.strictObject({ base: str(80), modes: chips(30), relocate: z.boolean() }),
-    availability: str(200),
-    compensation: str(120),
-    visa: str(200),
-    proof: z.array(str(240)).max(10),
-    links: z.strictObject({ resume: str(300), site: str(300) }),
-  }),
+  clock: clockShape(0),
+  hiring: hiringShape,
   resumeFiles: z.strictObject({
     submitted: z.strictObject({ href: str(300), label: str(80), updatedAt: month() }),
     generated: z.strictObject({ route: str(300) }),
@@ -96,16 +100,24 @@ export const resumeSchema = z.strictObject({
   title: str(160),
   location: str(160),
   summary: long(1200),
-  skills: z.array(z.strictObject({ group: str(60), items: chips(60) })).max(12),
+  // The four lists below are `skill_group`, `experience`, `certification` and `education` records under
+  // CONTENT_SOURCE=db (round 24); they stay here, optional, for the frozen copy that code mode still reads.
+  skills: z.array(z.strictObject({ group: str(60), items: chips(60) })).max(12).optional(),
   experience: z
     .array(z.strictObject({ role: str(80), company: str(80), period: str(60), headline: long(400), bullets: z.array(long(400)).max(20) }))
-    .max(12),
+    .max(12)
+    .optional(),
   personalProjects: z.array(z.strictObject({ name: str(80), status: str(60), line: long(400), url: link().optional() })).max(12),
-  certifications: z.array(z.strictObject({ issuer: str(80), line: long(300), items: chips(120).optional() })).max(20),
-  education: z.array(z.strictObject({ degree: str(160), school: str(160), year: str(20), note: str(120).optional() })).max(6),
+  certifications: z.array(z.strictObject({ issuer: str(80), line: long(300), items: chips(120).optional() })).max(20).optional(),
+  education: z.array(z.strictObject({ degree: str(160), school: str(160), year: str(20), note: str(120).optional() })).max(6).optional(),
   /** Indices into the first role's bullets that make the one-page PDF. */
   pdfBullets: z.array(z.number().int().min(0).max(40)).max(40).optional(),
 });
+
+// ---- engineer.hiring and engineer.clock (the `hire --brief` facts and the visitor's-clock bands) ----
+// Under CONTENT_SOURCE=db these two are the singletons; in code mode `engineer.terminal` still carries them.
+export const hiringSchema = hiringShape;
+export const clockSchema = clockShape(0);
 
 // ---- engineer.i18n ------------------------------------------------------------------------------
 const i18n = z.strictObject({ who: str(160), role: str(120), city: str(80), uptime: str(300), summary: long(1200), status: str(160), now: z.array(str(240)).max(8), proof: z.array(long(400)).max(10) });
@@ -192,6 +204,8 @@ export const netflixSchema = z.strictObject({
   profiles: z.array(z.strictObject({ id: z.enum(["recruiter", "developer", "story"]), name: str(40), line: str(200), glyph: str(4) })).min(1).max(3),
   /** Three adjectives per branch / kind ("This series is ..."). */
   adjectives: z.record(str(20), z.tuple([str(30), str(30), str(30)])),
+  /** The book-a-call link: nothing renders while `href` is empty. */
+  bookCall: z.strictObject({ label: str(40), href: z.string().max(500).regex(/^(https:\/\/.+)?$/, "an https:// link, or empty") }).optional(),
 });
 
 // ---- registry -----------------------------------------------------------------------------------
@@ -201,6 +215,8 @@ export const SCHEMAS = {
   "hub.copy": hubCopySchema,
   "engineer.terminal": terminalSchema,
   "engineer.resume": resumeSchema,
+  "engineer.hiring": hiringSchema,
+  "engineer.clock": clockSchema,
   "engineer.i18n": i18nSchema,
   "engineer.timeline": timelineSchema,
   "engineer.arch": archSchema,
@@ -221,7 +237,7 @@ export const GROUPS: ReadonlyArray<{ id: string; label: string; keys: SettingKey
   { id: "identity", label: "Identity", keys: ["identity"], accent: "#f3f1ec" },
   { id: "personas", label: "Personas", keys: ["personas.copy"], accent: "#ff8a3d" },
   { id: "hub", label: "Hub", keys: ["hub.copy"], accent: "#a78bfa" },
-  { id: "terminal", label: "Engineer terminal", keys: ["engineer.terminal", "engineer.resume", "engineer.i18n"], accent: "#3b82f6" },
+  { id: "terminal", label: "Engineer terminal", keys: ["engineer.terminal", "engineer.resume", "engineer.hiring", "engineer.clock", "engineer.i18n"], accent: "#3b82f6" },
   { id: "timeline", label: "Timeline", keys: ["engineer.timeline"], accent: "#4ade80" },
   { id: "diagrams", label: "Diagrams", keys: ["engineer.arch"], accent: "#22d3ee" },
   { id: "views", label: "Views", keys: ["engineer.views"], accent: "#f472b6" },
