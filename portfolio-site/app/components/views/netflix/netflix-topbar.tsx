@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * The fixed top bar (17-persona-views.md §7): our R mark, Home / Series / My List / Profiles, an expanding
- * search and the active profile's tile. Transparent over the billboard, black after 80px of scroll. On phones
+ * The fixed top bar (17-persona-views.md §7): our R mark, Home / Series / My List, an expanding
+ * search and the active profile's tile (the one door to Profiles). Transparent over the billboard, black after 80px of scroll. On phones
  * it keeps the mark, the search and the profile tile.
  */
 import { useEffect, useRef, useState } from "react";
@@ -35,16 +35,38 @@ type Props = {
 
 export function NetflixTopbar({ title, searchToken = 0, glyph, tone, query, onQuery, onPasteText, onHome, onSeries, onMyList, onProfiles, onClearHistory, onReplay, onKeys, profile }: Props) {
   const [forDraft, setForDraft] = useState("");
-  const [forCopied, setForCopied] = useState(false);
-  const copyFor = async () => {
+  // E5: the copy never waits. A synchronous copy runs inside the press; when the browser refuses it, the link is shown in a
+  // read-only field to select (and the async clipboard is tried in the background). No `window.prompt`, nothing awaited.
+  const [forState, setForState] = useState<"idle" | "copied" | "manual">("idle");
+  const [forUrl, setForUrl] = useState("");
+  const forTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(forTimer.current), []);
+  const copyFor = () => {
     const link = forLink(window.location.origin, profile ?? "recruiter", forDraft);
+    setForUrl(link);
+    const before = document.activeElement as HTMLElement | null;
+    let ok = false;
     try {
-      await navigator.clipboard.writeText(link);
-    } catch {
-      window.prompt("Link", link);
+      const ta = document.createElement("textarea");
+      ta.value = link;
+      ta.setAttribute("readonly", "");
+      ta.style.cssText = "position:fixed;top:0;left:0;opacity:0;pointer-events:none";
+      document.body.appendChild(ta);
+      ta.select();
+      ok = document.execCommand("copy");
+      ta.remove();
+    } catch {}
+    before?.focus({ preventScroll: true });
+    window.clearTimeout(forTimer.current);
+    if (ok) {
+      setForState("copied");
+      forTimer.current = window.setTimeout(() => setForState("idle"), 2200);
+      return;
     }
-    setForCopied(true);
-    window.setTimeout(() => setForCopied(false), 2200);
+    setForState("manual");
+    try {
+      void navigator.clipboard?.writeText(link).then(() => setForState("copied"), () => {});
+    } catch {}
   };
   const [solid, setSolid] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -115,9 +137,6 @@ export function NetflixTopbar({ title, searchToken = 0, glyph, tone, query, onQu
         </button>
         <button type="button" onClick={onMyList}>
           My List
-        </button>
-        <button type="button" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((v) => !v)}>
-          Profiles
         </button>
       </nav>
       <div className="nf-bar-right">
@@ -201,10 +220,21 @@ export function NetflixTopbar({ title, searchToken = 0, glyph, tone, query, onQu
                   }}
                 >
                   <label htmlFor="nf-for-in">{t("nf.for.make", "en")}</label>
-                  <input id="nf-for-in" type="text" inputMode="text" autoComplete="off" maxLength={FOR_MAX} value={forDraft} placeholder={t("nf.for.ph", "en")} onChange={(e) => setForDraft(typeFor(e.target.value))} />
+                  <input id="nf-for-in" type="text" inputMode="text" autoComplete="off" maxLength={FOR_MAX} value={forDraft} placeholder={t("nf.for.ph", "en")} onChange={(e) => {
+                      setForDraft(typeFor(e.target.value));
+                      setForState("idle");
+                    }} />
                   <button type="submit" disabled={!cleanFor(forDraft)}>
-                    {forCopied ? t("nf.for.copied", "en") : t("nf.for.copy", "en")}
+                    {forState === "copied" ? t("nf.for.copied", "en") : t("nf.for.copy", "en")}
                   </button>
+                  {forState === "manual" ? (
+                    <>
+                      <p className="nf-pmenu-for-note" role="status">
+                        {t("nf.for.manual", "en")}
+                      </p>
+                      <input type="text" readOnly aria-label={t("nf.for.link", "en")} value={forUrl} onFocus={(e) => e.currentTarget.select()} ref={(el) => el?.select()} />
+                    </>
+                  ) : null}
                 </form>
               ) : null}
             </div>

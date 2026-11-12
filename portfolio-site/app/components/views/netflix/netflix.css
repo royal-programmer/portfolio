@@ -1313,3 +1313,9 @@
   margin: 0.2rem 0;
   color: var(--nf-dim);
 }
+
+.nf-pmenu-for-note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--nf-dim);
+}

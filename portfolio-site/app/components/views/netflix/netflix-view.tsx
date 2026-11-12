@@ -23,6 +23,7 @@ import type { FitPool } from "@/lib/site/terminal-fit";
 import { seasonSub, type NfLine, type SubData } from "@/lib/site/netflix-subs";
 import { KeysOverlay, useNetflixKeys } from "./netflix-keys";
 import { chime } from "./netflix-sound";
+import { applyViewIcon } from "@/lib/site/view-icons";
 import { clearHistory, useCc, useLikes, useMyList, useProgress, useSound } from "./netflix-store";
 import { NETFLIX_PROFILES, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, top10Of, type HireSheet, TOP10_ROW_TITLE, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
 import type { TermLink, TerminalData } from "@/lib/site/terminal-data";
@@ -102,6 +103,8 @@ export function NetflixView(props: NetflixViewProps) {
     toastTimer.current = window.setTimeout(() => setToast(null), action ? 6500 : 3200);
   }, []);
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
+  // E5: a red R on black in the tab while this view is mounted; the page's own icon returns on unmount.
+  useEffect(() => applyViewIcon("netflix"), []);
 
   useEffect(() => {
     const p = readProfile();

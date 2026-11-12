@@ -152,7 +152,7 @@ const KEYS: Array<[string, string]> = [
   ["→ in a card", "Next episode (the season's last one ends on a card of its own)"],
   ["/", "Search"],
   ["m", "Mute or unmute"],
-  ["p", "Profiles"],
+  ["p", "Profile menu (the avatar, top right)"],
   ["?", "This list"],
 ];
 

@@ -229,7 +229,7 @@ const COMMANDS: CommandDef[] = [
   { name: "view", group: "open", usage: "view [id]" },
   { name: "git", group: "read", usage: "git log [--oneline] [-n k]" },
   { name: "stats", group: "read", usage: "stats [year|langs]", long: true },
-  { name: "share", group: "read", usage: "share [command]", long: true },
+  { name: "share", group: "read", usage: "share [command] | share netflix --for \"Name\"", long: true },
   { name: "fit", group: "read", usage: "fit [paste]", long: true },
   { name: "arch", group: "read", usage: "arch [shift-roster|automations|process-apis|this-site]", long: true },
   { name: "screensaver", group: "terminal", usage: "screensaver [off|on]", long: true },
