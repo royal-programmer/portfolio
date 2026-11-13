@@ -20,7 +20,10 @@ const groupKeysDiffer = (g: NavGroup, differing: readonly string[]) => g.section
 
 export function AdminShell({ differing, email, tableReady, error, children }: { differing: string[]; email: string; tableReady: boolean; error?: string; children: React.ReactNode }) {
   const path = usePathname();
-  const [, activeGroup = "", activeSection = ""] = path.split("/").filter(Boolean);
+  // On the admin host the URL is `/engineer/projects` (the proxy rewrites it); on other hosts `/admin/engineer/projects`.
+  const segs = path.split("/").filter(Boolean);
+  if (segs[0] === "admin") segs.shift();
+  const [activeGroup = "", activeSection = ""] = segs;
   const [sheet, setSheet] = useState<string | null>(null);
   const [findSignal, setFindSignal] = useState(0);
   const navRef = useRef<HTMLElement>(null);
@@ -88,7 +91,7 @@ export function AdminShell({ differing, email, tableReady, error, children }: { 
           </button>
         </div>
         <nav id="adm-nav" ref={navRef} className={`adm-nav${sheetOpen ? " is-open" : ""}`} aria-label="Admin" onKeyDown={onKeyDown}>
-          <Link data-nav href="/admin" onClick={guard} className="adm-home" aria-current={path === "/admin" ? "page" : undefined}>
+          <Link data-nav href="/admin" onClick={guard} className="adm-home" aria-current={path === "/admin" || path === "/" ? "page" : undefined}>
             Home
           </Link>
           {NAV.map((g) => (
