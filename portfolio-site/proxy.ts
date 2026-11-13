@@ -1,5 +1,5 @@
 /**
- * Subdomain routing (decision D31).
+ * Subdomain routing (decision D31). `admin.<root>` serves the console at its root (lib/site/admin-host.ts).
  *
  *   ratulroy.me/            → hub (served by /whoami)
  *   www. / who.             → redirect to the bare root
@@ -18,7 +18,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isPersonaSlug } from "@/lib/content/types";
 import { parseHost, SUBDOMAIN_BY_PERSONA } from "@/lib/site/hosts";
-import { ADMIN_HOST_LABEL } from "@/lib/site/admin-host";
+import { ADMIN_HOST_LABEL, adminRoute, isAdminPath, type AdminRoute } from "@/lib/site/admin-host";
+import { ACCESS_DENIED_BODY, accessConfig, verifyAccessJwt } from "@/lib/admin/access";
 
 function hostUrl(request: NextRequest, root: string, label: string | null, pathname: string) {
   // Built by hand: NextURL normalises `localhost` hostnames, which breaks dev redirects.
@@ -33,8 +34,42 @@ function noindex<T extends NextResponse>(res: T): T {
   return res;
 }
 
-export function proxy(request: NextRequest) {
-  return noindex(route(request));
+export async function proxy(request: NextRequest) {
+  const res = route(request);
+  // Cloudflare Access (only when configured): admin pages and server actions need its signed token.
+  // A redirect reveals nothing, so only responses that would serve the console are gated.
+  const cfg = accessConfig();
+  if (cfg && (res.status < 300 || res.status >= 400)) {
+    const parsed = parseHost(request.headers.get("host"));
+    const adminScope = parsed.kind === "admin" || isAdminPath(request.nextUrl.pathname);
+    if (adminScope) {
+      const r = await verifyAccessJwt(request.headers.get("cf-access-jwt-assertion"), cfg);
+      if (!r.ok) return noindex(new NextResponse(ACCESS_DENIED_BODY, { status: 403, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } }));
+    }
+  }
+  return noindex(res);
+}
+
+/** Apply a pure admin routing decision (lib/site/admin-host.ts) with this request's URL pieces. */
+function applyAdmin(request: NextRequest, root: string, decision: AdminRoute): NextResponse | null {
+  if (decision.kind === "pass") return null;
+  if (decision.kind === "rewrite") {
+    const target = request.nextUrl.clone();
+    target.pathname = decision.pathname;
+    return NextResponse.rewrite(target);
+  }
+  return NextResponse.redirect(hostUrl(request, root, ADMIN_HOST_LABEL, decision.pathname), decision.status);
+}
+
+function adminDecision(request: NextRequest, onAdminHost: boolean): AdminRoute {
+  return adminRoute({
+    onAdminHost,
+    pathname: request.nextUrl.pathname,
+    method: request.method,
+    isRsc: request.headers.has("rsc"),
+    production: process.env.NODE_ENV === "production",
+    strict: process.env.ADMIN_HOST_STRICT === "1",
+  });
 }
 
 function route(request: NextRequest) {
@@ -51,7 +86,11 @@ function route(request: NextRequest) {
     case "hub-alias":
       return NextResponse.redirect(hostUrl(request, parsed.root, null, pathname), 308);
 
+    case "admin":
+      return applyAdmin(request, parsed.root, adminDecision(request, true)) ?? NextResponse.next();
+
     case "hub": {
+      if (first === "admin" && ADMIN_HOST_LABEL) return applyAdmin(request, parsed.root, adminDecision(request, false)) ?? NextResponse.next();
       if (pathname === "/") {
         // Keep the query (dev preview flags and the like) across the rewrite.
         const hub = new URL("/whoami", request.url);
@@ -66,8 +105,11 @@ function route(request: NextRequest) {
     }
 
     case "persona": {
-      // Admin (/admin) + hub live on the root host (auth cookies are host-scoped).
-      if (first === "admin") return NextResponse.redirect(hostUrl(request, parsed.root, ADMIN_HOST_LABEL, pathname));
+      // The admin lives on its own host (auth cookies are host-scoped); apex mode keeps it on the root.
+      if (first === "admin") {
+        if (!ADMIN_HOST_LABEL) return NextResponse.redirect(hostUrl(request, parsed.root, null, pathname));
+        return applyAdmin(request, parsed.root, adminDecision(request, false)) ?? NextResponse.next();
+      }
       if (first === "whoami") return NextResponse.redirect(hostUrl(request, parsed.root, null, "/"));
       // Path-style URL on the persona's own host. Documents get the clean URL;
       // client-router (RSC) fetches are served as-is — the router can't follow

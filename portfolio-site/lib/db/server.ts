@@ -11,6 +11,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { accessAllows } from "@/lib/admin/access-gate";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -61,6 +62,8 @@ export async function isAdmin(): Promise<boolean> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return false;
+  // Cloudflare Access (when configured) is the first lock: its token's email must be this admin's.
+  if (!(await accessAllows(user.email))) return false;
   const { data } = await supabase
     .from("admins")
     .select("user_id")

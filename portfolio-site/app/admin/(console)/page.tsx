@@ -10,6 +10,9 @@ import { previewActive } from "@/lib/settings/preview";
 import { getAllSettings } from "@/lib/settings/read";
 import { emptyRequired } from "../_lib/record-forms";
 import { computeHealth, type HealthInput } from "../_lib/health";
+import { accessConfig } from "@/lib/admin/access";
+import { ADMIN_HOST_LABEL } from "@/lib/site/admin-host";
+import { parseHost } from "@/lib/site/hosts";
 import { HomeView } from "../_collections/home-view";
 
 const SECTION: Record<string, string> = {
@@ -36,6 +39,21 @@ async function ogResolves(): Promise<boolean | null> {
   } catch {
     return null;
   }
+}
+
+/** Where this request reached the admin, whether Access is on, and the sign-in redirect URL to allow-list. */
+async function securityInput(): Promise<NonNullable<HealthInput["security"]>> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+  const parsed = parseHost(host);
+  const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN?.trim();
+  return {
+    // An unrouted host (localhost, a *.vercel.app preview) serves /admin by path and is fine; a routed non-admin host is not.
+    adminHost: parsed.kind === "admin" || parsed.kind === "unrouted",
+    hostName: host.replace(/:\d+$/, "") || "unknown host",
+    accessOn: accessConfig() !== null,
+    callbackUrl: root ? (ADMIN_HOST_LABEL ? `https://${ADMIN_HOST_LABEL}.${root}/auth/callback` : `https://${root}/admin/auth/callback`) : null,
+  };
 }
 
 /** The Insights screen, if the analytics round has added it (checked on disk; nothing renders when it is absent). */
@@ -99,6 +117,7 @@ export default async function AdminHome() {
         return bad.length ? [{ label: `${e.title || e.slug}: ${bad.join(", ")}`, href: section(e) }] : [];
       }),
     touched: entries.map((e) => ({ label: e.title || e.slug, href: section(e), updatedAt: e.updated_at })),
+    security: await securityInput(),
     now,
   };
   const health = loaded ? computeHealth(input) : [];

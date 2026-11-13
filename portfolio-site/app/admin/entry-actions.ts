@@ -11,7 +11,7 @@ import { safeNext } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { parseHost } from "@/lib/site/hosts";
-import { ADMIN_HOST_LABEL } from "@/lib/site/admin-host";
+import { ADMIN_HOST_LABEL, adminOrigin } from "@/lib/site/admin-host";
 import { getServerClient, isAdmin } from "@/lib/db/server";
 import { ingestImage } from "@/lib/media/pipeline";
 import type { Media, PersonaSlug, Visibility } from "@/lib/content";
@@ -53,16 +53,15 @@ function rateLimited(ip: string): boolean {
   return false;
 }
 
-/** The apex origin of this request (admin lives on the root host, never a persona subdomain). */
-async function apexOrigin(): Promise<string> {
+/** The admin origin of this request: `admin.<root>` in production, the request's own host when unrouted. */
+async function adminSiteOrigin(): Promise<string> {
   const h = await headers();
   const hostHeader = h.get("x-forwarded-host") ?? h.get("host");
   const host = (hostHeader ?? "").toLowerCase();
   const local = /^(localhost|127\.0\.0\.1|[\w-]+\.localhost)(:\d+)?$/.test(host);
   const proto = h.get("x-forwarded-proto") ?? (local ? "http" : "https");
   const parsed = parseHost(hostHeader);
-  const port = host.match(/:\d+$/)?.[0] ?? "";
-  return parsed.kind === "unrouted" ? `${proto}://${host}` : `${proto}://${ADMIN_HOST_LABEL ? `${ADMIN_HOST_LABEL}.` : ""}${parsed.root}${port}`;
+  return adminOrigin({ host, proto, root: parsed.kind === "unrouted" ? null : parsed.root, label: ADMIN_HOST_LABEL });
 }
 
 /**
@@ -78,7 +77,10 @@ export async function requestSignInLink(_prev: ActionState, formData: FormData):
   if (rateLimited(ip)) return { error: "Too many requests. Try again in a few minutes." };
 
   const next = safeNext(String(formData.get("next") ?? ""));
-  const emailRedirectTo = `${await apexOrigin()}/admin/auth/callback${next ? `?next=${encodeURIComponent(next)}` : ""}`;
+  const origin = await adminSiteOrigin();
+  // On the admin host the callback is /auth/callback (the proxy rewrites it); elsewhere it is the path style.
+  const callback = ADMIN_HOST_LABEL && origin.includes(`//${ADMIN_HOST_LABEL}.`) ? "/auth/callback" : "/admin/auth/callback";
+  const emailRedirectTo = `${origin}${callback}${next ? `?next=${encodeURIComponent(next)}` : ""}`;
   try {
     const supabase = await getServerClient();
     await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo } });
@@ -89,7 +91,7 @@ export async function requestSignInLink(_prev: ActionState, formData: FormData):
 }
 
 // A Google button goes here later: `supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo } })`
-// with the same apex `/admin/auth/callback` redirect. Not built yet (docs/claude-planning/16-admin-console.md, "Sign-in").
+// with the same admin-host `/auth/callback` redirect. Not built yet (docs/claude-planning/16-admin-console.md, "Sign-in").
 
 export async function signOut(): Promise<void> {
   const supabase = await getServerClient();

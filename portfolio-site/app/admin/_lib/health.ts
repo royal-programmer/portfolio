@@ -18,6 +18,8 @@ export type HealthInput = {
   invalid: { label: string; href: string }[];
   /** Everything that carries an `updatedAt` (ISO) and a screen. */
   touched: { label: string; href: string; updatedAt: string }[];
+  /** Where the admin is served and whether Cloudflare Access is checked (`undefined` = not looked at). */
+  security?: { adminHost: boolean; hostName: string; accessOn: boolean; callbackUrl: string | null };
   now: number;
 };
 
@@ -81,6 +83,14 @@ export function computeHealth(i: HealthInput): HealthItem[] {
   items.push(item("empty", "No record has an empty required field", i.invalid.map((x) => x.label), "none empty", i.invalid[0]?.href ?? "/admin/engineer"));
   const stale = i.touched.filter((t) => i.now - Date.parse(t.updatedAt) > STALE_DAYS * DAY);
   items.push(item("stale", `Nothing untouched for ${STALE_DAYS} days`, stale.map((s) => s.label), "all recent", stale[0]?.href ?? "/admin/engineer"));
+  if (i.security) {
+    const s = i.security;
+    const bad = [!s.adminHost && "the admin is not on its own host (admin.<root>)", !s.accessOn && "Cloudflare Access check is off (set CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD)"].filter(Boolean) as string[];
+    const sec = item("security", "Security: admin host and Access", bad, `on ${s.hostName}, Access check on`, "/admin");
+    // Always remind: the redirect URL must be in Supabase's allow-list or the sign-in link lands on the wrong page.
+    if (s.callbackUrl) sec.examples = [...sec.examples, `Supabase redirect URLs must include ${s.callbackUrl}`].slice(0, 3);
+    items.push(sec);
+  }
   return items;
 }
 

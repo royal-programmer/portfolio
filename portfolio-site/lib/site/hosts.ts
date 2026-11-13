@@ -11,6 +11,7 @@
  * rewritten and the plain path URLs keep working.
  */
 import type { PersonaSlug } from "@/lib/content/types";
+import { adminHostLabel } from "@/lib/site/admin-host";
 
 /** Subdomain label → persona. Short, human words; the page headline carries the persona name. */
 export const PERSONA_BY_SUBDOMAIN: Readonly<Record<string, PersonaSlug>> = {
@@ -52,11 +53,12 @@ export type ParsedHost =
   | { kind: "unrouted" }
   | { kind: "hub"; root: string }
   | { kind: "hub-alias"; root: string; label: string }
+  | { kind: "admin"; root: string; label: string }
   | { kind: "persona"; root: string; label: string; persona: PersonaSlug }
   | { kind: "unknown"; root: string; label: string };
 
 /** Classify a `Host` header (port is ignored). */
-export function parseHost(hostHeader: string | null, roots: string[] = rootDomains()): ParsedHost {
+export function parseHost(hostHeader: string | null, roots: string[] = rootDomains(), adminLabel: string | null = adminHostLabel()): ParsedHost {
   const host = (hostHeader ?? "").toLowerCase().replace(/:\d+$/, "");
   for (const root of roots) {
     if (host === root) return { kind: "hub", root };
@@ -64,6 +66,7 @@ export function parseHost(hostHeader: string | null, roots: string[] = rootDomai
     const label = host.slice(0, -(root.length + 1));
     if (label.includes(".")) return { kind: "unrouted" };
     if (HUB_ALIASES.includes(label)) return { kind: "hub-alias", root, label };
+    if (adminLabel && label === adminLabel) return { kind: "admin", root, label };
     const persona = PERSONA_BY_SUBDOMAIN[label];
     if (persona) return { kind: "persona", root, label, persona };
     return { kind: "unknown", root, label };
