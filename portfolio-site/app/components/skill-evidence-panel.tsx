@@ -6,7 +6,7 @@
  * also react), Tab stays inside, and focus goes back to whatever opened it. Used by the terminal, the Netflix
  * view and anything else that lists skills; the caller supplies the evidence and the language.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./skill-evidence-panel.css";
 import { PersonaLink } from "@/lib/site/persona-link";
 import type { SkillEvidence } from "@/lib/site/skill-evidence";
@@ -16,13 +16,14 @@ const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1
 
 export function SkillEvidencePanel({ evidence, lang = "en", onClose }: { evidence: SkillEvidence; lang?: Lang; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null);
+  // Read while rendering: by the time effects run, an inert page underneath has already dropped the focus.
+  const [opener] = useState<HTMLElement | null>(() => (typeof document !== "undefined" && document.activeElement instanceof HTMLElement ? document.activeElement : null));
   const close = useRef(onClose);
   useEffect(() => {
     close.current = onClose;
   }, [onClose]);
 
   useEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     box.current?.querySelector<HTMLElement>("[data-first]")?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -56,9 +57,10 @@ export function SkillEvidencePanel({ evidence, lang = "en", onClose }: { evidenc
     window.addEventListener("keydown", onKey, true);
     return () => {
       window.removeEventListener("keydown", onKey, true);
-      opener?.focus?.({ preventScroll: true });
+      // After the view under the panel is no longer inert.
+      window.setTimeout(() => opener?.focus?.({ preventScroll: true }), 30);
     };
-  }, []);
+  }, [opener]);
 
   const e = evidence;
   const title = `skill-ev-${e.name.replace(/[^a-z0-9]/gi, "")}`;

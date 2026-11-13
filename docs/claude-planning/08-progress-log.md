@@ -1466,3 +1466,9 @@ stripped service_role's table grants).
 
 - Play now opens `netflix-player.tsx`, a fixed full-viewport dialog (back arrow and title top-left, F for fullscreen, Esc, focus trap and return, controls hide after 3 s, tap toggles on a phone). Projects play the same chaptered trailer inside it; episodes and certificates play the short card, with the binge countdown inside the player. The modal billboard and the card hover keep a quiet muted preview (6 s of the first clip, then the poster). Details in `17-persona-views.md` section 26.
 - Open: not run in a browser this round (no browser tool, dev server slow); type check and lint only. Next session: open API Test Center Play at 1280 and 393 and check chapters, pause, arrows, Esc, F, end card and an episode binge.
+
+### Round 28 - skill evidence (2026-11-13)
+
+- A skill now shows what backs it: panel (modal / bottom sheet) on terminal resume chips and Netflix skill cards, `skill <name>` and `man skill` in the terminal with tab completion, stage stars run `skill <name>`, admin Skills screen to link projects, roles and certificates (draft or publish). Builder is `lib/site/skill-evidence.ts`, tested in `scripts/content-roundtrip.mjs`. The stage takes its terminal data as a prop. See section 27 of `17-persona-views.md`.
+- Verified in a browser (Playwright, 1280 and 393): terminal chips, panel, Esc and focus return, `skill` output, Netflix card; screenshots in `tmp/r28/`. Not verified: the admin screen (needs a signed-in session and migration 0012 applied), the stage star click in WebGL, the panel in `db` mode against real rows.
+- Surprise: the running dev server already showed links on C# and Python (the records are in), so the matched-by-name path is covered by the test, not by a screenshot of C#.
