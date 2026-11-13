@@ -12,7 +12,7 @@
   inset: 0;
   background: rgba(0, 0, 0, 0.7);
 }
-.nf-fit {
+.nf-fitbox {
   position: relative;
   width: min(640px, 100%);
   max-height: min(88svh, 820px);
@@ -95,12 +95,12 @@
   gap: 0.6rem;
   margin-top: 0.2rem;
 }
-.nf-fit .nf-btn {
+.nf-fitbox .nf-btn {
   min-height: 42px;
   padding: 0 1.2rem;
   font-size: 0.95rem;
 }
-.nf-fit .nf-btn:disabled {
+.nf-fitbox .nf-btn:disabled {
   opacity: 0.45;
   cursor: default;
 }
@@ -195,7 +195,7 @@ button.nf-fit-chip:hover {
   background: rgba(255, 255, 255, 0.16);
 }
 button.nf-fit-chip:focus-visible,
-.nf-fit .nf-btn:focus-visible {
+.nf-fitbox .nf-btn:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--nf-accent) 70%, #fff);
   outline-offset: 2px;
 }
@@ -210,7 +210,7 @@ button.nf-fit-chip:focus-visible,
     place-items: end stretch;
     padding: 0;
   }
-  .nf-fit {
+  .nf-fitbox {
     width: 100%;
     max-height: 90svh;
     padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0px));
@@ -248,7 +248,7 @@ button.nf-fit-chip:focus-visible,
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .nf-fit,
+  .nf-fitbox,
   .nf-fit-ring-fg {
     animation: none;
     transition: none;

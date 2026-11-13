@@ -109,6 +109,7 @@ export function NetflixFitSheet({ lang, hire, pool, evidence, opener, paused, on
       window.clearTimeout(timer.current);
       // After the page underneath is no longer inert.
       window.setTimeout(() => {
+        if (document.querySelector(".nf-fitbox")) return;
         const back = el?.isConnected ? el : returnTo ? document.querySelector<HTMLElement>(returnTo) : null;
         back?.focus({ preventScroll: true });
       }, 30);
@@ -170,7 +171,7 @@ export function NetflixFitSheet({ lang, hire, pool, evidence, opener, paused, on
   return (
     <div className="nf-fit-wrap" inert={paused ? true : undefined}>
       <div className="nf-fit-back" onClick={onClose} aria-hidden />
-      <div className="nf-fit" ref={box} role="dialog" aria-modal="true" aria-labelledby="nf-fit-title">
+      <div className="nf-fitbox" ref={box} role="dialog" aria-modal="true" aria-labelledby="nf-fit-title">
         <div className="nf-fit-handle" onTouchStart={(e) => (drag.current = { y: e.touches[0].clientY, dy: 0 })} onTouchMove={move} onTouchEnd={release}>
           <span aria-hidden />
         </div>

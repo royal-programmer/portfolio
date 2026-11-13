@@ -164,3 +164,94 @@ export function screenTexture(w: number, h: number, accent = "#7aa2ff"): THREE.C
   t.anisotropy = 4;
   return t;
 }
+
+/** A blank picture with a title (an image field with no picture yet, or a picture that could not load). */
+export function labelTexture(text: string, w = 256, h = 256, bg = "#1c1f2b", fg = "#9aa5ce", note?: string): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const g = c.getContext("2d")!;
+  g.fillStyle = bg;
+  g.fillRect(0, 0, w, h);
+  g.strokeStyle = fg;
+  g.globalAlpha = 0.35;
+  g.lineWidth = 3;
+  g.strokeRect(10, 10, w - 20, h - 20);
+  g.globalAlpha = 1;
+  g.fillStyle = fg;
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  const size = Math.max(14, Math.min(h / 7, (w - 40) / Math.max(4, text.length) * 1.6));
+  g.font = `600 ${size}px system-ui, sans-serif`;
+  g.fillText(text, w / 2, h / 2 - (note ? size * 0.5 : 0), w - 30);
+  if (note) {
+    g.font = `${size * 0.55}px system-ui, sans-serif`;
+    g.fillStyle = "#ff8a8a";
+    g.fillText(note, w / 2, h / 2 + size * 0.7, w - 30);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+/** The console's home screen: one tile per world (the stage's worlds), a dark ground. */
+export function homeScreenTexture(tiles: Array<{ label: string; color: string }>, w = 512, h = 288): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const g = c.getContext("2d")!;
+  const gr = g.createLinearGradient(0, 0, w, h);
+  gr.addColorStop(0, "#0a1030");
+  gr.addColorStop(1, "#1a0f33");
+  g.fillStyle = gr;
+  g.fillRect(0, 0, w, h);
+  const cols = 3;
+  const tw = (w - 60) / cols;
+  const th = (h - 90) / 2;
+  tiles.slice(0, 6).forEach((t, i) => {
+    const x = 20 + (i % cols) * (tw + 10);
+    const y = 50 + Math.floor(i / cols) * (th + 10);
+    g.fillStyle = t.color;
+    g.globalAlpha = 0.85;
+    g.fillRect(x, y, tw, th);
+    g.globalAlpha = 1;
+    g.fillStyle = "#ffffff";
+    g.font = "600 20px system-ui, sans-serif";
+    g.textBaseline = "bottom";
+    g.fillText(t.label, x + 10, y + th - 8);
+  });
+  g.fillStyle = "#cfd6f2";
+  g.font = "600 18px system-ui, sans-serif";
+  g.textBaseline = "top";
+  g.fillText("Home", 22, 16);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+/** A clock face: ticks and numerals on a light disc (the hands are meshes). */
+export function clockFaceTexture(size = 256): THREE.CanvasTexture {
+  const c = canvas(size);
+  const g = c.getContext("2d")!;
+  const r = size / 2;
+  g.fillStyle = "#f1ece2";
+  g.beginPath();
+  g.arc(r, r, r, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = "#1c1e26";
+  for (let i = 0; i < 60; i++) {
+    const a = (i / 60) * Math.PI * 2;
+    const long = i % 5 === 0;
+    g.lineWidth = long ? 5 : 2;
+    g.beginPath();
+    g.moveTo(r + Math.sin(a) * r * (long ? 0.8 : 0.88), r - Math.cos(a) * r * (long ? 0.8 : 0.88));
+    g.lineTo(r + Math.sin(a) * r * 0.94, r - Math.cos(a) * r * 0.94);
+    g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}

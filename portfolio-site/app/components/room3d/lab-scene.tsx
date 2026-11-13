@@ -590,10 +590,11 @@ type LabStats = { calls: number; triangles: number; geometries: number; textures
 /** Collects frame times and renderer.info per frame; read from `window.__lab` by the test script. */
 function Stats() {
   const gl = useThree((s) => s.gl);
+  const get = useThree((s) => s.get);
   const scene = useThree((s) => s.scene);
   const stats = useRef<LabStats>({ calls: 0, triangles: 0, geometries: 0, textures: 0, programs: 0, frameMs: [] });
   useEffect(() => {
-    gl.info.autoReset = false;
+    get().gl.info.autoReset = false;
     (window as unknown as { __lab: unknown }).__lab = {
       stats: stats.current,
       texMB: () => {
@@ -611,7 +612,7 @@ function Stats() {
         return b / 1048576;
       },
     };
-  }, [gl, scene]);
+  }, [get, scene]);
   useFrame((_, dt) => {
     const s = stats.current;
     s.calls = gl.info.render.calls;
