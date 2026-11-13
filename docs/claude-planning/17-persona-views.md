@@ -648,7 +648,7 @@ Ratul asked why Fit check lived only in the terminal. It is now native to the Ne
 - **Entry points.** The Open to work chip, the phone Hire sheet, a `Fit check` button in the hero's secondary row, and the `f` key (listed in the `?` keys overlay). `openFit(source, returnTo?)` dispatches a window event the view listens for. The `?run=fit` links in the Netflix files are gone.
 - **Events.** `fit_open` (ref: chip, sheet, hero, key) and `fit_check` (ref: the verdict level only: strong, good, partial, none) are in the allowlist (`lib/site/events.ts`); `fit_check` also counts as an action in the Insights funnel (`ACTION_KINDS`, one line). `HireSheet` gained `seedRole` and `seedStack` for the mail seed.
 - **Strings.** `nf.fit.*` in en, bn and hi (the existing `fit.*` verdict strings are reused). The hero button, like its neighbours, is English.
-- **Checked.** `tmp/r31/fit.cjs` (Playwright): 1280, 393 and 1280 with reduced motion; a .NET/React/SQL Server description and an unrelated ML/AWS one; Esc, focus return, Tab trap, console. Screenshots in `tmp/r31/`.
+- **Checked.** `tmp/r31/fit.cjs` (Playwright): 1280, 393 and 1280 with reduced motion; a .NET/React/SQL Server description and an unrelated ML/AWS one; Esc, focus return, Tab trap, console. Screenshots in `tmp/r31/`. The dialog class is `nf-fitbox` because `nf-fit` is already the card rating badge (it carries `pointer-events: none`).
 
 ## 31. 3D room, P0 and P1 (round 32)
 

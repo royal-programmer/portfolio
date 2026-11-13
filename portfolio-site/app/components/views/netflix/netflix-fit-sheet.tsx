@@ -263,7 +263,7 @@ export function NetflixFitSheet({ lang, hire, pool, evidence, opener, paused, on
                     <li key={a.want}>
                       <span className="nf-fit-chip">
                         {a.want}
-                        {a.have ? <em> → {a.have}</em> : null}
+                        {a.have && a.have !== a.want ? <em> → {a.have}</em> : null}
                       </span>
                     </li>
                   ))}
