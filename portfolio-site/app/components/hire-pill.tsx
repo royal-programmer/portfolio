@@ -44,7 +44,7 @@ export function HirePill({ on = true, hub = false }: { on?: boolean; hub?: boole
           <PersonaLink role="menuitem" persona="engineer" path="/?run=hire">
             Terminal: hire
           </PersonaLink>
-          <PersonaLink role="menuitem" persona="engineer" path="/?run=fit">
+          <PersonaLink role="menuitem" persona="engineer" path="/?run=fit" hard>
             Fit check: paste a job description
           </PersonaLink>
         </div>

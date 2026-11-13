@@ -164,7 +164,7 @@ export function NetflixHireSheet({ lang, hire, onClose }: { lang: Lang; hire: Hi
           <span>{t("nf.hire.resume", lang)}</span>
           <small>PDF</small>
         </a>
-        <PersonaLink persona="engineer" path="/?run=fit" className="nf-sheet-fit">
+        <PersonaLink persona="engineer" path="/?run=fit" hard className="nf-sheet-fit">
           Fit check: paste a job description (stays in your browser)
         </PersonaLink>
         <button type="button" className="nf-sheet-close" onClick={onClose}>

@@ -70,7 +70,7 @@ export function NetflixHireChip({ hire }: { hire: HireSheet }) {
               </a>
             ) : null}
           </div>
-          <PersonaLink persona="engineer" path="/?run=fit" className="nf-hirechip-fit">
+          <PersonaLink persona="engineer" path="/?run=fit" hard className="nf-hirechip-fit">
             Fit check: paste a job description (stays in your browser)
           </PersonaLink>
         </div>
