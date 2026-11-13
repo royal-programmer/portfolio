@@ -60,8 +60,6 @@ export function buildConstellation(input: { stack: string[]; skills: string[]; a
   const names = [...seen.values()];
   const keys = names.map(norm);
 
-  // Which diagram(s) each technology belongs to; which projects it ships in.
-  const archOf = keys.map((k, i) => input.arch.filter((d) => d.nodes.some((n) => labelHas(n.label, names[i]))).map((d) => d.id));
   const groups: number[][] = [];
   for (const d of input.arch) {
     const g = names.map((n, i) => (d.nodes.some((node) => labelHas(node.label, n)) ? i : -1)).filter((i) => i >= 0);
@@ -102,7 +100,8 @@ export function buildConstellation(input: { stack: string[]; skills: string[]; a
   const stars = names.map((name, i): Star => {
     const r = CAP.radius * dep[i];
     const pos: [number, number, number] = [CAP.centre[0] + Math.sin(az[i]) * Math.cos(el[i]) * r, CAP.centre[1] + Math.sin(el[i]) * r, CAP.centre[2] - Math.cos(az[i]) * Math.cos(el[i]) * r];
-    return { name, pos, cmd: commandFor(keys[i], archOf[i]) };
+    // A star opens what that technology is backed by (`skill <name>` in the terminal); `commandFor` stays for the old routes.
+    return { name, pos, cmd: `skill ${name}` };
   });
   return { stars, edges };
 }

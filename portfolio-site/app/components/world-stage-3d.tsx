@@ -14,13 +14,12 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import { useRouter } from "next/navigation";
 import type { BlogPost, Entry } from "@/lib/content";
 import type { PersonaSlug } from "@/lib/content/types";
-import { getViews } from "@/lib/content/views";
 import { ogLines } from "@/lib/site/og-lines";
 import { personaHref } from "@/lib/site/persona-link";
 import { shelfFromEntries, STAGE_DOOR, STAGE_PERF, STAGE_PROPS, STAGE_STOPS, STAGE_TIERS, TIER_BELOW, type ShelfCase, type StageProp, type StageTierId } from "@/lib/site/stage-data";
 import { useExperience } from "../experience-provider";
 import { bandFor } from "@/lib/site/terminal-clock";
-import { CLOCK, terminalData } from "@/lib/site/terminal-data";
+import { CLOCK, type TerminalData } from "@/lib/site/terminal-data";
 import { paletteFor } from "@/lib/site/terminal-themes";
 import { StageProps } from "./stage/props";
 import { StageDoor, type DoorGo } from "./stage/door";
@@ -373,7 +372,7 @@ function screenTheme(bandTheme: string): string {
   }
 }
 
-export default function WorldStage3D({ slug, t, entries, posts, story, photo, capture, onFirstFrame }: { slug: PersonaSlug; t: number; entries?: Entry[]; posts?: BlogPost[]; story?: MutableRefObject<StoryState>; photo?: MutableRefObject<PhotoState>; capture?: MutableRefObject<CaptureFn | null>; onFirstFrame?: () => void }) {
+export default function WorldStage3D({ slug, t, entries, terminal, story, photo, capture, onFirstFrame }: { slug: PersonaSlug; t: number; entries?: Entry[]; posts?: BlogPost[]; /** The engineer data as the server built it (settings and records included); the laptop screen and the skill stars read it. */ terminal?: TerminalData; story?: MutableRefObject<StoryState>; photo?: MutableRefObject<PhotoState>; capture?: MutableRefObject<CaptureFn | null>; onFirstFrame?: () => void }) {
   const router = useRouter();
   const clock = useRef<VrClock>(createClock());
   const state = useRef<VrState>(createVrState());
@@ -467,10 +466,10 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
 
   // The laptop's live terminal (engineer only): drawn at once, then kept current by the rig's frame.
   useEffect(() => {
-    if (slug !== "engineer") return;
+    if (slug !== "engineer" || !terminal) return;
     let screen: TerminalScreen | null = null;
     try {
-      const data = terminalData(undefined, entries ?? [], posts ?? [], getViews("engineer"));
+      const data = terminal;
       screen = createTerminalScreen({
         banner: ogLines(data, "banner"),
         output: ogLines(data, "portfolio"),
@@ -489,7 +488,7 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
       setLiveScreen(null);
       screen?.dispose();
     };
-  }, [slug, entries, posts]);
+  }, [slug, terminal]);
 
   useEffect(() => {
     screenRef.current?.setFps(cfg.screenFps);
@@ -615,11 +614,11 @@ export default function WorldStage3D({ slug, t, entries, posts, story, photo, ca
   );
   // The skill constellation (S5): stack and résumé skills, joined by what shares a diagram or a project.
   const constellation = useMemo(() => {
-    if (slug !== "engineer") return null;
-    const d = terminalData(undefined, entries ?? [], posts ?? [], getViews("engineer"));
+    if (slug !== "engineer" || !terminal) return null;
+    const d = terminal;
     const max = Math.round(cfg.stars / (window.matchMedia("(max-width: 767px)").matches ? 2 : 1));
     return buildConstellation({ stack: d.stack, skills: d.resume.skills.flatMap((g) => g.items), arch: d.arch, projects: d.projects }, max);
-  }, [slug, entries, posts, cfg.stars]);
+  }, [slug, terminal, cfg.stars]);
   const starsActive = useRef(true);
   const onTap = useCallback((id: string) => {
     setTapId(id);

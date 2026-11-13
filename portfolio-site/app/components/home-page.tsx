@@ -1,5 +1,6 @@
 "use client";
 
+import type { TerminalData } from "@/lib/site/terminal-data";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { isLaunchedPersona } from "@/lib/content/types";
@@ -37,6 +38,8 @@ type HomePageProps = {
   engineerEntries: Entry[];
   /** Engineer blog posts for the recent-writing strip. */
   engineerBlogPosts: BlogPost[];
+  /** The engineer data as the server built it, for the stage. */
+  terminal?: TerminalData;
 };
 
 const CONTENT_FALLBACK: PersonaContent = {
@@ -54,6 +57,7 @@ export function HomePage({
   personas,
   engineerEntries,
   engineerBlogPosts,
+  terminal,
 }: HomePageProps) {
   const { persona, setPersona, personaHydrated } = usePersona();
   const pathname = usePathname();
@@ -611,6 +615,7 @@ export function HomePage({
           content={content}
           engineerEntries={engineerEntries}
           engineerBlogPosts={engineerBlogPosts}
+          terminal={terminal}
         />
       </div>
 

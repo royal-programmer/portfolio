@@ -28,6 +28,8 @@ import { applyViewIcon } from "@/lib/site/view-icons";
 import { clearHistory, useCc, useLikes, useMyList, useProgress, useSound } from "./netflix-store";
 import { NETFLIX_PROFILES, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, top10Of, type HireSheet, TOP10_ROW_TITLE, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
 import type { TermLink, TerminalData } from "@/lib/site/terminal-data";
+import { SkillEvidencePanel } from "@/app/components/skill-evidence-panel";
+import type { SkillEvidence } from "@/lib/site/skill-evidence";
 
 export type NetflixViewProps = {
   accent: string;
@@ -46,6 +48,8 @@ export type NetflixViewProps = {
   subData: SubData;
   /** `via=normal`: no staged motion. */
   fast: boolean;
+  /** What each skill is backed by (lower-case name to evidence), built on the server: a skill card opens it instead of the detail modal. */
+  skillEv?: Record<string, SkillEvidence>;
 };
 
 type ToastAction = { label: string; run: () => void };
@@ -230,7 +234,7 @@ function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => voi
 
 type ModalState = { id: string; origin: DOMRect | null; play: boolean; playMs?: number };
 
-function NetflixBody({ show, series, profile, status, hire, fitPool, subData, now, fast, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
+function NetflixBody({ show, series, profile, status, hire, fitPool, subData, now, fast, skillEv, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
   const shows = useMemo(() => Object.values(series), [series]);
   const index = useMemo(() => indexItems(shows), [shows]);
   const topId = useMemo(() => topEpisodeId(shows), [shows]);
@@ -251,6 +255,8 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
     }
   });
 
+  /** The skill whose evidence panel is open (a skill card). */
+  const [skillOpen, setSkillOpen] = useState<string | null>(null);
   const restore = useRef(false);
   const modalOpen = modal !== null;
   // C4: the phone Hire sheet and the tab bar's Search signal.
@@ -262,7 +268,7 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
   // N9: remote-control keys, and the `?` overlay that lists them.
   const [keysOpen, setKeysOpen] = useState(false);
   const said = useNetflixKeys({
-    modalOpen: modalOpen || sheetOpen,
+    modalOpen: modalOpen || sheetOpen || skillOpen !== null,
     keysOpen,
     toggleKeys: () => setKeysOpen((v) => !v),
     toggleMute: () => {
@@ -281,11 +287,15 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
 
   const [opens, setOpens] = useState(0);
   const open = useCallback<CardEnv["open"]>((item, el, play = false) => {
+    if (item.kind === "skill" && skillEv?.[item.s.name.toLowerCase()]) {
+      setSkillOpen(item.s.name.toLowerCase());
+      return;
+    }
     trigger.current = { el, id: item.id };
     setOpens((n) => n + 1);
     setModal({ id: item.id, origin: el?.getBoundingClientRect() ?? null, play });
     setTitleParam(item.id);
-  }, []);
+  }, [skillEv]);
   const swap = useCallback((item: NfItem) => {
     setModal((m) => (m ? { ...m, id: item.id, play: false } : m));
     setTitleParam(item.id);
@@ -522,7 +532,7 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
       </div>
       {keysOpen ? <KeysOverlay onClose={() => setKeysOpen(false)} /> : null}
       {autopilot.state ? <AutopilotRail state={autopilot.state} onSkip={autopilot.skip} onStop={autopilot.stop} /> : null}
-      <div className="nf-page" aria-hidden={modal || sheetOpen ? true : undefined} inert={modal || sheetOpen ? true : undefined}>
+      <div className="nf-page" aria-hidden={modal || sheetOpen || skillOpen ? true : undefined} inert={modal || sheetOpen || skillOpen ? true : undefined}>
         {q ? (
           <div className="nf-results">
             <NetflixGrid items={results} env={env} query={query.trim()} />
@@ -556,6 +566,7 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
         }}
       />
       <NetflixHireBar hire={hire} opens={opens} hold={modal !== null || sheetOpen || !!autopilot.state} />
+      {skillOpen && skillEv?.[skillOpen] ? <SkillEvidencePanel evidence={skillEv[skillOpen]} lang={lang} onClose={() => setSkillOpen(null)} /> : null}
       {sheetOpen ? <NetflixHireSheet lang={lang} hire={hire} onClose={closeSheet} /> : null}
       {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} autoPlay={modal.play} playMs={modal.playMs} cast={castList} profile={profile} now={now} contact={contact} book={hire.book} onCast={castFromModal} onClose={close} onSwap={swap} onShow={onShow} /> : null}
     </>

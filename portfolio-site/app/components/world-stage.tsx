@@ -5,6 +5,7 @@
  * setup, alive on its own stage; Normal mode gets the same object as the hub's line drawing,
  * drawing itself in. Everything under it is the same page in both modes.
  */
+import type { TerminalData } from "@/lib/site/terminal-data";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BlogPost, Entry } from "@/lib/content";
@@ -119,7 +120,7 @@ function storyAllowed() {
   return !reduce && !saveData;
 }
 
-export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: number; entries?: Entry[]; posts?: BlogPost[] }) {
+export function WorldStage({ slug, t, entries, posts, terminal }: { slug: PersonaSlug; t: number; entries?: Entry[]; posts?: BlogPost[]; terminal?: TerminalData }) {
   const { experience, ready } = useExperience();
   const c = spectrumColor(t, 60);
   const [framed, setFramed] = useState(false);
@@ -240,7 +241,7 @@ export function WorldStage({ slug, t, entries, posts }: { slug: PersonaSlug; t: 
     >
       {/* Server-rendered first paint: the desk's outline, until the first WebGL frame (or the line drawing) takes over. */}
       {slug === "engineer" ? <StageSilhouette color={c} gone={framed || (ready && experience !== "immersive")} /> : null}
-      {!ready ? null : experience === "immersive" ? <WorldStage3D slug={slug} t={t} entries={entries} posts={posts} story={state} photo={photo} capture={capture} onFirstFrame={() => setFramed(true)} /> : <StageLines slug={slug} t={t} />}
+      {!ready ? null : experience === "immersive" ? <WorldStage3D slug={slug} t={t} entries={entries} posts={posts} terminal={terminal} story={state} photo={photo} capture={capture} onFirstFrame={() => setFramed(true)} /> : <StageLines slug={slug} t={t} />}
     </div>
   );
   // The desk's props as text buttons, so keyboard and screen-reader users reach them; focus lights the prop.
