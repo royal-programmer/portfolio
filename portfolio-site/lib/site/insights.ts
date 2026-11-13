@@ -19,7 +19,7 @@ export type InsightRow = {
 export type Count = { key: string; n: number };
 
 /** The steps after a title is opened that count as reaching out. */
-export const ACTION_KINDS = ["hire_open", "mail_click", "book_click", "resume_download"] as const;
+export const ACTION_KINDS = ["hire_open", "fit_check", "mail_click", "book_click", "resume_download"] as const;
 
 const DAY = 86_400_000;
 

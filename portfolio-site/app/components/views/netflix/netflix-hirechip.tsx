@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { HireSheet } from "@/lib/site/netflix-data";
-import { PersonaLink } from "@/lib/site/persona-link";
+import { openFit } from "./netflix-fit-sheet";
 import { track } from "@/lib/site/track";
 
 export function NetflixHireChip({ hire }: { hire: HireSheet }) {
@@ -70,9 +70,16 @@ export function NetflixHireChip({ hire }: { hire: HireSheet }) {
               </a>
             ) : null}
           </div>
-          <PersonaLink persona="engineer" path="/?run=fit" hard className="nf-hirechip-fit">
+          <button
+            type="button"
+            className="nf-hirechip-fit"
+            onClick={() => {
+              setOpen(false);
+              openFit("chip", ".nf-hirechip-btn");
+            }}
+          >
             Fit check: paste a job description (stays in your browser)
-          </PersonaLink>
+          </button>
         </div>
       ) : null}
     </div>

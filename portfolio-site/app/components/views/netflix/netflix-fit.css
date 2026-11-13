@@ -1,0 +1,267 @@
+/* The Fit check dialog (17-persona-views.md section 30): centred modal on desktop, bottom sheet at 768px and under. */
+.nf-fit-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 86;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.nf-fit-back {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+}
+.nf-fit {
+  position: relative;
+  width: min(640px, 100%);
+  max-height: min(88svh, 820px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 1.4rem 1.6rem 1.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--nf-line);
+  background: #17171d;
+  color: var(--nf-ink);
+  animation: nf-fit-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes nf-fit-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+.nf-fit-handle {
+  display: none;
+}
+.nf-fit-title {
+  margin: 0;
+  font-family: var(--font-display), serif;
+  font-size: 1.6rem;
+}
+.nf-fit-lede,
+.nf-fit-low {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--nf-dim);
+}
+.nf-fit-low {
+  color: var(--nf-ink);
+}
+.nf-fit-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.nf-fit-text {
+  width: 100%;
+  min-height: 9rem;
+  resize: vertical;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--nf-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--nf-ink);
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+.nf-fit-text:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--nf-accent) 70%, #fff);
+  outline-offset: 2px;
+}
+.nf-fit-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.8rem;
+  color: var(--nf-dim);
+}
+.nf-fit-over {
+  color: #f0b36a;
+}
+.nf-fit-private,
+.nf-fit-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--nf-dim);
+}
+.nf-fit-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.2rem;
+}
+.nf-fit .nf-btn {
+  min-height: 42px;
+  padding: 0 1.2rem;
+  font-size: 0.95rem;
+}
+.nf-fit .nf-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.nf-fit-result {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.nf-fit-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--nf-line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.nf-fit-card:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--nf-accent) 70%, #fff);
+}
+.nf-fit-ring {
+  flex: none;
+}
+.nf-fit-ring-bg {
+  stroke: rgba(255, 255, 255, 0.14);
+}
+.nf-fit-ring-fg {
+  stroke: color-mix(in srgb, var(--nf-accent) 70%, #fff);
+  transition: stroke-dasharray 500ms ease;
+}
+[data-level="partial"] .nf-fit-ring-fg {
+  stroke: #d9a35a;
+}
+.nf-fit-ring-n {
+  fill: var(--nf-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+.nf-fit-verdict {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.nf-fit-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.nf-fit-group h3 {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nf-dim);
+}
+.nf-fit-group h3 small {
+  margin-left: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.nf-fit-group ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nf-fit-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0.2rem 0.8rem;
+  border: 1px solid var(--nf-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--nf-ink);
+  font: inherit;
+  font-size: 0.85rem;
+}
+.nf-fit-chip em {
+  margin-left: 0.3rem;
+  font-style: normal;
+  color: var(--nf-dim);
+}
+button.nf-fit-chip {
+  cursor: pointer;
+}
+button.nf-fit-chip:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+button.nf-fit-chip:focus-visible,
+.nf-fit .nf-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--nf-accent) 70%, #fff);
+  outline-offset: 2px;
+}
+[data-kind="match"] .nf-fit-chip {
+  border-color: color-mix(in srgb, var(--nf-accent) 55%, transparent);
+}
+[data-kind="not"] .nf-fit-chip {
+  color: var(--nf-dim);
+}
+@media (max-width: 768px) {
+  .nf-fit-wrap {
+    place-items: end stretch;
+    padding: 0;
+  }
+  .nf-fit {
+    width: 100%;
+    max-height: 90svh;
+    padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    border: 0;
+    border-radius: 16px 16px 0 0;
+    animation: nf-fit-up 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .nf-fit-handle {
+    display: grid;
+    place-items: center;
+    height: 28px;
+    margin: 0 -16px;
+    touch-action: pan-y;
+    flex: none;
+  }
+  .nf-fit-handle span {
+    width: 44px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.45);
+  }
+  .nf-fit-text {
+    font-size: 16px;
+  }
+  .nf-fit-keyhint {
+    display: none;
+  }
+  .nf-fit-acts .nf-btn {
+    flex: 1 1 100%;
+  }
+}
+@keyframes nf-fit-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nf-fit,
+  .nf-fit-ring-fg {
+    animation: none;
+    transition: none;
+  }
+}
+.nf-hirechip-fit,
+.nf-sheet-fit {
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+.nf-hirechip-fit {
+  text-align: left;
+  padding: 0;
+}

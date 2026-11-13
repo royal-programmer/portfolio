@@ -16,6 +16,7 @@ import { NetflixGrid, NetflixRows, type CardEnv, type DisplayRow } from "./netfl
 import { NetflixModal } from "./netflix-modal";
 import { NetflixTopbar } from "./netflix-topbar";
 import { NetflixHireSheet, NetflixTabBar } from "./netflix-tabbar";
+import { NetflixFitSheet, onFitOpen, openFit, type FitOpen } from "./netflix-fit-sheet";
 import { NetflixHireBar } from "./netflix-hirebar";
 import { NetflixSkim } from "./netflix-skim";
 import { NetflixSeo } from "./netflix-seo";
@@ -291,10 +292,21 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
   const [tab, setTab] = useState<"home" | "search" | "list" | "hire">("home");
   const lang = cc.on && cc.lang ? cc.lang : "en";
   const closeSheet = useCallback(() => setSheetOpen(false), []);
+  // Fit check (section 30): opened by the chip, the Hire sheet, the hero link and the `f` key through `openFit`.
+  const [fitOpener, setFitOpener] = useState<FitOpen | null>(null);
+  const closeFit = useCallback(() => setFitOpener(null), []);
+  useEffect(
+    () =>
+      onFitOpen((d) => {
+        track("fit_open", d.source);
+        setFitOpener(d);
+      }),
+    [],
+  );
   // N9: remote-control keys, and the `?` overlay that lists them.
   const [keysOpen, setKeysOpen] = useState(false);
   const said = useNetflixKeys({
-    modalOpen: modalOpen || sheetOpen || skillOpen !== null,
+    modalOpen: modalOpen || sheetOpen || skillOpen !== null || fitOpener !== null,
     keysOpen,
     toggleKeys: () => setKeysOpen((v) => !v),
     toggleMute: () => {
@@ -563,7 +575,7 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
       </div>
       {keysOpen ? <KeysOverlay onClose={() => setKeysOpen(false)} /> : null}
       {autopilot.state ? <AutopilotRail state={autopilot.state} onSkip={autopilot.skip} onStop={autopilot.stop} /> : null}
-      <div className="nf-page" aria-hidden={modal || sheetOpen || skillOpen ? true : undefined} inert={modal || sheetOpen || skillOpen ? true : undefined}>
+      <div className="nf-page" aria-hidden={modal || sheetOpen || skillOpen || fitOpener ? true : undefined} inert={modal || sheetOpen || skillOpen || fitOpener ? true : undefined}>
         {q ? (
           <div className="nf-results">
             <NetflixGrid items={results} env={env} query={query.trim()} />
@@ -600,7 +612,19 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
       />
       <NetflixHireBar hire={hire} opens={opens} hold={modal !== null || sheetOpen || !!autopilot.state} />
       {skillOpen && skillEv?.[skillOpen] ? <SkillEvidencePanel evidence={skillEv[skillOpen]} lang={lang} onClose={() => setSkillOpen(null)} /> : null}
-      {sheetOpen ? <NetflixHireSheet lang={lang} hire={hire} onClose={closeSheet} /> : null}
+      {sheetOpen ? (
+        <NetflixHireSheet
+          lang={lang}
+          hire={hire}
+          onClose={closeSheet}
+          onFit={() => {
+            setSheetOpen(false);
+            setTab("home");
+            openFit("sheet", ".nf-tabbar-btn:last-child");
+          }}
+        />
+      ) : null}
+      {fitOpener ? <NetflixFitSheet lang={lang} hire={hire} pool={fitPool} evidence={skillEv} opener={fitOpener} paused={skillOpen !== null} onSkill={setSkillOpen} onClose={closeFit} /> : null}
       {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} autoPlay={modal.play} playMs={modal.playMs} cast={castList} profile={profile} now={now} contact={contact} book={hire.book} onCast={castFromModal} onClose={close} onSwap={swap} onShow={onShow} /> : null}
     </>
   );

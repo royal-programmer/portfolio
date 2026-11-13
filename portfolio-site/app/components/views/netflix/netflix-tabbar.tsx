@@ -9,7 +9,6 @@ import { useEffect, useRef, useState } from "react";
 import type { HireSheet } from "@/lib/site/netflix-data";
 import { t, type Lang } from "@/lib/site/terminal-strings";
 import { useForName } from "./use-for-name";
-import { PersonaLink } from "@/lib/site/persona-link";
 
 const FOCUSABLE = 'button:not([disabled]), a[href]';
 
@@ -56,7 +55,7 @@ export function NetflixTabBar({ lang, active, listDot, onHome, onSearch, onList,
   );
 }
 
-export function NetflixHireSheet({ lang, hire, onClose }: { lang: Lang; hire: HireSheet; onClose: () => void }) {
+export function NetflixHireSheet({ lang, hire, onClose, onFit }: { lang: Lang; hire: HireSheet; onClose: () => void; onFit: () => void }) {
   const forName = useForName();
   const box = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
@@ -164,9 +163,9 @@ export function NetflixHireSheet({ lang, hire, onClose }: { lang: Lang; hire: Hi
           <span>{t("nf.hire.resume", lang)}</span>
           <small>PDF</small>
         </a>
-        <PersonaLink persona="engineer" path="/?run=fit" hard className="nf-sheet-fit">
-          Fit check: paste a job description (stays in your browser)
-        </PersonaLink>
+        <button type="button" className="nf-sheet-fit" onClick={onFit}>
+          {t("nf.fit.open", lang)}: {t("nf.fit.label", lang).toLowerCase()}
+        </button>
         <button type="button" className="nf-sheet-close" onClick={onClose}>
           {t("nf.hire.close", lang)}
         </button>
