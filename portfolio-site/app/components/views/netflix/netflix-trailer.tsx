@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * A project's Play (17-persona-views.md §25, F1): a trailer in chapters. The chapters and their timings come from
+ * A project's Play (17-persona-views.md §25, F1; §26): a trailer in chapters, shown inside the full-screen player (`netflix-player.tsx`). The chapters and their timings come from
  * `lib/site/netflix-trailer.ts`; this is the player. Text types at about 22 characters a second and holds for a beat before the
  * next chapter; a chapter with a clip plays the real clip, muted, with its sentence as a subtitle, and ends when the clip has
  * ended and the line has been read, whichever is later. A voice (AD) is waited for. Pause (Space or a tap), previous and next
@@ -108,18 +108,11 @@ export function Trailer({
     return () => window.clearInterval(id);
   }, []);
 
-  // Pause when the tab is hidden or the trailer scrolls out of view.
-  const root = useRef<HTMLDivElement>(null);
+  // Pause when the tab is hidden (the player itself is always on screen).
   useEffect(() => {
     const vis = () => setAway(document.visibilityState === "hidden");
     document.addEventListener("visibilitychange", vis);
-    const el = root.current;
-    const io = el ? new IntersectionObserver((en) => setAway(en.some((e) => !e.isIntersecting)), { threshold: 0.25 }) : null;
-    if (el && io) io.observe(el);
-    return () => {
-      document.removeEventListener("visibilitychange", vis);
-      io?.disconnect();
-    };
+    return () => document.removeEventListener("visibilitychange", vis);
   }, []);
 
   // AD: each chapter's text is spoken, and the chapter waits for the voice to finish.
@@ -186,11 +179,11 @@ export function Trailer({
   return (
     <div
       className="nf-tr"
-      ref={root}
       data-kind={chapter.kind}
       data-paused={userPaused || undefined}
       onClick={(e) => {
-        if (!(e.target as HTMLElement).closest("a, button")) setUserPaused((p) => !p);
+        // A mouse click pauses; a tap on a phone only shows or hides the controls (the player shell).
+        if ((e.nativeEvent as PointerEvent).pointerType !== "touch" && !(e.target as HTMLElement).closest("a, button")) setUserPaused((p) => !p);
       }}
     >
       {clip ? (
@@ -239,7 +232,7 @@ export function Trailer({
         </div>
       )}
 
-      <div className="nf-tr-ctl" role="group" aria-label={t("nf.tr.chapter", "en")}>
+      <div className="nf-tr-ctl nf-pl-chrome" role="group" aria-label={t("nf.tr.chapter", "en")}>
         <button type="button" aria-label={t("nf.tr.prev", "en")} disabled={at === 0} onClick={() => dispatch({ type: "go", to: at - 1 })}>
           ◀
         </button>

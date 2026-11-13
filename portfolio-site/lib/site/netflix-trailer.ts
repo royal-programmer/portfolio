@@ -13,6 +13,11 @@ export const CLIP_CAP_MS = 8000;
 /** The longest a chapter waits for a clip or a voice that never finishes. */
 export const MAX_WAIT_MS = 45_000;
 
+/** The quiet preview on a card hover or the modal billboard: a clip plays muted for this long, then the poster stays (round 27). */
+export const PREVIEW_MS = 6000;
+/** The full-screen player hides its controls after this long without input (round 27). */
+export const CHROME_HIDE_MS = 3000;
+
 export type ChapterClip = { src: string; poster: string; label: string };
 export type Chapter = {
   id: string;

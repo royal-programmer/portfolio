@@ -7,7 +7,7 @@
  * meta row, description, the season's episodes, "More like this" and About. Everything is swapped in place.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { NF_ADJECTIVES, castOf, endCardOf, factsOf, metricLabel, moreLike, previouslyLine, type BookCall, type CastMember, type NetflixProfileId, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
+import { NF_ADJECTIVES, castOf, endCardOf, factsOf, metricLabel, moreLike, previouslyLine, type BookCall, type CastMember, type ProjectMedia, type NetflixProfileId, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
 import { DISPLAY_ROOT } from "@/lib/site/brand";
 import { netflixShareLink } from "@/lib/site/netflix-og";
 import { caseEligible, caseSlug } from "@/lib/site/netflix-case";
@@ -21,8 +21,9 @@ import { adCancel, useAd, useAdSpeech } from "./netflix-ad";
 import { chime } from "./netflix-sound";
 import { NfArt } from "./netflix-art";
 import { ClipsRow, NfPoster, ScreensRow } from "./netflix-media";
-import { trailerChapters } from "@/lib/site/netflix-trailer";
+import { PREVIEW_MS, trailerChapters } from "@/lib/site/netflix-trailer";
 import { Trailer } from "./netflix-trailer";
+import { Player } from "./netflix-player";
 import { BINGE_SECONDS, bingeActive, cancelBinge, setBinge } from "@/lib/site/netflix-binge";
 import { useCc, useLikes, useMyList, useSound } from "./netflix-store";
 
@@ -208,13 +209,17 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
   const togglePlay = () => {
     setPlay({ id: item.id, on: !playing });
   };
+  const closePlayer = () => setPlay({ id: item.id, on: false });
   const finished = () => {
-    setPlay({ id: item.id, on: false });
     onShow(item, true);
+    // F3: after an episode that has a next one, count down to it inside the player (never in the guided play).
+    if (item.kind === "episode" && playMs == null && !isLast && bingeOn && nextEp) {
+      setCountFor(item.id);
+      return;
+    }
+    closePlayer();
     // The teleprompter ending on a season's last episode rolls the credits (not in the guided play, which closes the card itself).
     if (isLast && playMs == null) setEndFor(item.id);
-    // F3: after an episode that has a next one, count down to it (never in the guided play).
-    else if (item.kind === "episode" && playMs == null && bingeOn && nextEp) setCountFor(item.id);
   };
   const playNext = () => {
     if (!nextEp) return;
@@ -226,6 +231,7 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
     cancelBinge();
     setBingeOn(false);
     setCountFor(null);
+    closePlayer();
   };
   const toggleBinge = () => {
     setBinge(!bingeOn);
@@ -376,8 +382,7 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
           <>
         <div className="nf-m-top" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
           <div className="nf-m-handle" aria-hidden />
-          <Billboard key={item.id} facts={facts} playing={playing} contact={contact} book={book} guided={playMs != null} onTrailerDone={trailerDone} playMs={playMs} sub={cc.on && cc.lang ? epSub(facts.tone, facts.season, facts.n, cc.lang) : undefined} ad={ad} lang={cc.lang} onFinish={finished}>
-            {countFor === item.id && nextEp ? <BingeCard title={nextEp.kind === "episode" ? nextEp.e.title : ""} onNow={playNext} onCancel={cancelNext} /> : null}
+          <Billboard key={item.id} facts={facts} playing={playing}>
             <button type="button" className="nf-m-x" aria-label="Close" onClick={requestClose}>
               <span aria-hidden>×</span>
             </button>
@@ -401,8 +406,8 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
             ) : null}
             <div className="nf-m-bar">
               <div className="nf-m-btns">
-                <button type="button" className="nf-btn nf-btn-play" onClick={togglePlay} aria-pressed={playing}>
-                  <span aria-hidden>{playing ? "■" : "▶"}</span> {playing ? "Stop" : "Play"}
+                <button type="button" className="nf-btn nf-btn-play" onClick={togglePlay} aria-haspopup="dialog">
+                  <span aria-hidden>▶</span> {t("nf.tr.play", "en")}
                 </button>
                 {item.kind === "episode" ? (
                   <button type="button" className="nf-btn nf-btn-glass nf-m-next" onClick={() => step(1)}>
@@ -590,6 +595,18 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
           </>
         )}
       </div>
+      {playing ? (
+        <Player title={facts.title} meta={[facts.season != null ? `S${facts.season}` : "", facts.n != null ? `E${facts.n}` : ""].filter(Boolean).join(" ")} onBack={closePlayer} returnFocus={() => panel.current?.querySelector<HTMLElement>(".nf-btn-play")}>
+          {facts.kind === "project" ? (
+            <ProjectTrailer facts={facts} contact={contact} book={book} guided={playMs != null} ad={ad} onDone={trailerDone} />
+          ) : (
+            <>
+              <Teleprompter key={item.id} text={`${facts.title}. ${facts.blurb ?? ""}`.trim()} sub={cc.on && cc.lang ? epSub(facts.tone, facts.season, facts.n, cc.lang) : undefined} ad={ad} lang={cc.lang} ms={playMs ?? 6000} onDone={finished} />
+              {countFor === item.id && nextEp ? <BingeCard title={nextEp.kind === "episode" ? nextEp.e.title : ""} onNow={playNext} onCancel={cancelNext} /> : null}
+            </>
+          )}
+        </Player>
+      ) : null}
     </div>
   );
 }
@@ -734,24 +751,42 @@ function BingeCard({ title, onNow, onCancel }: { title: string; onNow: () => voi
 
 /* ---------- Billboard ---------- */
 
-function Billboard({ facts, playing, contact, book, guided, onTrailerDone, playMs, sub, ad, lang, onFinish, children }: { facts: NfFacts; playing: boolean; contact: TermLink[]; book?: BookCall; guided: boolean; onTrailerDone: () => void; playMs?: number; sub?: string; ad: ReturnType<typeof useAd>; lang?: string | null; onFinish: () => void; children: React.ReactNode }) {
+/** The quiet preview (round 27): a project's first clip, muted, for a few seconds, then the poster stays. Never under reduced motion or save-data, and never while the player is open. */
+function BillboardPreview({ clip }: { clip: ProjectMedia["clips"][number] }) {
+  const [over, setOver] = useState(false);
+  const [calm] = useState(() => reduced());
+  const saving = typeof navigator !== "undefined" && !!(navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
+  if (calm || saving || over) return null;
   return (
-    <div className="nf-bb" data-playing={playing || undefined}>
+    <video
+      className="nf-hclip"
+      src={clip.src}
+      muted
+      playsInline
+      autoPlay
+      preload="metadata"
+      aria-hidden
+      onTimeUpdate={(e) => {
+        if (e.currentTarget.currentTime * 1000 >= PREVIEW_MS) setOver(true);
+      }}
+      onEnded={() => setOver(true)}
+      onError={() => setOver(true)}
+    />
+  );
+}
+
+function Billboard({ facts, playing, children }: { facts: NfFacts; playing: boolean; children: React.ReactNode }) {
+  const clip = facts.kind === "project" ? facts.media?.clips[0] : undefined;
+  return (
+    <div className="nf-bb">
       <div className="nf-bb-art" aria-hidden>
         <NfArt seed={facts.id} tone={facts.tone} big live />
         {facts.media ? <NfPoster media={facts.media} eager /> : null}
+        {clip && !playing ? <BillboardPreview clip={clip} /> : null}
       </div>
       <div className="nf-bb-shade" aria-hidden />
-      {playing && facts.kind === "project" ? <ProjectTrailer facts={facts} contact={contact} book={book} guided={guided} ad={ad} onDone={onTrailerDone} /> : null}
-      {playing && facts.kind !== "project" ? <Teleprompter text={`${facts.title}. ${facts.blurb ?? ""}`.trim()} sub={sub} ad={ad} lang={lang} ms={playMs ?? 6000} onDone={onFinish} /> : null}
-      <h2 className="nf-bb-title" data-hidden={playing || undefined}>
-        {facts.title}
-      </h2>
-      {facts.metric ? (
-        <p className="nf-bb-metric" data-hidden={playing || undefined}>
-          {metricLabel(facts.metric)}
-        </p>
-      ) : null}
+      <h2 className="nf-bb-title">{facts.title}</h2>
+      {facts.metric ? <p className="nf-bb-metric">{metricLabel(facts.metric)}</p> : null}
       {children}
     </div>
   );
