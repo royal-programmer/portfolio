@@ -7,6 +7,9 @@ import { fromDb } from "@/lib/content/source";
 import type { BlogPost, Entry, ProjectBeat, ProjectMedia, ProjectStatus, ProjectStory } from "@/lib/content/types";
 import { LEGACY } from "@/lib/site/legacy-content";
 import { personaIdentity } from "@/lib/site/brand";
+import { hireLine } from "@/lib/site/hire-line";
+
+export { skimIds } from "@/lib/site/hire-line";
 import type { TermCommit, TermProject, TerminalData } from "@/lib/site/terminal-data";
 
 export type NetflixProfileId = "recruiter" | "developer" | "story";
@@ -747,7 +750,7 @@ export function bookOf(b?: BookCall): BookCall | undefined {
   return b && /^https:\/\//i.test(b.href.trim()) ? { label: b.label, href: b.href.trim() } : undefined;
 }
 
-export type HireSheet = { book?: BookCall; email?: string; resume: string; brief: string; /** The one availability line (`hiring.availability`). */ availability: string };
+export type HireSheet = { book?: BookCall; email?: string; resume: string; brief: string; /** The sheet's first line: role, level, place and availability in one sentence (`hireLine`). */ line: string; /** The one availability line (`hiring.availability`). */ availability: string };
 
 /**
  * "Popular with visitors": built from the last `windowDays` of title_open and play_complete counts, shown after Top 10
@@ -777,7 +780,7 @@ export function hireSheetOf(data: TerminalData): HireSheet {
     ...(["linkedin", "github"] as const).flatMap((k) => (link(k) ? [`  ${k.padEnd(9)} ${link(k)}`] : [])),
     `  resume    ${h.links.site}${h.links.resume}`,
   ];
-  return { book: bookOf(data.book), email, resume: h.links.resume, brief: lines.join("\n"), availability: h.availability };
+  return { book: bookOf(data.book), email, resume: h.links.resume, brief: lines.join("\n"), line: hireLine(h), availability: h.availability };
 }
 
 /* ---------- C5: Previously on... ---------- */

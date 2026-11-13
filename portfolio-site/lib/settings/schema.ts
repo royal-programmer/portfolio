@@ -206,6 +206,8 @@ export const netflixSchema = z.strictObject({
   adjectives: z.record(str(20), z.tuple([str(30), str(30), str(30)])),
   /** The book-a-call link: nothing renders while `href` is empty. */
   bookCall: z.strictObject({ label: str(40), href: z.string().max(500).regex(/^(https:\/\/.+)?$/, "an https:// link, or empty") }).optional(),
+  /** "Skim in 30 seconds": up to three title ids a recruiter should see first. Empty or absent means the profile's featured trio. */
+  skim: z.array(str(80)).max(3).optional(),
 });
 
 // ---- registry -----------------------------------------------------------------------------------

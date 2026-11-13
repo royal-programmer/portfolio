@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import type { HireSheet } from "@/lib/site/netflix-data";
 import { t, type Lang } from "@/lib/site/terminal-strings";
 import { useForName } from "./use-for-name";
+import { PersonaLink } from "@/lib/site/persona-link";
 
 const FOCUSABLE = 'button:not([disabled]), a[href]';
 
@@ -137,6 +138,7 @@ export function NetflixHireSheet({ lang, hire, onClose }: { lang: Lang; hire: Hi
           <span aria-hidden />
         </div>
         <h2 className="nf-sheet-title">{t("nf.hire.title", lang)}</h2>
+        {hire.line ? <p className="nf-sheet-line">{hire.line}</p> : null}
         {forName ? <p className="nf-sheet-hi">{t("nf.for.hi", lang).replace("{name}", forName)}</p> : null}
         {hire.email ? (
           <a className="nf-sheet-act" href={`mailto:${hire.email}`}>
@@ -162,6 +164,9 @@ export function NetflixHireSheet({ lang, hire, onClose }: { lang: Lang; hire: Hi
           <span>{t("nf.hire.resume", lang)}</span>
           <small>PDF</small>
         </a>
+        <PersonaLink persona="engineer" path="/?run=fit" className="nf-sheet-fit">
+          Fit check: paste a job description (stays in your browser)
+        </PersonaLink>
         <button type="button" className="nf-sheet-close" onClick={onClose}>
           {t("nf.hire.close", lang)}
         </button>

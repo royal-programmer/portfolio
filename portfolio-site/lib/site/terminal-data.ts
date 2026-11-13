@@ -213,6 +213,8 @@ export type TerminalData = {
   themes?: ThemePalette[];
   /** The book-a-call link (`netflix.bookCall`); absent when none is set. */
   book?: { label: string; href: string };
+  /** "Skim in 30 seconds" (`netflix.skim`): up to three title ids; absent means the featured trio. */
+  skim?: string[];
 };
 
 const MAX_BODY = 6000;
@@ -318,5 +320,6 @@ export function terminalData(persona: Persona | undefined, entries: Entry[], pos
     i18n: cfg.i18n ?? I18N,
     themes: cfg.themes?.palettes,
     book: cfg.netflix ? cfg.netflix.bookCall : fromDb ? undefined : LEGACY.BOOK_CALL,
+    skim: cfg.netflix?.skim?.length ? cfg.netflix.skim : undefined,
   };
 }

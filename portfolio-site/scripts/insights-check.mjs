@@ -2,6 +2,7 @@
 // Run: node --experimental-strip-types scripts/insights-check.mjs
 import assert from "node:assert/strict";
 import { classifyLink, cleanRef, makeLimiter, validateBatch, EVENT_KINDS } from "../lib/site/events.ts";
+import { hireLine, skimIds } from "../lib/site/hire-line.ts";
 import { completionRate, csvCell, funnel, perDay, rankPopular, summarize, toCsv, withinDays } from "../lib/site/insights.ts";
 
 let n = 0;
@@ -126,6 +127,19 @@ ok("popular: hidden below the threshold, ranked by weight above it", () => {
   assert.equal(rankPopular([row("title_open", { ref: "a" })], rule, known, NOW), null);
   const rows = [row("title_open", { ref: "a" }), row("title_open", { ref: "a" }), row("title_open", { ref: "b" }), row("play_complete", { ref: "b" }), row("title_open", { ref: "zz" }), row("title_open", { ref: "c", at: at(40) })];
   assert.deepEqual(rankPopular(rows, rule, known, NOW), ["b", "a"]);
+});
+
+ok("hire line is one sentence from the data, leaving out what is empty", () => {
+  const h = { roles: ["Software Engineer"], level: "mid-level", location: { base: "Bengaluru", modes: ["hybrid", "remote"], relocate: true }, availability: "employed, notice period applies" };
+  assert.equal(hireLine(h), "Software Engineer, mid-level; based in Bengaluru, hybrid / remote; employed, notice period applies.");
+  assert.equal(hireLine({ roles: [], level: "", location: { base: "", modes: [], relocate: false }, availability: "" }), "");
+});
+ok("skim: own ids that exist, else the featured trio, at most three", () => {
+  const known = new Set(["a", "b", "c", "d"]);
+  const feat = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }];
+  assert.deepEqual(skimIds(["d", "zz", "b"], feat, known), ["d", "b"]);
+  assert.deepEqual(skimIds(undefined, feat, known), ["a", "b", "c"]);
+  assert.deepEqual(skimIds(["zz"], feat, known), ["a", "b", "c"]);
 });
 
 console.log(`${n} checks passed`);

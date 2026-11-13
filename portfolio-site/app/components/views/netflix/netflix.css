@@ -1319,3 +1319,126 @@
   font-size: 0.78rem;
   color: var(--nf-dim);
 }
+
+/* ---------- Persistent "Open to work" chip (desktop top bar) and the Skim strip (round 30) ---------- */
+.nf-hirechip {
+  position: relative;
+}
+.nf-hirechip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--nf-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--nf-ink);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.nf-hirechip-btn:hover,
+.nf-hirechip-btn[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.14);
+}
+.nf-hirechip-btn i {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #4ade80;
+}
+.nf-hirechip-pop {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  right: 0;
+  z-index: 60;
+  width: min(22rem, 90vw);
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--nf-line);
+  border-radius: 10px;
+  background: rgba(16, 16, 22, 0.98);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.nf-hirechip-line {
+  margin: 0;
+  color: var(--nf-ink);
+}
+.nf-hirechip-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.nf-hirechip-acts a,
+.nf-hirechip-acts button {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--nf-line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--nf-ink);
+  font: inherit;
+  font-size: 0.8rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+.nf-hirechip-acts a:hover,
+.nf-hirechip-acts button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.nf-hirechip-fit {
+  color: color-mix(in srgb, var(--nf-accent) 60%, #fff);
+  font-size: 0.78rem;
+}
+.nf-skim {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.8rem;
+  margin: 0 0 0.25rem;
+  padding: 1rem 16px 0;
+  font-size: 0.85rem;
+  color: var(--nf-dim);
+}
+.nf-skim b {
+  color: var(--nf-ink);
+  font-weight: 600;
+}
+.nf-skim button {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--nf-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--nf-ink);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.nf-skim button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.nf-sheet-line {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--nf-ink);
+}
+.nf-sheet-fit {
+  color: color-mix(in srgb, var(--nf-accent) 60%, #fff);
+  font-size: 0.85rem;
+  text-align: center;
+}
+@media (max-width: 768px) {
+  .nf-hirechip {
+    display: none;
+  }
+}
+@media (max-width: 768px) {
+  .nf-skim button {
+    width: 100%;
+    border-radius: 10px;
+    text-align: left;
+  }
+}

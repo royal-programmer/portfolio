@@ -15,6 +15,7 @@ import { WorldBoot } from "../../components/world-boot";
 import { ViewShell } from "../../components/views/view-shell";
 import { POPULAR, indexItems, NETFLIX_PROFILES, hireSheetOf, buildNetflix, isNetflixProfile, type NetflixShow, type NetflixProfileId } from "@/lib/site/netflix-data";
 import { netflixCard, netflixShareLink } from "@/lib/site/netflix-og";
+import { cleanFor, forLink } from "@/lib/site/netflix-for";
 import { loadEngineerTerminalData } from "../../load-terminal-data";
 import { skillEvidenceMap } from "@/lib/site/skill-evidence";
 import { I18N, terminalData } from "@/lib/site/terminal-data";
@@ -27,7 +28,7 @@ import { pickPopular } from "@/lib/site/insights";
 
 type ProjectDetailProps = {
   params: Promise<{ persona: string; slug: string }>;
-  searchParams: Promise<{ via?: string; title?: string; profile?: string }>;
+  searchParams: Promise<{ via?: string; title?: string; profile?: string; for?: string }>;
 };
 
 export async function generateStaticParams() {
@@ -62,11 +63,17 @@ export async function generateMetadata({ params, searchParams }: ProjectDetailPr
     const origin = siteOrigin(SUBDOMAIN_BY_PERSONA[persona]);
     // A watch-party link (N6): `?title=<id>` previews that one episode, drawn by `/og?cmd=netflix:<id>`.
     if (view.id === "netflix") {
-      const { title: id, profile } = await searchParams;
-      const card = typeof id === "string" ? netflixCard(await loadEngineerTerminalData(), id) : null;
+      const { title: id, profile, for: forRaw } = await searchParams;
+      const who = cleanFor(typeof forRaw === "string" ? forRaw : undefined);
+      const card = typeof id === "string" ? netflixCard(await loadEngineerTerminalData(), id, who || undefined) : null;
       if (card) {
         const p = isNetflixProfile(profile) ? profile : "story";
-        return shareMetadata({ title: `${card.title} · ${view.name} | Ratul Roy`, description: card.line, cmd: `netflix:${id}`, origin, url: netflixShareLink(origin, p, id as string) });
+        return shareMetadata({ title: `${card.title} · ${view.name} | Ratul Roy`, description: card.line, cmd: `netflix:${id}`, origin, url: netflixShareLink(origin, p, id as string), forName: who || undefined });
+      }
+      // A link made for a person (`?for=`): the card says who it was picked for, and what the series is.
+      if (who) {
+        const home = netflixCard(await loadEngineerTerminalData(), "home", who);
+        if (home) return shareMetadata({ title: `Picked for ${who}: ${home.title}, software engineer | Ratul Roy`, description: home.line, cmd: "netflix:home", origin, url: forLink(origin, isNetflixProfile(profile) ? profile : "recruiter", who), forName: who });
       }
     }
     return shareMetadata({ title: `${view.name} · ${record?.label ?? persona} | Ratul Roy`, description: view.line, cmd: `view ${view.id}`, origin, url: `${origin}/${view.id}` });
@@ -203,7 +210,7 @@ async function PersonaViewPage({ persona, view, fromTerminal, via }: { persona: 
     const popular = pickPopular(tally, POPULAR, new Set(indexItems(Object.values(series)).keys())) ?? undefined;
     return (
       <ViewShell persona={persona} view={view} stripVia={fromTerminal}>
-        <NetflixView accent={accent} series={series} hire={hireSheetOf(data)} contact={data.contact} status={data.status} portrait={data.portrait} subData={{ uptime: data.uptime, i18n: { bn: { uptime: tr.bn.uptime, status: tr.bn.status }, hi: { uptime: tr.hi.uptime, status: tr.hi.status } } }} now={data.now} fitPool={{ stack: data.stack, resume: { skills: data.resume.skills } }} skillEv={skillEvidenceMap(data)} popular={popular} fast={via === "normal"} />
+        <NetflixView accent={accent} series={series} hire={hireSheetOf(data)} contact={data.contact} status={data.status} portrait={data.portrait} subData={{ uptime: data.uptime, i18n: { bn: { uptime: tr.bn.uptime, status: tr.bn.status }, hi: { uptime: tr.hi.uptime, status: tr.hi.status } } }} now={data.now} fitPool={{ stack: data.stack, resume: { skills: data.resume.skills } }} skillEv={skillEvidenceMap(data)} popular={popular} skim={data.skim} fast={via === "normal"} />
       </ViewShell>
     );
   }

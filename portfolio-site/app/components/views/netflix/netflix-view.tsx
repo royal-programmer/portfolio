@@ -17,6 +17,7 @@ import { NetflixModal } from "./netflix-modal";
 import { NetflixTopbar } from "./netflix-topbar";
 import { NetflixHireSheet, NetflixTabBar } from "./netflix-tabbar";
 import { NetflixHireBar } from "./netflix-hirebar";
+import { NetflixSkim } from "./netflix-skim";
 import { NetflixSeo } from "./netflix-seo";
 import { AUTOPILOT_TYPE_MS, AutopilotRail, autopilotSeen, useAutopilot } from "./netflix-autopilot";
 import { JD_MIN, netflixFit, sortByFit } from "@/lib/site/netflix-fit";
@@ -28,7 +29,7 @@ import { applyViewIcon } from "@/lib/site/view-icons";
 import { track, setTrackContext } from "@/lib/site/track";
 import { classifyLink } from "@/lib/site/events";
 import { clearHistory, useCc, useLikes, useMyList, useProgress, useSound } from "./netflix-store";
-import { NETFLIX_PROFILES, POPULAR, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, top10Of, type HireSheet, TOP10_ROW_TITLE, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
+import { NETFLIX_PROFILES, POPULAR, skimIds, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, top10Of, type HireSheet, TOP10_ROW_TITLE, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
 import type { TermLink, TerminalData } from "@/lib/site/terminal-data";
 import { SkillEvidencePanel } from "@/app/components/skill-evidence-panel";
 import type { SkillEvidence } from "@/lib/site/skill-evidence";
@@ -54,6 +55,8 @@ export type NetflixViewProps = {
   skillEv?: Record<string, SkillEvidence>;
   /** "Popular with visitors": title ids ranked from the last 30 days of real counts; absent while there are too few to say. */
   popular?: string[];
+  /** "Skim in 30 seconds": the title ids to see first (`netflix.skim`); absent means the featured trio. */
+  skim?: string[];
 };
 
 type ToastAction = { label: string; run: () => void };
@@ -257,7 +260,7 @@ function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => voi
 
 type ModalState = { id: string; origin: DOMRect | null; play: boolean; playMs?: number };
 
-function NetflixBody({ show, series, profile, status, hire, fitPool, subData, now, fast, skillEv, popular, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
+function NetflixBody({ show, series, profile, status, hire, fitPool, subData, now, fast, skillEv, popular, skim, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
   const shows = useMemo(() => Object.values(series), [series]);
   const index = useMemo(() => indexItems(shows), [shows]);
   const topId = useMemo(() => topEpisodeId(shows), [shows]);
@@ -554,7 +557,7 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
 
   return (
     <>
-      <NetflixTopbar title={show.title} searchToken={searchToken} glyph={profileMeta?.glyph ?? "R"} tone={TONES[profile]} query={query} onQuery={onQuery} onPasteText={onPasteText} onHome={toTop} onSeries={toRows} onMyList={toList} onProfiles={onSwitch} onClearHistory={askClear} onReplay={onReplay} onKeys={() => setKeysOpen(true)} profile={profile} />
+      <NetflixTopbar title={show.title} searchToken={searchToken} glyph={profileMeta?.glyph ?? "R"} tone={TONES[profile]} query={query} onQuery={onQuery} onPasteText={onPasteText} onHome={toTop} onSeries={toRows} onMyList={toList} onProfiles={onSwitch} onClearHistory={askClear} onReplay={onReplay} onKeys={() => setKeysOpen(true)} profile={profile} hire={hire} />
       <div className="nf-visually-hidden" role="status" aria-live="polite">
         {said}
       </div>
@@ -568,6 +571,7 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
         ) : (
           <>
             <NetflixHero series={show} profile={profile} status={status} fast={fast} firstRowId={firstRow} features={features} onOpen={(item, play) => open(item, null, play)} held={modal !== null} sound={sound} recap={recap} onRecapEnd={endRecap} cc={cc} subData={subData} book={hire.book} />
+            <NetflixSkim ids={skimIds(skim, show.featured, new Set(index.keys()))} index={index} onOpen={(item) => open(item, null)} />
             <NetflixRows show={show} rows={ratedRows} contact={contact} env={env} onRecap={profile === "story" ? playRecap : undefined} />
           </>
         )}

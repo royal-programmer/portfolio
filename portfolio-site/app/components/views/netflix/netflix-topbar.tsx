@@ -9,6 +9,8 @@ import { useEffect, useRef, useState } from "react";
 import { cleanFor, forLink, FOR_MAX, typeFor } from "@/lib/site/netflix-for";
 import { VIEW_ICONS } from "@/lib/site/view-icons";
 import { t } from "@/lib/site/terminal-strings";
+import type { HireSheet } from "@/lib/site/netflix-data";
+import { NetflixHireChip } from "./netflix-hirechip";
 
 type Props = {
   /** Shown beside the mark on phones, where the top bar is just the title and the profile tile. */
@@ -32,9 +34,11 @@ type Props = {
   onKeys?: () => void;
   /** The active profile id, for "Make a link for someone" (D1). */
   profile?: string;
+  /** The persistent "Open to work" chip (desktop); absent renders nothing. */
+  hire?: HireSheet;
 };
 
-export function NetflixTopbar({ title, searchToken = 0, glyph, tone, query, onQuery, onPasteText, onHome, onSeries, onMyList, onProfiles, onClearHistory, onReplay, onKeys, profile }: Props) {
+export function NetflixTopbar({ title, searchToken = 0, glyph, tone, query, onQuery, onPasteText, onHome, onSeries, onMyList, onProfiles, onClearHistory, onReplay, onKeys, profile, hire }: Props) {
   const [forDraft, setForDraft] = useState("");
   // E5: the copy never waits. A synchronous copy runs inside the press; when the browser refuses it, the link is shown in a
   // read-only field to select (and the async clipboard is tried in the background). No `window.prompt`, nothing awaited.
@@ -141,6 +145,7 @@ export function NetflixTopbar({ title, searchToken = 0, glyph, tone, query, onQu
         </button>
       </nav>
       <div className="nf-bar-right">
+        {hire ? <NetflixHireChip hire={hire} /> : null}
         <div className="nf-search-box" data-open={expanded || undefined} role="search">
           <button type="button" className="nf-search-btn" aria-label={expanded ? "Search" : "Open search"} aria-expanded={expanded} onClick={expanded ? () => input.current?.focus() : openSearch}>
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>

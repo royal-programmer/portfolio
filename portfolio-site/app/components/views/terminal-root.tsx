@@ -2594,7 +2594,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
             </span>
           ) : null}
         </div>
-        <aside className="terminal-os-pane" aria-label={S["pane.aria"]}>
+        <section className="terminal-os-pane" aria-label={S["pane.aria"]}>
           <h3>{S["pane.where"]}</h3>
           <p className="terminal-os-pane-where">{shortPath(cwd)}</p>
           <h3>{S["pane.who"]}</h3>
@@ -2609,7 +2609,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
             {clockNow ? S["clock.pane"](say(S, lang, clockNow.getHours(), clockNow.getMinutes()), say(S, lang, hmIn(clockNow, data.clock.myTz).h, hmIn(clockNow, data.clock.myTz).m)) : " "}
           </p>
           <div className="terminal-os-pane-actions">
-            {["hire", "resume --pdf", "mail"].map((c) => (
+            {["hire", "resume --pdf", "mail", "fit"].map((c) => (
               <button key={c} type="button" tabIndex={-1} title={c === "hire" ? S["hb.tip"] : c === "resume --pdf" ? S["pane.resume.tip"] : undefined} onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit(c)}>
                 {c}
               </button>
@@ -2656,7 +2656,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
           ) : null}
           <h3>{S["pane.keys"]}</h3>
           <p className="terminal-os-keys">{S["pane.keysline"]}</p>
-        </aside>
+        </section>
         </div>
         <div className="terminal-os-status">
           <span className="terminal-os-status-lw">

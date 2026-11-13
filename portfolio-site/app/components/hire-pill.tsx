@@ -44,6 +44,9 @@ export function HirePill({ on = true, hub = false }: { on?: boolean; hub?: boole
           <PersonaLink role="menuitem" persona="engineer" path="/?run=hire">
             Terminal: hire
           </PersonaLink>
+          <PersonaLink role="menuitem" persona="engineer" path="/?run=fit">
+            Fit check: paste a job description
+          </PersonaLink>
         </div>
       ) : null}
       <button type="button" className="hire-pill-btn" aria-label="Résumé and contact" aria-expanded={shown} tabIndex={on ? 0 : -1} onClick={() => setOpen((o) => !o)}>

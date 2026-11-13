@@ -2278,6 +2278,11 @@ em.font-display,
 .terminal-root-row.is-sel {
   background: color-mix(in srgb, var(--c) 12%, transparent);
 }
+/* The selected row tints the background: its description reads brighter than the faint grey so it stays above 4.5:1. */
+.terminal-root-row.is-sel .is-dim,
+.terminal-root-row.is-sel > i.is-out {
+  color: color-mix(in srgb, var(--ink) 82%, transparent);
+}
 @media (pointer: coarse) {
   .terminal-root-row {
     min-height: 44px;
