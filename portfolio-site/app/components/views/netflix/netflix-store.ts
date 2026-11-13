@@ -6,6 +6,7 @@
  * stay in step.
  */
 import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { subLangOf } from "@/lib/site/netflix-subs";
 
 export const LIST_KEY = "xp-nf-list";
 export const LIKES_KEY = "xp-nf-likes";
@@ -94,10 +95,28 @@ export function useProgress() {
   return { map, recent, set };
 }
 
+/** Empties My List, thumbs-up and watch progress (the Profiles menu's "Clear watch history"). */
+export function clearHistory() {
+  write(PROGRESS_KEY, "{}");
+  write(LIST_KEY, "[]");
+  write(LIKES_KEY, "[]");
+}
+
 /** Muted by default; the pick is remembered. */
 export function useSound() {
   const raw = useRaw(SOUND_KEY);
   const on = raw === "on";
   const toggle = useCallback(() => write(SOUND_KEY, read(SOUND_KEY) === "on" ? "off" : "on"), []);
   return { on, toggle };
+}
+
+export const CC_KEY = "xp-nf-cc";
+const TERM_LANG_KEY = "xp-term-lang";
+
+/** Subtitles (N8): the on/off pick is this view's; the language is the terminal's saved one (`bn` or `hi`, else none). */
+export function useCc() {
+  const raw = useRaw(CC_KEY);
+  const lang = subLangOf(useRaw(TERM_LANG_KEY));
+  const toggle = useCallback(() => write(CC_KEY, read(CC_KEY) === "on" ? "off" : "on"), []);
+  return { on: raw === "on", lang, toggle };
 }

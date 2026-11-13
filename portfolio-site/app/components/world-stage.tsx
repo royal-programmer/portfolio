@@ -5,9 +5,17 @@
  * setup, alive on its own stage; Normal mode gets the same object as the hub's line drawing,
  * drawing itself in. Everything under it is the same page in both modes.
  */
+import type { TerminalData } from "@/lib/site/terminal-data";
 import dynamic from "next/dynamic";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { BlogPost, Entry } from "@/lib/content";
 import type { PersonaSlug } from "@/lib/content/types";
+import { StageSilhouette } from "./stage/silhouette";
+import { StoryPanel, StoryRail } from "./stage/story";
+import { createPhoto, PhotoOverlay, type CaptureFn, type PhotoState } from "./stage/photo";
+import { personaHref } from "@/lib/site/persona-link";
+import type { StoryState } from "./world-stage-3d";
+import { shelfFromEntries, STAGE_PERF, STAGE_PROPS, STAGE_STOPS, STAGE_TRAVEL } from "@/lib/site/stage-data";
 import { spectrumColor } from "@/lib/site/spectrum";
 import { useExperience } from "../experience-provider";
 import { CONSTELLATIONS, strokeObject, strokesLength } from "./hub/constellations";
@@ -105,12 +113,125 @@ function StageLines({ slug, t }: { slug: PersonaSlug; t: number }) {
   return <canvas ref={ref} aria-hidden className="h-full w-full" />;
 }
 
-export function WorldStage({ slug, t }: { slug: PersonaSlug; t: number }) {
+/** Is the scroll story allowed here? Not with reduced motion, nor when the visitor asked to save data. */
+function storyAllowed() {
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true || window.matchMedia("(prefers-reduced-data: reduce)").matches;
+  return !reduce && !saveData;
+}
+
+export function WorldStage({ slug, t, entries, posts, terminal }: { slug: PersonaSlug; t: number; entries?: Entry[]; posts?: BlogPost[]; terminal?: TerminalData }) {
   const { experience, ready } = useExperience();
   const c = spectrumColor(t, 60);
-  return (
+  const [framed, setFramed] = useState(false);
+  const props = ready && experience === "immersive" && slug === "engineer";
+  const cases = shelfFromEntries(entries);
+  const send = (name: string, detail: unknown) => window.dispatchEvent(new CustomEvent(name, { detail }));
+
+  // The scroll story: a tall container with the stage stuck to the top; the page's scroll position becomes the camera's stop.
+  const [story, setStory] = useState(false);
+  useEffect(() => {
+    if (!props) return;
+    const ok = () => queueMicrotask(() => setStory(storyAllowed()));
+    ok();
+    const mqs = [window.matchMedia("(prefers-reduced-motion: reduce)"), window.matchMedia("(prefers-reduced-data: reduce)")];
+    mqs.forEach((m) => m.addEventListener("change", ok));
+    return () => mqs.forEach((m) => m.removeEventListener("change", ok));
+  }, [props]);
+  const state = useRef<StoryState>({ p: 0, on: false });
+  // Photo mode (S6): the orbit the overlay asks for, the capture function the canvas registers, the box the guide sits on.
+  const [photoOn, setPhotoOn] = useState(false);
+  const photo = useRef<PhotoState>(createPhoto());
+  const capture = useRef<CaptureFn | null>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  // The performance strip (S7): the tier and the measured fps for a few seconds, or all the time with ?debug=fps.
+  const [perf, setPerf] = useState<{ label: string; fps: number; stepped: boolean } | null>(null);
+  useEffect(() => {
+    let timer = 0;
+    const keep = new URLSearchParams(window.location.search).get("debug") === "fps";
+    const on = (e: Event) => {
+      setPerf((e as CustomEvent<{ label: string; fps: number; stepped: boolean }>).detail);
+      window.clearTimeout(timer);
+      if (!keep) timer = window.setTimeout(() => setPerf(null), STAGE_PERF.showS * 1000);
+    };
+    window.addEventListener("stage:perf", on);
+    return () => {
+      window.removeEventListener("stage:perf", on);
+      window.clearTimeout(timer);
+    };
+  }, []);
+  const closePhoto = useCallback(() => setPhotoOn(false), []);
+  const wrap = useRef<HTMLDivElement>(null);
+  const stick = useRef<HTMLDivElement>(null);
+  const rail = useRef<HTMLElement>(null);
+  const panels = useRef<Array<HTMLDivElement | null>>([]);
+  const [active, setActive] = useState(0);
+  const activeRef = useRef(0);
+  const live = props && story;
+  useEffect(() => {
+    state.current.on = Boolean(live);
+    if (!live) {
+      state.current.p = 0;
+      return;
+    }
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const w = wrap.current;
+      const st = stick.current;
+      if (!w || !st) return;
+      const r = w.getBoundingClientRect();
+      const top = parseFloat(getComputedStyle(st).top) || 0;
+      const range = Math.max(1, r.height - st.offsetHeight);
+      const p = Math.min(1, Math.max(0, (top - r.top) / range)) * (STAGE_STOPS.length - 1);
+      state.current.p = p;
+      const inView = r.bottom > 0 && r.top < window.innerHeight;
+      if (rail.current) {
+        rail.current.style.opacity = inView ? "1" : "0";
+        rail.current.style.pointerEvents = inView ? "auto" : "none";
+      }
+      // Each panel is fully there at its own stop and gone a stop away.
+      panels.current.forEach((el, k) => {
+        if (!el) return;
+        const stop = k + 1;
+        const wgt = Math.min(1, Math.max(0, 1 - Math.abs(p - stop) * 1.7));
+        el.style.opacity = String(wgt);
+        el.style.transform = `translateY(${(1 - wgt) * 14 * (p < stop ? 1 : -1)}px)`;
+        el.style.pointerEvents = wgt > 0.5 ? "auto" : "none";
+        el.style.visibility = wgt > 0.01 ? "visible" : "hidden";
+      });
+      const idx = Math.round(p);
+      if (idx !== activeRef.current) {
+        activeRef.current = idx;
+        setActive(idx);
+      }
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [live]);
+  const goStop = useCallback((i: number) => {
+    const w = wrap.current;
+    const st = stick.current;
+    if (!w || !st) return;
+    const top = parseFloat(getComputedStyle(st).top) || 0;
+    const range = Math.max(1, w.offsetHeight - st.offsetHeight);
+    const y = w.getBoundingClientRect().top + window.scrollY + (i / (STAGE_STOPS.length - 1)) * range - top;
+    window.scrollTo({ top: y, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }, []);
+
+  const box = (
     <div
-      className="world-stage relative h-[46svh] min-h-[260px] w-full overflow-hidden rounded-3xl border"
+      ref={boxRef}
+      className={`world-stage relative w-full overflow-hidden rounded-3xl border ${live ? "stage-story-box" : "h-[46svh] min-h-[260px]"}`}
       style={{
         borderColor: "var(--surface-border)",
         background: `radial-gradient(ellipse at 50% 60%, color-mix(in srgb, ${c} 18%, #07070a), #07070a 72%)`,
@@ -118,7 +239,98 @@ export function WorldStage({ slug, t }: { slug: PersonaSlug; t: number }) {
       }}
       aria-hidden
     >
-      {!ready ? null : experience === "immersive" ? <WorldStage3D slug={slug} t={t} /> : <StageLines slug={slug} t={t} />}
+      {/* Server-rendered first paint: the desk's outline, until the first WebGL frame (or the line drawing) takes over. */}
+      {slug === "engineer" ? <StageSilhouette color={c} gone={framed || (ready && experience !== "immersive")} /> : null}
+      {!ready ? null : experience === "immersive" ? <WorldStage3D slug={slug} t={t} entries={entries} posts={posts} terminal={terminal} story={state} photo={photo} capture={capture} onFirstFrame={() => setFramed(true)} /> : <StageLines slug={slug} t={t} />}
     </div>
+  );
+  // The desk's props as text buttons, so keyboard and screen-reader users reach them; focus lights the prop.
+  const hud = props ? (
+    <div className="stage-hud" style={{ ["--stage-c" as string]: c }} role="group" aria-label="On the desk: run a command; on the shelf: open a project">
+      {STAGE_PROPS.map((p, i) => (
+        <span key={p.id} className="inline-flex items-center">
+          {i ? (
+            <span aria-hidden className="mr-2.5">
+              ·
+            </span>
+          ) : null}
+          <button type="button" onClick={() => send("stage:run", p.id)} onFocus={() => send("stage:focus", p.id)} onBlur={() => send("stage:focus", null)} onPointerEnter={() => send("stage:focus", p.id)} onPointerLeave={() => send("stage:focus", null)}>
+            {p.label}
+          </button>
+        </span>
+      ))}
+      <span aria-hidden className="mx-2.5">
+        |
+      </span>
+      <button type="button" onClick={() => send("stage:door", null)} onFocus={() => send("stage:doorfocus", true)} onBlur={() => send("stage:doorfocus", false)} onPointerEnter={() => send("stage:doorfocus", true)} onPointerLeave={() => send("stage:doorfocus", false)}>
+        door
+      </button>
+      <span aria-hidden className="mx-2.5">
+        ·
+      </span>
+      <button type="button" onClick={() => setPhotoOn(true)} aria-haspopup="dialog">
+        photo
+      </button>
+      {perf ? (
+        <span role="status" className="stage-perf" style={{ flexBasis: "100%", textAlign: "center" }}>
+          {perf.stepped ? `stepped down to ${perf.label} for a smooth frame · change in the hub's gate` : `${perf.label} · ${perf.fps} fps`}
+        </span>
+      ) : null}
+      {/* The project shelf's cases, as buttons: focus pulls the case out, Enter opens the project. */}
+      <span aria-hidden className="mx-2.5">
+        |
+      </span>
+      {cases.map((cs, i) => (
+        <span key={cs.id} className="inline-flex items-center">
+          {i ? (
+            <span aria-hidden className="mr-2.5">
+              ·
+            </span>
+          ) : null}
+          <button type="button" onClick={() => send("stage:case", cs.id)} onFocus={() => send("stage:casefocus", cs.id)} onBlur={() => send("stage:casefocus", null)} onPointerEnter={() => send("stage:casefocus", cs.id)} onPointerLeave={() => send("stage:casefocus", null)}>
+            {cs.title.toLowerCase()}
+          </button>
+        </span>
+      ))}
+    </div>
+  ) : null;
+
+  const overlay = photoOn && props ? <PhotoOverlay boxRef={boxRef} photo={photo} capture={capture} accent={c} shareUrl={new URL(personaHref(window.location.origin, "engineer", "/?run=view%20stage").href, window.location.origin).href} onClose={closePhoto} /> : null;
+  if (live) {
+    return (
+      <>
+        <div ref={wrap} className="stage-story" style={{ ["--travel-d" as string]: STAGE_TRAVEL.desktop, ["--travel-p" as string]: STAGE_TRAVEL.phone, ["--stage-c" as string]: c }}>
+          <div ref={stick} className="stage-story-stick">
+            <div className="relative">
+              {box}
+              {/* Words beside the stops, over the stage; the page fades them with the scroll. */}
+              <div className="stage-story-words">
+                {([1, 2, 3] as const).map((k) => (
+                  <StoryPanel key={k} stop={k} ref={(el) => void (panels.current[k - 1] = el)} />
+                ))}
+              </div>
+            </div>
+            {hud}
+          </div>
+        </div>
+        <StoryRail ref={rail} active={active} color={c} onGo={goStop} />
+        {overlay}
+      </>
+    );
+  }
+  return (
+    <>
+      {box}
+      {hud}
+      {overlay}
+      {/* No camera travel (reduced motion, data saver): the three panels simply stack under the desk. */}
+      {props ? (
+        <div className="stage-static" style={{ ["--stage-c" as string]: c }}>
+          {([1, 2, 3] as const).map((k) => (
+            <StoryPanel key={k} stop={k} static />
+          ))}
+        </div>
+      ) : null}
+    </>
   );
 }

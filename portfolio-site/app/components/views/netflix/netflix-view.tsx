@@ -9,25 +9,58 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./netflix.css";
 import "./netflix-rows.css";
 import "./netflix-modal.css";
+import "./netflix-art.css";
+import "./netflix-media.css";
 import { NetflixHero } from "./netflix-hero";
 import { NetflixGrid, NetflixRows, type CardEnv, type DisplayRow } from "./netflix-rows";
 import { NetflixModal } from "./netflix-modal";
 import { NetflixTopbar } from "./netflix-topbar";
-import { useLikes, useMyList, useProgress, useSound } from "./netflix-store";
-import { generatePortrait } from "@/lib/site/portrait-gen";
-import { NETFLIX_PROFILES, factsOf, indexItems, isNetflixProfile, rowItems, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
+import { NetflixHireSheet, NetflixTabBar } from "./netflix-tabbar";
+import { NetflixHireBar } from "./netflix-hirebar";
+import { NetflixSkim } from "./netflix-skim";
+import { NetflixSeo } from "./netflix-seo";
+import { AUTOPILOT_TYPE_MS, AutopilotRail, autopilotSeen, useAutopilot } from "./netflix-autopilot";
+import { JD_MIN, netflixFit, sortByFit } from "@/lib/site/netflix-fit";
+import type { FitPool } from "@/lib/site/terminal-fit";
+import { seasonSub, type NfLine, type SubData } from "@/lib/site/netflix-subs";
+import { KeysOverlay, useNetflixKeys } from "./netflix-keys";
+import { chime } from "./netflix-sound";
+import { applyViewIcon } from "@/lib/site/view-icons";
+import { track, setTrackContext } from "@/lib/site/track";
+import { classifyLink } from "@/lib/site/events";
+import { clearHistory, useCc, useLikes, useMyList, useProgress, useSound } from "./netflix-store";
+import { NETFLIX_PROFILES, POPULAR, skimIds, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, top10Of, type HireSheet, TOP10_ROW_TITLE, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
 import type { TermLink, TerminalData } from "@/lib/site/terminal-data";
+import { SkillEvidencePanel } from "@/app/components/skill-evidence-panel";
+import type { SkillEvidence } from "@/lib/site/skill-evidence";
 
 export type NetflixViewProps = {
   accent: string;
+  /** The phone Hire sheet's contents (C4). */
+  hire: HireSheet;
   /** The three cuts, built on the server from the one dataset. */
   series: Record<NetflixProfileId, NetflixShow>;
   contact: TermLink[];
   status: string;
   portrait: TerminalData["portrait"];
+  /** What a pasted job description is weighed against (N7). */
+  fitPool: FitPool;
+  /** What I am doing now (the end-of-season card shows it). */
+  now?: { month: string; lines: string[] };
+  /** The translated facts the subtitles (CC) come from (N8). */
+  subData: SubData;
   /** `via=normal`: no staged motion. */
   fast: boolean;
+  /** What each skill is backed by (lower-case name to evidence), built on the server: a skill card opens it instead of the detail modal. */
+  skillEv?: Record<string, SkillEvidence>;
+  /** "Popular with visitors": title ids ranked from the last 30 days of real counts; absent while there are too few to say. */
+  popular?: string[];
+  /** "Skim in 30 seconds": the title ids to see first (`netflix.skim`); absent means the featured trio. */
+  skim?: string[];
 };
+
+type ToastAction = { label: string; run: () => void };
+type Notify = (msg: string, action?: ToastAction) => void;
 
 const PROFILE_KEY = "xp-nf-profile";
 const OLD_PROFILE_KEY = "xp-series-profile";
@@ -71,20 +104,41 @@ export function NetflixView(props: NetflixViewProps) {
   const { accent, series } = props;
   // undefined: not read yet (the page stays dark, nothing flashes); null: ask.
   const [profile, setProfile] = useState<NetflixProfileId | null | undefined>(undefined);
-  const [toast, setToast] = useState<{ id: number; msg: string } | null>(null);
+  const [toast, setToast] = useState<{ id: number; msg: string; action?: ToastAction } | null>(null);
   const toastTimer = useRef(0);
+  // N3: bumped to start the guided play (a fresh pick of Recruiter, or "Replay the recruiter cut").
+  const [autoToken, setAutoToken] = useState(0);
 
-  const notify = useCallback((msg: string) => {
+  const notify = useCallback<Notify>((msg, action) => {
     window.clearTimeout(toastTimer.current);
-    setToast({ id: Date.now(), msg });
-    toastTimer.current = window.setTimeout(() => setToast(null), 3200);
+    setToast({ id: Date.now(), msg, action });
+    toastTimer.current = window.setTimeout(() => setToast(null), action ? 6500 : 3200);
   }, []);
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
+  // E5: a red R on black in the tab while this view is mounted; the page's own icon returns on unmount.
+  useEffect(() => applyViewIcon("netflix"), []);
+  // Visitor counts (no cookie, nothing personal): the view opening, and real clicks on mail / book / resume / code / visit links.
+  const bookHref = props.hire.book?.href ?? "";
+  useEffect(() => {
+    setTrackContext({ persona: "engineer", view: "netflix" });
+    track("view_open");
+  }, []);
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (!e.isTrusted) return; // the guided play's own steps are never counted
+      const a = (e.target as Element | null)?.closest?.("a[href]");
+      const hit = a ? classifyLink(a.getAttribute("href") ?? "", bookHref) : null;
+      if (hit) track(hit.kind, hit.ref);
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [bookHref]);
 
   useEffect(() => {
     const p = readProfile();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the pick lives in localStorage and the URL, only readable after mount
     setProfile(p?.id ?? null);
+    if (p) setTrackContext({ profile: p.id });
     if (p?.save) {
       try {
         window.localStorage.setItem(PROFILE_KEY, p.id);
@@ -99,6 +153,16 @@ export function NetflixView(props: NetflixViewProps) {
     } catch {}
     window.scrollTo({ top: 0 });
     setProfile(id);
+    setTrackContext({ profile: id });
+    track("profile_pick", id);
+    // The guided play runs once per device, only on a fresh Recruiter pick (never a deep link or a silent restore).
+    if (id === "recruiter" && !autopilotSeen() && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) setAutoToken((n) => n + 1);
+  }, []);
+
+  const replayCut = useCallback(() => {
+    window.scrollTo({ top: 0 });
+    setProfile("recruiter");
+    setAutoToken((n) => n + 1);
   }, []);
 
   const switchProfile = useCallback(() => {
@@ -108,22 +172,35 @@ export function NetflixView(props: NetflixViewProps) {
   }, []);
 
   return (
-    <div className="nf-root" style={{ "--nf-accent": accent } as React.CSSProperties} data-profile={profile ?? ""}>
+    <main className="nf-root" style={{ "--nf-accent": accent } as React.CSSProperties} data-profile={profile ?? ""}>
+      <NetflixSeo series={series} contact={props.contact} />
       {profile === undefined ? null : profile === null ? (
         <ProfileGate onPick={pick} notify={notify} />
       ) : (
-        <NetflixBody {...props} show={series[profile]} profile={profile} onSwitch={switchProfile} notify={notify} />
+        <NetflixBody {...props} show={series[profile]} profile={profile} onSwitch={switchProfile} onReplay={replayCut} autoToken={autoToken} notify={notify} />
       )}
       {toast ? (
         <div className="nf-toast" role="status" key={toast.id}>
           {toast.msg}
+          {toast.action ? (
+            <button
+              type="button"
+              className="nf-toast-act"
+              onClick={() => {
+                toast.action?.run();
+                setToast(null);
+              }}
+            >
+              {toast.action.label}
+            </button>
+          ) : null}
         </div>
       ) : null}
-    </div>
+    </main>
   );
 }
 
-function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => void; notify: (msg: string) => void }) {
+function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => void; notify: Notify }) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const [edit, setEdit] = useState(false);
   useEffect(() => {
@@ -143,7 +220,7 @@ function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => voi
   };
 
   return (
-    <main className="nf-gate">
+    <div className="nf-gate">
       <h1 className="nf-gate-title">{edit ? "Manage Profiles:" : "Who’s watching?"}</h1>
       <div className="nf-profiles" role="group" aria-label="Profiles">
         {NETFLIX_PROFILES.map((p, i) => (
@@ -177,13 +254,13 @@ function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => voi
       <button type="button" className="nf-manage" aria-pressed={edit} onClick={() => setEdit((v) => !v)}>
         {edit ? "Done" : "Manage Profiles"}
       </button>
-    </main>
+    </div>
   );
 }
 
-type ModalState = { id: string; origin: DOMRect | null; play: boolean };
+type ModalState = { id: string; origin: DOMRect | null; play: boolean; playMs?: number };
 
-function NetflixBody({ show, series, profile, status, portrait, fast, contact, onSwitch, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; notify: (msg: string) => void }) {
+function NetflixBody({ show, series, profile, status, hire, fitPool, subData, now, fast, skillEv, popular, skim, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
   const shows = useMemo(() => Object.values(series), [series]);
   const index = useMemo(() => indexItems(shows), [shows]);
   const topId = useMemo(() => topEpisodeId(shows), [shows]);
@@ -191,28 +268,7 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
   const likes = useLikes();
   const progress = useProgress();
   const sound = useSound();
-
-  /* ----- the portrait, drawn once (the title stays the LCP); skeleton rows until then ----- */
-  const [text, setText] = useState("");
-  const [waited, setWaited] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    const run = () =>
-      generatePortrait(portrait, "blocks", 160).then(
-        (a) => !cancelled && setText(a.lines.map((l) => l.map((r) => r.t).join("")).join("\n")),
-        () => {},
-      );
-    const w = window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
-    const idle = w.requestIdleCallback ? w.requestIdleCallback(run, { timeout: 1500 }) : window.setTimeout(run, 300);
-    const t = window.setTimeout(() => setWaited(true), 700);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-      if (w.requestIdleCallback) w.cancelIdleCallback?.(idle);
-      else window.clearTimeout(idle);
-    };
-  }, [portrait]);
-  const ready = text !== "" || waited;
+  const cc = useCc();
 
   /* ----- the modal: ?title= opens it, closing strips it ----- */
   const trigger = useRef<{ el: HTMLElement | null; id: string } | null>(null);
@@ -225,8 +281,27 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
     }
   });
 
+  /** The skill whose evidence panel is open (a skill card). */
+  const [skillOpen, setSkillOpen] = useState<string | null>(null);
   const restore = useRef(false);
   const modalOpen = modal !== null;
+  // C4: the phone Hire sheet and the tab bar's Search signal.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [searchToken, setSearchToken] = useState(0);
+  const [tab, setTab] = useState<"home" | "search" | "list" | "hire">("home");
+  const lang = cc.on && cc.lang ? cc.lang : "en";
+  const closeSheet = useCallback(() => setSheetOpen(false), []);
+  // N9: remote-control keys, and the `?` overlay that lists them.
+  const [keysOpen, setKeysOpen] = useState(false);
+  const said = useNetflixKeys({
+    modalOpen: modalOpen || sheetOpen || skillOpen !== null,
+    keysOpen,
+    toggleKeys: () => setKeysOpen((v) => !v),
+    toggleMute: () => {
+      if (!sound.on) chime();
+      sound.toggle();
+    },
+  });
   useEffect(() => {
     if (modalOpen || !restore.current) return;
     restore.current = false;
@@ -236,11 +311,20 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
     el?.focus({ preventScroll: true });
   }, [modalOpen]);
 
+  const [opens, setOpens] = useState(0);
   const open = useCallback<CardEnv["open"]>((item, el, play = false) => {
+    if (item.kind === "skill" && skillEv?.[item.s.name.toLowerCase()]) {
+      track("skill_open", item.s.name.toLowerCase());
+      setSkillOpen(item.s.name.toLowerCase());
+      return;
+    }
+    track("title_open", item.id);
+    if (play) track("play_start", item.id);
     trigger.current = { el, id: item.id };
+    setOpens((n) => n + 1);
     setModal({ id: item.id, origin: el?.getBoundingClientRect() ?? null, play });
     setTitleParam(item.id);
-  }, []);
+  }, [skillEv]);
   const swap = useCallback((item: NfItem) => {
     setModal((m) => (m ? { ...m, id: item.id, play: false } : m));
     setTitleParam(item.id);
@@ -251,6 +335,35 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
     // Focus goes back to the card in the effect below, once the page is no longer inert.
     restore.current = true;
   }, []);
+  // N5: the page-wide technology filter, mirrored in `?cast=`.
+  const [castKey, setCastKey] = useState<string | null>(() => {
+    try {
+      return castKeyOf(new URLSearchParams(window.location.search).get("cast"));
+    } catch {
+      return null;
+    }
+  });
+  const castList = useMemo(() => show.rows.flatMap((r) => (r.kind === "cast" ? r.items : [])), [show.rows]);
+  const castLabel = castKey ? (castList.find((c) => c.key === castKey)?.name ?? castKey) : null;
+  const pickCast = useCallback((key: string | null) => {
+    setCastKey(key);
+    try {
+      const u = new URL(window.location.href);
+      if (key) u.searchParams.set("cast", key);
+      else u.searchParams.delete("cast");
+      window.history.replaceState(window.history.state, "", u);
+    } catch {}
+    if (key) requestAnimationFrame(() => document.getElementById("nf-rows-top")?.scrollIntoView({ behavior: "auto", block: "start" }));
+  }, []);
+  const castFromModal = useCallback(
+    (key: string) => {
+      setModal(null);
+      stripParam("title");
+      pickCast(key);
+    },
+    [pickCast],
+  );
+
   const onShow = useCallback(
     (item: NfItem, through: boolean) => {
       progress.set(item.id, through ? 1 : 0.35);
@@ -259,6 +372,14 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [progress.set],
   );
+
+  // Reduced motion gets no guided play: a static "Start here" badge on the three stops instead.
+  const reducedMotion = useMemo(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches, []);
+  const startHere = useMemo(() => (profile === "recruiter" && reducedMotion ? new Set(show.recruiterCut) : undefined), [profile, reducedMotion, show.recruiterCut]);
+
+  // N7: a pasted job description (held in memory only) rates every card with the terminal's fit engine.
+  const [jd, setJd] = useState<string | null>(null);
+  const fit = useMemo(() => (jd ? netflixFit(jd, fitPool, [...index.values()]) : null), [jd, fitPool, index]);
 
   const env: CardEnv = {
     open,
@@ -269,6 +390,9 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
     progress: progress.map,
     topId,
     soundOn: sound.on,
+    startHere,
+    cast: { active: castKey, label: castLabel, pick: pickCast },
+    fit: fit ? { byId: fit.byId, matched: fit.matched, total: fit.total, clear: () => setJd(null) } : undefined,
   };
 
   /* ----- rows: Continue watching and My List first when there is something in them ----- */
@@ -276,17 +400,46 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
     const pick = (ids: string[]) => ids.map((id) => index.get(id)).filter((i): i is NfItem => !!i);
     const cont = pick(progress.recent).slice(0, 14);
     const mine = pick(list.ids);
+    // N2: up to two "Because you opened" rows from the same history, never repeating a Continue watching card.
+    const seen = new Set<string>();
+    const poolItems = show.rows.flatMap(rowItems).filter((it) => !seen.has(it.id) && !!seen.add(it.id));
+    const because = becauseRows(progress.recent, poolItems, index, new Set(cont.map((c) => c.id))).map((b): DisplayRow => ({ id: b.id, title: b.title, items: b.items }));
+    const topRow: DisplayRow[] = profile === "story" ? [] : [{ id: "top10", title: TOP10_ROW_TITLE, items: top10Of(show), top10: true }];
+    const base = show.rows.map((r): DisplayRow => (r.kind === "contact" ? { id: r.id, title: r.title, contact: true } : r.kind === "cast" ? { id: r.id, title: r.title, cast: r.items } : r.kind === "series" ? { id: r.id, title: r.title, certs: r.items } : { id: r.id, title: r.title, items: rowItems(r) }));
+    // Developer: right after Projects (the first row); Recruiter: before the work rows, after Continue / Because / My List.
+    // D2: "Trending now" from live public commits: Developer's second row, Recruiter's right after Top 10 (never in Story).
+    const trend: DisplayRow[] = profile === "story" ? [] : [{ id: "trending", title: "Trending now", trending: true }];
+    const popularItems = (popular ?? []).map((id) => index.get(id)).filter((i): i is NfItem => !!i);
+    const popRow: DisplayRow[] = popularItems.length ? [{ id: "popular", title: POPULAR.title, items: popularItems }] : [];
+    const withTop = profile === "developer" ? [base[0], ...trend, ...topRow, ...popRow, ...base.slice(1)] : [...topRow, ...popRow, ...trend, ...base];
     return [
       ...(cont.length ? [{ id: "continue", title: "Continue watching", items: cont } as DisplayRow] : []),
+      ...because,
       ...(mine.length ? [{ id: "mylist", title: "My List", items: mine } as DisplayRow] : []),
-      ...show.rows.map((r): DisplayRow => (r.kind === "contact" ? { id: r.id, title: r.title, contact: true } : { id: r.id, title: r.title, items: rowItems(r) })),
+      ...withTop,
     ];
-  }, [index, progress.recent, list.ids, show.rows]);
+  }, [index, progress.recent, list.ids, show, profile, popular]);
+
+  // N5: with a technology picked, every row keeps only the cards that mention it (rows left empty go).
+  const shownRows = useMemo<DisplayRow[]>(() => {
+    if (!castKey) return rows;
+    return rows.flatMap((r): DisplayRow[] => {
+      if ("contact" in r || "cast" in r || "trending" in r || "certs" in r) return [r];
+      const items = r.items.filter((it) => mentionsCast(it, castKey));
+      return items.length ? [{ ...r, items }] : [];
+    });
+  }, [rows, castKey]);
+
+  // N7: with a description active, each row's cards sort by fit, highest first.
+  const ratedRows = useMemo<DisplayRow[]>(() => {
+    if (!fit) return shownRows;
+    return shownRows.map((r) => ("items" in r ? { ...r, items: sortByFit(r.items, fit.byId) } : r));
+  }, [shownRows, fit]);
 
   /* ----- search ----- */
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
-  const results = useMemo(() => {
+  const rawResults = useMemo(() => {
     if (!q) return [];
     const seen = new Set<string>();
     const out: NfItem[] = [];
@@ -303,6 +456,22 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
     return out;
   }, [q, show.rows]);
 
+  const results = useMemo(() => (fit ? sortByFit(rawResults, fit.byId) : rawResults), [rawResults, fit]);
+
+  // A long paste (or a long typed line) is a job description, not a search.
+  const onQuery = useCallback((v: string) => {
+    if (v.trim().length >= JD_MIN) {
+      setJd(v);
+      setQuery("");
+    } else setQuery(v);
+  }, []);
+  const onPasteText = useCallback((v: string) => {
+    if (v.trim().length < JD_MIN) return false;
+    setJd(v);
+    setQuery("");
+    return true;
+  }, []);
+
   /* ----- top bar actions ----- */
   const behavior = (): ScrollBehavior => (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth");
   const toTop = () => {
@@ -311,7 +480,7 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
   };
   const toRows = () => {
     setQuery("");
-    requestAnimationFrame(() => document.getElementById(`nf-row-${rows[0]?.id}`)?.scrollIntoView({ behavior: behavior(), block: "start" }));
+    requestAnimationFrame(() => document.getElementById(`nf-row-${shownRows[0]?.id}`)?.scrollIntoView({ behavior: behavior(), block: "start" }));
   };
   const toList = () => {
     if (!list.ids.length) return notify("Add something with ＋");
@@ -319,45 +488,120 @@ function NetflixBody({ show, series, profile, status, portrait, fast, contact, o
     requestAnimationFrame(() => document.getElementById("nf-row-mylist")?.scrollIntoView({ behavior: behavior(), block: "start" }));
   };
 
+  const askClear = () =>
+    notify("Clear watch history, My List and thumbs-up on this device?", {
+      label: "Clear",
+      run: () => {
+        clearHistory();
+        notify("Watch history cleared");
+      },
+    });
+
+  /* ----- N4: a season's recap types in the hero's trailer panel ----- */
+  const [recap, setRecap] = useState<{ key: number; lines: NfLine[] } | null>(null);
+  const endRecap = useCallback(() => setRecap(null), []);
+  const playRecap = (year: number) => {
+    const lines = seasonRecap(show, year);
+    if (!lines.length) return;
+    window.scrollTo({ top: 0, behavior: behavior() });
+    // The first line is "Season <year> · <n> episodes": the one line of a recap with a translation.
+    const row = show.rows.find((r) => r.id === `s${year}`);
+    const count = row?.kind === "episodes" ? row.items.length : 0;
+    setRecap({ key: Date.now(), lines: lines.map((text, i) => ({ text, sub: i === 0 && cc.on && cc.lang ? seasonSub(year, count, cc.lang) : undefined })) });
+  };
+
+  /* ----- N3: the Recruiter cut ----- */
+  const openStop = (id: string): boolean => {
+    const item = index.get(id);
+    const el = document.querySelector<HTMLElement>(`[data-nf-card="${CSS.escape(id)}"]`);
+    if (!item || !el) return false;
+    el.scrollIntoView({ behavior: "auto", block: "center" });
+    trigger.current = { el, id };
+    setModal({ id, origin: el.getBoundingClientRect(), play: true, playMs: AUTOPILOT_TYPE_MS });
+    setTitleParam(id);
+    return true;
+  };
+  const closeModalSoft = () => {
+    if (document.querySelector('[aria-modal="true"].nf-m')) window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+  };
+  const finishCut = () => {
+    document.getElementById("nf-row-tbc")?.scrollIntoView({ behavior: behavior(), block: "center" });
+    const hello = document.querySelector<HTMLElement>("#nf-row-tbc .nf-btn-play");
+    hello?.classList.add("nf-pulse");
+    window.setTimeout(() => hello?.classList.remove("nf-pulse"), 6000);
+  };
+  const autopilot = useAutopilot({ cut: show.recruiterCut, openStop, closeModal: closeModalSoft, finish: finishCut });
+  const startCut = autopilot.start;
+  const stopCut = autopilot.stop;
+  const lastToken = useRef(0);
+  useEffect(() => {
+    if (!autoToken || autoToken === lastToken.current || profile !== "recruiter") return;
+    lastToken.current = autoToken;
+    if (reducedMotion) {
+      notify("Look for the Start here badges on three cards");
+      return;
+    }
+    // Let the rows paint and the visitor see the page first.
+    const t = window.setTimeout(startCut, 1400);
+    return () => window.clearTimeout(t);
+  }, [autoToken, profile, reducedMotion, startCut, notify]);
+  // Leaving the page's recruiter cut (another profile, a search) ends the play.
+  useEffect(() => {
+    if (profile !== "recruiter" || q) stopCut();
+  }, [profile, q, stopCut]);
+
   const profileMeta = NETFLIX_PROFILES.find((p) => p.id === profile);
   const modalItem = modal ? index.get(modal.id) : undefined;
-  const more = topId ? index.get(topId) : undefined;
+  const features = useMemo(() => show.featured.flatMap((f) => { const item = index.get(f.id); return item ? [{ item, label: f.label }] : []; }), [show.featured, index]);
   const firstRow = show.rows[0]?.id;
 
   return (
     <>
-      <NetflixTopbar glyph={profileMeta?.glyph ?? "R"} tone={TONES[profile]} query={query} onQuery={setQuery} onHome={toTop} onSeries={toRows} onMyList={toList} onProfiles={onSwitch} />
-      <div className="nf-page" aria-hidden={modal ? true : undefined} inert={modal ? true : undefined}>
+      <NetflixTopbar title={show.title} searchToken={searchToken} glyph={profileMeta?.glyph ?? "R"} tone={TONES[profile]} query={query} onQuery={onQuery} onPasteText={onPasteText} onHome={toTop} onSeries={toRows} onMyList={toList} onProfiles={onSwitch} onClearHistory={askClear} onReplay={onReplay} onKeys={() => setKeysOpen(true)} profile={profile} hire={hire} />
+      <div className="nf-visually-hidden" role="status" aria-live="polite">
+        {said}
+      </div>
+      {keysOpen ? <KeysOverlay onClose={() => setKeysOpen(false)} /> : null}
+      {autopilot.state ? <AutopilotRail state={autopilot.state} onSkip={autopilot.skip} onStop={autopilot.stop} /> : null}
+      <div className="nf-page" aria-hidden={modal || sheetOpen || skillOpen ? true : undefined} inert={modal || sheetOpen || skillOpen ? true : undefined}>
         {q ? (
           <div className="nf-results">
             <NetflixGrid items={results} env={env} query={query.trim()} />
           </div>
         ) : (
           <>
-            <NetflixHero series={show} profile={profile} status={status} text={text} fast={fast} firstRowId={firstRow} onMore={more ? () => open(more, null) : undefined} sound={sound} />
-            {ready ? <NetflixRows show={show} rows={rows} contact={contact} env={env} /> : <SkeletonRows />}
+            <NetflixHero series={show} profile={profile} status={status} fast={fast} firstRowId={firstRow} features={features} onOpen={(item, play) => open(item, null, play)} held={modal !== null} sound={sound} recap={recap} onRecapEnd={endRecap} cc={cc} subData={subData} book={hire.book} />
+            <NetflixSkim ids={skimIds(skim, show.featured, new Set(index.keys()))} index={index} onOpen={(item) => open(item, null)} />
+            <NetflixRows show={show} rows={ratedRows} contact={contact} env={env} onRecap={profile === "story" ? playRecap : undefined} />
           </>
         )}
       </div>
-      {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} portraitText={text} autoPlay={modal.play} onClose={close} onSwap={swap} onShow={onShow} /> : null}
+      <NetflixTabBar
+        lang={lang}
+        active={q ? "search" : tab}
+        listDot={list.ids.length > 0}
+        onHome={() => {
+          setTab("home");
+          toTop();
+        }}
+        onSearch={() => {
+          setTab("search");
+          setSearchToken((n) => n + 1);
+        }}
+        onList={() => {
+          setTab("list");
+          toList();
+        }}
+        onHire={() => {
+          setTab("hire");
+          setSheetOpen(true);
+          track("hire_open", "sheet");
+        }}
+      />
+      <NetflixHireBar hire={hire} opens={opens} hold={modal !== null || sheetOpen || !!autopilot.state} />
+      {skillOpen && skillEv?.[skillOpen] ? <SkillEvidencePanel evidence={skillEv[skillOpen]} lang={lang} onClose={() => setSkillOpen(null)} /> : null}
+      {sheetOpen ? <NetflixHireSheet lang={lang} hire={hire} onClose={closeSheet} /> : null}
+      {modal && modalItem ? <NetflixModal item={modalItem} index={index} origin={modal.origin} autoPlay={modal.play} playMs={modal.playMs} cast={castList} profile={profile} now={now} contact={contact} book={hire.book} onCast={castFromModal} onClose={close} onSwap={swap} onShow={onShow} /> : null}
     </>
-  );
-}
-
-/** Shimmering placeholder rows while the portrait draws. */
-function SkeletonRows() {
-  return (
-    <div className="nf-rows nf-skeleton" aria-hidden>
-      {[0, 1].map((r) => (
-        <div className="nf-row" key={r}>
-          <span className="nf-sk-title nf-shimmer" />
-          <div className="nf-sk-row">
-            {Array.from({ length: 6 }, (_, i) => (
-              <span className="nf-sk-card nf-shimmer" key={i} />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
   );
 }

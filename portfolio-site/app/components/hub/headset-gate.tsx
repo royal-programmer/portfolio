@@ -118,7 +118,7 @@ export function HeadsetGate({ device, quality, onQuality, status, startedAt, lea
               type="button"
               disabled={!ready}
               onClick={onWear}
-              className="gate-wear pointer-events-auto mb-[9svh] font-mono text-[11px] tracking-[0.2em] text-[var(--ink-dim)] uppercase transition-colors hover:text-[var(--ink)] disabled:cursor-progress"
+              className="gate-wear pointer-events-auto mb-[9svh] max-sm:mb-[3svh] font-mono text-[11px] tracking-[0.2em] text-[var(--ink-dim)] uppercase transition-colors hover:text-[var(--ink)] disabled:cursor-progress"
             >
               {ready ? (
                 "Put on the headset"
@@ -130,9 +130,17 @@ export function HeadsetGate({ device, quality, onQuality, status, startedAt, lea
               )}
               {ready ? <span aria-hidden className="gate-wear-line" /> : null}
             </button>
-            <p className="mb-6 min-h-4 text-xs text-[var(--ink-faint)]" aria-live="polite">
+            <p className="mb-3 min-h-4 text-center text-xs text-[var(--ink-faint)] sm:mb-6" aria-live="polite">
               {slow ? "Taking longer than usual — Normal view is ready right now." : device?.preferNormal ? "This device may struggle with 3D — Normal is recommended." : ""}
             </p>
+            {/* Phones: a real, visible way past the headset, right under it (the small text link below is for sm and up). */}
+            <button
+              type="button"
+              onClick={onNormal}
+              className="pointer-events-auto mb-6 inline-flex min-h-11 w-full max-w-sm items-center justify-center rounded-full border border-[var(--ink-dim)] px-5 font-mono text-xs text-[var(--ink)] sm:hidden"
+            >
+              Skip the headset · Normal view <span aria-hidden className="ml-2">→</span>
+            </button>
           </>
         )}
       </div>
@@ -152,7 +160,7 @@ export function HeadsetGate({ device, quality, onQuality, status, startedAt, lea
           <button
             type="button"
             onClick={onNormal}
-            className="hit pointer-events-auto justify-self-start font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline sm:justify-self-end"
+            className="hit pointer-events-auto justify-self-start font-mono text-[10px] tracking-[0.2em] text-[var(--ink-faint)] uppercase underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline max-sm:hidden sm:justify-self-end"
           >
             Or proceed without the headset →
           </button>

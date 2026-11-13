@@ -81,6 +81,12 @@ for attempt in 1 2 3 4 5 6; do
   echo "REST ping attempt $attempt → HTTP $code"
   if [[ "$code" == "200" ]]; then
     echo "Supabase is awake ✅"
+    # Retention for site_events (migration 0013): drop rows older than 180 days. Best effort: an
+    # unapplied migration (404) or a blip must not fail the keep-alive.
+    purge="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' -X POST \
+      -H "apikey: ${SUPABASE_ANON_KEY}" -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+      -H "Content-Type: application/json" -d '{}' "${rest}/rpc/purge_site_events" || true)"
+    echo "site_events purge → HTTP $purge"
     [[ -z "$token_problem" ]] || { echo "::error::$token_problem"; exit 1; }
     exit 0
   fi

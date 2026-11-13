@@ -7,9 +7,26 @@
  * meta row, description, the season's episodes, "More like this" and About. Everything is swapped in place.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { NF_ADJECTIVES, factsOf, moreLike, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
+import { NF_ADJECTIVES, castOf, endCardOf, factsOf, metricLabel, moreLike, previouslyLine, type BookCall, type CastMember, type ProjectMedia, type NetflixProfileId, type NfFacts, type NfItem } from "@/lib/site/netflix-data";
+import { DISPLAY_ROOT } from "@/lib/site/brand";
+import { netflixShareLink } from "@/lib/site/netflix-og";
+import { caseEligible, caseSlug } from "@/lib/site/netflix-case";
+import type { TermLink } from "@/lib/site/terminal-data";
+import { epSub } from "@/lib/site/netflix-subs";
+import { t } from "@/lib/site/terminal-strings";
+import { useViewExit } from "../view-shell";
+import { useForName } from "./use-for-name";
+import { AdButton, CcButton } from "./netflix-cc";
+import { adCancel, useAd, useAdSpeech } from "./netflix-ad";
 import { chime } from "./netflix-sound";
-import { useLikes, useMyList, useSound } from "./netflix-store";
+import { NfArt } from "./netflix-art";
+import { ClipsRow, NfPoster, ScreensRow } from "./netflix-media";
+import { PREVIEW_MS, trailerChapters } from "@/lib/site/netflix-trailer";
+import { Trailer } from "./netflix-trailer";
+import { Player } from "./netflix-player";
+import { BINGE_SECONDS, bingeActive, cancelBinge, setBinge } from "@/lib/site/netflix-binge";
+import { useCc, useLikes, useMyList, useSound } from "./netflix-store";
+import { track } from "@/lib/site/track";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const isPhone = () => typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches;
@@ -21,26 +38,46 @@ type Props = {
   index: Map<string, NfItem>;
   /** The card's rectangle, for the grow-from-card opening. Null: opened from a link. */
   origin: DOMRect | null;
-  portraitText: string;
   /** Start playing as soon as it opens (the card's play button). */
   autoPlay?: boolean;
+  /** How long Play's teleprompter types for (the guided play passes a long one); default six seconds. */
+  playMs?: number;
+  /** The show's cast, and what a Cast chip does (filter the page by that technology). */
+  cast?: CastMember[];
+  /** The profile the share link opens in (N6). */
+  profile?: NetflixProfileId;
+  /** What the end-of-season card shows (N10): what I am doing now, and how to reach me. */
+  now?: { month: string; lines: string[] };
+  contact?: TermLink[];
+  /** The book-a-call link (F6), when there is one. */
+  book?: BookCall;
+  onCast?: (key: string) => void;
   onClose: () => void;
   onSwap: (item: NfItem) => void;
   /** Called when an item is shown (progress bookkeeping); `playedThrough` once its Play finished. */
   onShow: (item: NfItem, playedThrough: boolean) => void;
 };
 
-export function NetflixModal({ item, index, origin, portraitText, autoPlay, onClose, onSwap, onShow }: Props) {
+export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, profile = "story", now: nowInfo, contact = [], book, onCast, onClose, onSwap, onShow }: Props) {
   const facts = useMemo(() => factsOf(item), [item]);
+  const itemCast = useMemo(() => (cast ? castOf(item, cast) : []), [item, cast]);
   const overlay = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const backdrop = useRef<HTMLDivElement>(null);
   const closing = useRef(false);
   const sound = useSound();
+  const cc = useCc();
+  const ad = useAd(cc.lang);
   const list = useMyList();
   const likes = useLikes();
   const [play, setPlay] = useState<{ id: string; on: boolean }>({ id: item.id, on: !!autoPlay });
   const playing = play.id === item.id && play.on;
+  // N10: the id of the last episode whose end card is showing.
+  const [endFor, setEndFor] = useState<string | null>(null);
+  const showEnd = endFor === item.id;
+  // F3: the id of the episode whose "Next episode in 5" card is counting down, and the Autoplay next toggle.
+  const [countFor, setCountFor] = useState<string | null>(null);
+  const [bingeOn, setBingeOn] = useState(() => bingeActive(reduced()));
   const [seasonPick, setSeasonPick] = useState<{ id: string; season: number } | null>(null);
   const [now] = useState(() => Date.now());
 
@@ -96,6 +133,7 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, onCl
   const requestClose = useCallback(() => {
     if (closing.current) return;
     closing.current = true;
+    adCancel();
     const ms = reduced() ? 80 : 160;
     backdrop.current?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, fill: "forwards" });
     const a = panel.current?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, fill: "forwards" });
@@ -103,17 +141,115 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, onCl
     else onClose();
   }, [onClose]);
 
-  /* ----- Play ----- */
-  const togglePlay = () => {
-    if (!playing && item.kind === "project" && facts.live) {
-      window.open(facts.live, "_blank", "noopener,noreferrer");
-      return;
+  /* ----- N6: Share: copies the watch-party link (the system sheet on phones) ----- */
+  const [copied, setCopied] = useState(false);
+  const [dl, setDl] = useState<"" | "busy" | "fail">("");
+  const dlTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(dlTimer.current), []);
+  const copiedTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
+  // D3: the one-page case study PDF, for a project or episode with a metric or a long synopsis.
+  const download = async () => {
+    if (dl === "busy") return;
+    setDl("busy");
+    try {
+      const r = await fetch(`/api/netflix/case/${encodeURIComponent(item.id)}`);
+      if (!r.ok) throw new Error(String(r.status));
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `ratul-roy-${caseSlug(facts.title)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      setDl("");
+    } catch {
+      setDl("fail");
+      window.clearTimeout(dlTimer.current);
+      dlTimer.current = window.setTimeout(() => setDl(""), 4000);
     }
+  };
+
+  const share = async () => {
+    const host = window.location.hostname;
+    const origin = host === "localhost" || host.endsWith(".localhost") ? window.location.origin : `https://code.${DISPLAY_ROOT}`;
+    const url = netflixShareLink(origin, profile, item.id);
+    track("share_link_make", item.id);
+    if (isPhone() && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: facts.title, text: facts.blurb, url });
+        return;
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+      }
+    }
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(url);
+      ok = true;
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      ta.style.cssText = "position:fixed;opacity:0";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        ok = document.execCommand("copy");
+      } catch {}
+      ta.remove();
+      panel.current?.querySelector<HTMLElement>(".nf-m-share")?.focus({ preventScroll: true });
+    }
+    if (!ok) return;
+    setCopied(true);
+    window.clearTimeout(copiedTimer.current);
+    copiedTimer.current = window.setTimeout(() => setCopied(false), 2000);
+  };
+
+  /* ----- Play ----- */
+  // E4, F1: Play never leaves the page. A project plays its trailer, which ends on its own end card with the links.
+  const togglePlay = () => {
+    if (!playing && playMs == null) track("play_start", item.id);
     setPlay({ id: item.id, on: !playing });
   };
+  const closePlayer = () => setPlay({ id: item.id, on: false });
   const finished = () => {
-    setPlay({ id: item.id, on: false });
+    if (playMs == null) track("play_complete", item.id);
     onShow(item, true);
+    // F3: after an episode that has a next one, count down to it inside the player (never in the guided play).
+    if (item.kind === "episode" && playMs == null && !isLast && bingeOn && nextEp) {
+      setCountFor(item.id);
+      return;
+    }
+    closePlayer();
+    // The teleprompter ending on a season's last episode rolls the credits (not in the guided play, which closes the card itself).
+    if (isLast && playMs == null) setEndFor(item.id);
+  };
+  const playNext = () => {
+    if (!nextEp) return;
+    setCountFor(null);
+    track("play_start", nextEp.id);
+    setPlay({ id: nextEp.id, on: true });
+    onSwap(nextEp);
+  };
+  const cancelNext = () => {
+    cancelBinge();
+    setBingeOn(false);
+    setCountFor(null);
+    closePlayer();
+  };
+  const toggleBinge = () => {
+    setBinge(!bingeOn);
+    setBingeOn(!bingeOn);
+    setCountFor(null);
+  };
+  // F1: a project's trailer reached its end card (or, in the guided play, its third chapter): played through.
+  const trailerDone = () => {
+    if (playMs != null) finished();
+    else {
+      track("play_complete", item.id);
+      onShow(item, true);
+    }
   };
 
   /* ----- keyboard: Esc, Tab trap, Space toggles Play ----- */
@@ -122,6 +258,16 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, onCl
       e.preventDefault();
       e.stopPropagation();
       requestClose();
+      return;
+    }
+    if (e.key === "Backspace" && !(e.target as HTMLElement).closest("input, textarea, select")) {
+      e.preventDefault();
+      requestClose();
+      return;
+    }
+    if ((e.key === "ArrowRight" || e.key === "ArrowLeft") && item.kind === "episode" && !(e.target as HTMLElement).closest("input, textarea, select")) {
+      e.preventDefault();
+      step(e.key === "ArrowRight" ? 1 : -1);
       return;
     }
     if (e.key === " ") {
@@ -197,6 +343,28 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, onCl
     [index, item.kind, season],
   );
   const more = useMemo(() => moreLike(item, index, 6), [item, index]);
+  const previously = useMemo(() => previouslyLine(item, index), [item, index]);
+  // The item's own season in Episodes order, whatever season the picker shows: Next walks it, the last one ends on the card.
+  const own = useMemo(
+    () => (item.kind === "episode" ? [...index.values()].flatMap((o) => (o.kind === "episode" && o.e.season === item.e.season ? [o] : [])).sort((a, b) => (a.kind === "episode" && b.kind === "episode" ? a.e.n - b.e.n : 0)) : []),
+    [index, item],
+  );
+  const isLast = item.kind === "episode" && own.length > 0 && own[own.length - 1].id === item.id;
+  const nextEp = item.kind === "episode" ? own[own.findIndex((o) => o.id === item.id) + 1] : undefined;
+  const end = useMemo(() => (item.kind === "episode" ? endCardOf(item.e.season, index, nowInfo?.month) : null), [item, index, nowInfo?.month]);
+  const step = (dir: 1 | -1) => {
+    if (item.kind !== "episode") return;
+    if (showEnd) {
+      if (dir < 0) setEndFor(null);
+      return;
+    }
+    const to = own[own.findIndex((o) => o.id === item.id) + dir];
+    if (to) onSwap(to);
+    else if (dir > 0) setEndFor(item.id);
+  };
+  useEffect(() => {
+    if (showEnd) panel.current?.querySelector<HTMLElement>(".nf-m-x")?.focus({ preventScroll: true });
+  }, [showEnd]);
 
   const onEpisodeKey = (e: React.KeyboardEvent, i: number) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
@@ -215,25 +383,66 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, onCl
   return (
     <div className="nf-modal" ref={overlay} onKeyDown={onKeyDown} data-tone={facts.tone}>
       <div className="nf-backdrop" ref={backdrop} onClick={requestClose} aria-hidden />
-      <div className="nf-m" ref={panel} role="dialog" aria-modal="true" aria-label={facts.title}>
+      <div className="nf-m" ref={panel} role="dialog" aria-modal="true" aria-label={showEnd && end ? end.complete : facts.title}>
+        {showEnd && end ? (
+          <EndCard end={end} now={nowInfo} contact={contact} book={book} onClose={requestClose} onNext={end.nextFirst ? () => onSwap(end.nextFirst as NfItem) : undefined} />
+        ) : (
+          <>
         <div className="nf-m-top" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
           <div className="nf-m-handle" aria-hidden />
-          <Billboard key={item.id} facts={facts} portraitText={portraitText} playing={playing} onFinish={finished}>
+          <Billboard key={item.id} facts={facts} playing={playing}>
             <button type="button" className="nf-m-x" aria-label="Close" onClick={requestClose}>
               <span aria-hidden>×</span>
             </button>
+            <button type="button" className="nf-m-share" aria-label="Share this episode" title="Share" onClick={share}>
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="6" cy="12" r="2.6" />
+                <circle cx="17.5" cy="6" r="2.6" />
+                <circle cx="17.5" cy="18" r="2.6" />
+                <path d="m8.3 10.8 7-3.6M8.3 13.2l7 3.6" />
+              </svg>
+            </button>
+            {copied ? (
+              <span className="nf-m-copied" role="status">
+                link copied
+              </span>
+            ) : null}
+            {dl === "fail" ? (
+              <span className="nf-m-copied" role="alert">
+                could not build the case study
+              </span>
+            ) : null}
             <div className="nf-m-bar">
               <div className="nf-m-btns">
-                <button type="button" className="nf-btn nf-btn-play" onClick={togglePlay} aria-pressed={playing}>
-                  <span aria-hidden>{playing ? "■" : "▶"}</span> {playing ? "Stop" : "Play"}
+                <button type="button" className="nf-btn nf-btn-play" onClick={togglePlay} aria-haspopup="dialog">
+                  <span aria-hidden>▶</span> {t("nf.tr.play", "en")}
                 </button>
+                {item.kind === "episode" ? (
+                  <button type="button" className="nf-btn nf-btn-glass nf-m-next" onClick={() => step(1)}>
+                    Next <span aria-hidden>▶</span>
+                  </button>
+                ) : null}
                 <button type="button" className="nf-round" aria-label={inList ? "Remove from My List" : "Add to My List"} aria-pressed={inList} title={inList ? "Remove from My List" : "Add to My List"} onClick={() => list.toggle(item.id)}>
                   <span aria-hidden>{inList ? "✓" : "＋"}</span>
                 </button>
                 <button type="button" className="nf-round" aria-label={liked ? "Remove your thumbs-up" : "I like this"} aria-pressed={liked} title="I like this" onClick={() => likes.toggle(item.id)}>
                   <span aria-hidden>👍</span>
                 </button>
+                {caseEligible(facts, item.kind) ? (
+                  <button type="button" className="nf-round nf-m-dl" aria-label="Download the case study (PDF)" title="Download case study" aria-busy={dl === "busy"} onClick={download}>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M12 4v11M7 11l5 5 5-5M5 20h14" />
+                    </svg>
+                  </button>
+                ) : null}
               </div>
+              {item.kind === "episode" ? (
+                <button type="button" className="nf-round nf-m-binge" aria-label={t("nf.binge.toggle", "en")} aria-pressed={bingeOn} title={t("nf.binge.toggle", "en")} onClick={toggleBinge}>
+                  <span aria-hidden>⏭</span>
+                </button>
+              ) : null}
+              <CcButton cc={cc} />
+              <AdButton ad={ad} />
               <button
                 type="button"
                 className="nf-round nf-m-vol"
@@ -260,6 +469,7 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, onCl
               {facts.grade ? <span className="nf-grade">{facts.grade}</span> : null}
               <span className="nf-hd">{facts.branchLabel}</span>
             </div>
+            {previously ? <Previously key={item.id} label={t("nf.previously", cc.on && cc.lang ? cc.lang : "en")} text={previously} /> : null}
             {facts.blurb ? <p className="nf-m-desc">{facts.blurb}</p> : null}
             {facts.stack.length ? (
               <ul className="nf-m-chips" role="list" aria-label="Stack">
@@ -293,6 +503,22 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, onCl
               <div>
                 <dt>Tags:</dt>
                 <dd>{[...facts.tags, ...facts.stack.slice(0, 3)].join(", ")}</dd>
+              </div>
+            ) : null}
+            {itemCast.length && onCast ? (
+              <div>
+                <dt>Cast:</dt>
+                <dd>
+                  <ul className="nf-m-cast" role="list" aria-label="Cast">
+                    {itemCast.map((c) => (
+                      <li key={c.id}>
+                        <button type="button" onClick={() => onCast(c.key)} title={`Show only ${c.name}`}>
+                          {c.name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
               </div>
             ) : null}
             <div>
@@ -340,6 +566,9 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, onCl
           </section>
         ) : null}
 
+        {facts.media ? <ScreensRow media={facts.media} title={t("nf.shots", "en")} /> : null}
+        {facts.media ? <ClipsRow media={facts.media} title={t("nf.clips", "en")} playLabel={t("nf.clip.play", "en")} /> : null}
+
         {more.length ? (
           <section className="nf-m-sec" aria-labelledby="nf-m-more">
             <h3 id="nf-m-more">More like this</h3>
@@ -350,7 +579,7 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, onCl
                   <li key={o.id}>
                     <button type="button" className="nf-mcard" data-tone={f.tone} onClick={() => onSwap(o)}>
                       <span className="nf-mcard-art" aria-hidden>
-                        <span>{f.letter}</span>
+                        <NfArt seed={o.id} tone={f.tone} />
                       </span>
                       <span className="nf-mcard-meta">
                         <span className="nf-mcard-title">{f.title}</span>
@@ -371,6 +600,158 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, onCl
             <span>Created by</span> Ratul Roy · <span>Data:</span> terminal-data.ts · <span>Maturity:</span> open to work
           </p>
         </section>
+          </>
+        )}
+      </div>
+      {playing ? (
+        <Player title={facts.title} meta={[facts.season != null ? `S${facts.season}` : "", facts.n != null ? `E${facts.n}` : ""].filter(Boolean).join(" ")} onBack={closePlayer} returnFocus={() => panel.current?.querySelector<HTMLElement>(".nf-btn-play")}>
+          {facts.kind === "project" ? (
+            <ProjectTrailer facts={facts} contact={contact} book={book} guided={playMs != null} ad={ad} onDone={trailerDone} />
+          ) : (
+            <>
+              <Teleprompter key={item.id} text={`${facts.title}. ${facts.blurb ?? ""}`.trim()} sub={cc.on && cc.lang ? epSub(facts.tone, facts.season, facts.n, cc.lang) : undefined} ad={ad} lang={cc.lang} ms={playMs ?? 6000} onDone={finished} />
+              {countFor === item.id && nextEp ? <BingeCard title={nextEp.kind === "episode" ? nextEp.e.title : ""} onNow={playNext} onCancel={cancelNext} /> : null}
+            </>
+          )}
+        </Player>
+      ) : null}
+    </div>
+  );
+}
+
+/** C5: "Previously on…" types the earlier episode's title and figure. It sits beside the controls, never in front of them, and reserves its own height. */
+function Previously({ label, text }: { label: string; text: string }) {
+  const calm = useMemo(() => reduced(), []);
+  const [chars, setChars] = useState(calm ? text.length : 0);
+  useEffect(() => {
+    if (calm) return;
+    let n = 0;
+    const id = window.setInterval(() => {
+      n += 1;
+      setChars(n);
+      if (n >= text.length) window.clearInterval(id);
+    }, 28);
+    return () => window.clearInterval(id);
+  }, [calm, text]);
+  return (
+    <p className="nf-m-prev" aria-label={`${label} ${text}`}>
+      <span aria-hidden>
+        <b>{label}</b> <span className="nf-m-prev-t">{text.slice(0, chars)}</span>
+        <span className="nf-m-prev-ghost">{text.slice(chars)}</span>
+      </span>
+    </p>
+  );
+}
+
+/* ---------- N10: the end-of-season card ---------- */
+
+function EndCard({ end, now, contact, book, onClose, onNext }: { book?: BookCall; end: ReturnType<typeof endCardOf>; now?: { month: string; lines: string[] }; contact: TermLink[]; onClose: () => void; onNext?: () => void }) {
+  const exit = useViewExit();
+  const forName = useForName();
+  const link = (label: string) => contact.find((c) => c.label === label)?.href;
+  const mail = link("mail");
+  const linkedin = link("linkedin");
+  const github = link("github");
+  return (
+    <section className="nf-end" aria-labelledby="nf-end-h">
+      <button type="button" className="nf-m-x" aria-label="Close" onClick={onClose}>
+        <span aria-hidden>×</span>
+      </button>
+      {forName ? <p className="nf-end-hi">{t("nf.for.hi", "en").replace("{name}", forName)}</p> : null}
+      <h2 id="nf-end-h">{end.complete}</h2>
+      <p className="nf-end-next">{end.next}</p>
+      {now?.lines.length ? (
+        <div className="nf-end-now">
+          <h3>Now</h3>
+          <ul role="list">
+            {now.lines.map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      <div className="nf-end-actions">
+        {onNext ? (
+          <button type="button" className="nf-btn nf-btn-play" onClick={onNext}>
+            <span aria-hidden>▶</span> Watch next season
+          </button>
+        ) : null}
+        {book ? (
+          <a className="nf-btn nf-btn-glass" href={book.href} target="_blank" rel="noreferrer">
+            {book.label}
+          </a>
+        ) : null}
+        {mail ? (
+          <a className="nf-btn nf-btn-glass" href={mail}>
+            Say hello
+          </a>
+        ) : null}
+        {linkedin ? (
+          <a className="nf-btn nf-btn-glass" href={linkedin} target="_blank" rel="noreferrer">
+            LinkedIn
+          </a>
+        ) : null}
+        {github ? (
+          <a className="nf-btn nf-btn-glass" href={github} target="_blank" rel="noreferrer">
+            GitHub
+          </a>
+        ) : null}
+        {exit ? (
+          <button type="button" className="nf-btn nf-btn-glass" onClick={exit}>
+            Back to the terminal
+          </button>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+/* ---------- F3: the next-episode countdown ---------- */
+
+/** "Next episode in 5" over the lower billboard: Play now, Cancel. Enter plays now, Esc cancels (and does not close the card). */
+function BingeCard({ title, onNow, onCancel }: { title: string; onNow: () => void; onCancel: () => void }) {
+  const [n, setN] = useState(BINGE_SECONDS);
+  const now = useRef(onNow);
+  const cancel = useRef(onCancel);
+  useEffect(() => {
+    now.current = onNow;
+    cancel.current = onCancel;
+  });
+  useEffect(() => {
+    const id = window.setInterval(() => setN((v) => v - 1), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  useEffect(() => {
+    if (n <= 0) now.current();
+  }, [n]);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        cancel.current();
+      } else if (e.key === "Enter" && !(e.target as HTMLElement | null)?.closest("button, a")) {
+        e.preventDefault();
+        e.stopPropagation();
+        now.current();
+      }
+    };
+    window.addEventListener("keydown", key, true);
+    return () => window.removeEventListener("keydown", key, true);
+  }, []);
+  return (
+    <div className="nf-binge" role="group" aria-label={t("nf.binge.in", "en").replace("{n}", String(Math.max(0, n)))}>
+      <p className="nf-binge-t" aria-live="polite">
+        {t("nf.binge.in", "en").replace("{n}", String(Math.max(0, n)))}
+      </p>
+      {title ? <p className="nf-binge-n">{title}</p> : null}
+      <div className="nf-binge-b">
+        <button type="button" className="nf-btn nf-btn-play" onClick={onNow} autoFocus>
+          <span aria-hidden>▶</span> {t("nf.binge.now", "en")}
+        </button>
+        <button type="button" className="nf-btn nf-btn-glass" onClick={onCancel}>
+          {t("nf.binge.cancel", "en")}
+        </button>
       </div>
     </div>
   );
@@ -378,30 +759,65 @@ export function NetflixModal({ item, index, origin, portraitText, autoPlay, onCl
 
 /* ---------- Billboard ---------- */
 
-function Billboard({ facts, portraitText, playing, onFinish, children }: { facts: NfFacts; portraitText: string; playing: boolean; onFinish: () => void; children: React.ReactNode }) {
-  const epTone = facts.tone === "main" || facts.tone === "learn" || facts.tone === "side" || facts.tone === "life";
+/** The quiet preview (round 27): a project's first clip, muted, for a few seconds, then the poster stays. Never under reduced motion or save-data, and never while the player is open. */
+function BillboardPreview({ clip }: { clip: ProjectMedia["clips"][number] }) {
+  const [over, setOver] = useState(false);
+  const [calm] = useState(() => reduced());
+  const saving = typeof navigator !== "undefined" && !!(navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
+  if (calm || saving || over) return null;
   return (
-    <div className="nf-bb" data-playing={playing || undefined}>
+    <video
+      className="nf-hclip"
+      src={clip.src}
+      muted
+      playsInline
+      autoPlay
+      preload="metadata"
+      aria-hidden
+      onTimeUpdate={(e) => {
+        if (e.currentTarget.currentTime * 1000 >= PREVIEW_MS) setOver(true);
+      }}
+      onEnded={() => setOver(true)}
+      onError={() => setOver(true)}
+    />
+  );
+}
+
+function Billboard({ facts, playing, children }: { facts: NfFacts; playing: boolean; children: React.ReactNode }) {
+  const clip = facts.kind === "project" ? facts.media?.clips[0] : undefined;
+  return (
+    <div className="nf-bb">
       <div className="nf-bb-art" aria-hidden>
-        {portraitText ? <pre>{portraitText}</pre> : <span className="nf-shimmer" />}
+        <NfArt seed={facts.id} tone={facts.tone} big live />
+        {facts.media ? <NfPoster media={facts.media} eager /> : null}
+        {clip && !playing ? <BillboardPreview clip={clip} /> : null}
       </div>
-      {epTone ? null : (
-        <span className="nf-bb-letter" aria-hidden>
-          {facts.letter}
-        </span>
-      )}
       <div className="nf-bb-shade" aria-hidden />
-      {playing ? <Teleprompter text={`${facts.title}. ${facts.blurb ?? ""}`.trim()} onDone={onFinish} /> : null}
-      <h2 className="nf-bb-title" data-hidden={playing || undefined}>
-        {facts.title}
-      </h2>
+      <h2 className="nf-bb-title">{facts.title}</h2>
+      {facts.metric ? <p className="nf-bb-metric">{metricLabel(facts.metric)}</p> : null}
       {children}
     </div>
   );
 }
 
+/** A project's trailer (F1): its chapters from the story data. The Recruiter cut plays the first three at a 1.25x hold and skips the end card. */
+function ProjectTrailer({ facts, contact, book, guided, ad, onDone }: { facts: NfFacts; contact: TermLink[]; book?: BookCall; guided: boolean; ad: ReturnType<typeof useAd>; onDone: () => void }) {
+  const chapters = useMemo(
+    () =>
+      trailerChapters(
+        { title: facts.title, summary: facts.blurb, stack: facts.stack, live: facts.live, story: facts.story, media: facts.media, labels: { built: t("nf.tr.built", "en"), dev: t("nf.end.dev", "en"), live: t("nf.status.live", "en"), liveBuilding: t("nf.status.livebuilding", "en") } },
+        guided,
+      ),
+    [facts, guided],
+  );
+  return <Trailer chapters={chapters} holdScale={guided ? 1.25 : 1} adOn={ad.on} adTag="en-IN" live={facts.live} repo={facts.repo} contact={contact} dev={facts.story?.status === "in-development"} book={book} guided={guided} onDone={onDone} />;
+}
+
 /** Types the text over six seconds (all at once, then a short hold, under reduced motion). */
-function Teleprompter({ text, onDone }: { text: string; onDone: () => void }) {
+function Teleprompter({ text, sub, ad, lang, ms, onDone }: { text: string; sub?: string; ad: ReturnType<typeof useAd>; lang?: string | null; ms: number; onDone: () => void }) {
+  // D4: the synopsis is English, so it is spoken with the English voice; a natural end lets it finish.
+  const natural = useRef(false);
+  useAdSpeech({ on: ad.on, tag: "en-IN" }, text, () => natural.current);
   const calm = useMemo(() => reduced(), []);
   const [chars, setChars] = useState(calm ? text.length : 0);
   const done = useRef(onDone);
@@ -410,6 +826,7 @@ function Teleprompter({ text, onDone }: { text: string; onDone: () => void }) {
   });
   useEffect(() => {
     if (calm) {
+      natural.current = true;
       const t = window.setTimeout(() => done.current(), 2000);
       return () => window.clearTimeout(t);
     }
@@ -417,9 +834,10 @@ function Teleprompter({ text, onDone }: { text: string; onDone: () => void }) {
     let raf = 0;
     let hold = 0;
     const tick = (now: number) => {
-      const c = Math.min(text.length, Math.floor(((now - t0) / 6000) * text.length));
+      const c = Math.min(text.length, Math.floor(((now - t0) / ms) * text.length));
       setChars(c);
       if (c >= text.length) {
+        natural.current = true;
         hold = window.setTimeout(() => done.current(), 800);
         return;
       }
@@ -430,11 +848,16 @@ function Teleprompter({ text, onDone }: { text: string; onDone: () => void }) {
       cancelAnimationFrame(raf);
       window.clearTimeout(hold);
     };
-  }, [calm, text]);
+  }, [calm, text, ms]);
   return (
     <p className="nf-tele2" aria-live="off">
       {text.slice(0, chars)}
       {chars < text.length ? <span className="nf-caret">▌</span> : null}
+      {sub ? (
+        <span className="nf-sub" lang={lang ?? undefined}>
+          {sub}
+        </span>
+      ) : null}
     </p>
   );
 }

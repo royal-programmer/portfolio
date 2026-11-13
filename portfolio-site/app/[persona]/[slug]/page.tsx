@@ -8,21 +8,27 @@ import {
   listEntries,
   type LaunchedPersona,
 } from "@/lib/content";
-import { getView, getViews } from "@/lib/content/views";
+import { loadTerminalConfig, loadViews } from "@/lib/settings/load";
 import { placeOnSpectrum } from "@/lib/site/spectrum";
 import { HomePage } from "../../components/home-page";
 import { WorldBoot } from "../../components/world-boot";
 import { ViewShell } from "../../components/views/view-shell";
-import { NETFLIX_PROFILES, buildNetflix, type NetflixShow, type NetflixProfileId } from "@/lib/site/netflix-data";
-import { terminalData } from "@/lib/site/terminal-data";
+import { POPULAR, indexItems, NETFLIX_PROFILES, hireSheetOf, buildNetflix, isNetflixProfile, type NetflixShow, type NetflixProfileId } from "@/lib/site/netflix-data";
+import { netflixCard, netflixShareLink } from "@/lib/site/netflix-og";
+import { cleanFor, forLink } from "@/lib/site/netflix-for";
+import { loadEngineerTerminalData } from "../../load-terminal-data";
+import { skillEvidenceMap } from "@/lib/site/skill-evidence";
+import { I18N, terminalData } from "@/lib/site/terminal-data";
 import { NetflixView } from "../../components/views/netflix/netflix-view";
 import { loadHomeContent } from "../../load-home-content";
 import { shareMetadata, siteOrigin } from "@/lib/site/share-meta";
 import { SUBDOMAIN_BY_PERSONA } from "@/lib/site/hosts";
+import { getPopularTally } from "@/lib/site/popular";
+import { pickPopular } from "@/lib/site/insights";
 
 type ProjectDetailProps = {
   params: Promise<{ persona: string; slug: string }>;
-  searchParams: Promise<{ via?: string }>;
+  searchParams: Promise<{ via?: string; title?: string; profile?: string; for?: string }>;
 };
 
 export async function generateStaticParams() {
@@ -30,7 +36,7 @@ export async function generateStaticParams() {
   const params: Array<{ persona: string; slug: string }> = [];
   for (const persona of personas) {
     // The page's views are branches at the same depth as its entries (17-persona-views.md).
-    const views = getViews(persona);
+    const views = await loadViews(persona);
     for (const view of views) params.push({ persona, slug: view.id });
     const entries = await listEntries(persona);
     for (const entry of entries) {
@@ -46,15 +52,30 @@ export async function generateStaticParams() {
   return params;
 }
 
-export async function generateMetadata({ params }: ProjectDetailProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: ProjectDetailProps): Promise<Metadata> {
   const { persona, slug } = await params;
   if (!isLaunchedPersona(persona)) {
     return { title: "Not found | Ratul Roy", robots: { index: false, follow: false } };
   }
-  const view = getView(persona, slug);
+  const view = (await loadViews(persona)).find((v) => v.id === slug);
   if (view) {
     const record = await getPersona(persona);
     const origin = siteOrigin(SUBDOMAIN_BY_PERSONA[persona]);
+    // A watch-party link (N6): `?title=<id>` previews that one episode, drawn by `/og?cmd=netflix:<id>`.
+    if (view.id === "netflix") {
+      const { title: id, profile, for: forRaw } = await searchParams;
+      const who = cleanFor(typeof forRaw === "string" ? forRaw : undefined);
+      const card = typeof id === "string" ? netflixCard(await loadEngineerTerminalData(), id, who || undefined) : null;
+      if (card) {
+        const p = isNetflixProfile(profile) ? profile : "story";
+        return shareMetadata({ title: `${card.title} · ${view.name} | Ratul Roy`, description: card.line, cmd: `netflix:${id}`, origin, url: netflixShareLink(origin, p, id as string), forName: who || undefined });
+      }
+      // A link made for a person (`?for=`): the card says who it was picked for, and what the series is.
+      if (who) {
+        const home = netflixCard(await loadEngineerTerminalData(), "home", who);
+        if (home) return shareMetadata({ title: `Picked for ${who}: ${home.title}, software engineer | Ratul Roy`, description: home.line, cmd: "netflix:home", origin, url: forLink(origin, isNetflixProfile(profile) ? profile : "recruiter", who), forName: who });
+      }
+    }
     return shareMetadata({ title: `${view.name} · ${record?.label ?? persona} | Ratul Roy`, description: view.line, cmd: `view ${view.id}`, origin, url: `${origin}/${view.id}` });
   }
   const entry = await getEntryBySlug(persona, slug);
@@ -74,7 +95,7 @@ export default async function PersonaEntryPage({ params, searchParams }: Project
 
   if (slug === "series") redirect(`/${persona}/netflix`);
 
-  const view = getView(persona, slug);
+  const view = (await loadViews(persona)).find((v) => v.id === slug);
   if (view) return <PersonaViewPage persona={persona} view={view.id} fromTerminal={via === "terminal"} via={via} />;
 
   const entry = await getEntryBySlug(persona, slug);
@@ -96,7 +117,7 @@ export default async function PersonaEntryPage({ params, searchParams }: Project
         </PersonaLink>
 
         <article className="mt-8 space-y-6">
-          <header className="space-y-3">
+          <header className="space-y-3" style={{ viewTransitionName: `case-${entry.slug}` } as React.CSSProperties}>
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">{entry.type}</p>
             <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">{entry.title}</h1>
             {role ? <p className="text-[var(--muted)]">{role}</p> : null}
@@ -168,21 +189,28 @@ async function PersonaViewPage({ persona, view, fromTerminal, via }: { persona: 
   const t = placeOnSpectrum(ranked).find((p) => p.slug === persona)?.t ?? 0.5;
   const items = engineerEntries.filter((e) => e.visibility === "public").map((e) => e.slug);
   if (view === "stage") {
+    // The stage reads the same data as the terminal (records under db), built here and handed down.
+    const stageData = persona === "engineer" ? await loadEngineerTerminalData() : undefined;
     return (
       <ViewShell persona={persona} view={view} stripVia={fromTerminal}>
         {/* The terminal already printed this view's boot: no second entry animation. */}
         {fromTerminal ? null : <WorldBoot slug={persona} color={accent} t={t} via="normal" items={items} />}
-        <HomePage routePersona={persona} personas={personas} engineerEntries={engineerEntries} engineerBlogPosts={engineerBlogPosts} />
+        <HomePage routePersona={persona} personas={personas} engineerEntries={engineerEntries} engineerBlogPosts={engineerBlogPosts} terminal={stageData} />
       </ViewShell>
     );
   }
   if (view === "netflix") {
     // One dataset, three orderings: built here, picked on the client ("Who's watching?").
-    const data = terminalData(personas.find((p) => p.slug === persona), engineerEntries, engineerBlogPosts, getViews(persona));
+    const { cfg, views } = await loadTerminalConfig();
+    const data = terminalData(personas.find((p) => p.slug === persona), engineerEntries, engineerBlogPosts, views, cfg);
     const series = Object.fromEntries(NETFLIX_PROFILES.map((p) => [p.id, buildNetflix(p.id, data, engineerEntries, engineerBlogPosts)])) as Record<NetflixProfileId, NetflixShow>;
+    const tr = data.i18n ?? I18N;
+    // "Popular with visitors": real counts of the last 30 days, hidden below the threshold (null), cached an hour.
+    const tally = await getPopularTally(POPULAR).catch(() => ({ events: 0, scores: {} }));
+    const popular = pickPopular(tally, POPULAR, new Set(indexItems(Object.values(series)).keys())) ?? undefined;
     return (
       <ViewShell persona={persona} view={view} stripVia={fromTerminal}>
-        <NetflixView accent={accent} series={series} contact={data.contact} status={data.status} portrait={data.portrait} fast={via === "normal"} />
+        <NetflixView accent={accent} series={series} hire={hireSheetOf(data)} contact={data.contact} status={data.status} portrait={data.portrait} subData={{ uptime: data.uptime, i18n: { bn: { uptime: tr.bn.uptime, status: tr.bn.status }, hi: { uptime: tr.hi.uptime, status: tr.hi.status } } }} now={data.now} fitPool={{ stack: data.stack, resume: { skills: data.resume.skills } }} skillEv={skillEvidenceMap(data)} popular={popular} skim={data.skim} fast={via === "normal"} />
       </ViewShell>
     );
   }

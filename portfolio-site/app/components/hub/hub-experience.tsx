@@ -25,7 +25,9 @@ import { SplitText } from "gsap/SplitText";
 import Lenis from "lenis";
 import type { PersonaSlug } from "@/lib/content/types";
 import { ambient } from "@/lib/site/ambient-sound";
+import { setTrackContext, track } from "@/lib/site/track";
 import { DISPLAY_ROOT, HUB_COPY, personaIdentity } from "@/lib/site/brand";
+import type { TermProfile } from "@/lib/site/profiles";
 import { analyseDevice, type DeviceReport } from "@/lib/site/device";
 import type { Quality } from "@/lib/site/experience";
 import { PersonaLink, personaHref } from "@/lib/site/persona-link";
@@ -48,7 +50,8 @@ gsap.registerPlugin(ScrollTrigger, SplitText);
 
 export type HubChapter = { slug: PersonaSlug; t: number; body: string; points: string[] };
 export type HubUpcoming = { slug: PersonaSlug; t: number };
-type Props = { chapters: HubChapter[]; upcoming: HubUpcoming[]; /** Published engineer project slugs (the terminal's `ls`). */ terminalItems?: string[] };
+export type HubCopy = { headline: string; intro: string; throughTitle: string; moreTitle: string; closingTitle: string; closingBody: string; character: readonly string[] };
+type Props = { chapters: HubChapter[]; upcoming: HubUpcoming[]; /** Published engineer project slugs (the terminal's `ls`). */ terminalItems?: string[]; /** Admin-console copy (`hub.copy`); the code defaults when absent. */ copy?: HubCopy; email?: string; /** The profile links (`profile_link` records, or the frozen copy in code mode); the footer shows the work and social rows. */ profiles?: TermProfile[] };
 
 type SectionKind =
   | { kind: "hero" }
@@ -89,7 +92,13 @@ class SceneBoundary extends Component<{ onFail: () => void; children: ReactNode 
   }
 }
 
-export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props) {
+export function HubExperience({ chapters, upcoming, terminalItems = [], copy: copyProp, email: emailProp, profiles = [] }: Props) {
+  useEffect(() => {
+    setTrackContext({ persona: "hub", view: "hub" });
+    track("view_open");
+  }, []);
+  const copy: HubCopy = copyProp ?? HUB_COPY;
+  const email = emailProp ?? HUB_COPY.email;
   const xp = useExperience();
   const { experience, ready, chosen, setExperience, setQuality, qualityChosen, sound, soundChoice } = xp;
 
@@ -157,9 +166,16 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
   const normalEnter = useRef<((slug: string) => void) | null>(null);
   // Read once, before the provider strips it from the URL.
   const xpForced = useRef<boolean>(false);
+  const fromStage = useRef<string | null>(null);
   if (typeof window !== "undefined" && !xpForced.current) {
     const q = new URLSearchParams(window.location.search).get("xp");
     if (q === "normal" || q === "immersive") xpForced.current = true;
+    // Through the Stage's door: no gate, Normal mode, and the chapter it came from (see experience-provider.tsx).
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("via") === "stage" && sp.get("from")) {
+      xpForced.current = true;
+      fromStage.current = sp.get("from");
+    }
   }
   const blinkRaf = useRef(0);
   const eyeRef = useRef<SVGEllipseElement>(null);
@@ -220,6 +236,14 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     // Run once when the provider is ready.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
+
+  // Arriving through the Stage's door: land on the chapter that world sits in (once the page has laid out).
+  useEffect(() => {
+    const slug = fromStage.current;
+    if (!decided || !slug) return;
+    const id = window.setTimeout(() => document.getElementById(slug)?.scrollIntoView({ behavior: "auto", block: "start" }), 450);
+    return () => window.clearTimeout(id);
+  }, [decided]);
 
   const sceneWanted = !!device?.webgl && status !== "failed" && (gate !== null || experience === "immersive");
   const immersiveLive = experience === "immersive" && status !== "failed" && atLeast(phase, "wear");
@@ -810,6 +834,9 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
     if (scrollFree) lenisRef.current?.start();
     else lenisRef.current?.stop();
   }, [scrollFree]);
+  // Leaving the hub (a view opens in the same document) must not leave `html { overflow: hidden }` behind: that froze
+  // every page-scrolling view (Netflix, Stage ...) on a phone, where the hand-off is a client navigation.
+  useEffect(() => () => document.documentElement.classList.remove("scroll-locked"), []);
 
   // ---- Pointer: parallax always; drag to look, hold to slow, tap to start ----
   useEffect(() => {
@@ -1052,10 +1079,10 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
               <span className="block italic text-[var(--ink-dim)]">Many perspectives.</span>
             </h1>
             <p data-hero-item className="mt-7 text-[length:var(--step-1)] text-[var(--ink-dim)]">
-              {HUB_COPY.intro} <CyclingPhrase chapters={chapters} />
+              {copy.intro} <CyclingPhrase chapters={chapters} />
             </p>
             <p data-hero-item className="mt-3 font-mono text-[11px] leading-relaxed tracking-[0.06em] text-[var(--ink-faint)] sm:text-xs">
-              <CyclingLine lines={HUB_COPY.character} />
+              <CyclingLine lines={copy.character} />
             </p>
           </div>
         </section>
@@ -1063,7 +1090,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         {/* ---------- Into the colour ---------- */}
         <section id="through" data-section className="flex min-h-[110svh] items-center justify-center px-4 text-center sm:px-8">
           <h2 data-split className="max-w-3xl font-display text-[length:var(--step-4)] leading-[0.98] tracking-[-0.015em]">
-            {HUB_COPY.throughTitle}
+            {copy.throughTitle}
           </h2>
         </section>
 
@@ -1076,7 +1103,7 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
             <div className="max-w-xl">
               <p className="font-mono text-[10px] tracking-[0.24em] text-[var(--ink-faint)] uppercase">Still refracting</p>
               <h2 data-split className="mt-4 font-display text-[length:var(--step-4)] leading-[0.95]">
-                {HUB_COPY.moreTitle}
+                {copy.moreTitle}
               </h2>
               <ul data-rise className="mt-8 flex flex-wrap gap-x-6 gap-y-2 font-mono text-[11px] tracking-[0.16em] uppercase">
                 {upcoming.map((u, i) => (
@@ -1094,30 +1121,40 @@ export function HubExperience({ chapters, upcoming, terminalItems = [] }: Props)
         <section id="end" data-section className="flex min-h-[100svh] flex-col px-4 sm:px-8 lg:px-12">
           <div className="my-auto max-w-2xl pt-28 lg:max-w-3xl">
             <h2 data-split className="font-display text-[length:var(--step-4)] leading-[0.95]">
-              {HUB_COPY.closingTitle.split(/(?<=\.)\s+/).map((line, i) => (
+              {copy.closingTitle.split(/(?<=\.)\s+/).map((line, i) => (
                 <span key={i} className={`block ${i > 0 ? "italic text-[var(--ink-dim)]" : ""}`}>
                   {line}
                 </span>
               ))}
             </h2>
             <div data-rise>
-              <p className="mt-6 max-w-lg text-[length:var(--step-0)] leading-relaxed text-[var(--ink-dim)]">{HUB_COPY.closingBody}</p>
+              <p className="mt-6 max-w-lg text-[length:var(--step-0)] leading-relaxed text-[var(--ink-dim)]">{copy.closingBody}</p>
               <div className="mt-10">
                 <a
-                  href={`mailto:${HUB_COPY.email}`}
+                  href={`mailto:${email}`}
                   className="inline-flex min-h-12 items-center gap-3 rounded-full bg-[var(--ink)] px-7 text-sm font-medium text-[var(--void)] transition-transform duration-[var(--dur-2)] hover:-translate-y-0.5"
                 >
                   Say hello <span aria-hidden>→</span>
                 </a>
                 <a
-                  href="/resume.pdf"
+                  href="/Ratul_Roy_Resume.pdf"
                   target="_blank"
                   rel="noreferrer"
                   className="hit ml-3 inline-flex min-h-12 items-center rounded-full border border-[var(--line)] px-6 text-sm text-[var(--ink-dim)] transition-colors hover:text-[var(--ink)]"
                 >
                   Résumé (PDF)
                 </a>
-                <p className="mt-4 font-mono text-xs text-[var(--ink-faint)]">{HUB_COPY.email}</p>
+                <p className="mt-4 font-mono text-xs text-[var(--ink-faint)]">{email}</p>
+                {/* The same data as the terminal's `profiles`: work and social rows, plus GitHub. */}
+                <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1 font-mono text-xs">
+                  {profiles.filter((p) => p.href && (p.group === "work" || p.group === "social" || p.id === "github")).map((p) => (
+                    <li key={p.id}>
+                      <a href={p.href} target="_blank" rel="noreferrer" className="hit inline-flex min-h-8 items-center text-[var(--ink-dim)] underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline">
+                        {p.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
                 {immersiveLive && introDone ? (
                   // The one line in the empty sky (D38): click it and the journey rewinds to the headset.
                   <button type="button" onClick={rewind} className="vr-takeoff">
@@ -1293,6 +1330,8 @@ function PersonaChapter({ chapter, index, total, onEnter, waiting, warm }: { cha
             <PersonaLink
               persona={chapter.slug}
               onClick={(e) => {
+                setTrackContext({ persona: chapter.slug, view: "hub" });
+                track("profile_pick", chapter.slug);
                 if (!onEnter) return;
                 e.preventDefault();
                 onEnter(chapter.slug);

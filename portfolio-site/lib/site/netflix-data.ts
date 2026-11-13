@@ -3,9 +3,14 @@
  * posts, contact) arranged as a show. Pure, no React. A profile is an ordering of the same data, not
  * different data; the only literals here are labels.
  */
-import type { BlogPost, Entry } from "@/lib/content/types";
+import { fromDb } from "@/lib/content/source";
+import type { BlogPost, Entry, ProjectBeat, ProjectMedia, ProjectStatus, ProjectStory } from "@/lib/content/types";
+import { LEGACY } from "@/lib/site/legacy-content";
 import { personaIdentity } from "@/lib/site/brand";
-import type { TermCommit, TerminalData } from "@/lib/site/terminal-data";
+import { hireLine } from "@/lib/site/hire-line";
+
+export { skimIds } from "@/lib/site/hire-line";
+import type { TermCommit, TermProject, TerminalData } from "@/lib/site/terminal-data";
 
 export type NetflixProfileId = "recruiter" | "developer" | "story";
 export type NetflixProfile = { id: NetflixProfileId; name: string; line: string; /** One character, drawn in the tile's accent. */ glyph: string };
@@ -17,6 +22,13 @@ export const NETFLIX_PROFILES: readonly NetflixProfile[] = [
 ];
 
 export const isNetflixProfile = (s: string | null | undefined): s is NetflixProfileId => NETFLIX_PROFILES.some((p) => p.id === s);
+
+/**
+ * A figure from the item's own text (C1, E1): `value` and `label` read `200+ active users`; `context` is the plain
+ * words that say where it comes from (`internal tool`). It is shown as a small quiet label, never as a headline
+ * number. An explicit text, never invented.
+ */
+export type Metric = { value: string; label: string; context?: string };
 
 export type Episode = {
   id: string;
@@ -34,6 +46,8 @@ export type Episode = {
   grade?: string;
   /** A project / view link when the episode is one. */
   href?: string;
+  /** A figure found in the title or synopsis (`metricOf`); never invented. */
+  metric?: Metric;
 };
 
 export type SkillCard = { id: string; name: string; group: string };
@@ -48,12 +62,43 @@ export type ProjectCard = {
   /** Internal page, when there is one. */
   href?: string;
   kind: "project" | "post";
+  metric?: Metric;
+  /** Real product imagery (E2): a poster, screenshots and short clips. Only some projects have it. */
+  media?: ProjectMedia;
+  /** The project's story (F2): who it is for, why it exists, what it does in beats, and where it stands. */
+  audience?: string;
+  problem?: string;
+  /** What it does, one beat each; `clip` is an id from `media.clips`. */
+  beats?: ProjectBeat[];
+  status?: ProjectStatus;
+  /** One line that replaces the summary in the trailer's title chapter. */
+  description?: string;
 };
 
+export type { ProjectBeat, ProjectMedia, ProjectStatus, ProjectStory } from "@/lib/content/types";
+
+/**
+ * The story of a project (F2): the project record's own `story`, else (code mode only) the frozen copy by slug, else an
+ * empty story (the trailer then falls back to title, summary and stack). The one function that reads story fields.
+ */
+export function storyOf(p: Pick<TermProject, "slug" | "story">): ProjectStory {
+  return p.story ?? (fromDb ? {} : LEGACY.PROJECT_STORY[p.slug]) ?? {};
+}
+
+/** A project's poster, screenshots and clips (E2): the record's `media`, else (code mode only) the frozen copy by slug. The one reader. */
+export function mediaOf(p: Pick<TermProject, "slug" | "media">): ProjectMedia | undefined {
+  return p.media ?? (fromDb ? undefined : LEGACY.PROJECT_MEDIA[p.slug]);
+}
+
+/** A technology on the cast row (N5): how many episodes / projects mention it. `key` is the canonical lower-case name. */
+export type CastMember = { id: string; key: string; name: string; count: number };
+
 export type NetflixRow =
+  | { id: string; title: string; kind: "cast"; items: CastMember[] }
   | { id: string; title: string; kind: "episodes"; items: Episode[] }
   | { id: string; title: string; kind: "cards"; items: ProjectCard[] }
   | { id: string; title: string; kind: "skills"; items: SkillCard[] }
+  | { id: string; title: string; kind: "series"; items: CertSeason[] }
   | { id: string; title: string; kind: "contact"; items: [] };
 
 export type NetflixShow = {
@@ -65,7 +110,97 @@ export type NetflixShow = {
   /** What the sticky bar offers: seasons for the full story, the rows otherwise. Each id is a row id. */
   nav: Array<{ id: string; label: string }>;
   rows: NetflixRow[];
+  /** The Recruiter cut (N3): card ids in play order, resolved from `RECRUITER_CUT`. Empty on the other profiles. */
+  recruiterCut: string[];
+  /** The hero carousel (C3): up to three card ids with their tab labels, resolved from `FEATURED`. */
+  featured: Array<{ id: string; label: string }>;
 };
+
+/**
+ * The Recruiter cut's three stops, in order (N3). Each is matched against the data, never hard-coded in the view:
+ * a project card by slug, else an episode by title (and tag, when given). The first hit wins.
+ */
+export const RECRUITER_CUT: ReadonlyArray<{ episode?: { title: RegExp; tag?: string }; project?: string }> = [
+  { episode: { title: /shift roster/i, tag: "v2.0" } },
+  { episode: { title: /11 python automations/i } },
+  { project: "api-test-center", episode: { title: /api test center/i } },
+];
+
+
+/* ---------- C1: the figure on a card (a quiet label since E1) ---------- */
+
+/**
+ * Explicit overrides, checked first: a title (and tag, when given) mapped to its figure, or to `null` to say
+ * "no figure". Every value here is a number that already appears in the item's own text (the timeline, the
+ * hiring proof lines); this table only pins the wording of the label.
+ */
+export const METRIC_OVERRIDES: ReadonlyArray<{ title: RegExp; tag?: string; metric: Metric | null }> = [
+  { title: /shift roster/i, tag: "v2.0", metric: { value: "200+", label: "active users", context: "internal tool" } },
+  { title: /11 python automations/i, metric: { value: "11", label: "automations", context: "finance and sync" } },
+  { title: /vms query/i, metric: { value: "5–10 → 2–3", label: "min", context: "query time" } },
+  { title: /7 openai partneru/i, metric: { value: "7", label: "credentials", context: "OpenAI PartnerU" } },
+];
+
+const NUM = String.raw`\d[\d,]*(?:\.\d+)?`;
+const RANGE = String.raw`${NUM}(?:\s?[–-]\s?${NUM})?`;
+const WORD_NUM: Record<string, string> = { one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10", eleven: "11", twelve: "12" };
+const num = (s: string) => WORD_NUM[s.toLowerCase()] ?? s;
+
+/**
+ * The regex rules, tried in this order over "title. synopsis" (the first rule that matches wins, wherever it sits
+ * in the text): a before/after time (`5–10 minutes to 2–3` -> `5–10 → 2–3 min`), a user count, a count of
+ * automations, a count of credentials, a count of records. No match: no figure, pure art.
+ */
+const METRIC_RULES: ReadonlyArray<{ re: RegExp; make: (m: RegExpExecArray) => Metric }> = [
+  { re: new RegExp(String.raw`(${RANGE})\s*min(?:ute)?s?\s+(?:to|→|->)\s+(${RANGE})`, "i"), make: (m) => ({ value: `${m[1]} → ${m[2]}`, label: "min" }) },
+  { re: new RegExp(String.raw`(${NUM}\+?)\s+(?:active\s+)?users\b`, "i"), make: (m) => ({ value: m[1], label: "users" }) },
+  { re: new RegExp(String.raw`\b(\d+|${Object.keys(WORD_NUM).join("|")})\s+(?:python\s+)?automations\b`, "i"), make: (m) => ({ value: num(m[1]), label: "automations" }) },
+  { re: new RegExp(String.raw`\b(\d+)\s+(?:[\w-]+\s+){0,2}(?:credentials|certifications|certs)\b`, "i"), make: (m) => ({ value: m[1], label: "credentials" }) },
+  { re: new RegExp(String.raw`(${NUM}K?\+?)\s+(?:employee-)?(?:shift\s+)?records\b`, "i"), make: (m) => ({ value: m[1], label: "records" }) },
+];
+
+/** The item's figure: an override when one names it, else the first regex rule that matches its text. */
+export function metricOf(title: string, synopsis?: string, tag?: string): Metric | undefined {
+  const o = METRIC_OVERRIDES.find((x) => x.title.test(title) && (!x.tag || x.tag === tag));
+  if (o) return o.metric ?? undefined;
+  const text = `${title}. ${synopsis ?? ""}`;
+  for (const rule of METRIC_RULES) {
+    const m = rule.re.exec(text);
+    if (m) return rule.make(m);
+  }
+  return undefined;
+}
+
+/**
+ * The hero carousel's three titles per profile (C3). Each is matched against the data like the Recruiter cut:
+ * a project card by slug, else an episode by title (and tag); `label` is the tab text.
+ */
+export const FEATURED: Record<NetflixProfileId, ReadonlyArray<{ label: string; episode?: { title: RegExp; tag?: string }; project?: string }>> = {
+  recruiter: [
+    { label: "Shift Roster", episode: { title: /shift roster/i, tag: "v2.0" } },
+    { label: "11 automations", episode: { title: /11 python automations/i } },
+    { label: "API Test Center", project: "api-test-center", episode: { title: /api test center/i } },
+  ],
+  developer: [
+    { label: "API Test Center", project: "api-test-center", episode: { title: /api test center/i } },
+    { label: "11 automations", episode: { title: /11 python automations/i } },
+    { label: "Shift Roster", episode: { title: /shift roster/i, tag: "v2.0" } },
+  ],
+  story: [
+    { label: "Shift Roster", episode: { title: /shift roster/i, tag: "v2.0" } },
+    { label: "VMS query", episode: { title: /vms query/i } },
+    { label: "This terminal", episode: { title: /build this terminal/i } },
+  ],
+};
+
+/** `5–10 min to 2–3 min` for a before/after figure, `200+ active users` for the rest. */
+export const metricLine = (m: Metric): string => (m.value.includes(" → ") ? m.value.split(" → ").map((v) => `${v} ${m.label}`).join(" to ") : `${m.value} ${m.label}`);
+
+/**
+ * The quiet label under a title (E1): the figure with its context in plain words. A before/after figure leads with its
+ * context (`query time 5–10 min to 2–3 min`); a count follows it (`200+ active users · internal tool`).
+ */
+export const metricLabel = (m: Metric): string => (m.value.includes(" → ") ? [m.context, metricLine(m)].filter(Boolean).join(" ") : [metricLine(m), m.context].filter(Boolean).join(" · "));
 
 const monthIndex = (date: string) => {
   const [y, m] = date.split("-");
@@ -94,6 +229,7 @@ export function buildEpisodes(data: TerminalData, projects: Array<{ slug: string
       runtime: months >= 24 ? `${Math.round(months / 12)} yr` : months >= 1 ? `${months} mo` : "1 ep",
       grade: c.grade,
       href: c.tag && slugs.has(c.tag) ? `/engineer/${c.tag}` : undefined,
+      metric: metricOf(c.subject, c.body?.join(" "), c.tag),
     };
   });
 }
@@ -119,17 +255,20 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
     year: p.year,
     href: `/engineer/${p.slug}`,
     kind: "project",
+    metric: metricOf(p.title, p.summary),
+    media: mediaOf(p),
+    ...storyOf(p),
   }));
-  const postCards: ProjectCard[] = data.posts.map((p) => ({ id: `post-${p.slug}`, title: p.title, summary: p.excerpt, stack: [], year: p.date?.slice(0, 4), kind: "post" }));
+  const postCards: ProjectCard[] = data.posts.map((p) => ({ id: `post-${p.slug}`, title: p.title, summary: p.excerpt, stack: [], year: p.date?.slice(0, 4), kind: "post", metric: metricOf(p.title, p.excerpt) }));
 
   const inStack = new Set(data.stack.map((s) => s.toLowerCase()));
   const skills: SkillCard[] = data.resume.skills.flatMap((g) => g.items.map((name) => ({ id: `skill-${name}`, name, group: g.group })));
   const stackFirst = [...skills].sort((a, b) => Number(inStack.has(b.name.toLowerCase())) - Number(inStack.has(a.name.toLowerCase())));
 
+  const cast = buildCast(data, episodes, projectCards);
+  const castRows: NetflixRow[] = cast.length ? [{ id: "cast", title: "Cast · the stack", kind: "cast", items: cast }] : [];
   const main = episodes.filter((e) => e.branch === "main").sort(newestFirst);
   const side = episodes.filter((e) => e.branch === "side").sort(newestFirst);
-  const collegeFrom = data.periods.find((p) => p.id === "college")?.from ?? "2020-08";
-  const learning = episodes.filter((e) => e.branch === "learn" && e.date >= collegeFrom).sort(newestFirst);
 
   const parts = data.uptime.split(" · ").map((s) => s.trim()).filter(Boolean);
 
@@ -147,7 +286,8 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
       work,
       projects,
       { id: "skills", title: "Skills", kind: "skills", items: skills },
-      { id: "certs", title: "Certifications", kind: "episodes", items: learning },
+      ...castRows,
+      { id: "certs", title: "Certifications", kind: "series", items: buildCertSeries(data.resume.certifications) },
       tbc,
     ];
   } else if (profile === "developer") {
@@ -155,6 +295,7 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
     rows = [
       projects,
       { id: "stack", title: "Stack", kind: "skills", items: stackFirst },
+      ...castRows,
       { id: "side", title: "Side quests", kind: "episodes", items: side },
       work,
       ...(postCards.length ? [{ id: "writing", title: "Writing", kind: "cards", items: postCards } as NetflixRow] : []),
@@ -170,12 +311,16 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
       const items = episodes.filter((e) => e.season === y);
       return { id: `s${y}`, title: `Season ${y} · ${label(y, items[0])}`, kind: "episodes", items };
     });
-    rows = [...seasonRows, tbc];
+    rows = [...seasonRows, ...castRows, tbc];
   }
 
   // Newest season first on the bar, like the brief's chips (2026 … 2002); the other profiles list their rows.
-  if (profile === "story") nav = years.map((y) => ({ id: `s${y}`, label: String(y) }));
-  else nav = rows.filter((r) => r.kind !== "contact").map((r) => ({ id: r.id, label: r.title }));
+  if (profile === "story") nav = [...years.map((y) => ({ id: `s${y}`, label: String(y) })), ...castRows.map(() => ({ id: "cast", label: "Cast" }))];
+  else {
+    nav = rows.filter((r) => r.kind !== "contact").map((r) => ({ id: r.id, label: r.title }));
+    // The Top 10 row is added by the view (it sits after Continue / Because): first for Recruiter, after Projects for Developer.
+    nav.splice(profile === "recruiter" ? 0 : 1, 0, { id: "top10", label: "Top 10" });
+  }
 
   return {
     title: data.resume.name,
@@ -184,7 +329,45 @@ export function buildNetflix(profile: NetflixProfileId, data: TerminalData, entr
     seasons: years,
     nav,
     rows,
+    recruiterCut: profile === "recruiter" ? resolveCut(episodes, projectCards) : [],
+    featured: resolveSteps(FEATURED[profile], episodes, projectCards),
   };
+}
+
+/* ---------- E3: certificates as a series ---------- */
+
+/** A credential, shown as an episode. `issued` and `validThrough` only when the data states them; `verify` only when a link exists. */
+export type CertEpisode = { id: string; issuer: string; name: string; issued?: string; validThrough?: string; verify?: string };
+/** An issuer, shown as a season. */
+export type CertSeason = { id: string; label: string; hue: string; episodes: CertEpisode[] };
+
+/** The seasons' order, names and badge colours. The first rule that matches the résumé's issuer wins; the last catches the rest. Data. */
+export const CERT_SEASONS: ReadonlyArray<{ id: string; match: RegExp; label: string; hue: string }> = [
+  { id: "openai", match: /openai/i, label: "OpenAI PartnerU", hue: "#10a37f" },
+  { id: "cisco", match: /cisco/i, label: "Cisco Networking Academy", hue: "#049fd9" },
+  { id: "ibm", match: /(?:^|[^a-z])ibm(?:[^a-z]|$)/i, label: "IBM", hue: "#4f6dff" },
+  { id: "other", match: /./, label: "Other", hue: "#b08a3a" },
+];
+
+const CERT_ISSUED = /\s*·\s*([A-Z][a-z]{2} \d{4})\s*$/;
+const CERT_VALID = /valid through\s+([^;·]+?)\s*$/i;
+
+/**
+ * Group the résumé's certifications into seasons by issuer (E3). It takes the plain list, so it keeps working when the
+ * list moves to records. Dates come only from the text (`· Jul 2022`, `valid through Jul–Aug 2027`); nothing is invented.
+ */
+export function buildCertSeries(certs: ReadonlyArray<{ issuer: string; line: string; items?: string[]; verify?: string }>): CertSeason[] {
+  const seasons = new Map<string, CertSeason>();
+  for (const c of certs) {
+    const rule = CERT_SEASONS.find((r) => r.match.test(c.issuer)) ?? CERT_SEASONS[CERT_SEASONS.length - 1];
+    const season = seasons.get(rule.id) ?? { id: rule.id, label: rule.label, hue: rule.hue, episodes: [] };
+    seasons.set(rule.id, season);
+    const issued = CERT_ISSUED.exec(c.line)?.[1];
+    const validThrough = CERT_VALID.exec(c.line)?.[1];
+    const names = c.items?.length ? c.items : [c.line.replace(CERT_ISSUED, "").trim()];
+    for (const name of names) season.episodes.push({ id: `cert-${rule.id}-${season.episodes.length + 1}`, issuer: rule.label, name, issued, validThrough, verify: c.verify });
+  }
+  return CERT_SEASONS.flatMap((r) => seasons.get(r.id) ?? []);
 }
 
 /* ---------- The modal's unified item (17-persona-views.md §7) ---------- */
@@ -204,20 +387,22 @@ export const rowItems = (row: NetflixRow): NfItem[] => {
 
 /** Three adjectives per branch / kind, shown as "This series is". Labels, not data about Ratul's work. */
 export const NF_ADJECTIVES: Record<string, [string, string, string]> = {
-  main: ["Hands-on", "Production", "Measured"],
-  learn: ["Curious", "Rigorous", "Foundational"],
-  side: ["Playful", "Experimental", "Self-driven"],
+  main: ["Hands-on", "In production", "Measured"],
+  learn: ["Curious", "Steady", "Foundational"],
+  side: ["Playful", "Experimental", "Hands-on"],
   life: ["Personal", "Formative", "Human"],
   project: ["Built", "Shipped", "Open"],
   post: ["Written", "Reflective", "Plain"],
-  skill: ["Practiced", "Daily", "Reliable"],
+  skill: ["Practiced", "Familiar", "Ongoing"],
 };
 
 export const NF_BRANCH_LABEL: Record<Episode["branch"], string> = { main: "work", learn: "learning", side: "side quest", life: "life" };
 
 /** What the modal needs from an item, flattened. */
 export type NfFacts = {
+  id: string;
   title: string;
+  metric?: Metric;
   blurb?: string;
   /** "main" | "learn" | … for episodes; the kind for the rest. */
   tone: string;
@@ -235,12 +420,20 @@ export type NfFacts = {
   repo?: string;
   href?: string;
   letter: string;
+  /** Real imagery (E2), for projects that have it. */
+  media?: ProjectMedia;
+  /** The project's story (F2), for the trailer. */
+  story?: ProjectStory;
+  /** "episode" | "project" | "post" | "skill". */
+  kind?: NfItem["kind"];
 };
 
 export function factsOf(item: NfItem): NfFacts {
   if (item.kind === "episode") {
     const e = item.e;
     return {
+      id: item.id,
+      metric: e.metric,
       title: e.title,
       blurb: e.synopsis,
       tone: e.branch,
@@ -255,13 +448,16 @@ export function factsOf(item: NfItem): NfFacts {
       year: String(e.season),
       href: e.href,
       letter: e.title.trim().charAt(0).toUpperCase(),
+      kind: "episode",
     };
   }
   if (item.kind === "skill") {
-    return { title: item.s.name, blurb: `${item.s.name}, in the ${item.s.group} group of the résumé's skills.`, tone: "skill", branchLabel: item.s.group, tags: [item.s.group], stack: [], letter: item.s.name.trim().charAt(0).toUpperCase() };
+    return { id: item.id, title: item.s.name, blurb: `${item.s.name}, in the ${item.s.group} group of the résumé's skills.`, tone: "skill", branchLabel: item.s.group, tags: [item.s.group], stack: [], letter: item.s.name.trim().charAt(0).toUpperCase(), kind: "skill" };
   }
   const c = item.c;
   return {
+    id: item.id,
+    metric: c.metric,
     title: c.title,
     blurb: c.summary,
     tone: item.kind,
@@ -273,6 +469,9 @@ export function factsOf(item: NfItem): NfFacts {
     repo: c.repo,
     href: c.href,
     letter: c.title.trim().charAt(0).toUpperCase(),
+    media: c.media,
+    story: { description: c.description, audience: c.audience, problem: c.problem, beats: c.beats, status: c.status },
+    kind: item.kind,
   };
 }
 
@@ -297,13 +496,300 @@ export function moreLike(item: NfItem, index: Map<string, NfItem>, max = 6): NfI
   return pool.slice(0, max);
 }
 
+
+/* ---------- C2: Top 10, ranked by scope ---------- */
+
+/**
+ * The ranking formula, all weights here. score = metric + recency + branch + kind:
+ *  - metric: +100 when the item has a figure (`metricOf`), else 0 (it ranks lower, never hidden);
+ *  - recency: 0..30, linear from `from` (college start) to the newest date among the ranked items;
+ *  - branch: main 20, side 10, learn 6, life 0 (episodes); project 14, post 2 (cards);
+ *  - ties break by date, newest first, then by id.
+ * Skills have no date or figure and are not ranked.
+ */
+export const SCOPE = { metric: 100, recency: 30, from: "2020-08", branch: { main: 20, side: 10, learn: 6, life: 0, project: 14, post: 2 } as Record<string, number> };
+
+const scopeDate = (it: NfItem) => (it.kind === "episode" ? it.e.date : it.kind === "skill" ? "" : it.c.year ? `${it.c.year}-06` : "");
+const scopeMetric = (it: NfItem) => (it.kind === "episode" ? it.e.metric : it.kind === "skill" ? undefined : it.c.metric);
+
+/** Ranked by scope, largest first. Items are the rankable ones only (no skills, no life episodes); never filters by metric. */
+export function scopeRank(items: NfItem[]): NfItem[] {
+  const pool = items.filter((it) => it.kind !== "skill" && !(it.kind === "episode" && it.e.branch === "life"));
+  const dates = pool.map(scopeDate).filter(Boolean).map(monthIndex);
+  const lo = monthIndex(SCOPE.from);
+  const hi = Math.max(lo + 1, ...dates);
+  const score = (it: NfItem) => {
+    const d = scopeDate(it);
+    const rec = d ? Math.max(0, Math.min(1, (monthIndex(d) - lo) / (hi - lo))) * SCOPE.recency : 0;
+    const key = it.kind === "episode" ? it.e.branch : it.kind;
+    return (scopeMetric(it) ? SCOPE.metric : 0) + rec + (SCOPE.branch[key] ?? 0);
+  };
+  const scored = new Map(pool.map((it) => [it.id, score(it)]));
+  return [...pool].sort((a, b) => (scored.get(b.id) ?? 0) - (scored.get(a.id) ?? 0) || (scopeDate(a) < scopeDate(b) ? 1 : scopeDate(a) > scopeDate(b) ? -1 : a.id < b.id ? -1 : 1));
+}
+
+/** The ten cards of a profile's "Top 10" row: the rankable items in its rows, deduplicated. */
+export function top10Of(show: NetflixShow): NfItem[] {
+  const seen = new Set<string>();
+  const pool = show.rows.flatMap(rowItems).filter((it) => !seen.has(it.id) && !!seen.add(it.id));
+  return scopeRank(pool).slice(0, 10);
+}
+
+/** Does this profile get the row, and where: Recruiter first, Developer after Projects (an index into `rows`). */
+export const TOP10_ROW_TITLE = "Top 10";
+
 /** The episode that wears the "Top 10" badge: Shift Roster, v2.0. */
 export function topEpisodeId(shows: NetflixShow[]): string | null {
+  const top = new Set(scopeRank([...indexItems(shows).values()]).slice(0, 10).map((i) => i.id));
   for (const s of shows)
     for (const r of s.rows)
       if (r.kind === "episodes") {
         const hit = r.items.find((e) => e.tag === "v2.0" && /shift roster/i.test(e.title)) ?? r.items.find((e) => /shift roster/i.test(e.title));
-        if (hit) return hit.id;
+        if (hit) return top.has(hit.id) ? hit.id : null;
       }
+  return null;
+}
+
+/* ---------- N2: "Because you opened …" ---------- */
+
+export type BecauseRow = { id: string; title: string; items: NfItem[] };
+
+/** The tags and stack an item carries, lower-cased, for the "shares two" rule. */
+const tagSet = (item: NfItem): Set<string> => {
+  const f = factsOf(item);
+  return new Set([...f.tags, ...f.stack].map((t) => t.toLowerCase()));
+};
+
+const dateOf = (item: NfItem) => (item.kind === "episode" ? item.e.date : item.kind === "skill" ? "" : `${item.c.year ?? ""}`);
+
+/**
+ * Up to two rows seeded by the most recently opened cards (`recent`, newest first): up to 8 cards that share the
+ * seed's branch, or at least two tags / stack entries with it, newest first, never a card already in Continue
+ * watching (`exclude`) or the seed itself. Derived from what is already stored; nothing new is kept.
+ */
+export function becauseRows(recent: string[], pool: NfItem[], index: Map<string, NfItem>, exclude: Set<string>, rows = 2, per = 8): BecauseRow[] {
+  const out: BecauseRow[] = [];
+  const seen = new Set<string>();
+  for (const id of recent) {
+    if (out.length >= rows) break;
+    const seed = index.get(id);
+    if (!seed || seen.has(id)) continue;
+    seen.add(id);
+    const mine = tagSet(seed);
+    const items = pool
+      .filter((o) => o.id !== seed.id && !exclude.has(o.id))
+      .filter((o) => {
+        if (seed.kind === "episode" && o.kind === "episode" && o.e.branch === seed.e.branch) return true;
+        if (seed.kind === "skill" && o.kind === "skill" && o.s.group === seed.s.group) return true;
+        let shared = 0;
+        for (const t of tagSet(o)) if (mine.has(t)) shared += 1;
+        return shared >= 2;
+      })
+      .sort((a, b) => (dateOf(a) < dateOf(b) ? 1 : dateOf(a) > dateOf(b) ? -1 : a.id < b.id ? -1 : 1))
+      .slice(0, per);
+    if (items.length) out.push({ id: `because-${out.length}`, title: `Because you opened ${clip(factsOf(seed).title, 60)}`, items });
+  }
+  return out;
+}
+
+/* ---------- N3: the Recruiter cut ---------- */
+
+type CutStep = { label?: string; episode?: { title: RegExp; tag?: string }; project?: string };
+
+function resolveSteps<T extends CutStep>(steps: ReadonlyArray<T>, episodes: Episode[], projects: ProjectCard[]): Array<{ id: string; label: string }> {
+  const out: Array<{ id: string; label: string }> = [];
+  for (const step of steps) {
+    const card = step.project ? projects.find((p) => p.id === `project-${step.project}`) : undefined;
+    const spec = step.episode;
+    const ep = spec ? (episodes.find((e) => spec.title.test(e.title) && (!spec.tag || e.tag === spec.tag)) ?? episodes.find((e) => spec.title.test(e.title))) : undefined;
+    const id = card?.id ?? ep?.id;
+    if (id) out.push({ id, label: step.label ?? "" });
+  }
+  return out;
+}
+
+function resolveCut(episodes: Episode[], projects: ProjectCard[]): string[] {
+  return resolveSteps(RECRUITER_CUT, episodes, projects).map((s) => s.id);
+}
+
+/* ---------- N4: season recap ---------- */
+
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+
+/** The typed recap for one season of the full story: the count, one line per episode, then the period and grade. */
+export function seasonRecap(show: NetflixShow, year: number): string[] {
+  const row = show.rows.find((r) => r.id === `s${year}`);
+  if (!row || row.kind !== "episodes") return [];
+  const eps = [...row.items].sort((a, b) => a.n - b.n);
+  const label = row.title.split(" · ").slice(1).join(" · ");
+  const grade = eps.find((e) => e.grade)?.grade;
+  const lines = [`Season ${year} · ${eps.length} ${eps.length === 1 ? "episode" : "episodes"}`, ...eps.map((e) => clip(e.title, 70))];
+  const tail = [label, grade].filter(Boolean).join(" · ");
+  if (tail) lines.push(tail);
+  return lines;
+}
+
+/* ---------- N5: cast and crew ---------- */
+
+/** Spellings that mean the same technology; keyed by the canonical lower-case name. */
+const CAST_ALIASES: Record<string, string[]> = {
+  ".net": [".net", "dotnet", "asp.net", "dot net"],
+  typescript: ["typescript", "ts"],
+  javascript: ["javascript", "js", "ecmascript"],
+  "c#": ["c#", "csharp"],
+  postgresql: ["postgresql", "postgres"],
+  "sql server": ["sql server", "mssql"],
+  react: ["react", "react.js", "reactjs"],
+  "next.js": ["next.js", "nextjs"],
+  "node.js": ["node.js", "nodejs", "node"],
+  "github actions": ["github actions"],
+};
+
+const slug = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9#+.]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+const canonical = (name: string): string => {
+  const n = name.trim().toLowerCase();
+  for (const [key, list] of Object.entries(CAST_ALIASES)) if (key === n || list.includes(n)) return key;
+  return n;
+};
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const reCache = new Map<string, RegExp>();
+const termRe = (key: string): RegExp => {
+  let re = reCache.get(key);
+  if (!re) {
+    const terms = [...new Set([key, ...(CAST_ALIASES[key] ?? [])])];
+    re = new RegExp(`(?<![a-z0-9])(?:${terms.map(escapeRe).join("|")})(?![a-z0-9#+])`, "i");
+    reCache.set(key, re);
+  }
+  return re;
+};
+
+/** The canonical technology behind a `?cast=` value (a slug or a name), or null when empty. */
+export const castKeyOf = (value: string | null | undefined): string | null => {
+  const v = value?.trim().toLowerCase();
+  if (!v) return null;
+  for (const key of Object.keys(CAST_ALIASES)) if (slug(key) === v || key === v) return key;
+  return canonical(v);
+};
+
+const haystack = (item: NfItem): string => {
+  const f = factsOf(item);
+  return [f.title, f.blurb, ...f.tags, ...f.stack].filter(Boolean).join(" \n ");
+};
+
+/** Does this card mention the technology? (title, synopsis, tags, project stack; case-insensitive, aliases folded.) */
+export function mentionsCast(item: NfItem, key: string): boolean {
+  return termRe(key).test(haystack(item));
+}
+
+/** The technologies an item mentions, from the show's cast (the modal's "Cast:" chips). */
+export function castOf(item: NfItem, cast: CastMember[]): CastMember[] {
+  const hay = haystack(item);
+  return cast.filter((c) => termRe(c.key).test(hay));
+}
+
+const niceName = (s: string) => (s === s.toLowerCase() ? (s.length <= 3 ? s.toUpperCase() : s.charAt(0).toUpperCase() + s.slice(1)) : s);
+
+/** data.stack ∪ résumé skills, each with the count of episodes and projects that mention it. Computed once per build. */
+export function buildCast(data: TerminalData, episodes: Episode[], projects: ProjectCard[]): CastMember[] {
+  const names = new Map<string, string>();
+  for (const g of data.resume.skills) for (const n of g.items) if (!names.has(canonical(n))) names.set(canonical(n), n);
+  for (const n of data.stack) if (!names.has(canonical(n))) names.set(canonical(n), niceName(n));
+  const haystacks = [...episodes.map((e) => haystack({ id: e.id, kind: "episode", e })), ...projects.map((c) => haystack({ id: c.id, kind: c.kind, c }))];
+  return [...names.entries()]
+    .map(([key, name]) => {
+      const re = termRe(key);
+      return { id: `cast-${slug(key)}`, key, name, count: haystacks.filter((h) => re.test(h)).length };
+    })
+    .filter((c) => c.count > 0)
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+
+/* ---------- N10: end-of-season card ---------- */
+
+export type EndCard = {
+  complete: string;
+  /** "Next season starts in 42 days" only when the data's `now.month` is later than this season's year; otherwise "This is the current season". */
+  next: string;
+  /** The first episode of the next season in the data, for "Watch next season". */
+  nextFirst: NfItem | null;
+};
+
+/**
+ * What the modal shows after a season's last episode. The countdown is the gap, in days, between this season's
+ * last episode and the next season's first one in the data (a season that is over has a next one already).
+ */
+export function endCardOf(season: number, index: Map<string, NfItem>, nowMonth?: string): EndCard {
+  const eps = [...index.values()].flatMap((o) => (o.kind === "episode" ? [o] : []));
+  const mine = eps.filter((o) => o.e.season === season);
+  const later = eps.filter((o) => o.e.season > season);
+  const nextSeason = later.length ? Math.min(...later.map((o) => o.e.season)) : null;
+  const nextEps = nextSeason == null ? [] : later.filter((o) => o.e.season === nextSeason).sort((a, b) => a.e.n - b.e.n);
+  const nextFirst = nextEps[0] ?? null;
+  const nowYear = nowMonth ? Number(nowMonth.slice(0, 4)) : NaN;
+  let next = "This is the current season";
+  if (nowYear > season) {
+    const lastEnd = Math.max(...mine.map((o) => monthIndex(o.e.date)), 0);
+    const nextStart = nextFirst ? monthIndex(nextFirst.e.date) : null;
+    const days = nextStart == null ? null : Math.max(1, Math.round((nextStart - lastEnd) * 30.4));
+    next = days == null ? "The next season is already running" : `Next season starts in ${days} ${days === 1 ? "day" : "days"}`;
+  }
+  return { complete: `Season ${season} complete`, next, nextFirst };
+}
+
+/* ---------- C4: the phone Hire sheet ---------- */
+
+/** The book-a-call link (F6). Data (`netflix.bookCall`), empty until Ratul gives the link: while `href` is empty no button renders and nothing mentions it. */
+export type BookCall = { label: string; href: string };
+/** The link when there is one (https only), else undefined. */
+export function bookOf(b?: BookCall): BookCall | undefined {
+  return b && /^https:\/\//i.test(b.href.trim()) ? { label: b.label, href: b.href.trim() } : undefined;
+}
+
+export type HireSheet = { book?: BookCall; email?: string; resume: string; brief: string; /** The sheet's first line: role, level, place and availability in one sentence (`hireLine`). */ line: string; /** The one availability line (`hiring.availability`). */ availability: string };
+
+/**
+ * "Popular with visitors": built from the last `windowDays` of title_open and play_complete counts, shown after Top 10
+ * for every profile, hidden until there are `minEvents` counted events (nothing is faked). Weights are data.
+ */
+export const POPULAR = { title: "Popular with visitors", windowDays: 30, minEvents: 20, max: 10, weights: { title_open: 1, play_complete: 3 } } as const;
+
+/** When the contextual Hire bar appears (D5): after this many opened titles or this long on the page; a dismissal is remembered this many days. Data. */
+export const HIRE_BAR = { afterOpens: 2, afterMs: 45_000, rememberDays: 7 } as const;
+
+/** What the Hire sheet offers, from the existing contact and `hiring` data: the mail address, the résumé path and the `hire --brief` text. */
+export function hireSheetOf(data: TerminalData): HireSheet {
+  const h = data.hiring;
+  const link = (kind: string) => data.contact.find((c) => c.label === kind && /^https:\/\//i.test(c.href))?.href;
+  const email = data.contact.find((c) => c.label === "mail")?.href.replace(/^mailto:/i, "");
+  const lines = [
+    `$ hire --brief · ${data.resume.name}`,
+    `Roles: ${h.roles.join(" / ")}`,
+    `Level: ${h.level}`,
+    `Stack: ${[...h.stack.core, ...h.stack.plus].join(", ")}`,
+    `Where: ${[h.location.base, h.location.modes.join(" / "), ...(h.location.relocate ? ["open to relocate"] : [])].join(" · ")}`,
+    `Availability: ${h.availability}`,
+    "Proof:",
+    ...h.proof.map((p) => `  - ${p}`),
+    "Reach:",
+    ...(email ? [`  mail      ${email}`] : []),
+    ...(["linkedin", "github"] as const).flatMap((k) => (link(k) ? [`  ${k.padEnd(9)} ${link(k)}`] : [])),
+    `  resume    ${h.links.site}${h.links.resume}`,
+  ];
+  return { book: bookOf(data.book), email, resume: h.links.resume, brief: lines.join("\n"), line: hireLine(h), availability: h.availability };
+}
+
+/* ---------- C5: Previously on... ---------- */
+
+/** The line a modal types above the synopsis: the previous episode of the same season, with its figure. First episodes (and non-episodes) have none. */
+export function previouslyLine(item: NfItem, index: Map<string, NfItem>): string | null {
+  if (item.kind !== "episode" || item.e.n <= 1) return null;
+  for (const o of index.values()) {
+    if (o.kind === "episode" && o.e.season === item.e.season && o.e.n === item.e.n - 1) return [clip(o.e.title, 80), o.e.metric ? metricLabel(o.e.metric) : ""].filter(Boolean).join(" · ");
+  }
   return null;
 }

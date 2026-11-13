@@ -69,10 +69,13 @@ type PersonaLinkProps =Omit<ComponentProps<typeof Link>, "href"> & {
   persona: PersonaSlug;
   /** Path inside the persona world, e.g. "/roster" or "/blog/my-post". */
   path?: string;
+  /** A full page load even on the same host: for a link out of a view that lives inside the terminal's own page (the client router would keep that view mounted). */
+  hard?: boolean;
 };
 
-export function PersonaLink({ persona, path = "/", ...rest }: PersonaLinkProps) {
-  return <HostAwareLink {...usePersonaHref(persona, path)} {...rest} />;
+export function PersonaLink({ persona, path = "/", hard, ...rest }: PersonaLinkProps) {
+  const h = usePersonaHref(persona, path);
+  return <HostAwareLink {...h} crossOrigin={h.crossOrigin || !!hard} {...rest} />;
 }
 
 /** Link to the hub (bare root domain) from any host. */

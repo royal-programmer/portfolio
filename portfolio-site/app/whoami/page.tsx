@@ -1,16 +1,20 @@
 import type { Metadata } from "next";
 import { ALL_PERSONAS, listEntries, listPersonas } from "@/lib/content";
-import { HUB_COPY } from "@/lib/site/brand";
+import { loadProfiles } from "@/lib/content/records";
+import { getSettingValues } from "@/lib/settings/read";
 import { shareMetadata, siteOrigin } from "@/lib/site/share-meta";
 import { placeOnSpectrum } from "@/lib/site/spectrum";
 import { HubExperience, type HubChapter, type HubUpcoming } from "../components/hub/hub-experience";
 
-export const metadata: Metadata = shareMetadata({
-  title: `Ratul Roy — ${HUB_COPY.headline}`,
-  description: "Engineer, trader, photographer — and more perspectives on the way. Follow the light into each world.",
-  cmd: "portfolio",
-  origin: siteOrigin(null),
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const { identity, "hub.copy": copy } = await getSettingValues(["identity", "hub.copy"]);
+  return shareMetadata({
+    title: `${identity.name} — ${copy.headline}`,
+    description: "Engineer, trader, photographer — and more perspectives on the way. Follow the light into each world.",
+    cmd: "portfolio",
+    origin: siteOrigin(null),
+  });
+}
 
 /**
  * The hub (served at the bare root domain by proxy.ts, and at /whoami on hosts
@@ -22,6 +26,7 @@ export default async function WhoAmIPage({ searchParams }: { searchParams: Promi
   // Every persona climbs by default — all six worlds are built. `?preview=published` shows only
   // the ones whose content is published (what the hub used to do), the rest as colours on the way.
   const { preview } = await searchParams;
+  const { identity, "hub.copy": copy } = await getSettingValues(["identity", "hub.copy"]);
   const previewAll = preview !== "published";
   const [adminPersonas, engineerEntries] = await Promise.all([previewAll ? listPersonas({ includeNonPublic: true }) : Promise.resolve([]), listEntries("engineer")]);
   // The admin read needs the server-only key; without it (or on a blip) the public list stands in.
@@ -44,5 +49,5 @@ export default async function WhoAmIPage({ searchParams }: { searchParams: Promi
   }));
   const upcoming: HubUpcoming[] = upcomingSlugs.map((slug) => ({ slug, t: placed.get(slug) ?? 0.5 }));
 
-  return <HubExperience chapters={chapters} upcoming={upcoming} terminalItems={terminalItems} />;
+  return <HubExperience chapters={chapters} upcoming={upcoming} terminalItems={terminalItems} copy={copy} email={identity.email} profiles={await loadProfiles()} />;
 }

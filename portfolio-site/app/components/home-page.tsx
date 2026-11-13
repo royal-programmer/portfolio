@@ -1,5 +1,6 @@
 "use client";
 
+import type { TerminalData } from "@/lib/site/terminal-data";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { isLaunchedPersona } from "@/lib/content/types";
@@ -27,6 +28,7 @@ import {
   type UiTheme,
 } from "./site-content";
 import type { Entry, BlogPost, Persona as PersonaRecord } from "@/lib/content";
+import { track } from "@/lib/site/track";
 
 type HomePageProps = {
   /** When set, this page was opened via `/[persona]` — play a one-shot enter motion. */
@@ -37,6 +39,8 @@ type HomePageProps = {
   engineerEntries: Entry[];
   /** Engineer blog posts for the recent-writing strip. */
   engineerBlogPosts: BlogPost[];
+  /** The engineer data as the server built it, for the stage. */
+  terminal?: TerminalData;
 };
 
 const CONTENT_FALLBACK: PersonaContent = {
@@ -54,6 +58,7 @@ export function HomePage({
   personas,
   engineerEntries,
   engineerBlogPosts,
+  terminal,
 }: HomePageProps) {
   const { persona, setPersona, personaHydrated } = usePersona();
   const pathname = usePathname();
@@ -150,7 +155,16 @@ export function HomePage({
 
   useEffect(() => {
     window.localStorage.setItem("sound-enabled", soundEnabled ? "true" : "false");
+    // The Stage's headphones glow with the site setting.
+    window.dispatchEvent(new CustomEvent("site:sound", { detail: soundEnabled }));
   }, [soundEnabled]);
+
+  // The Stage's headphones toggle the same setting the preferences panel does.
+  useEffect(() => {
+    const toggle = () => setSoundEnabled((v) => !v);
+    window.addEventListener("stage:sound-toggle", toggle);
+    return () => window.removeEventListener("stage:sound-toggle", toggle);
+  }, []);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent | TouchEvent) => {
@@ -386,6 +400,7 @@ export function HomePage({
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Lead submission failed");
+      track("contact_submit", "chat");
       appendAssistantMessage("Done. I have saved your request and Ratul will get back to you soon.", {
         pauseBeforeDotsMs: CHAT_GAP_AFTER_USER_MS,
       });
@@ -602,6 +617,7 @@ export function HomePage({
           content={content}
           engineerEntries={engineerEntries}
           engineerBlogPosts={engineerBlogPosts}
+          terminal={terminal}
         />
       </div>
 

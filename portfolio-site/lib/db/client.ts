@@ -5,7 +5,7 @@
  *   - `publicClient()`  — anon key, RLS-enforced. Safe anywhere (server reads
  *     of public content). Can only ever see non-private rows.
  *   - `adminClient()`   — service_role key, BYPASSES RLS. SERVER-ONLY. Used by
- *     server actions / capture surfaces after the app has authenticated the
+ *     server actions / admin pages after the app has authenticated the
  *     admin. Guarded so it can never run in the browser.
  *
  * The service_role key is read from a non-NEXT_PUBLIC env var, so it is never

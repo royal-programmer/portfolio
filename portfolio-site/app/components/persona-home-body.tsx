@@ -1,5 +1,6 @@
 "use client";
 
+import type { TerminalData } from "@/lib/site/terminal-data";
 import { Sparkles } from "lucide-react";
 import { forwardRef } from "react";
 import type { BlogPost, Entry } from "@/lib/content";
@@ -54,16 +55,18 @@ type PersonaHomeBodyProps = {
   content: PersonaContent;
   engineerEntries: Entry[];
   engineerBlogPosts: BlogPost[];
+  /** The engineer data as the server built it, for the stage (db mode reads records there). */
+  terminal?: TerminalData;
 };
 
 export const PersonaHomeBody = forwardRef<PersonaMotionOrchestratorHandle, PersonaHomeBodyProps>(
-  function PersonaHomeBody({ persona, spectrumT, content, engineerEntries, engineerBlogPosts }, ref) {
+  function PersonaHomeBody({ persona, spectrumT, content, engineerEntries, engineerBlogPosts, terminal }, ref) {
     return (
       <PersonaMotionOrchestrator ref={ref}>
         {/* The world's hero: the hub's setup (Immersive) or its line drawing (Normal), the same page under it. */}
         <section className={`${SITE_SHELL} pb-6 pt-2 md:pb-8`}>
           <PersonaMotionSlot id={`${persona}-stage`} dir="down" exitOrder={0} enterOrder={0}>
-            <WorldStage slug={persona} t={spectrumT} />
+            <WorldStage slug={persona} t={spectrumT} entries={engineerEntries} posts={engineerBlogPosts} terminal={terminal} />
           </PersonaMotionSlot>
         </section>
         {persona === "engineer" && (

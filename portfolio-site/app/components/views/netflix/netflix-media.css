@@ -1,0 +1,533 @@
+/* Real imagery (17-persona-views.md §24, E2 and E4). */
+.nf-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+  z-index: 0;
+}
+.nf-poster .nf-photo,
+.nf-t10-card .nf-photo {
+  opacity: 0.55;
+}
+.nf-poster:has(.nf-photo)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(8, 8, 12, 0.92), rgba(8, 8, 12, 0.1) 70%);
+  pointer-events: none;
+}
+.nf-poster:has(.nf-photo) > * {
+  z-index: 1;
+}
+.nf-poster:has(.nf-photo) > .nf-photo,
+.nf-poster:has(.nf-photo) > .nf-art2 {
+  z-index: 0;
+}
+.nf-hero .nf-art .nf-photo {
+  opacity: 0.8;
+}
+.nf-bb-art .nf-photo {
+  opacity: 1;
+  object-position: top center;
+}
+
+/* Screens and Clips rows in the modal */
+.nf-shots,
+.nf-clips {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 0 0 6px;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+}
+.nf-shots > li,
+.nf-clips > li {
+  flex: none;
+  scroll-snap-align: start;
+  content-visibility: auto;
+  contain-intrinsic-size: 240px 150px;
+}
+.nf-shot,
+.nf-clip {
+  position: relative;
+  display: block;
+  width: 240px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: #0b0b0f;
+  color: var(--nf-ink);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+}
+.nf-shot img,
+.nf-clip img,
+.nf-clip video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+.nf-clip video {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+}
+.nf-shot span,
+.nf-clip-label {
+  display: block;
+  padding: 6px 10px 8px;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  color: var(--nf-dim);
+}
+.nf-clip-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.85), transparent);
+  color: #fff;
+}
+.nf-clip-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  font-size: 0.7rem;
+  z-index: 1;
+}
+.nf-shot:hover,
+.nf-clip:hover,
+.nf-shot:focus-visible,
+.nf-clip:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+}
+@media (max-width: 720px) {
+  .nf-shot,
+  .nf-clip {
+    width: 200px;
+  }
+}
+
+.nf-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.nf-lightbox-bg {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+}
+.nf-lightbox figure {
+  position: relative;
+  margin: 0;
+  max-width: min(1280px, 100%);
+}
+.nf-lightbox img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 82vh;
+  object-fit: contain;
+  border-radius: 6px;
+}
+.nf-lightbox figcaption {
+  margin-top: 8px;
+  text-align: center;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.8rem;
+  color: var(--nf-dim);
+}
+.nf-lightbox .nf-m-x {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+}
+
+/* Play for a project (F1): the trailer in chapters, then the end card */
+.nf-pend {
+  position: absolute;
+  left: 2.5rem;
+  right: 2.5rem;
+  bottom: 5.2rem;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.nf-pend-dev {
+  margin: 0;
+  font-family: var(--font-display), serif;
+  font-weight: 800;
+  font-size: clamp(1.4rem, 3.4vw, 2.2rem);
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.6);
+}
+.nf-pend-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+@media (max-width: 720px) {
+  .nf-pend {
+    left: 16px;
+    right: 16px;
+    bottom: 4.4rem;
+  }
+}
+@media (forced-colors: active) {
+  .nf-photo {
+    forced-color-adjust: none;
+  }
+}
+
+/* The full-screen player (round 27, 17-persona-views.md section 26) */
+.nf-pl {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  background: #000;
+  color: var(--nf-ink, #fff);
+  overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: manipulation;
+  --pl-t: max(1rem, env(safe-area-inset-top));
+  --pl-b: max(1rem, env(safe-area-inset-bottom));
+  --pl-l: max(1.5rem, env(safe-area-inset-left));
+  --pl-r: max(1.5rem, env(safe-area-inset-right));
+}
+.nf-pl-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: var(--pl-t) var(--pl-r) 2rem var(--pl-l);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.75), transparent);
+}
+.nf-pl-back,
+.nf-pl-fs {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+.nf-pl-back:hover,
+.nf-pl-fs:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.nf-pl-fs {
+  margin-left: auto;
+}
+.nf-pl-title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display), serif;
+  font-weight: 800;
+  font-size: clamp(1.1rem, 2.2vw, 1.6rem);
+}
+.nf-pl-meta {
+  flex: none;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+/* Controls hide after 3 s without input, unless paused, on the end card, or a control has the keyboard focus */
+.nf-pl-chrome {
+  transition: opacity 200ms;
+}
+.nf-pl[data-chrome="hide"] {
+  cursor: none;
+}
+.nf-pl[data-chrome="hide"] .nf-pl-chrome {
+  opacity: 0;
+  pointer-events: none;
+}
+.nf-pl:has(.nf-tr[data-paused]) .nf-pl-chrome,
+.nf-pl:has(.nf-tr[data-kind="end"]) .nf-pl-chrome,
+.nf-pl .nf-pl-chrome:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+.nf-pl:has(.nf-tr[data-paused]),
+.nf-pl:has(.nf-tr[data-kind="end"]) {
+  cursor: default;
+}
+
+.nf-tr {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  cursor: pointer;
+}
+.nf-tr[data-kind="end"] {
+  cursor: default;
+}
+/* A clip fills the screen at its own shape, letterboxed on black; the subtitle has its own band underneath */
+.nf-tr-stage {
+  position: absolute;
+  inset: 0;
+  padding: calc(var(--pl-t) + 3.2rem) var(--pl-l) calc(var(--pl-b) + 6.2rem);
+  background: #000;
+}
+.nf-tr-stage video,
+.nf-tr-stage img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.nf-tr-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: calc(var(--pl-t) + 3.5rem) max(8vw, var(--pl-r)) calc(var(--pl-b) + 5rem) max(8vw, var(--pl-l));
+  overflow: hidden;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: clamp(1rem, 2.1vw, 1.6rem);
+  line-height: 1.6;
+  color: var(--nf-ink);
+}
+.nf-tr-text p {
+  margin: 0 0 0.5em;
+  max-width: 46rem;
+  white-space: pre-wrap;
+}
+.nf-tr-name {
+  font-family: var(--font-display), serif;
+  font-weight: 800;
+  font-size: clamp(2rem, 6vw, 4.2rem);
+  line-height: 1.1;
+}
+.nf-tr-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.nf-tr-chips li {
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  font-size: 0.8em;
+}
+.nf-tr-sub {
+  position: absolute;
+  left: var(--pl-l);
+  right: var(--pl-r);
+  bottom: calc(var(--pl-b) + 3.4rem);
+  margin: 0 auto;
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 12px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.72);
+  text-align: center;
+  font-size: clamp(0.95rem, 1.9vw, 1.35rem);
+  line-height: 1.4;
+  color: #fff;
+}
+/* The chapter dots are the progress bar, along the bottom */
+.nf-tr-ctl {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2rem var(--pl-r) var(--pl-b) var(--pl-l);
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.75), transparent);
+}
+.nf-tr-ctl > button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.nf-tr-ctl > button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.28);
+}
+.nf-tr-ctl > button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.nf-tr-dots {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  margin: 0 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.nf-tr-dots li {
+  flex: 1;
+  height: 24px;
+  display: flex;
+  align-items: center;
+}
+.nf-tr-dots button {
+  width: 100%;
+  height: 5px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+}
+.nf-tr-dots li[data-state="done"] button {
+  background: #fff;
+}
+.nf-tr-dots li[data-state="now"] button {
+  background: linear-gradient(90deg, #e50914 calc(var(--p, 0) * 100%), rgba(255, 255, 255, 0.3) 0);
+}
+.nf-tr-paused {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 8px 18px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.7);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.95rem;
+  color: #fff;
+  pointer-events: none;
+}
+/* The end card, inside the player */
+.nf-tr .nf-pend {
+  left: var(--pl-l);
+  right: var(--pl-r);
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+  align-items: center;
+  text-align: center;
+  gap: 18px;
+}
+.nf-tr .nf-pend-actions {
+  justify-content: center;
+}
+/* An episode's text, and the binge card, inside the player */
+.nf-pl .nf-tele2 {
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-height: none;
+  padding: calc(var(--pl-t) + 3.5rem) max(8vw, var(--pl-r)) calc(var(--pl-b) + 5rem) max(8vw, var(--pl-l));
+  border-radius: 0;
+  background: transparent;
+  font-size: clamp(1rem, 2.1vw, 1.6rem);
+}
+.nf-pl .nf-binge {
+  left: var(--pl-l);
+  right: var(--pl-r);
+  bottom: var(--pl-b);
+  max-width: 44rem;
+  margin: 0 auto;
+}
+@media (max-width: 720px) {
+  .nf-pl {
+    --pl-l: max(1rem, env(safe-area-inset-left));
+    --pl-r: max(1rem, env(safe-area-inset-right));
+  }
+  .nf-tr-text {
+    font-size: 0.95rem;
+    padding-left: var(--pl-l);
+    padding-right: var(--pl-r);
+  }
+  .nf-tr-name {
+    font-size: 2rem;
+  }
+  .nf-tr .nf-pend-actions .nf-btn {
+    flex: 1 1 40%;
+    min-height: 40px;
+  }
+  .nf-pl .nf-tele2 {
+    padding-left: var(--pl-l);
+    padding-right: var(--pl-r);
+  }
+}
+/* A phone on its side: the least chrome, the most picture */
+@media (orientation: landscape) and (max-height: 520px) {
+  .nf-pl-top {
+    padding-bottom: 1rem;
+  }
+  .nf-tr-stage {
+    padding: calc(var(--pl-t) + 2.4rem) var(--pl-l) calc(var(--pl-b) + 5.2rem);
+  }
+  .nf-tr-text,
+  .nf-pl .nf-tele2 {
+    padding-top: calc(var(--pl-t) + 2.6rem);
+    padding-bottom: calc(var(--pl-b) + 3.6rem);
+    font-size: 0.9rem;
+  }
+  .nf-tr-name {
+    font-size: 1.6rem;
+  }
+  .nf-tr-ctl {
+    padding-top: 1rem;
+  }
+  .nf-tr .nf-pend-dev {
+    font-size: 1rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nf-pl-chrome {
+    transition: none;
+  }
+}
+
+/* The hover clip (F4): over the poster, under the title */
+.nf-hclip {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}

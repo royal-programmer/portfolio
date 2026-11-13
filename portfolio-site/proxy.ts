@@ -18,6 +18,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isPersonaSlug } from "@/lib/content/types";
 import { parseHost, SUBDOMAIN_BY_PERSONA } from "@/lib/site/hosts";
+import { ADMIN_HOST_LABEL } from "@/lib/site/admin-host";
 
 function hostUrl(request: NextRequest, root: string, label: string | null, pathname: string) {
   // Built by hand: NextURL normalises `localhost` hostnames, which breaks dev redirects.
@@ -61,12 +62,12 @@ function route(request: NextRequest) {
       if (isPersonaSlug(first)) {
         return NextResponse.redirect(hostUrl(request, parsed.root, SUBDOMAIN_BY_PERSONA[first], rest));
       }
-      return NextResponse.next(); // /capture etc.
+      return NextResponse.next(); // /admin etc.
     }
 
     case "persona": {
-      // Admin + hub live on the root host (auth cookies are host-scoped).
-      if (first === "capture") return NextResponse.redirect(hostUrl(request, parsed.root, null, pathname));
+      // Admin (/admin) + hub live on the root host (auth cookies are host-scoped).
+      if (first === "admin") return NextResponse.redirect(hostUrl(request, parsed.root, ADMIN_HOST_LABEL, pathname));
       if (first === "whoami") return NextResponse.redirect(hostUrl(request, parsed.root, null, "/"));
       // Path-style URL on the persona's own host. Documents get the clean URL;
       // client-router (RSC) fetches are served as-is — the router can't follow

@@ -23,11 +23,14 @@ import {
 } from "@/lib/site/terminal-fs";
 import { fitMatch, FIT_MAX } from "@/lib/site/terminal-fit";
 import { layoutArch, type ArchRun } from "@/lib/site/terminal-arch";
+import { cleanFor, forLink } from "@/lib/site/netflix-for";
 import { didYouMean } from "@/lib/site/terminal-suggest";
 import type { TermCommit, TerminalData } from "@/lib/site/terminal-data";
 import { LANG_NAMES, LANGS, STRINGS, type Lang, type StringKey, type TerminalStrings } from "@/lib/site/terminal-strings";
 import { clockCopy, say } from "@/lib/site/terminal-clock";
 import { OTHER_WORLDS, worldName } from "@/lib/site/terminal-worlds";
+import { findSkill, skillEvidence, skillNames } from "@/lib/site/skill-evidence";
+import { isProfileGroup, PROFILE_GROUPS, type ProfileGroup } from "@/lib/site/profiles";
 
 export type MenuId = "views" | "projects" | "writing" | "themes" | "langs";
 export type MenuRow = { key: string; label: string; line: string };
@@ -94,7 +97,7 @@ export type TimelineRow =
   | { year: string; mon: string; subject: string; tag?: string; grade?: string; dim?: boolean; life?: boolean; glyph?: string; label?: string; periodGrade?: string };
 
 /** One token in a `links` line: a link (`href`), a command (`cmd`) or a UI action (`act`: copy `url`, or open the phone's share sheet). */
-export type LinkItem = { label: string; href?: string; external?: boolean; cmd?: string; act?: "copy" | "share"; url?: string; title?: string };
+export type LinkItem = { label: string; /** A skill chip: the UI opens that skill's evidence panel. */ skill?: string; href?: string; external?: boolean; cmd?: string; act?: "copy" | "share"; url?: string; title?: string };
 
 export type Out =
   | { kind: "text"; text: string; dim?: boolean; accent?: boolean }
@@ -139,6 +142,8 @@ export type Effect =
   /** `git log`: the UI fetches the public activity. */
   | { kind: "git-log"; oneline: boolean; limit: number }
   | { kind: "window"; url: string }
+  /** `resume --build`: the UI streams the build's progress from `/api/resume/build`. */
+  | { kind: "resume-build" }
   | { kind: "theme"; id: ThemeId }
   /** `theme auto`: forget the saved pick; the UI follows the visitor's clock again. */
   | { kind: "theme-auto" }
@@ -152,6 +157,8 @@ export type Effect =
   /** `stats [year|langs]`: the UI fetches the GitHub year and draws it. */
   | { kind: "stats"; mode: "all" | "year" | "langs" }
   | { kind: "worlds" }
+  /** `profiles [group]`: the UI prints the rows and fills in the live numbers from `/api/profiles`. */
+  | { kind: "profiles"; group?: ProfileGroup }
   | { kind: "sl" }
   /** `fit` with no text: the UI opens its paste box. */
   | { kind: "fit-box" }
@@ -202,7 +209,8 @@ const COMMANDS: CommandDef[] = [
   { name: "qr", group: "open", usage: "qr" },
   { name: "theme", group: "terminal", usage: "theme [name|auto|random]", long: true },
   { name: "crt", group: "terminal", usage: "crt" },
-  { name: "resume", group: "read", usage: "resume [--pdf]" },
+  { name: "resume", group: "read", usage: "resume [--pdf|--build]" },
+  { name: "skill", group: "read", usage: "skill <name>", long: true },
   { name: "portrait", group: "read", usage: "portrait [mode|list|next]" },
   { name: "whoami", group: "read", usage: "whoami" },
   { name: "neofetch", group: "read", usage: "neofetch" },
@@ -216,13 +224,14 @@ const COMMANDS: CommandDef[] = [
   { name: "cls", group: "terminal", usage: "cls" },
   { name: "portfolio", group: "read", usage: "portfolio", long: true },
   { name: "worlds", group: "read", usage: "worlds" },
+  { name: "profiles", group: "read", usage: "profiles [group]" },
   { name: "now", group: "read", usage: "now" },
   { name: "hire", group: "read", usage: "hire [--brief]" },
   { name: "timeline", group: "read", usage: "timeline [--all]" },
   { name: "view", group: "open", usage: "view [id]" },
   { name: "git", group: "read", usage: "git log [--oneline] [-n k]" },
   { name: "stats", group: "read", usage: "stats [year|langs]", long: true },
-  { name: "share", group: "read", usage: "share [command]", long: true },
+  { name: "share", group: "read", usage: "share [command] | share netflix --for \"Name\"", long: true },
   { name: "fit", group: "read", usage: "fit [paste]", long: true },
   { name: "arch", group: "read", usage: "arch [shift-roster|automations|process-apis|this-site]", long: true },
   { name: "screensaver", group: "terminal", usage: "screensaver [off|on]", long: true },
@@ -260,7 +269,7 @@ const TIPS = [
 /** What `help` shows first: `start here`, then three short groups. `help --all` lists every command under the older four. */
 const HELP_START = ["portfolio", "hire", "help"];
 const HELP_GROUPS: Array<{ key: StringKey; names: string[] }> = [
-  { key: "group.read", names: ["about", "resume", "projects", "writing", "timeline", "now", "worlds", "contact"] },
+  { key: "group.read", names: ["about", "resume", "projects", "writing", "timeline", "now", "worlds", "contact", "profiles"] },
   { key: "group.live", names: ["stats", "git", "curl", "fit"] },
   { key: "group.terminal", names: ["theme", "lang", "pane", "clear", "exit"] },
 ];
@@ -326,7 +335,7 @@ export function createShell(data: TerminalData): Shell {
       };
       const main = data.contact.filter((c) => !c.group);
       const more = data.contact.filter((c) => c.group === "elsewhere");
-      return [...main.map(row), ...(more.length ? [text(""), text(S.elsewhere, true), ...more.map(row)] : [])];
+      return [...main.map(row), ...(more.length ? [text(""), text(S.elsewhere, true), ...more.map(row)] : []), text(""), text(S["contact.profiles"], true)];
     }
     return lines.map((l): Out => {
       const link = /^(?:repo|live) ↗ (\S+)$/.exec(l);
@@ -581,7 +590,7 @@ export function createShell(data: TerminalData): Shell {
     const github = url("github");
     const email = data.contact.find((c) => c.label === "mail")?.href.replace(/^mailto:/i, "");
     const resumeUrl = `https://${host}${h.links.resume}`;
-    type Row = { t: string; dim?: boolean; label?: string };
+    type Row = { t: string; dim?: boolean; /** Dim only the trailing "ask" word (the rest is a real value). */ askTail?: boolean; label?: string };
     const where = [h.location.base, h.location.modes.join(" / "), ...(h.location.relocate ? [S["hb.reloc"]] : [])].join(" · ");
     const secs: Array<{ label: string; rows: Row[] }> = [
       { label: S["hb.roles"], rows: [...h.roles.map((t) => ({ t })), { t: h.level, dim: true }] },
@@ -590,8 +599,8 @@ export function createShell(data: TerminalData): Shell {
       {
         label: S["hb.when"],
         rows: [
-          { label: S["hb.avail"], t: h.availability, dim: ask(h.availability) },
-          { label: S["hb.comp"], t: h.compensation, dim: ask(h.compensation) },
+          { label: S["hb.avail"], t: h.availability, askTail: ask(h.availability) },
+          { label: S["hb.comp"], t: h.compensation, askTail: ask(h.compensation) },
         ],
       },
       { label: S["hb.proof"], rows: h.proof.map((t) => ({ t })) },
@@ -613,9 +622,13 @@ export function createShell(data: TerminalData): Shell {
       head(sec.label);
       for (const r of sec.rows) {
         const lead = r.label ? `${r.label}  ` : "";
-        wrapText(r.t, w - 2 - lead.length).forEach((l, i) => {
-          if (r.label && i === 0) out.push({ kind: "parts", parts: [{ text: `${bar}${lead}` }, { text: l, tone: r.dim ? "dim" : undefined }] });
-          else out.push(text(`${bar}${" ".repeat(lead.length)}${l}`, r.dim));
+        const lines = wrapText(r.t, w - 2 - lead.length);
+        lines.forEach((l, i) => {
+          const tail = r.askTail && i === lines.length - 1 ? /^(.*?)(ask)$/i.exec(l) : null;
+          const pad = i === 0 ? lead : " ".repeat(lead.length);
+          if (tail) out.push({ kind: "parts", parts: [{ text: `${bar}${pad}${tail[1]}` }, { text: tail[2], tone: "dim" }] });
+          else if (r.label && i === 0) out.push({ kind: "parts", parts: [{ text: `${bar}${lead}` }, { text: l, tone: r.dim ? "dim" : undefined }] });
+          else out.push(text(`${bar}${pad}${l}`, r.dim));
         });
       }
     }
@@ -625,6 +638,7 @@ export function createShell(data: TerminalData): Shell {
       ...(linkedin ? [{ label: "linkedin", href: linkedin, external: true }] : []),
       ...(github ? [{ label: "github", href: github, external: true }] : []),
       { label: "resume --pdf", cmd: "resume --pdf" },
+      { label: "resume --build", cmd: "resume --build" },
       { label: S["share.copy"], act: "copy" as const, url: sheet },
       { label: S["share.share"], act: "share" as const, url: link, title: `$ hire --brief · ${data.resume.name}` },
     ];
@@ -633,6 +647,7 @@ export function createShell(data: TerminalData): Shell {
       out.push({ kind: "links", prefix: `${bar}→ `, items: tokens.slice(0, 3) });
       out.push({ kind: "links", prefix: `${bar}→ `, items: tokens.slice(3) });
     }
+    for (const n of data.hiring.alsoOn ?? []) out.push(text(`${bar}${S["hb.also"](n)}`, true));
     for (const l of wrapText(S["hb.foot"], w - 2)) out.push(text(`${bar}${l}`, true));
     return out;
   };
@@ -691,7 +706,7 @@ export function createShell(data: TerminalData): Shell {
     go("worlds");
     head(S["pf.contact"]);
     row(clip([...data.contact.filter((c) => !c.group).map((c) => c.label), "resume --pdf"].join(" · ")));
-    go("contact", "mail", "share");
+    go("contact", "profiles", "mail", "share");
     return out;
   };
 
@@ -703,6 +718,21 @@ export function createShell(data: TerminalData): Shell {
       // Default: the command before this one (not share itself), else the whole portfolio.
       const prev = [...st.history].reverse().find((h) => cmdName(h) !== "share" && NAMES.includes(cmdName(h)));
       cmd = prev ? prev.trim().replace(/\s+/g, " ").replace(/^\//, "") : "portfolio";
+    }
+    // `share netflix --for "Acme"`: the Netflix view's link made for a person (17-persona-views.md §22, D1).
+    const forM = /^netflix\s+--for\s+(?:"([^"]*)"|'([^']*)'|(.+))$/i.exec(cmd);
+    if (forM) {
+      const who = cleanFor(forM[1] ?? forM[2] ?? forM[3]);
+      if (!who) return [text(S["err.share"](args.join(" ").trim()))];
+      const o = `https://${host}`;
+      const url = forLink(o, "recruiter", who);
+      const img = `${o}/og?cmd=${encodeURIComponent("netflix:home")}&for=${encodeURIComponent(who)}`;
+      return [
+        text(S["share.head"](`netflix --for "${who}"`), true),
+        { kind: "links", prefix: "link   ", items: [{ label: url, href: url }] },
+        { kind: "links", prefix: "image  ", items: [{ label: img, href: img }] },
+        { kind: "links", prefix: "       ", items: [{ label: S["share.copy"], act: "copy", url }, { label: S["share.share"], act: "share", url, title: `Picked for ${who} · Ratul Roy` }] },
+      ];
     }
     // Same shape the `?run=` handler accepts: a known command, plain characters, short.
     if (!/^[a-z][a-z0-9 ._~/-]{0,40}$/i.test(cmd) || !NAMES.includes(cmdName(cmd)))
@@ -812,7 +842,7 @@ export function createShell(data: TerminalData): Shell {
     out.push(text(""), text(loc()?.summary ?? r.summary), text(""), text(S["resume.experience"], true));
     for (const x of r.experience) out.push(text(`${x.role} · ${x.company} · ${x.period}`), text(x.headline, true));
     out.push(text(""), text(S["resume.skills"], true));
-    for (const g of r.skills) out.push(text(g.group, true), text(g.items.join(" · ")));
+    for (const g of r.skills) out.push(text(g.group, true), { kind: "links", items: g.items.map((n) => ({ label: n, skill: n })) });
     out.push(text(""), text(S["resume.education"], true));
     for (const e of r.education) out.push(text(`${e.degree} · ${e.school} · ${e.year}`));
     const named = r.certifications.find((c) => c.items?.length);
@@ -823,6 +853,36 @@ export function createShell(data: TerminalData): Shell {
     }
     out.push(text(""), text(S["resume.foot1"], true));
     out.push(text(S["resume.foot2"], true));
+    out.push(text(S["resume.foot3"], true));
+    return out;
+  };
+
+  /** `skill <name>`: the same evidence as the panel, as text: projects, work, certificates, or a plain "no linked work yet". */
+  const skill = (arg: string): Out[] => {
+    const name = findSkill(data, arg);
+    if (!name) return [text(arg ? S["err.skill.none"](arg) : S["err.skill.usage"])];
+    const ev = skillEvidence(data, name);
+    const out: Out[] = [{ kind: "text", text: ev.group ? `${ev.name} · ${S["skill.in"](ev.group)}` : ev.name, accent: true }];
+    if (ev.source === "none") return [...out, text(S["skill.none"], true)];
+    if (ev.projects.length) {
+      out.push(text(""), text(S["skill.projects"], true));
+      for (const p of ev.projects) out.push({ kind: "run", text: p.title + (p.line ? ` · ${p.line}` : ""), cmd: `open ${p.slug}` });
+    }
+    if (ev.work.length) {
+      out.push(text(""), text(S["skill.work"], true));
+      for (const w of ev.work) {
+        out.push(text(`${w.role} · ${w.company} · ${w.period}`));
+        for (const b of w.bullets) out.push(text(`  • ${b}`, true));
+      }
+    }
+    if (ev.certs.length) {
+      out.push(text(""), text(S["skill.certs"], true));
+      for (const c of ev.certs) {
+        out.push(text(`${c.name} · ${c.issuer}`));
+        if (c.verify) out.push({ kind: "link", label: `  ${S["skill.verify"]}: ${c.verify}`, href: c.verify, external: /^https?:\/\//i.test(c.verify) });
+      }
+    }
+    out.push(text(""), text(S[ev.source === "linked" ? "skill.linked" : "skill.matched"], true));
     return out;
   };
 
@@ -890,6 +950,11 @@ export function createShell(data: TerminalData): Shell {
         return git(args);
       case "worlds":
         return { lines: [], effect: { kind: "worlds" } };
+      case "profiles": {
+        const g = (args[0] ?? "").toLowerCase();
+        if (args.length > 1 || (g && !isProfileGroup(g))) return { lines: [text(S["err.profiles.usage"])] };
+        return { lines: [], effect: { kind: "profiles", ...(g ? { group: g as ProfileGroup } : {}) } };
+      }
       case "portfolio":
         return { lines: portfolio(env?.cols ?? 100) };
       case "hire":
@@ -911,6 +976,8 @@ export function createShell(data: TerminalData): Shell {
         if (args.length > 1 || (a && a !== "off" && a !== "on")) return { lines: [text(S["err.saver.usage"])] };
         return { lines: [], effect: { kind: "saver", mode: a === "off" ? "off" : a === "on" ? "on" : "now" } };
       }
+      case "skill":
+        return { lines: skill(line.trim().replace(/^\/?skill\s*/i, "")) };
       case "arch":
         return { lines: arch(args[0], env?.cols ?? 100) };
       case "mail": {
@@ -932,14 +999,11 @@ export function createShell(data: TerminalData): Shell {
       case "neofetch":
         return { lines: neofetch() };
       case "resume":
-        if (args.includes("--pdf"))
-          return {
-            lines: [
-              text(S["resume.pdf"]),
-              { kind: "link", label: "/resume.pdf", href: "/resume.pdf", external: true },
-            ],
-            effect: { kind: "window", url: "/resume.pdf" },
-          };
+        if (args.includes("--build")) return { lines: [], effect: { kind: "resume-build" } };
+        if (args.includes("--pdf")) {
+          const href = data.resumeFiles.submitted.href;
+          return { lines: [text(S["resume.pdf"]), { kind: "link", label: href, href, external: true }], effect: { kind: "window", url: href } };
+        }
         return { lines: resume() };
       case "stats": {
         const a = (args[0] ?? "").toLowerCase();
@@ -1088,11 +1152,22 @@ export function createShell(data: TerminalData): Shell {
       if (cmd === "screensaver") return ["off", "on"].filter((n) => n.startsWith(word));
       if (cmd === "lang") return [...LANGS].filter((n) => n.startsWith(word.toLowerCase()));
       if (cmd === "arch") return data.arch.map((d) => d.id).filter((n) => n.startsWith(word.toLowerCase()));
+      if (cmd === "skill") {
+        // Skill names can hold spaces ("SQL Server"): match the whole phrase typed so far, offer the token being typed.
+        const before = head.replace(/^\/?skill\s*/i, "");
+        const at = before ? before.split(/\s+/).length : 0;
+        const prefix = (before ? `${before.toLowerCase()} ` : "") + word.toLowerCase();
+        return skillNames(data)
+          .filter((n) => n.toLowerCase().startsWith(prefix))
+          .flatMap((n) => n.split(/\s+/)[at] ?? [])
+          .filter((v, i, arr) => arr.indexOf(v) === i);
+      }
       if (cmd === "hire") return ["--brief"].filter((n) => n.startsWith(word));
       if (cmd === "mail") return ["--fit"].filter((n) => n.startsWith(word));
       if (cmd === "share") return NAMES.filter((n) => n.startsWith(word.toLowerCase()));
       if (cmd === "timeline") return ["--all"].filter((n) => n.startsWith(word));
-      if (cmd === "resume") return ["--pdf"].filter((n) => n.startsWith(word));
+      if (cmd === "resume") return ["--pdf", "--build"].filter((n) => n.startsWith(word));
+      if (cmd === "profiles") return [...PROFILE_GROUPS].filter((n) => n.startsWith(word.toLowerCase()));
       if (cmd === "stats") return ["year", "langs"].filter((n) => n.startsWith(word));
       if (cmd === "curl") return ["github"].filter((n) => n.startsWith(word));
       if (cmd === "git") {

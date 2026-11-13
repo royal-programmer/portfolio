@@ -2278,6 +2278,11 @@ em.font-display,
 .terminal-root-row.is-sel {
   background: color-mix(in srgb, var(--c) 12%, transparent);
 }
+/* The selected row tints the background: its description reads brighter than the faint grey so it stays above 4.5:1. */
+.terminal-root-row.is-sel .is-dim,
+.terminal-root-row.is-sel > i.is-out {
+  color: color-mix(in srgb, var(--ink) 82%, transparent);
+}
 @media (pointer: coarse) {
   .terminal-root-row {
     min-height: 44px;
@@ -3612,6 +3617,370 @@ em.font-display,
 @media (max-width: 767px) {
   .terminal-os-status-here {
     display: none;
+  }
+}
+
+
+/* `profiles`: label, handle, live number, open. Wraps on a phone; the open link stays at the right. */
+.terminal-root-body .terminal-os-profile {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 1.5ch;
+}
+.terminal-os-profile b {
+  min-width: 16ch;
+  font-weight: inherit;
+}
+.terminal-os-profile i {
+  font-style: normal;
+}
+.terminal-os-profile > span {
+  display: inline;
+}
+.terminal-os-profile .terminal-root-link {
+  margin-left: auto;
+}
+
+/* Touch: the transcript pans vertically and never hands the gesture to the page behind it. */
+.terminal-root-body {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+.terminal-root-menu-hint {
+  display: block;
+  padding: 4px 6px 0;
+}
+/* The Netflix row and top-bar chips pan sideways by touch (the page still pans up and down). */
+.nf-scroller,
+.nf-bar-nav {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+}
+.nf-bar-nav {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+/* The Stage: a prop's hover label and the HUD strip of text buttons (S3). */
+.stage-prop-label {
+  font: 500 11px/1 var(--font-geist-mono), ui-monospace, monospace;
+  color: var(--stage-c, #7aa2ff);
+  background: rgba(8, 8, 12, 0.82);
+  border: 1px solid color-mix(in srgb, var(--stage-c, #7aa2ff) 55%, transparent);
+  border-radius: 6px;
+  padding: 4px 7px;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+.stage-hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px 0;
+  font: 500 12px/1.2 var(--font-geist-mono), ui-monospace, monospace;
+  color: var(--ink-dim, #a9a7a1);
+}
+.stage-hud button {
+  font: inherit;
+  color: var(--stage-c, #7aa2ff);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 8px;
+  min-height: 32px;
+  cursor: pointer;
+}
+.stage-hud button:hover,
+.stage-hud button:focus-visible {
+  border-color: color-mix(in srgb, var(--stage-c, #7aa2ff) 60%, transparent);
+  outline: none;
+}
+.stage-prop-label small {
+  display: block;
+  margin-top: 3px;
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+/* The Stage's scroll story (S9): a tall container, the stage stuck to the top, words beside the stops, a dot rail. */
+.stage-story {
+  position: relative;
+  height: calc(100svh + 3 * var(--travel-d, 80) * 1svh);
+}
+.stage-story-stick {
+  position: sticky;
+  top: 5.25rem;
+}
+.stage-story-box {
+  height: calc(100svh - 10rem);
+  min-height: 320px;
+}
+.stage-story-words {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 1.5rem;
+}
+.stage-panel {
+  position: absolute;
+  top: 50%;
+  max-width: min(24rem, 42%);
+  margin-top: -6rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--stage-c, #7aa2ff) 35%, transparent);
+  background: rgba(8, 8, 12, 0.72);
+  backdrop-filter: blur(10px);
+  color: #ecebe6;
+  opacity: 0;
+  visibility: hidden;
+  will-change: opacity, transform;
+}
+.stage-panel[data-side="left"] {
+  left: clamp(1rem, 4vw, 3rem);
+}
+.stage-panel[data-side="right"] {
+  right: clamp(1rem, 4vw, 3rem);
+}
+.stage-panel-eyebrow {
+  font: 500 11px/1 var(--font-geist-mono), ui-monospace, monospace;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--stage-c, #7aa2ff);
+}
+.stage-panel-title {
+  margin-top: 0.55rem;
+  font-size: clamp(1.25rem, 2.4vw, 1.9rem);
+  font-weight: 600;
+  line-height: 1.15;
+}
+.stage-panel-body {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  opacity: 0.75;
+}
+.stage-panel-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+.stage-panel-link {
+  font: 500 12px/1 var(--font-geist-mono), ui-monospace, monospace;
+  color: var(--stage-c, #7aa2ff);
+  border: 1px solid color-mix(in srgb, var(--stage-c, #7aa2ff) 55%, transparent);
+  border-radius: 999px;
+  padding: 0.6rem 0.9rem;
+  min-height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+}
+.stage-panel-link:hover,
+.stage-panel-link:focus-visible {
+  background: color-mix(in srgb, var(--stage-c, #7aa2ff) 18%, transparent);
+  outline: none;
+}
+.stage-static {
+  display: grid;
+  gap: 0.9rem;
+  padding: 0.5rem 0 0;
+}
+.stage-panel-static {
+  position: static;
+  opacity: 1;
+  visibility: visible;
+  max-width: none;
+  margin: 0;
+}
+.stage-rail {
+  position: fixed;
+  right: max(0.6rem, env(safe-area-inset-right, 0px));
+  top: 50%;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  transform: translateY(-50%);
+  transition: opacity 200ms ease;
+  opacity: 0;
+  pointer-events: none;
+}
+.stage-rail-dot {
+  position: relative;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.stage-rail-dot::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  border: 1.5px solid var(--stage-c, #7aa2ff);
+  background: transparent;
+  transition: background 160ms ease, transform 160ms ease;
+}
+.stage-rail-dot[data-active="true"]::before {
+  background: var(--stage-c, #7aa2ff);
+  transform: scale(1.25);
+}
+.stage-rail-dot:focus-visible {
+  outline: 2px solid var(--stage-c, #7aa2ff);
+  outline-offset: -4px;
+  border-radius: 999px;
+}
+.stage-rail-label {
+  position: absolute;
+  right: 2rem;
+  padding: 3px 7px;
+  font: 500 11px/1 var(--font-geist-mono), ui-monospace, monospace;
+  color: #ecebe6;
+  background: rgba(8, 8, 12, 0.85);
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+.stage-rail-dot:hover .stage-rail-label,
+.stage-rail-dot:focus-visible .stage-rail-label {
+  opacity: 1;
+}
+@media (max-width: 767px) {
+  .stage-story {
+    height: calc(100svh + 3 * var(--travel-p, 55) * 1svh);
+  }
+  .stage-story-stick {
+    top: 4.5rem;
+  }
+  .stage-story-box {
+    height: 60svh;
+    min-height: 0;
+  }
+  .stage-panel {
+    max-width: none;
+    left: 0.6rem !important;
+    right: 0.6rem !important;
+    top: auto;
+    bottom: 0.6rem;
+    margin-top: 0;
+  }
+}
+
+
+
+
+
+/* The Stage's photo mode (S6): the page dims, a 1200 x 630 guide sits on the stage, a bar of buttons below. */
+html[data-stage-photo] .stage-story-words,
+html[data-stage-photo] .stage-hud {
+  opacity: 0;
+  transition: opacity 200ms;
+}
+.stage-photo {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  touch-action: none;
+  cursor: grab;
+  animation: stage-photo-in 250ms ease-out both;
+}
+.stage-photo-dim {
+  position: absolute;
+  border-radius: 1.5rem;
+  box-shadow: 0 0 0 200vmax rgba(7, 7, 10, 0.9);
+  pointer-events: none;
+}
+.stage-photo-guide {
+  position: absolute;
+  border: 1px solid color-mix(in srgb, var(--stage-c, #7aa2ff) 80%, #fff);
+  box-shadow: 0 0 0 100vmax rgba(7, 7, 10, 0.4);
+  pointer-events: none;
+}
+.stage-photo-guide span {
+  position: absolute;
+  left: 8px;
+  top: 6px;
+  font: 500 10px/1 var(--font-geist-mono), ui-monospace, monospace;
+  color: var(--stage-c, #7aa2ff);
+}
+.stage-photo-preview {
+  position: absolute;
+  inset: 0 0 4.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(7, 7, 10, 0.94);
+  cursor: default;
+}
+.stage-photo-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  height: auto;
+  border: 1px solid color-mix(in srgb, var(--stage-c, #7aa2ff) 50%, transparent);
+  border-radius: 6px;
+}
+.stage-photo-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  cursor: default;
+  font: 500 12px/1.3 var(--font-geist-mono), ui-monospace, monospace;
+  color: #cfccc4;
+}
+.stage-photo-bar button {
+  font: inherit;
+  color: var(--stage-c, #7aa2ff);
+  background: rgba(7, 7, 10, 0.7);
+  border: 1px solid color-mix(in srgb, var(--stage-c, #7aa2ff) 60%, transparent);
+  border-radius: 8px;
+  padding: 0 14px;
+  min-height: 40px;
+  cursor: pointer;
+}
+.stage-photo-bar button.is-primary {
+  background: color-mix(in srgb, var(--stage-c, #7aa2ff) 22%, #07070a);
+}
+.stage-photo-bar button:disabled {
+  opacity: 0.6;
+}
+.stage-photo-note {
+  flex-basis: 100%;
+  text-align: center;
+  min-height: 1.3em;
+  word-break: break-all;
+}
+@media (max-width: 767px) {
+  .stage-photo-bar button {
+    flex: 1 1 100%;
+  }
+}
+@keyframes stage-photo-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-photo {
+    animation: none;
   }
 }
 

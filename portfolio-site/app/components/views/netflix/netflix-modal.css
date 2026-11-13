@@ -103,6 +103,18 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.nf-bb-metric {
+  position: absolute;
+  left: 2.5rem;
+  right: 2.5rem;
+  bottom: 4.5rem;
+  margin: 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.78);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+.nf-bb-metric[data-hidden],
 .nf-bb-title[data-hidden] {
   display: none;
 }
@@ -145,6 +157,33 @@
   font-size: 1.7rem;
   line-height: 1;
   cursor: pointer;
+}
+.nf-m-share {
+  position: absolute;
+  top: 12px;
+  right: 64px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: #141419;
+  color: #fff;
+  cursor: pointer;
+}
+.nf-m-copied {
+  position: absolute;
+  top: 62px;
+  right: 12px;
+  z-index: 2;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #fff;
+  color: #141419;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 .nf-m-bar {
   position: absolute;
@@ -495,5 +534,176 @@
 @media (prefers-reduced-motion: reduce) {
   .nf-caret {
     animation: none;
+  }
+}
+
+/* Cast chips in the meta column (N5): each filters the page by that technology. */
+.nf-m-cast {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  vertical-align: top;
+}
+.nf-m-cast button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--nf-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--nf-ink);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.nf-m-cast button:hover,
+.nf-m-cast button:focus-visible {
+  background: var(--nf-ink);
+  color: #0b0b0f;
+}
+@media (pointer: coarse) {
+  .nf-m-cast button {
+    min-height: 40px;
+  }
+}
+
+/* Subtitles (N8): the CC toggle sits with the sound button at the bar's right. */
+.nf-m-bar .nf-cc {
+  margin-left: auto;
+}
+.nf-m-bar .nf-ad {
+  margin-left: 0.5rem;
+}
+.nf-m-bar .nf-m-vol {
+  margin-left: 0.5rem;
+}
+
+/* End-of-season card (N10): the modal's content swaps to the credits. */
+.nf-end {
+  position: relative;
+  display: grid;
+  gap: 1.1rem;
+  padding: 4.5rem 2.5rem 2.5rem;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--b) 35%, #0b0b0f), #141419 70%);
+}
+.nf-end h2 {
+  margin: 0;
+  font-family: var(--font-display, Georgia, serif);
+  font-size: clamp(1.8rem, 5vw, 2.8rem);
+  line-height: 1.1;
+}
+.nf-end-next {
+  margin: 0;
+  color: var(--nf-dim);
+  font-size: 1.05rem;
+}
+.nf-end-now h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nf-dim);
+}
+.nf-end-now ul {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nf-end-now li {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.9rem;
+}
+.nf-end-now li::before {
+  content: "› ";
+  color: var(--nf-accent);
+}
+.nf-end-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.nf-m-next {
+  min-height: 44px;
+}
+@media (max-width: 720px) {
+  .nf-end {
+    padding: 4.5rem 1.1rem 2rem;
+  }
+}
+
+
+/* C5: Previously on... */
+.nf-m-prev {
+  margin: 0 0 0.6rem;
+  padding: 0.45rem 0.7rem;
+  border-left: 3px solid var(--b);
+  background: rgba(255, 255, 255, 0.05);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #d6d4cf;
+}
+.nf-m-prev b {
+  font-weight: 600;
+  color: var(--nf-ink);
+}
+.nf-m-prev-ghost {
+  visibility: hidden;
+}
+
+/* Autoplay next (F3): the countdown card slides over the lower billboard */
+.nf-binge {
+  position: absolute;
+  left: 2.5rem;
+  right: 2.5rem;
+  bottom: 5rem;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: rgba(10, 10, 14, 0.92);
+  animation: nf-binge-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+.nf-binge p {
+  margin: 0;
+}
+.nf-binge-t {
+  font-family: var(--font-display), serif;
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+.nf-binge-n {
+  flex: 1 1 12rem;
+  min-width: 0;
+  color: var(--nf-dim);
+  font-size: 0.85rem;
+}
+.nf-binge-b {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+@keyframes nf-binge-in {
+  from {
+    transform: translateY(120%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nf-binge {
+    animation: none;
+  }
+}
+@media (max-width: 720px) {
+  .nf-binge {
+    left: 1.1rem;
+    right: 1.1rem;
+    bottom: 4.4rem;
   }
 }

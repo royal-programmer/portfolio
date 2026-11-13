@@ -22,7 +22,9 @@ export function hmIn(d: Date, tz: string): { h: number; m: number } {
   }
 }
 
-export const bandFor = (clock: TermClock, hour: number): TermClockBand => clock.bands.find((b) => hour >= b.from && hour < b.to) ?? clock.bands[0];
+/** The band for this hour; with no bands in the data (before the records are imported) a neutral one that changes nothing. */
+const NEUTRAL_BAND: TermClockBand = { id: "day", from: 0, to: 24, theme: "accent", greet: "", hint: "" };
+export const bandFor = (clock: TermClock, hour: number): TermClockBand => clock.bands.find((b) => hour >= b.from && hour < b.to) ?? clock.bands[0] ?? NEUTRAL_BAND;
 export const isWeekend = (d: Date) => d.getDay() === 0 || d.getDay() === 6;
 
 /** The greeting and hint for this moment: English from the data, bn and hi from the strings; the weekend wins over the band. */

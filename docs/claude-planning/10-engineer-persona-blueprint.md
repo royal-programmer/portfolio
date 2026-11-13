@@ -101,3 +101,21 @@ architecture diagram + a live "try the bot" link. (Filler idea → flagship.)
 - **Sequencing:** Cursor builds layout against the mockup while Claude lands the
   contract types. Cursor must **not** invent data shapes for the new types —
   they land from Claude first, then Cursor binds to them.
+
+## Records schema (round 24)
+
+`entries.data` per type, validated by `lib/content/record-schemas.ts`; the TypeScript shapes are in `lib/content/types.ts` (`EntryDataMap`). Periods are `{ start: "YYYY-MM", end: "YYYY-MM" | "present" }`; text is rendered from them. Slugs are prefixed by type (`experience-`, `education-`, `certification-`, `skills-`, `timeline-`, `milestone-`, `period-`, `diagram-`, `link-`) because `(persona_slug, slug)` is unique across types.
+
+| type | data |
+|------|------|
+| `experience` | company, role, period, headline, bullets[] |
+| `education` | degree, school, period, note? |
+| `certification` | issuer, line, items?[], verify? |
+| `skill_group` | group, items[{ name, projects?[], experience?[], certifications?[] }] (slugs: the "what I did with it" links) |
+| `timeline_event` | date, subject, body?[], branch (main/side/learn/life), tag?, grade? |
+| `milestone` | `kind: "event"` (same as timeline_event) or `kind: "period"` (label, from, to or null, grade?, note?) |
+| `diagram` | title, line?, nodes[{ id, label, kind }], edges[[from, to, label?]], notes[], projects[] (slugs that point at it) |
+| `profile_link` | label, handle, href?, group, live?, note?, optional?, contact?{ label, rank, group? } |
+| `project` (existing) | gains `story` and `media` |
+
+Singletons: `engineer.resume`, `engineer.hiring`, `engineer.clock`, `netflix.bookCall`.

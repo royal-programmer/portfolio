@@ -5,6 +5,12 @@ session) can resume without re-deriving state. Newest first.
 
 ---
 
+## 2026-11-12 - Round 21: Netflix, part C
+
+- C1 generated key art with the impact figure on every card and the modal billboard; C2 `Top 10 by impact` (documented rank formula); C3 the hero featured carousel (three titles per profile, art behind the trailer, tabs with progress); C4 phone app feel (bottom tab bar, Hire sheet, portrait poster hero, strings in en, bn, hi); C5 "Previously on…" in the modal. Details and the metric rules: 17-persona-views.md section 21.
+- Decisions the brief did not define: the rank formula (figure 100, recency 0..30 from 2020-08, branch weights, project 14, post 2; skills and life episodes unranked), the metric regex order (time before/after, users, automations, credentials, records), the Developer and full-story `FEATURED` sets, `Trailer` as a separate hero button now that Play opens the feature, and no ASCII portrait in the hero.
+
+
 ## 2026-11-10 — Round 8: `hire --brief`
 
 Forwardable one-screen fit sheet from a new `hiring` data block; `copy` token puts the sheet on the clipboard (72 cols); `mail --fit` pre-fills the message and tags the lead `hire-brief`. Details: 17-persona-views.md section 13. Availability and compensation are `· ask` placeholders until Ratul fills them. Not done: Series view and hub unchanged; the sheet's role/stack/proof lines stay English in bn and hi.
@@ -1396,3 +1402,84 @@ stripped service_role's table grants).
 ### Round 10 - the other worlds in the terminal (2026-11-10)
 
 - `lib/worlds/` pulse providers + `/api/worlds/pulse`; pane Live gets two rotating world lines; `worlds` command and a `worlds` line on `portfolio`; bn/hi strings. All five other worlds are stubs today (no content entries). Details: 17-persona-views.md section 15.
+
+### Round 14 - two résumés, resume --build with progress (2026-11-10)
+
+- Submitted PDF is the default (`resume --pdf`, hire pill, hub, Netflix hero, fit sheet links); `resume --build` streams a real build (`/api/resume/build`, `lib/resume/{pipeline,store,files}.ts`) and offers preview / download / share. `/resume.pdf` is force-dynamic. Fit sheet availability says employed at Altimetrik (dim on the trailing "ask" only). bn/hi strings added. Netflix "To be continued" has no résumé button (none added).
+
+### Round 15 - profiles, phone gate skip, menus by touch (2026-11-10)
+
+- `profiles` command + `/api/profiles`, hub and Netflix links from the same data; phone gate skip pill and compact mode switch; menu touch hint, up/down chips, `scroll-locked` cleanup (the real cause of frozen views on a phone). Not verified in a browser or by eslint: `portfolio-site/node_modules` lost packages mid-round (`@babel/runtime`, `@eslint-community/eslint-utils`, `.bin`), so the dev server could not compile the hub and eslint could not run; tsc (via `node node_modules/typescript/bin/tsc`) passes.
+
+### Round 16 - Netflix view, part A (2026-11-10)
+
+- Card previews, Because you opened rows, recruiter autopilot (rail, Skip to contact, once per device), season recap trailers, cast and crew with the `?cast=` filter. Profiles menu added (Switch, Replay the recruiter cut, Clear watch history). Verified at 1280 and 393 (no horizontal scroll); details in 17-persona-views.md section 7. Builder: Claude Sonnet 5.5.
+
+### Round 13 - admin console phase A (2026-11-10, branch `claude/admin`)
+
+- `0011_site_settings.sql` (not applied: Ratul runs it), Zod schemas + code defaults for 12 keys, typed reader with draft preview cookie, pages wired to it, `/admin` shell with schema-generated forms, draft/publish/discard, history and revert, `scripts/settings-roundtrip.mjs` (12/12 pass). Verified unauthenticated redirect and the default path (visible text and data props identical on both hosts); signed-in flow left for the lead. `zod` declared in `package.json`.
+
+### Round 17 - Netflix view, part B (2026-11-11)
+
+- N6 Share link + `/og?cmd=netflix:<id>` card and per-title metadata; N7 real fit ratings from a pasted job description (matcher kept in `terminal-fit.ts`, now with `jdWanted`/`textFit`); N8 CC subtitles (bn/hi, `nf.*` strings in all three files); N9 keyboard and remote navigation with the `?` overlay; N10 end-of-season card. Commits `feat(netflix)` x5 plus one `refactor(engineer)`. The `netflix` settings key is still not consumed.
+
+### Round 18 - Stage, part A (2026-11-11)
+
+- S1 live terminal on the laptop (click zooms in, `?via=stage`), S2 lighting by the clock band with lamp and window, S3 five command props with HUD strip, S8 silhouette and flat first paint with `stage:*` marks. Details: 17-persona-views.md section 18. Verified at 1280 and 393 in Chrome (dev server). Not done: admin forms for props and lighting.
+
+### Round 19 - Stage, part B (2026-11-11)
+
+- S4 project shelf (one instanced mesh of cases with an atlas for spine labels, hover pull, pull-out then a view-transition to the project header, HUD buttons), S5 skill constellation (Points + LineSegments, co-occurrence from `arch` diagrams and project stacks), S9 scroll-driven story (sticky stage, four camera stops, panels, dot rail, off-screen pause). Details: 17-persona-views.md section 19. Verified at 1280 and 393 in Chrome (dev server). Not done: admin forms for stops and copy; the `?` keyboard path into stars.
+
+### Round 20 - Stage, part C (2026-11-11)
+
+- S6 photo mode (1200 x 630 guide, orbit, on-demand capture with name strip, download / share), S7 performance tiers (gate quality drives dpr, reflections, stars, screen fps; measured fps strip; one automatic step down under 30 fps), S10 door to the other worlds (hub opens in Normal mode on the chapter), plus a boot-overlay unstick and a brighter daytime window. Details: 17-persona-views.md section 20; data list: 16-admin-console.md section 2.
+
+### Round 22 - admin sign-in and one admin root (2026-11-12)
+
+- Everything under `/admin`: `/admin/login` (magic link via `signInWithOtp`, `shouldCreateUser: false`, uniform reply, 3 per 10 min per IP; password kept), `/admin/auth/callback`, one guard in `app/admin/(console)/layout.tsx`. No `/capture` paths remain; the capture actions moved to `app/admin/entry-actions.ts`, the project form and uploader to `app/admin/_collections/`.
+- Admin grouped by persona (`nav.ts`, `collections.ts`), home with the now / coming map, master-detail Projects and Media (create, edit, duplicate, delete, photos), signed-in-as and sign out, non-admin banner. Admin host is one constant (`lib/site/admin-host.ts`).
+- Not verified: anything behind a session (the console itself) and real email delivery. Ratul sets two Supabase options (16-admin-console.md section 6).
+
+### Round 23 - Netflix, part D (2026-11-12)
+
+- X1 varied art (geometry families and tints per tone and seed), X2 re-checks (Top 10 numeral clip fixed), D1 `?for=` links (hero, Hire sheet, end card, `share netflix --for`, OG card, Profiles menu field), D2 Trending now from live public commits, D3 case study PDF, D4 audio description, D5 contextual Hire bar, D6 server-rendered text, JSON-LD, accessibility fixes. Details in 17-persona-views.md section 22.
+- Not verified: speech in a real bn-IN / hi-IN voice (the test browser has no such voice), axe-core directly (see section 22).
+
+### Round 25 - Netflix, part E (2026-11-12)
+
+- E1 quiet labels with context, `Top 10` by scope, phrase audit; E3 certifications as a series; E5 instant link maker with fallback, one Profiles door, `share --for` help, red R tab icon per view; E2 and E4 code (poster, Screens and Clips rows, Play then Visit end card). Details and the phrase list in `17-persona-views.md` section 24.
+- Open: the product assets still need to be copied (`node scripts/netflix-media.mjs` from `portfolio-site/`); until then posters and galleries hide themselves. Ratul has not confirmed the demo data in those assets is fake (all localhost, `demo-api`, sample products; one poster shows the placeholder `ACME Ltd`).
+
+### Round 26 - Netflix, part F (2026-11-12)
+
+- F1 chaptered trailer for a project's Play (title, who and why, clip beats with subtitles, built with, end card; about 43 s for API Test Center, clips cut at `clipMs`), F2 story fields as data (`storyOf`), F3 Next episode in 5 and Autoplay next, F4 hover clips on project cards, F5 blur-up placeholders and hero-only high priority, F6 resume line and Book a call (hidden until a link is set), F7 back to terminal on a direct route. Details in `17-persona-views.md` section 25.
+- Open: Ratul's Book a call link (`BOOK_CALL.href`); the "Popular with visitors" row needs an open log that does not exist; LCP in milliseconds needs a production build.
+
+### Round 24 - records out of the code (2026-11-13)
+
+- D1 record types, Zod schemas and migration `0012_content_records.sql` (written, not applied; copy in `tmp/`); D2 typed readers and pure assemblers; D3 `scripts/import-content.mjs` and `scripts/content-roundtrip.mjs`; D4 consumers switched behind `CONTENT_SOURCE=db|code` (default `code`, frozen copy in `lib/site/legacy-content.ts`). Skills carry links to project, experience and certification slugs. Project story, media and the book-a-call link are records and settings; `storyOf` and `mediaOf` are the single readers.
+- Importer dry run: 46 records (experience 1, education 1, certification 4, skill_group 3, milestone 7, timeline_event 17, diagram 4, profile_link 9), 1 project patch (api-test-center story and media), 3 settings plus `netflix.bookCall`.
+- Open (Ratul): run migration 0012, then `node scripts/import-content.mjs --apply`, check the site with `CONTENT_SOURCE=db`, then flip the flag and delete the legacy file in a later commit. Not verified: `db` mode in a browser against real rows (no network to the database from this session); the stage's skill constellation still reads the code fallbacks.
+
+### Round 27 - Netflix part G, a full-screen player (2026-11-13)
+
+- Play now opens `netflix-player.tsx`, a fixed full-viewport dialog (back arrow and title top-left, F for fullscreen, Esc, focus trap and return, controls hide after 3 s, tap toggles on a phone). Projects play the same chaptered trailer inside it; episodes and certificates play the short card, with the binge countdown inside the player. The modal billboard and the card hover keep a quiet muted preview (6 s of the first clip, then the poster). Details in `17-persona-views.md` section 26.
+- Open: not run in a browser this round (no browser tool, dev server slow); type check and lint only. Next session: open API Test Center Play at 1280 and 393 and check chapters, pause, arrows, Esc, F, end card and an episode binge.
+
+### Round 28 - skill evidence (2026-11-13)
+
+- A skill now shows what backs it: panel (modal / bottom sheet) on terminal resume chips and Netflix skill cards, `skill <name>` and `man skill` in the terminal with tab completion, stage stars run `skill <name>`, admin Skills screen to link projects, roles and certificates (draft or publish). Builder is `lib/site/skill-evidence.ts`, tested in `scripts/content-roundtrip.mjs`. The stage takes its terminal data as a prop. See section 27 of `17-persona-views.md`.
+- Verified in a browser (Playwright, 1280 and 393): terminal chips, panel, Esc and focus return, `skill` output, Netflix card; screenshots in `tmp/r28/`. Not verified: the admin screen (needs a signed-in session and migration 0012 applied), the stage star click in WebGL, the panel in `db` mode against real rows.
+- Surprise: the running dev server already showed links on C# and Python (the records are in), so the matched-by-name path is covered by the test, not by a screenshot of C#.
+
+### Round 29 - the admin becomes a real console (2026-11-13)
+
+- Every engineer record type has a form on one shared screen; hiring facts, clock and Book a call are sections; the project form carries story and media and no longer wipes them on save. Home shows a status strip, quick actions, a health checklist computed from real data (amber when unknown), recent changes with Revert and an Insights card when the route exists. Command palette (Ctrl/Cmd+K, Search button), `g`-shortcuts, `?` help, bulk tools, JSON export and dry-run import, Backup now, a bottom bar on phones. Section 28 of `17-persona-views.md`.
+- Tests: `node scripts/admin-roundtrip.mjs` (9 groups). Browser check with Playwright (global install) against the lead's dev server on 3000 through a temporary fixture route (deleted); screenshots in `tmp/r29/` at 1280 and 393. Not verified with a real signed-in session or real rows: saving, undo, import against the database, the preview iframe.
+- Decisions: a record's draft lives in the browser (no new table, no migration), publishing writes the row; "hidden" is `visibility: private`.
+
+### Round 30 - know what visitors do, turn visits into conversations (2026-11-13)
+
+- Privacy-first `site_events` (migration 0013, not applied), `/api/e`, `track()` and the hooks in Netflix, terminal and hub; admin Insights page with CSV; "Popular with visitors" row; persistent Open to work chip, one-sentence Hire line, Skim in 30 seconds, `?for=` share card, Fit check links; axe fixes on the terminal. Details in 17-persona-views.md section 29. Tests: `node --experimental-strip-types scripts/insights-check.mjs`.
+- Surprise: another builder's unbalanced `}` in `app/admin/admin.css` briefly broke the dev server's CSS for every page (a Turbopack build error overlay); it was fixed on their side.

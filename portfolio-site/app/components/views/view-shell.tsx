@@ -22,6 +22,11 @@ export function ViewShell({ persona, view, stripVia, children }: Props) {
   const origin = useOrigin();
   const root = useMemo(() => personaHref(origin, persona, "/"), [origin, persona]);
 
+  // A view always scrolls: drop any lock the hub left on the document (see hub-experience's scroll-locked effect).
+  useEffect(() => {
+    document.documentElement.classList.remove("scroll-locked");
+  }, []);
+
   useEffect(() => {
     rememberView(persona, view);
   }, [persona, view]);
@@ -39,7 +44,9 @@ export function ViewShell({ persona, view, stripVia, children }: Props) {
 
   const exit = useCallback(() => {
     forgetView(persona);
-    if (root.crossOrigin) window.location.assign(root.href);
+    // A direct load (no history behind it, or a cross-host root) takes a full navigation: the client router can answer
+    // from a cached root that still points at this view and appear to do nothing.
+    if (root.crossOrigin || window.history.length <= 1) window.location.assign(root.href);
     else router.push(root.href);
   }, [persona, root, router]);
 

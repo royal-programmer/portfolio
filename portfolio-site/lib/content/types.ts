@@ -177,7 +177,17 @@ export type EntryType =
   | "photo" // photographer
   | "artwork" // artist
   | "ride" // ride/travel
-  | "game"; // gamer
+  | "game" // gamer
+  | RecordType;
+
+/**
+ * Engineer records (round 24): lists of small items, each one editable, that used to live in code (the résumé,
+ * the timeline, the diagrams, the profile links). They are `entries` rows like projects, but they are never
+ * pages: public listings and `/engineer/<slug>` skip them; only `listRecords` (lib/content/records.ts) reads them.
+ */
+export type RecordType = "experience" | "education" | "certification" | "skill_group" | "timeline_event" | "milestone" | "diagram" | "profile_link";
+export const RECORD_TYPES: readonly RecordType[] = ["experience", "education", "certification", "skill_group", "timeline_event", "milestone", "diagram", "profile_link"] as const;
+export const isRecordType = (v: string): v is RecordType => (RECORD_TYPES as readonly string[]).includes(v);
 
 export interface GeoPoint {
   lat: number;
@@ -186,13 +196,68 @@ export interface GeoPoint {
   at?: string;
 }
 
+/** `clip` is a clip id from the project's `media.clips`; `clipMs` cuts a long clip (default 8 s). */
+export type ProjectBeat = { text: string; clip?: string; clipMs?: number };
+export type ProjectStatus = "in-development" | "live" | "live-building";
+/** A project's story (Netflix trailer): who it is for, why it exists, what it does in beats, and where it stands. */
+export type ProjectStory = { description?: string; audience?: string; problem?: string; beats?: ProjectBeat[]; status?: ProjectStatus };
+/** A project's own imagery, as data. Paths are under `public/`. */
+export type ProjectMedia = {
+  poster: { src: string; w: number; h: number; alt: string };
+  screens: Array<{ id: string; label: string; src: string; w: number; h: number }>;
+  clips: Array<{ id: string; label: string; poster: string; src: string }>;
+};
+
 export interface EngineerData {
   role?: string;
   techStack: string[];
   repoUrl?: string;
   deployedUrl?: string;
   demoVideoUrl?: string;
+  /** The Netflix trailer's story fields (moved out of code in round 24). */
+  story?: ProjectStory;
+  /** Poster, screenshots and clips. */
+  media?: ProjectMedia;
 }
+
+// ---- engineer records (RecordType) ------------------------------------------------------------------
+/** `YYYY-MM` to `YYYY-MM`, or `present`. Rendered to text by the reader, never stored as text. */
+export type RecordPeriod = { start: string; end: string };
+/** Slugs of other records, so one skill can answer "what did I do with C#": projects, experience and certifications. */
+export type SkillLinks = { projects?: string[]; experience?: string[]; certifications?: string[] };
+export type SkillItem = { name: string } & SkillLinks;
+export type ExperienceData = { company: string; role: string; period: RecordPeriod; headline: string; bullets: string[] };
+export type EducationData = { degree: string; school: string; period: RecordPeriod; note?: string };
+export type CertificationData = { issuer: string; line: string; items?: string[]; /** A public page that verifies it, when one exists. */ verify?: string };
+export type SkillGroupData = { group: string; items: SkillItem[] };
+export type TimelineBranch = "main" | "side" | "learn" | "life";
+/** A commit on the career history; `date` is `YYYY-MM` or `YYYY-MM-DD`. */
+export type TimelineEventData = { date: string; subject: string; body?: string[]; branch: TimelineBranch; tag?: string; grade?: string };
+/** School and life: a point (like an event) or a `period` bracket drawn in `timeline`. */
+export type MilestoneData =
+  | ({ kind: "event" } & TimelineEventData)
+  | { kind: "period"; label: string; from: string; to: string | null; grade?: string; note?: string };
+export type DiagramNodeKind = "ui" | "api" | "db" | "queue" | "ext" | "job";
+export type DiagramData = {
+  title: string;
+  line?: string;
+  nodes: Array<{ id: string; label: string; kind: DiagramNodeKind }>;
+  edges: Array<[string, string, string?]>;
+  notes: string[];
+  /** Project slugs whose page points at this diagram. */
+  projects: string[];
+};
+export type ProfileLinkData = {
+  label: string;
+  handle: string;
+  href?: string;
+  group: "code" | "learn" | "work" | "social";
+  live?: "github" | "stackoverflow" | "leetcode" | "holopin" | "hackerrank";
+  note?: string;
+  optional?: boolean;
+  /** Present when the profile is also a row of the terminal's `contact`: its label there and its place in that list. */
+  contact?: { label: string; rank: number; group?: "elsewhere" };
+};
 
 export interface TraderData {
   instrument: string;
@@ -250,6 +315,14 @@ export interface EntryDataMap {
   artwork: ArtworkData;
   ride: RideData;
   game: GameData;
+  experience: ExperienceData;
+  education: EducationData;
+  certification: CertificationData;
+  skill_group: SkillGroupData;
+  timeline_event: TimelineEventData;
+  milestone: MilestoneData;
+  diagram: DiagramData;
+  profile_link: ProfileLinkData;
 }
 
 export interface BaseEntry<T extends EntryType = EntryType> {
@@ -318,7 +391,7 @@ export interface Strategy {
 
 export interface ContentQueryOptions {
   /**
-   * Include `private`/`unlisted` rows. ONLY the authenticated capture/admin
+   * Include `private`/`unlisted` rows. ONLY the authenticated admin
    * surfaces pass this. The public site never does, so it can never receive
    * private data even if the UI has a bug — RLS is the second line of defence.
    */

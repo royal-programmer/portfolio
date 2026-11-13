@@ -13,9 +13,12 @@ import { Fragment, memo, useEffect, useMemo, useRef, useState, type CSSPropertie
 import { BOOT_BAR_STEPS, bootBar, terminalScript, type Line } from "@/app/components/hub/exit-sequence";
 import type { LaunchedPersona, PersonaView } from "@/lib/content/types";
 import { ambient } from "@/lib/site/ambient-sound";
+import { setTrackContext, track } from "@/lib/site/track";
 import { hubHref, personaHref, useOrigin } from "@/lib/site/persona-link";
 import { qrLines, qrModules } from "@/lib/site/qr";
 import { heatGrid, STATS_KEY, STATS_TTL, statsValid, type HeatCell, type HeatMonth, type StatsCache, type StatsData } from "@/lib/site/terminal-stats";
+import { SkillEvidencePanel } from "@/app/components/skill-evidence-panel";
+import { skillEvidence } from "@/lib/site/skill-evidence";
 import { TerminalSaver } from "@/app/components/views/terminal-saver";
 import { ArchView } from "@/app/components/views/terminal-arch";
 import type { ArchRun } from "@/lib/site/terminal-arch";
@@ -26,9 +29,10 @@ import { HOME, resolvePath, shortPath, USER } from "@/lib/site/terminal-fs";
 import { createShell, HISTORY_CAP, initialShellState, THEMES, type Effect, type FileItem, type LinkItem, type MenuId, type MenuRow, type Out, type ShellState, type ThemeId, type TimelineRow, type Tone } from "@/lib/site/terminal-shell";
 import { isPrerendering, whenActive } from "@/lib/site/prerender";
 import { bandFor, clockCopy, hmIn, say, THEME_AUTO_KEY } from "@/lib/site/terminal-clock";
-import { isLang, LANG_HINTS, STRINGS, type Lang, type TerminalStrings } from "@/lib/site/terminal-strings";
+import { isLang, LANG_HINTS, STRINGS, type Lang, type StringKey, type TerminalStrings } from "@/lib/site/terminal-strings";
 import { usePresence } from "@/lib/site/terminal-presence";
 import { OTHER_WORLDS, otherPulses, pulsesValid, pulseText, worldColor, worldName, WORLDS_KEY, WORLDS_TTL, type WorldsCache } from "@/lib/site/terminal-worlds";
+import { PROFILE_GROUPS, visibleProfiles, type ProfileGroup, type TermProfile } from "@/lib/site/profiles";
 import { DISPLAY_ROOT, personaIdentity } from "@/lib/site/brand";
 import type { PersonaSlug } from "@/lib/content/types";
 import type { WorldPulse } from "@/lib/worlds/pulse";
@@ -59,7 +63,7 @@ export type TerminalRootProps = {
 
 type Entry =
   /** `ps`: the path the command was typed at (the OS prompt); absent on the boot script's plain `$ `. */
-  | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string; label?: string; tag?: "ok" | "wait" | "bar"; cands?: string[]; hl?: number }
+  | { n: number; k: "out"; text: string; prompt?: boolean; dim?: boolean; accent?: boolean; ps?: string; label?: string; tag?: "ok" | "wait" | "bar" | "err"; cands?: string[]; hl?: number }
   | { n: number; k: "links"; items: LinkItem[]; prefix?: string; suffix?: string; dim?: boolean; lead?: string }
   | { n: number; k: "ghcommit"; label: string; url: string; rest: string }
   | { n: number; k: "portrait"; mode: PortraitMode }
@@ -74,6 +78,7 @@ type Entry =
   | { n: number; k: "cal"; title: string; weeks: Array<Array<number | null>>; today: number }
   | { n: number; k: "more" }
   | { n: number; k: "world"; persona: PersonaSlug; tag: string; line: string; href: string }
+  | { n: number; k: "profile"; id: string; label: string; handle: string; href?: string; stat?: string; pending?: boolean; note?: string }
   | { n: number; k: "heatmap"; weeks: HeatCell[][]; months: HeatMonth[]; narrow: boolean }
   | { n: number; k: "langbar"; langs: StatsData["languages"]; width: number }
   | { n: number; k: "neofetch"; rows: string[] }
@@ -306,11 +311,18 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   const router = useRouter();
   const origin = useOrigin();
   const shell = useMemo(() => createShell(data), [data]);
+  // Visitor counts (no cookie, nothing personal): this view opening.
+  useEffect(() => {
+    setTrackContext({ persona, view: "terminal" });
+    track("view_open");
+  }, [persona]);
   /** The language of the words the terminal speaks (`lang bn`); the ref is for the long-lived async code. */
   const [lang, setLang] = useState<Lang>("en");
   const langRef = useRef<Lang>("en");
   const T = () => STRINGS[langRef.current];
   const S = STRINGS[lang];
+  /** The skill whose evidence panel is open (a chip in `resume`). */
+  const [skillOpen, setSkillOpen] = useState<string | null>(null);
   const docs = useMemo(() => shell.docs(lang), [shell, lang]);
   const applyLang = (l: Lang, persist: boolean) => {
     langRef.current = l;
@@ -354,6 +366,11 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   const [palSel, setPalSel] = useState(0);
   /** The menu the arrow keys drive: the latest one shown, until Esc or another command. */
   const [menuN, setMenuN] = useState<number | null>(null);
+  /** A touch screen (coarse pointer): menus say "tap a row". Read after mount, so hydration matches. */
+  const [coarse, setCoarse] = useState(false);
+  useEffect(() => {
+    setCoarse(window.matchMedia("(pointer: coarse)").matches);
+  }, []);
   const [ready, setReady] = useState(false);
   const [opening, setOpening] = useState(false);
   const [checks, setChecks] = useState<Checks>({});
@@ -649,6 +666,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       if (cancelled.current) return;
       if (res.ok && j.ok) {
         patch({ text: T()["mail.sent"](email), dim: false, accent: true });
+        track("contact_submit", "terminal");
         tick("mail");
       } else fail(j.error ?? T()["mail.fail"](res.status));
     } catch {
@@ -772,6 +790,165 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     });
     setEntries((l) => l.filter((e) => e.n !== n));
     append([...rows, { n: ++seq.current, k: "links", dim: true, prefix: S["worlds.foot"], items: [{ label: DISPLAY_ROOT, href: hubHref(origin).href }] }]);
+  };
+
+  /** `profiles [group]`: one row per place, grouped; the live numbers fill in place when `/api/profiles` answers (any failure leaves a row's number out). */
+  const profilesRun = async (group?: ProfileGroup) => {
+    if (curlAbort.current) return void line(T()["gh.already"]("profiles"), false, true, here());
+    const S = T();
+    const base = data.profiles.filter((p) => !group || p.group === group);
+    const rowFor = (p: TermProfile, found: Record<string, { handle?: string; href?: string }>) => visibleProfiles([p], found)[0];
+    const live = (p: TermProfile) => !!p.live;
+    // First paint: every row that can have a live number says so; optional rows (LeetCode) wait for the route.
+    const first = base.filter((p) => !p.optional);
+    const numbers = new Map<string, number>();
+    const out: Entry[] = [];
+    for (const g of PROFILE_GROUPS) {
+      const rows = first.filter((p) => p.group === g);
+      if (!rows.length) continue;
+      out.push({ n: ++seq.current, k: "parts", parts: [{ text: `── ${S[`pr.group.${g}` as StringKey] as string} ──────────`, tone: "dim" }] });
+      for (const p of rows) {
+        const n = ++seq.current;
+        numbers.set(p.id, n);
+        out.push({ n, k: "profile", id: p.id, label: p.label, handle: p.handle, href: p.href, pending: live(p), note: p.note });
+      }
+    }
+    append(out);
+    if (!base.some(live)) return void append([{ n: ++seq.current, k: "out", text: S["pr.foot"], dim: true }]);
+    const ac = new AbortController();
+    curlAbort.current = ac;
+    try {
+      const r = await fetch("/api/profiles", { signal: ac.signal });
+      if (!r.ok) throw new Error(`http ${r.status}`);
+      const j = (await r.json()) as { profiles?: Array<{ id?: string; stat?: string; handle?: string; href?: string }> };
+      const got = Array.isArray(j.profiles) ? j.profiles.filter((x) => typeof x?.id === "string") : [];
+      const found: Record<string, { handle?: string; href?: string }> = {};
+      for (const x of got) found[x.id as string] = { handle: x.handle, href: x.href };
+      if (cancelled.current) return;
+      setEntries((es) => {
+        let next = es.map((e) => {
+          if (e.k !== "profile" || !numbers.has(e.id) || numbers.get(e.id) !== e.n) return e;
+          const x = got.find((y) => y.id === e.id);
+          return { ...e, pending: false, stat: typeof x?.stat === "string" ? x.stat : undefined };
+        });
+        // An optional row (LeetCode) that the route found goes at the end of its group.
+        for (const p of base.filter((q) => q.optional)) {
+          const v = rowFor(p, found);
+          if (!v) continue;
+          const x = got.find((y) => y.id === p.id);
+          const row: Entry = { n: ++seq.current, k: "profile", id: p.id, label: v.label, handle: v.handle, href: v.href, stat: x?.stat };
+          let at = -1;
+          next.forEach((e, i) => {
+            if (e.k === "profile" && data.profiles.find((q) => q.id === e.id)?.group === p.group) at = i;
+          });
+          next = at < 0 ? [...next, row] : [...next.slice(0, at + 1), row, ...next.slice(at + 1)];
+        }
+        return next;
+      });
+    } catch {
+      if (!ac.signal.aborted || cancelled.current) {
+        setEntries((es) => es.map((e) => (e.k === "profile" && e.pending ? { ...e, pending: false } : e)));
+      }
+    } finally {
+      if (curlAbort.current === ac) curlAbort.current = null;
+    }
+    if (!cancelled.current) append([{ n: ++seq.current, k: "out", text: S["pr.foot"], dim: true }]);
+  };
+
+  /**
+   * `resume --build`: the real build, streamed from `/api/resume/build`. A bar (6 steps: five stages and the result)
+   * and one line per stage, `[..]` while it runs and `[ok] … · 38 ms` when its event arrives; then the result and
+   * the tokens. Reduced motion changes nothing here: the lines already appear only as the events do.
+   */
+  const resumeBuildRun = async () => {
+    if (curlAbort.current) return void line(T()["gh.already"]("resume --build"), false, true, here());
+    const S = T();
+    const stages = ["collect", "layout", "fonts", "render", "verify"] as const;
+    type Stage = (typeof stages)[number];
+    const labels: Record<Stage, string> = { collect: S["rb.collect"], layout: S["rb.layout"], fonts: S["rb.fonts"], render: S["rb.render"], verify: S["rb.verify"] };
+    const fill = (k: number) => Math.round((k * BOOT_BAR_STEPS) / (stages.length + 1));
+    const ac = new AbortController();
+    curlAbort.current = ac;
+    const bar = ++seq.current;
+    let cur = ++seq.current;
+    append([
+      { n: bar, k: "out", text: bootBar(0), tag: "bar" },
+      { n: cur, k: "out", text: labels.collect, tag: "wait" },
+    ]);
+    let at = 0;
+    const fail = (stage: string, msg: string) => {
+      patchEntry(cur, { text: labels[stage as Stage] ?? stage, tag: "err" });
+      append([
+        { n: ++seq.current, k: "out", text: S["rb.fail"](stage, msg), tag: "err" },
+        { n: ++seq.current, k: "links", prefix: "→ ", items: [{ label: "resume --pdf", cmd: "resume --pdf" }] },
+      ]);
+    };
+    try {
+      const r = await fetch("/api/resume/build", { signal: ac.signal, cache: "no-store" });
+      if (!r.ok || !r.body) throw new Error(`http ${r.status}`);
+      const reader = r.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      let finished = false;
+      while (!finished) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i: number;
+        while ((i = buf.indexOf("\n\n")) >= 0) {
+          const block = buf.slice(0, i);
+          buf = buf.slice(i + 2);
+          const ev = /^event: (\w+)/m.exec(block)?.[1];
+          const raw = /^data: (.*)$/m.exec(block)?.[1];
+          if (!ev || !raw || cancelled.current) continue;
+          const d = JSON.parse(raw) as Record<string, unknown>;
+          if ((stages as readonly string[]).includes(ev)) {
+            const stage = ev as Stage;
+            at = stages.indexOf(stage) + 1;
+            patchEntry(cur, { text: `${labels[stage]} · ${Number(d.ms) || 0} ms`, tag: "ok" });
+            patchEntry(bar, { text: bootBar(fill(at)) });
+            ambient.key();
+            if (at < stages.length) {
+              cur = ++seq.current;
+              append([{ n: cur, k: "out", text: labels[stages[at]], tag: "wait" }]);
+            }
+          } else if (ev === "done") {
+            finished = true;
+            const token = String(d.token);
+            patchEntry(bar, { text: bootBar(BOOT_BAR_STEPS) });
+            append([
+              { n: ++seq.current, k: "out", text: S["rb.ok"](Number(d.pages) || 1, Math.max(1, Math.round(Number(d.bytes) / 1024)), (Number(d.ms) / 1000).toFixed(1)), tag: "ok" },
+              {
+                n: ++seq.current,
+                k: "links",
+                prefix: "→ ",
+                items: [
+                  { label: S["rb.preview"], href: `/resume.pdf?build=${token}`, external: true },
+                  { label: S["rb.download"], href: `/resume.pdf?build=${token}&download=1`, external: true },
+                  { label: "share", cmd: "share resume --build" },
+                ],
+              },
+            ]);
+          } else if (ev === "error") {
+            finished = true;
+            fail(String(d.stage), String(d.message));
+          }
+        }
+      }
+      if (!finished && !cancelled.current) fail(stages[Math.min(at, stages.length - 1)], "the stream ended early");
+    } catch (err) {
+      if (cancelled.current) return;
+      if (ac.signal.aborted) {
+        patchEntry(cur, { tag: undefined });
+        append([{ n: ++seq.current, k: "out", text: S["rb.cancel"], dim: true }]);
+      } else {
+        const lost = !navigator.onLine || err instanceof TypeError;
+        if (lost) setDown(true);
+        fail(stages[Math.min(at, stages.length - 1)], lost ? S["net.offline"] : err instanceof Error ? err.message : "failed");
+      }
+    } finally {
+      if (curlAbort.current === ac) curlAbort.current = null;
+    }
   };
 
   /** One run of a GitHub command: a `fetching …` line that the result or the error replaces. */
@@ -1096,6 +1273,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     if (views.some((v) => `/${v.id}` === path)) {
       tick("views");
       beacon(`view_open:${path.slice(1)}`);
+      if (!auto) track("view_open", path.slice(1));
     }
     live.current.busy = true;
     live.current.aborted = true;
@@ -1242,6 +1420,8 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     else if (fx.kind === "git-log") void gitLogLive(fx.oneline, fx.limit);
     else if (fx.kind === "stats") void statsRun(fx.mode);
     else if (fx.kind === "worlds") void worldsRun();
+    else if (fx.kind === "profiles") void profilesRun(fx.group);
+    else if (fx.kind === "resume-build") void resumeBuildRun();
     else if (fx.kind === "run") {
       // A tip's number: the real command runs next (`/` opens the palette).
       if (fx.cmd === "/") {
@@ -1296,6 +1476,13 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       const known = shell.commands.some((x) => x.name === name) || EGGS.includes(name);
       const first = r.lines[0];
       beacon(known ? name : "unknown", known && !(first?.kind === "text" && /command not found$/.test(first.text)));
+      // Visitor counts: the command's name only, never arguments, and never the autopilot's own steps.
+      if (!live.current.auto && known) {
+        track("terminal_cmd", name);
+        if (name === "hire") track("hire_open", "terminal");
+        else if (name === "mail") track("mail_click", "terminal");
+        else if (name === "resume" && /--pdf/.test(c)) track("resume_download", "terminal");
+      }
     }
     if (r.effect) effect(r.effect);
     if (!window.matchMedia("(pointer: coarse)").matches) input.current?.focus({ preventScroll: true });
@@ -1867,6 +2054,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   /** A `share` token: copy the link, or open the phone's share sheet. */
   const shareAct = (n: number, l: LinkItem) => {
     if (!l.url) return;
+    track("share_link_make", "terminal");
     if (l.act === "share") {
       void navigator.share?.({ title: l.title, url: l.url }).catch(() => {});
       return;
@@ -1885,12 +2073,14 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     line(T()["fx.mailfirst"], false, true, here());
     return true;
   };
-  const chipKey = (k: "tab" | "up" | "esc") => {
+  const chipKey = (k: "tab" | "up" | "down" | "esc") => {
     input.current?.focus({ preventScroll: true });
     if (k !== "esc" && mailBlocks()) return;
     if (k === "tab") tab();
     else if (k === "esc") act.current.esc();
-    else if (menu && !cmd) setSel((i) => (i + menu.rows.length - 1) % menu.rows.length);
+    else if (k === "down") {
+      if (menu && !cmd) setSel((i) => (i + 1) % menu.rows.length);
+    } else if (menu && !cmd) setSel((i) => (i + menu.rows.length - 1) % menu.rows.length);
     else walkHistory(-1);
   };
 
@@ -1941,7 +2131,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     e.k === "out" ? (
       <span key={e.n} className={`${e.prompt ? "is-cmd" : "is-out"} ${e.dim ? "is-dim" : ""} ${e.accent ? "is-accent" : ""}`}>
         {e.prompt ? (e.label ? <code className="ps-user">{e.label}</code> : ps1(e.ps)) : ""}
-        {e.tag === "ok" ? <b className="is-ok">[ok] </b> : e.tag === "wait" ? "[..] " : ""}
+        {e.tag === "ok" ? <b className="is-ok">[ok] </b> : e.tag === "wait" ? "[..] " : e.tag === "err" ? "[!!] " : ""}
         {e.cands
           ? e.cands.flatMap((c, i) => [i ? "   " : "", i === e.hl ? <b key={c} className="tab-hl">{c}</b> : c])
           : e.text || " "}
@@ -2135,6 +2325,17 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
           {S["worlds.open"]}
         </a>
       </span>
+    ) : e.k === "profile" ? (
+      <span key={e.n} className="is-out terminal-os-profile">
+        <b>{e.label}</b>
+        <i className="is-dim">{e.handle}</i>
+        <span className="is-dim pr-stat">{e.stat ?? (e.pending ? S["pr.fetching"] : e.note ?? "")}</span>
+        {e.href ? (
+          <a className="terminal-root-link" href={e.href} target="_blank" rel="noreferrer" onMouseDown={keepFocus}>
+            {S["pr.open"]}
+          </a>
+        ) : null}
+      </span>
     ) : e.k === "more" ? (
       <button key={e.n} type="button" className="terminal-root-more" onMouseDown={keepFocus} onClick={nextPage}>
         {S.more}
@@ -2154,6 +2355,13 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
                     {l.act === "copy" && copied === e.n ? S["share.copied"] : l.label}
                   </button>
                 </span>
+              ) : l.skill ? (
+                <button type="button" className="terminal-root-link" title={S["skill.chip"](l.skill)} onMouseDown={keepFocus} onClick={() => {
+                    track("skill_open", l.skill!.toLowerCase());
+                    setSkillOpen(l.skill!);
+                  }}>
+                  {l.label}
+                </button>
               ) : l.cmd ? (
                 <button type="button" className="terminal-root-link" onMouseDown={keepFocus} onClick={() => submit(l.cmd!)}>
                   {l.label}
@@ -2181,7 +2389,8 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
         </button>
       </span>
     ) : (
-      <ul key={e.n} role="list" className={`terminal-root-picker ${e.n === menuN ? "" : "is-inert"}`}>
+      <Fragment key={e.n}>
+      <ul role="list" className={`terminal-root-picker ${e.n === menuN ? "" : "is-inert"}`}>
         {e.rows.map((r, n) => {
           const on = e.n === menuN && n === sel;
           return (
@@ -2205,6 +2414,9 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
           );
         })}
       </ul>
+      {/* On a touch screen the highlight reads as keyboard-only, so say how the rows work. */}
+      {coarse && e.n === menuN ? <span className="is-out is-dim terminal-root-menu-hint">{S["menu.hint.touch"]}</span> : null}
+      </Fragment>
     );
 
   const typeChip = (run: () => void) => () => {
@@ -2224,7 +2436,8 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       lang={lang}
       data-lang={lang}
     >
-      <style>{THEME_CSS}</style>
+      <style>{data.themes ? themeCss(data.themes) : THEME_CSS}</style>
+      {skillOpen ? <SkillEvidencePanel evidence={skillEvidence(data, skillOpen)} lang={lang} onClose={() => setSkillOpen(null)} /> : null}
       {saver !== "off" ? (
         <TerminalSaver
           cfg={portraitCfg}
@@ -2381,13 +2594,10 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
             </span>
           ) : null}
         </div>
-        <aside className="terminal-os-pane" aria-label={S["pane.aria"]}>
+        <section className="terminal-os-pane" aria-label={S["pane.aria"]}>
           <h3>{S["pane.where"]}</h3>
           <p className="terminal-os-pane-where">{shortPath(cwd)}</p>
           <h3>{S["pane.who"]}</h3>
-          <p className="terminal-os-pane-clock" suppressHydrationWarning>
-            {clockNow ? S["clock.pane"](say(S, lang, clockNow.getHours(), clockNow.getMinutes()), say(S, lang, hmIn(clockNow, data.clock.myTz).h, hmIn(clockNow, data.clock.myTz).m)) : " "}
-          </p>
           <p className="terminal-os-pane-name">{data.resume.name.toLowerCase()}</p>
           <p>{S["pane.role"](data.i18n?.[lang as "bn" | "hi"]?.role ?? (data.resume.title.split(" · ")[0] ?? "").toLowerCase(), data.i18n?.[lang as "bn" | "hi"]?.city ?? data.resume.location.split(",")[0].toLowerCase())}</p>
           <p className="terminal-os-pane-status">
@@ -2395,9 +2605,12 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
             {data.i18n?.[lang as "bn" | "hi"]?.status ?? data.status}
           </p>
           {data.now?.lines[0] ? <p className="terminal-os-pane-now">{S["pane.now"](data.i18n?.[lang as "bn" | "hi"]?.now[0] ?? data.now.lines[0])}</p> : null}
+          <p className="terminal-os-pane-clock" suppressHydrationWarning>
+            {clockNow ? S["clock.pane"](say(S, lang, clockNow.getHours(), clockNow.getMinutes()), say(S, lang, hmIn(clockNow, data.clock.myTz).h, hmIn(clockNow, data.clock.myTz).m)) : " "}
+          </p>
           <div className="terminal-os-pane-actions">
-            {["hire", "resume --pdf", "mail"].map((c) => (
-              <button key={c} type="button" tabIndex={-1} title={c === "hire" ? S["hb.tip"] : undefined} onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit(c)}>
+            {["hire", "resume --pdf", "mail", "fit"].map((c) => (
+              <button key={c} type="button" tabIndex={-1} title={c === "hire" ? S["hb.tip"] : c === "resume --pdf" ? S["pane.resume.tip"] : undefined} onMouseDown={keepFocus} onClick={() => !mailBlocks() && submit(c)}>
                 {c}
               </button>
             ))}
@@ -2443,7 +2656,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
           ) : null}
           <h3>{S["pane.keys"]}</h3>
           <p className="terminal-os-keys">{S["pane.keysline"]}</p>
-        </aside>
+        </section>
         </div>
         <div className="terminal-os-status">
           <span className="terminal-os-status-lw">
@@ -2522,9 +2735,16 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
           <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={typeChip(() => chipKey("tab"))}>
             Tab
           </button>
-          <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => chipKey("up")} aria-label={S["chip.up"]}>
-            ↑
-          </button>
+          {menu && !cmd ? (
+            <>
+              <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => chipKey("up")} aria-label={S["chip.up"]}>
+                ↑
+              </button>
+              <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => chipKey("down")} aria-label={S["chip.down"]}>
+                ↓
+              </button>
+            </>
+          ) : null}
           <button type="button" tabIndex={-1} onMouseDown={keepFocus} onClick={() => chipKey("esc")}>
             Esc
           </button>

@@ -15,7 +15,7 @@ export function siteOrigin(label: string | null): string {
 }
 
 /** `/og?cmd=<cmd>` as an absolute URL (the route draws any command it knows, and `portfolio` for the rest). */
-export const ogImageUrl = (origin: string, cmd: string) => `${origin}/og?cmd=${encodeURIComponent(cmd)}`;
+export const ogImageUrl = (origin: string, cmd: string, forName?: string) => `${origin}/og?cmd=${encodeURIComponent(cmd)}${forName ? `&for=${encodeURIComponent(forName)}` : ""}`;
 
 /** The `?run=` value of a page request: one command line, in the same shape the terminal accepts, or null. */
 export function runParam(v: string | string[] | undefined): string | null {
@@ -24,8 +24,8 @@ export function runParam(v: string | string[] | undefined): string | null {
 }
 
 /** Title, description, `openGraph` and `twitter` for a page whose preview is the terminal running `cmd`. */
-export function shareMetadata(o: { title: string; description: string; cmd: string; origin: string; url?: string }): Metadata {
-  const images = [{ url: ogImageUrl(o.origin, o.cmd), width: 1200, height: 630, alt: `${o.title}: the terminal output` }];
+export function shareMetadata(o: { title: string; description: string; cmd: string; origin: string; url?: string; /** A "Picked for <name>" link (netflix?for=): the card says so. */ forName?: string }): Metadata {
+  const images = [{ url: ogImageUrl(o.origin, o.cmd, o.forName), width: 1200, height: 630, alt: `${o.title}: the terminal output` }];
   return {
     title: o.title,
     description: o.description,

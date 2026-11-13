@@ -10,7 +10,7 @@ import { placeOnSpectrum } from "@/lib/site/spectrum";
 import { HomePage } from "../components/home-page";
 import { WorldBoot } from "../components/world-boot";
 import { TerminalRoot } from "../components/views/terminal-root";
-import { getViews } from "@/lib/content/views";
+import { loadTerminalConfig } from "@/lib/settings/load";
 import { terminalData } from "@/lib/site/terminal-data";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -93,12 +93,13 @@ export default async function PersonaPage({ params, searchParams }: PersonaPageP
   const photo = media.photographer?.[0] ? `/hub/photographer/${media.photographer[0]}` : undefined;
   // ?via=pwa: opened from the home screen. A direct arrival (no hub hand-off) that says so in the boot.
   const pwa = via === "pwa";
-  const viaKind = via === "hub" ? "hub" : via === "normal" ? "normal" : null;
+  // ?via=stage (the Stage zoomed into the laptop) lands like ?via=normal: instant boot, fade in, no remembered view.
+  const viaKind = via === "hub" ? "hub" : via === "normal" || via === "stage" ? "normal" : null;
   // The Engineer page is one dataset with many views; its root is the terminal, which lists them
   // (17-persona-views.md). The other personas keep their page until their own rounds.
   if (launched === "engineer") {
-    const views = getViews(launched);
-    const data = terminalData(personas.find((p) => p.slug === launched), engineerEntries, engineerBlogPosts, views);
+    const { cfg, views } = await loadTerminalConfig();
+    const data = terminalData(personas.find((p) => p.slug === launched), engineerEntries, engineerBlogPosts, views, cfg);
     return <TerminalRoot persona={launched} t={t} color={accent} via={viaKind} pwa={pwa} items={items} views={views} data={data} />;
   }
   return (
