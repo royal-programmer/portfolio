@@ -13,6 +13,7 @@ import { Fragment, memo, useEffect, useMemo, useRef, useState, type CSSPropertie
 import { BOOT_BAR_STEPS, bootBar, terminalScript, type Line } from "@/app/components/hub/exit-sequence";
 import type { LaunchedPersona, PersonaView } from "@/lib/content/types";
 import { ambient } from "@/lib/site/ambient-sound";
+import { setTrackContext, track } from "@/lib/site/track";
 import { hubHref, personaHref, useOrigin } from "@/lib/site/persona-link";
 import { qrLines, qrModules } from "@/lib/site/qr";
 import { heatGrid, STATS_KEY, STATS_TTL, statsValid, type HeatCell, type HeatMonth, type StatsCache, type StatsData } from "@/lib/site/terminal-stats";
@@ -310,6 +311,11 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   const router = useRouter();
   const origin = useOrigin();
   const shell = useMemo(() => createShell(data), [data]);
+  // Visitor counts (no cookie, nothing personal): this view opening.
+  useEffect(() => {
+    setTrackContext({ persona, view: "terminal" });
+    track("view_open");
+  }, [persona]);
   /** The language of the words the terminal speaks (`lang bn`); the ref is for the long-lived async code. */
   const [lang, setLang] = useState<Lang>("en");
   const langRef = useRef<Lang>("en");
@@ -660,6 +666,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       if (cancelled.current) return;
       if (res.ok && j.ok) {
         patch({ text: T()["mail.sent"](email), dim: false, accent: true });
+        track("contact_submit", "terminal");
         tick("mail");
       } else fail(j.error ?? T()["mail.fail"](res.status));
     } catch {
@@ -1266,6 +1273,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
     if (views.some((v) => `/${v.id}` === path)) {
       tick("views");
       beacon(`view_open:${path.slice(1)}`);
+      if (!auto) track("view_open", path.slice(1));
     }
     live.current.busy = true;
     live.current.aborted = true;
@@ -1468,6 +1476,13 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       const known = shell.commands.some((x) => x.name === name) || EGGS.includes(name);
       const first = r.lines[0];
       beacon(known ? name : "unknown", known && !(first?.kind === "text" && /command not found$/.test(first.text)));
+      // Visitor counts: the command's name only, never arguments, and never the autopilot's own steps.
+      if (!live.current.auto && known) {
+        track("terminal_cmd", name);
+        if (name === "hire") track("hire_open", "terminal");
+        else if (name === "mail") track("mail_click", "terminal");
+        else if (name === "resume" && /--pdf/.test(c)) track("resume_download", "terminal");
+      }
     }
     if (r.effect) effect(r.effect);
     if (!window.matchMedia("(pointer: coarse)").matches) input.current?.focus({ preventScroll: true });
@@ -2039,6 +2054,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   /** A `share` token: copy the link, or open the phone's share sheet. */
   const shareAct = (n: number, l: LinkItem) => {
     if (!l.url) return;
+    track("share_link_make", "terminal");
     if (l.act === "share") {
       void navigator.share?.({ title: l.title, url: l.url }).catch(() => {});
       return;
@@ -2340,7 +2356,10 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
                   </button>
                 </span>
               ) : l.skill ? (
-                <button type="button" className="terminal-root-link" title={S["skill.chip"](l.skill)} onMouseDown={keepFocus} onClick={() => setSkillOpen(l.skill!)}>
+                <button type="button" className="terminal-root-link" title={S["skill.chip"](l.skill)} onMouseDown={keepFocus} onClick={() => {
+                    track("skill_open", l.skill!.toLowerCase());
+                    setSkillOpen(l.skill!);
+                  }}>
                   {l.label}
                 </button>
               ) : l.cmd ? (

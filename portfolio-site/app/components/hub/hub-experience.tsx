@@ -25,6 +25,7 @@ import { SplitText } from "gsap/SplitText";
 import Lenis from "lenis";
 import type { PersonaSlug } from "@/lib/content/types";
 import { ambient } from "@/lib/site/ambient-sound";
+import { setTrackContext, track } from "@/lib/site/track";
 import { DISPLAY_ROOT, HUB_COPY, personaIdentity } from "@/lib/site/brand";
 import type { TermProfile } from "@/lib/site/profiles";
 import { analyseDevice, type DeviceReport } from "@/lib/site/device";
@@ -92,6 +93,10 @@ class SceneBoundary extends Component<{ onFail: () => void; children: ReactNode 
 }
 
 export function HubExperience({ chapters, upcoming, terminalItems = [], copy: copyProp, email: emailProp, profiles = [] }: Props) {
+  useEffect(() => {
+    setTrackContext({ persona: "hub", view: "hub" });
+    track("view_open");
+  }, []);
   const copy: HubCopy = copyProp ?? HUB_COPY;
   const email = emailProp ?? HUB_COPY.email;
   const xp = useExperience();
@@ -1325,6 +1330,8 @@ function PersonaChapter({ chapter, index, total, onEnter, waiting, warm }: { cha
             <PersonaLink
               persona={chapter.slug}
               onClick={(e) => {
+                setTrackContext({ persona: chapter.slug, view: "hub" });
+                track("profile_pick", chapter.slug);
                 if (!onEnter) return;
                 e.preventDefault();
                 onEnter(chapter.slug);

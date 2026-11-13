@@ -49,7 +49,7 @@ export const DEFAULTS: Settings = {
   "engineer.themes": { palettes: THEME_PALETTES as Settings["engineer.themes"]["palettes"] },
   "site.switches": {
     xpDefault: "auto",
-    analytics: { enabled: false, provider: "none", id: "" },
+    analytics: { enabled: false, provider: "none", id: "", events: true },
     leadForm: true,
     maintenance: { enabled: false, message: "Back in a moment." },
   },

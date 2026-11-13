@@ -28,6 +28,7 @@ import {
   type UiTheme,
 } from "./site-content";
 import type { Entry, BlogPost, Persona as PersonaRecord } from "@/lib/content";
+import { track } from "@/lib/site/track";
 
 type HomePageProps = {
   /** When set, this page was opened via `/[persona]` — play a one-shot enter motion. */
@@ -399,6 +400,7 @@ export function HomePage({
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Lead submission failed");
+      track("contact_submit", "chat");
       appendAssistantMessage("Done. I have saved your request and Ratul will get back to you soon.", {
         pauseBeforeDotsMs: CHAT_GAP_AFTER_USER_MS,
       });

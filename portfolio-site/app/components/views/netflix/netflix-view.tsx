@@ -25,6 +25,8 @@ import { seasonSub, type NfLine, type SubData } from "@/lib/site/netflix-subs";
 import { KeysOverlay, useNetflixKeys } from "./netflix-keys";
 import { chime } from "./netflix-sound";
 import { applyViewIcon } from "@/lib/site/view-icons";
+import { track, setTrackContext } from "@/lib/site/track";
+import { classifyLink } from "@/lib/site/events";
 import { clearHistory, useCc, useLikes, useMyList, useProgress, useSound } from "./netflix-store";
 import { NETFLIX_PROFILES, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, top10Of, type HireSheet, TOP10_ROW_TITLE, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
 import type { TermLink, TerminalData } from "@/lib/site/terminal-data";
@@ -110,11 +112,28 @@ export function NetflixView(props: NetflixViewProps) {
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
   // E5: a red R on black in the tab while this view is mounted; the page's own icon returns on unmount.
   useEffect(() => applyViewIcon("netflix"), []);
+  // Visitor counts (no cookie, nothing personal): the view opening, and real clicks on mail / book / resume / code / visit links.
+  const bookHref = props.hire.book?.href ?? "";
+  useEffect(() => {
+    setTrackContext({ persona: "engineer", view: "netflix" });
+    track("view_open");
+  }, []);
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (!e.isTrusted) return; // the guided play's own steps are never counted
+      const a = (e.target as Element | null)?.closest?.("a[href]");
+      const hit = a ? classifyLink(a.getAttribute("href") ?? "", bookHref) : null;
+      if (hit) track(hit.kind, hit.ref);
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [bookHref]);
 
   useEffect(() => {
     const p = readProfile();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the pick lives in localStorage and the URL, only readable after mount
     setProfile(p?.id ?? null);
+    if (p) setTrackContext({ profile: p.id });
     if (p?.save) {
       try {
         window.localStorage.setItem(PROFILE_KEY, p.id);
@@ -129,6 +148,8 @@ export function NetflixView(props: NetflixViewProps) {
     } catch {}
     window.scrollTo({ top: 0 });
     setProfile(id);
+    setTrackContext({ profile: id });
+    track("profile_pick", id);
     // The guided play runs once per device, only on a fresh Recruiter pick (never a deep link or a silent restore).
     if (id === "recruiter" && !autopilotSeen() && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) setAutoToken((n) => n + 1);
   }, []);
@@ -288,9 +309,12 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
   const [opens, setOpens] = useState(0);
   const open = useCallback<CardEnv["open"]>((item, el, play = false) => {
     if (item.kind === "skill" && skillEv?.[item.s.name.toLowerCase()]) {
+      track("skill_open", item.s.name.toLowerCase());
       setSkillOpen(item.s.name.toLowerCase());
       return;
     }
+    track("title_open", item.id);
+    if (play) track("play_start", item.id);
     trigger.current = { el, id: item.id };
     setOpens((n) => n + 1);
     setModal({ id: item.id, origin: el?.getBoundingClientRect() ?? null, play });
@@ -563,6 +587,7 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
         onHire={() => {
           setTab("hire");
           setSheetOpen(true);
+          track("hire_open", "sheet");
         }}
       />
       <NetflixHireBar hire={hire} opens={opens} hold={modal !== null || sheetOpen || !!autopilot.state} />

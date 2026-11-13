@@ -26,6 +26,7 @@ import { Trailer } from "./netflix-trailer";
 import { Player } from "./netflix-player";
 import { BINGE_SECONDS, bingeActive, cancelBinge, setBinge } from "@/lib/site/netflix-binge";
 import { useCc, useLikes, useMyList, useSound } from "./netflix-store";
+import { track } from "@/lib/site/track";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const isPhone = () => typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches;
@@ -174,6 +175,7 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
     const host = window.location.hostname;
     const origin = host === "localhost" || host.endsWith(".localhost") ? window.location.origin : `https://code.${DISPLAY_ROOT}`;
     const url = netflixShareLink(origin, profile, item.id);
+    track("share_link_make", item.id);
     if (isPhone() && typeof navigator.share === "function") {
       try {
         await navigator.share({ title: facts.title, text: facts.blurb, url });
@@ -207,10 +209,12 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
   /* ----- Play ----- */
   // E4, F1: Play never leaves the page. A project plays its trailer, which ends on its own end card with the links.
   const togglePlay = () => {
+    if (!playing && playMs == null) track("play_start", item.id);
     setPlay({ id: item.id, on: !playing });
   };
   const closePlayer = () => setPlay({ id: item.id, on: false });
   const finished = () => {
+    if (playMs == null) track("play_complete", item.id);
     onShow(item, true);
     // F3: after an episode that has a next one, count down to it inside the player (never in the guided play).
     if (item.kind === "episode" && playMs == null && !isLast && bingeOn && nextEp) {
@@ -224,6 +228,7 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
   const playNext = () => {
     if (!nextEp) return;
     setCountFor(null);
+    track("play_start", nextEp.id);
     setPlay({ id: nextEp.id, on: true });
     onSwap(nextEp);
   };
@@ -241,7 +246,10 @@ export function NetflixModal({ item, index, origin, autoPlay, playMs, cast, prof
   // F1: a project's trailer reached its end card (or, in the guided play, its third chapter): played through.
   const trailerDone = () => {
     if (playMs != null) finished();
-    else onShow(item, true);
+    else {
+      track("play_complete", item.id);
+      onShow(item, true);
+    }
   };
 
   /* ----- keyboard: Esc, Tab trap, Space toggles Play ----- */

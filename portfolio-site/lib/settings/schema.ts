@@ -194,7 +194,7 @@ export const themesSchema = z.strictObject({
 export const switchesSchema = z.strictObject({
   /** The Experience a first-time visitor gets: immersive, normal, or chosen by their device. */
   xpDefault: z.enum(["auto", "immersive", "normal"]),
-  analytics: z.strictObject({ enabled: z.boolean(), provider: z.enum(["none", "cloudflare"]), id: str(80) }),
+  analytics: z.strictObject({ enabled: z.boolean(), provider: z.enum(["none", "cloudflare"]), id: str(80), /** Privacy-first visitor counts (no cookies, nothing personal). Absent means on. */ events: z.boolean().optional() }),
   leadForm: z.boolean(),
   maintenance: z.strictObject({ enabled: z.boolean(), message: long(300) }),
 });
