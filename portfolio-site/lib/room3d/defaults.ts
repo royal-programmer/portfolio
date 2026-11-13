@@ -66,7 +66,7 @@ const workRoom: Room = {
     obj("mouse", "mouse", [0.8, DESK_Y, -1.96], { mat: true, rgb: false }, { material: M("plastic", "#101116", 0.3) }),
     obj("headset", "headset", [1.15, DESK_Y, -1.9], { stand: true }, { material: M("plastic", "#14151a", 0.4), interaction: propCmd("headphones") }),
     obj("lamp", "lamp", [1.2, DESK_Y, -2.3], { form: "desk", height: 0.5, on: true }),
-    obj("mug", "cylinder", [-0.55, DESK_Y, -1.95], { r: 0.04, h: 0.09 }, { material: M("ceramic", "#e8e1d6", 0.35), interaction: propCmd("mug") }),
+    obj("mug", "cylinder", [1.02, DESK_Y, -1.72], { r: 0.04, h: 0.09 }, { material: M("ceramic", "#e8e1d6", 0.35), interaction: propCmd("mug") }),
     obj("notebook", "box", [-0.35, DESK_Y, -1.8], { w: 0.2, h: 0.02, d: 0.15, round: 0.003 }, { rotY: 0.2, material: M("paper", "#cfd6f2", 0.8), interaction: propCmd("notebook") }),
     obj("sticky", "box", [-0.6, DESK_Y, -2.2], { w: 0.07, h: 0.003, d: 0.07, round: 0 }, { rotY: -0.3, material: M("paper", "#f6e27a", 0.9), interaction: propCmd("sticky") }),
     obj("pc", "pcTower", [1.7, 0, -2.2], { h: 0.5, glass: true, rgb: true, fans: 3 }, { material: M("metal", "#15161b", 0.35) }),

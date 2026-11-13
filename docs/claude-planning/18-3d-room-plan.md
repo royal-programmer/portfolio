@@ -1,6 +1,6 @@
 # 18 — The 3D room and the dream room (plan, revised after the Keel critic, 2026-11-11)
 
-Status (2026-11-13): **P0 done (verdict go, section 11); P1 data model, tiers and kit built and viewable at `/stage-lab/room`.** The real Stage is not yet re-expressed through the kit (next). Details in `17-persona-views.md` section 31.
+Status (2026-11-14): **P0 done (verdict go, section 11); P1 built; round 34: the Stage can be drawn through the kit behind `?kit=1` (default still the old scene), desktop medium and high at or under 120 draw calls.** Details in `17-persona-views.md` sections 31 and 33.
 Owner decisions: rename Stage to **3D**; plan the whole room first; objects are generic (a curved
 or 48-inch monitor, not a brand); **every object configurable in the admin console** (position,
 size, rotation, add, remove); a **phone option and a quality setting**; the dream room is entered
