@@ -10,6 +10,8 @@ import { parseRecordData } from "@/lib/content/record-schemas";
 import { CollectionScreen, type ProjectRow } from "../../../_collections/collection-screen";
 import { findCollection } from "../../../collections";
 import { RecordsScreen } from "../../../_collections/records-screen";
+import { PostsScreen, type PostRow } from "../../../_collections/posts-screen";
+import { dayOf } from "../../../_lib/post-forms";
 import { BookingEditor } from "../../../_collections/booking-editor";
 import { loadRecordRows } from "../../../_lib/load";
 import type { RecordType } from "@/lib/content/types";
@@ -37,6 +39,10 @@ export default async function AdminSection({ params, searchParams }: Props) {
     if (col.kind === "records" && col.recordType) {
       const rows = await loadRecordRows(col.recordType as RecordType, col.uploads);
       return <RecordsScreen collection={col} rows={rows} initialId={sp.id} startNew={sp.new === "1"} />;
+    }
+    if (col.kind === "posts") {
+      const { rows, ready } = await loadPosts();
+      return <PostsScreen rows={rows} ready={ready} initialId={sp.id} startNew={sp.new === "1"} />;
     }
     if (col.id === "skills") return <SkillsScreen {...(await loadSkills())} initialId={sp.id} />;
     const entries = col.kind === "entries" || col.kind === "media" ? await listEntries("engineer", { includeNonPublic: true }).catch(() => []) : [];
@@ -94,6 +100,31 @@ export default async function AdminSection({ params, searchParams }: Props) {
       <SettingEditor key={active} settingKey={active} title={section.label} draft={s.draft} live={s.live} fallback={s.fallback} stored={s.stored} tableReady={tableReady} updatedAt={s.updatedAt} />
     </>
   );
+}
+
+/** Blog posts, hidden ones included (the admin session passes RLS). */
+async function loadPosts(): Promise<{ rows: PostRow[]; ready: boolean }> {
+  try {
+    const sb = await getServerClient();
+    const { data, error } = await sb.from("blog_posts").select("id, slug, title, excerpt, body, tags, visibility, published_at, updated_at").eq("persona_slug", "engineer").order("updated_at", { ascending: false });
+    if (error) return { rows: [], ready: false };
+    return {
+      ready: true,
+      rows: (data ?? []).map((r) => ({
+        id: String(r.id),
+        slug: String(r.slug),
+        title: String(r.title ?? ""),
+        excerpt: String(r.excerpt ?? ""),
+        body: String(r.body ?? ""),
+        tags: ((r.tags as string[] | null) ?? []).join(", "),
+        visibility: String(r.visibility),
+        publishedAt: dayOf(r.published_at as string | null),
+        updatedAt: String(r.updated_at ?? ""),
+      })),
+    };
+  } catch {
+    return { rows: [], ready: false };
+  }
 }
 
 /** The skill groups (drafts included, through the admin session) and the records they can link to. */

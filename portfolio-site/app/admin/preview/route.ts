@@ -7,13 +7,18 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isAdmin } from "@/lib/db/server";
 import { sharedCookieDomain } from "@/lib/site/experience";
 import { parseHost, rootDomains, SUBDOMAIN_BY_PERSONA } from "@/lib/site/hosts";
-import { makePreviewValue } from "@/lib/settings/preview";
+import { makePreviewValue, previewActive } from "@/lib/settings/preview";
 import { PREVIEW_COOKIE } from "@/lib/settings/schema";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
+  // The preview pane asks whether the draft cookie arrived (a blocked third-party cookie means a blank frame).
+  if (url.searchParams.get("check") === "1") {
+    if (!(await isAdmin())) return NextResponse.json({ active: false }, { status: 401 });
+    return NextResponse.json({ active: await previewActive() }, { headers: { "Cache-Control": "no-store" } });
+  }
   if (!(await isAdmin())) return NextResponse.redirect(new URL("/admin/login?next=/admin", url));
 
   const hostHeader = request.headers.get("host");
