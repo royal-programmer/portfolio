@@ -4,6 +4,9 @@ import { listEntries } from "@/lib/content";
 import { getAllSettings } from "@/lib/settings/read";
 import { isSettingKey } from "@/lib/settings/schema";
 import { SettingEditor } from "../../../editor";
+import { SkillsScreen, type PickOption, type SkillGroupRow } from "../../../_collections/skills-screen";
+import { getServerClient } from "@/lib/db/server";
+import { parseRecordData } from "@/lib/content/record-schemas";
 import { CollectionScreen, type ProjectRow } from "../../../_collections/collection-screen";
 import { findCollection } from "../../../collections";
 import { findSection, sectionPath } from "../../../nav";
@@ -27,6 +30,7 @@ export default async function AdminSection({ params, searchParams }: Props) {
   if (section.kind === "collection") {
     const col = findCollection(gid, sid);
     if (!col) notFound();
+    if (col.id === "skills") return <SkillsScreen {...(await loadSkills())} initialId={sp.id} />;
     const entries = col.kind === "entries" || col.kind === "media" ? await listEntries("engineer", { includeNonPublic: true }).catch(() => []) : [];
     const rows: ProjectRow[] = entries
       .filter((e) => e.type === "project")
@@ -72,4 +76,43 @@ export default async function AdminSection({ params, searchParams }: Props) {
       <SettingEditor key={active} settingKey={active} title={section.label} draft={s.draft} live={s.live} fallback={s.fallback} stored={s.stored} tableReady={tableReady} updatedAt={s.updatedAt} />
     </>
   );
+}
+
+/** The skill groups (drafts included, through the admin session) and the records they can link to. */
+async function loadSkills() {
+  const empty = { rows: [] as SkillGroupRow[], options: { projects: [], experience: [], certifications: [] } as { projects: PickOption[]; experience: PickOption[]; certifications: PickOption[] } };
+  try {
+    const sb = await getServerClient();
+    const { data } = await sb
+      .from("entries")
+      .select("id, slug, title, visibility, order, type, data")
+      .eq("persona_slug", "engineer")
+      .in("type", ["skill_group", "experience", "certification", "project"])
+      .order("order", { ascending: true });
+    const out = empty;
+    for (const r of data ?? []) {
+      const slug = String(r.slug);
+      if (r.type === "project") out.options.projects.push({ slug, label: String(r.title) });
+      else if (r.type === "experience") {
+        const d = parseRecordData("experience", r.data);
+        if (d) out.options.experience.push({ slug, label: `${d.role} · ${d.company}` });
+      } else if (r.type === "certification") {
+        const d = parseRecordData("certification", r.data);
+        if (d) out.options.certifications.push({ slug, label: `${d.line} · ${d.issuer}` });
+      } else {
+        const d = parseRecordData("skill_group", r.data);
+        if (d)
+          out.rows.push({
+            id: String(r.id),
+            slug,
+            visibility: String(r.visibility),
+            group: d.group,
+            items: d.items.map((i) => ({ name: i.name, projects: i.projects ?? [], experience: i.experience ?? [], certifications: i.certifications ?? [] })),
+          });
+      }
+    }
+    return out;
+  } catch {
+    return empty;
+  }
 }

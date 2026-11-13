@@ -5,7 +5,8 @@
  * (Server Actions are reachable via direct POST, not just the UI), and all DB
  * work goes through the cookie-bound client so RLS (`is_admin()`) is enforced.
  */
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { RECORD_SCHEMAS } from "@/lib/content/record-schemas";
 import { safeNext } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
@@ -289,4 +290,51 @@ export async function duplicateProject(id: string): Promise<ActionState> {
     if (error.code !== "23505") return { error: error.message };
   }
   return { error: "Could not find a free slug." };
+}
+
+// ---- Skill groups (records: which projects, roles and certificates used each skill) ------------------------
+
+/**
+ * Save one skill group. `payload` is the JSON the form builds ({ group, items: [{ name, projects?, experience?,
+ * certifications? }] }, each list holding record slugs in the order shown); it must satisfy the record's own
+ * schema. `intent` is "draft" (private: the site does not read it) or "publish" (public). No id creates the group.
+ */
+export async function saveSkillGroup(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (!(await isAdmin())) return { error: "Not authorized." };
+  let raw: unknown;
+  try {
+    raw = JSON.parse(String(formData.get("payload") ?? ""));
+  } catch {
+    return { error: "Could not read the form." };
+  }
+  const parsed = RECORD_SCHEMAS.skill_group.safeParse(raw);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ? `Check the form: ${parsed.error.issues[0].message}` : "Check the form." };
+  const data = parsed.data;
+  if (!data.group.trim()) return { error: "The group needs a name." };
+  if (data.items.some((i) => !i.name.trim())) return { error: "Every skill needs a name." };
+  const names = data.items.map((i) => i.name.trim().toLowerCase());
+  if (new Set(names).size !== names.length) return { error: "A skill name appears twice." };
+  const visibility: Visibility = formData.get("intent") === "publish" ? "public" : "private";
+  const id = String(formData.get("id") ?? "").trim();
+  const supabase = await getServerClient();
+
+  let entryId = id;
+  if (id) {
+    const { error } = await supabase.from("entries").update({ title: data.group, visibility, data }).eq("id", id).eq("type", "skill_group");
+    if (error) return { error: error.message };
+  } else {
+    const slug = `skills-${slugify(data.group)}`;
+    const { data: last } = await supabase.from("entries").select("order").eq("persona_slug", "engineer").eq("type", "skill_group").order("order", { ascending: false }).limit(1).maybeSingle();
+    const { data: row, error } = await supabase
+      .from("entries")
+      .insert({ persona_slug: "engineer", type: "skill_group", slug, title: data.group, visibility, order: Number(last?.order ?? 0) + 10, data })
+      .select("id")
+      .single();
+    if (error) return { error: error.code === "23505" ? `A skill group "${slug}" already exists.` : error.message };
+    entryId = row.id as string;
+  }
+  updateTag("entries:skill_group");
+  revalidatePath("/engineer");
+  revalidatePath("/admin/engineer/skills");
+  return { ok: true, entryId, message: visibility === "public" ? "Published." : "Saved as a draft (the site keeps showing the last published version)." };
 }
