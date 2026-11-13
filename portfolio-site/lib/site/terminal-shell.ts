@@ -29,6 +29,7 @@ import type { TermCommit, TerminalData } from "@/lib/site/terminal-data";
 import { LANG_NAMES, LANGS, STRINGS, type Lang, type StringKey, type TerminalStrings } from "@/lib/site/terminal-strings";
 import { clockCopy, say } from "@/lib/site/terminal-clock";
 import { OTHER_WORLDS, worldName } from "@/lib/site/terminal-worlds";
+import { findSkill, skillEvidence, skillNames } from "@/lib/site/skill-evidence";
 import { isProfileGroup, PROFILE_GROUPS, type ProfileGroup } from "@/lib/site/profiles";
 
 export type MenuId = "views" | "projects" | "writing" | "themes" | "langs";
@@ -96,7 +97,7 @@ export type TimelineRow =
   | { year: string; mon: string; subject: string; tag?: string; grade?: string; dim?: boolean; life?: boolean; glyph?: string; label?: string; periodGrade?: string };
 
 /** One token in a `links` line: a link (`href`), a command (`cmd`) or a UI action (`act`: copy `url`, or open the phone's share sheet). */
-export type LinkItem = { label: string; href?: string; external?: boolean; cmd?: string; act?: "copy" | "share"; url?: string; title?: string };
+export type LinkItem = { label: string; /** A skill chip: the UI opens that skill's evidence panel. */ skill?: string; href?: string; external?: boolean; cmd?: string; act?: "copy" | "share"; url?: string; title?: string };
 
 export type Out =
   | { kind: "text"; text: string; dim?: boolean; accent?: boolean }
@@ -209,6 +210,7 @@ const COMMANDS: CommandDef[] = [
   { name: "theme", group: "terminal", usage: "theme [name|auto|random]", long: true },
   { name: "crt", group: "terminal", usage: "crt" },
   { name: "resume", group: "read", usage: "resume [--pdf|--build]" },
+  { name: "skill", group: "read", usage: "skill <name>", long: true },
   { name: "portrait", group: "read", usage: "portrait [mode|list|next]" },
   { name: "whoami", group: "read", usage: "whoami" },
   { name: "neofetch", group: "read", usage: "neofetch" },
@@ -840,7 +842,7 @@ export function createShell(data: TerminalData): Shell {
     out.push(text(""), text(loc()?.summary ?? r.summary), text(""), text(S["resume.experience"], true));
     for (const x of r.experience) out.push(text(`${x.role} · ${x.company} · ${x.period}`), text(x.headline, true));
     out.push(text(""), text(S["resume.skills"], true));
-    for (const g of r.skills) out.push(text(g.group, true), text(g.items.join(" · ")));
+    for (const g of r.skills) out.push(text(g.group, true), { kind: "links", items: g.items.map((n) => ({ label: n, skill: n })) });
     out.push(text(""), text(S["resume.education"], true));
     for (const e of r.education) out.push(text(`${e.degree} · ${e.school} · ${e.year}`));
     const named = r.certifications.find((c) => c.items?.length);
@@ -852,6 +854,35 @@ export function createShell(data: TerminalData): Shell {
     out.push(text(""), text(S["resume.foot1"], true));
     out.push(text(S["resume.foot2"], true));
     out.push(text(S["resume.foot3"], true));
+    return out;
+  };
+
+  /** `skill <name>`: the same evidence as the panel, as text: projects, work, certificates, or a plain "no linked work yet". */
+  const skill = (arg: string): Out[] => {
+    const name = findSkill(data, arg);
+    if (!name) return [text(arg ? S["err.skill.none"](arg) : S["err.skill.usage"])];
+    const ev = skillEvidence(data, name);
+    const out: Out[] = [{ kind: "text", text: ev.group ? `${ev.name} · ${S["skill.in"](ev.group)}` : ev.name, accent: true }];
+    if (ev.source === "none") return [...out, text(S["skill.none"], true)];
+    if (ev.projects.length) {
+      out.push(text(""), text(S["skill.projects"], true));
+      for (const p of ev.projects) out.push({ kind: "run", text: p.title + (p.line ? ` · ${p.line}` : ""), cmd: `open ${p.slug}` });
+    }
+    if (ev.work.length) {
+      out.push(text(""), text(S["skill.work"], true));
+      for (const w of ev.work) {
+        out.push(text(`${w.role} · ${w.company} · ${w.period}`));
+        for (const b of w.bullets) out.push(text(`  • ${b}`, true));
+      }
+    }
+    if (ev.certs.length) {
+      out.push(text(""), text(S["skill.certs"], true));
+      for (const c of ev.certs) {
+        out.push(text(`${c.name} · ${c.issuer}`));
+        if (c.verify) out.push({ kind: "link", label: `  ${S["skill.verify"]}: ${c.verify}`, href: c.verify, external: /^https?:\/\//i.test(c.verify) });
+      }
+    }
+    out.push(text(""), text(S[ev.source === "linked" ? "skill.linked" : "skill.matched"], true));
     return out;
   };
 
@@ -945,6 +976,8 @@ export function createShell(data: TerminalData): Shell {
         if (args.length > 1 || (a && a !== "off" && a !== "on")) return { lines: [text(S["err.saver.usage"])] };
         return { lines: [], effect: { kind: "saver", mode: a === "off" ? "off" : a === "on" ? "on" : "now" } };
       }
+      case "skill":
+        return { lines: skill(line.trim().replace(/^\/?skill\s*/i, "")) };
       case "arch":
         return { lines: arch(args[0], env?.cols ?? 100) };
       case "mail": {
@@ -1119,6 +1152,16 @@ export function createShell(data: TerminalData): Shell {
       if (cmd === "screensaver") return ["off", "on"].filter((n) => n.startsWith(word));
       if (cmd === "lang") return [...LANGS].filter((n) => n.startsWith(word.toLowerCase()));
       if (cmd === "arch") return data.arch.map((d) => d.id).filter((n) => n.startsWith(word.toLowerCase()));
+      if (cmd === "skill") {
+        // Skill names can hold spaces ("SQL Server"): match the whole phrase typed so far, offer the token being typed.
+        const before = head.replace(/^\/?skill\s*/i, "");
+        const at = before ? before.split(/\s+/).length : 0;
+        const prefix = (before ? `${before.toLowerCase()} ` : "") + word.toLowerCase();
+        return skillNames(data)
+          .filter((n) => n.toLowerCase().startsWith(prefix))
+          .flatMap((n) => n.split(/\s+/)[at] ?? [])
+          .filter((v, i, arr) => arr.indexOf(v) === i);
+      }
       if (cmd === "hire") return ["--brief"].filter((n) => n.startsWith(word));
       if (cmd === "mail") return ["--fit"].filter((n) => n.startsWith(word));
       if (cmd === "share") return NAMES.filter((n) => n.startsWith(word.toLowerCase()));

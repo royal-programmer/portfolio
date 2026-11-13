@@ -16,6 +16,8 @@ import { ambient } from "@/lib/site/ambient-sound";
 import { hubHref, personaHref, useOrigin } from "@/lib/site/persona-link";
 import { qrLines, qrModules } from "@/lib/site/qr";
 import { heatGrid, STATS_KEY, STATS_TTL, statsValid, type HeatCell, type HeatMonth, type StatsCache, type StatsData } from "@/lib/site/terminal-stats";
+import { SkillEvidencePanel } from "@/app/components/skill-evidence-panel";
+import { skillEvidence } from "@/lib/site/skill-evidence";
 import { TerminalSaver } from "@/app/components/views/terminal-saver";
 import { ArchView } from "@/app/components/views/terminal-arch";
 import type { ArchRun } from "@/lib/site/terminal-arch";
@@ -313,6 +315,8 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
   const langRef = useRef<Lang>("en");
   const T = () => STRINGS[langRef.current];
   const S = STRINGS[lang];
+  /** The skill whose evidence panel is open (a chip in `resume`). */
+  const [skillOpen, setSkillOpen] = useState<string | null>(null);
   const docs = useMemo(() => shell.docs(lang), [shell, lang]);
   const applyLang = (l: Lang, persist: boolean) => {
     langRef.current = l;
@@ -2335,6 +2339,10 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
                     {l.act === "copy" && copied === e.n ? S["share.copied"] : l.label}
                   </button>
                 </span>
+              ) : l.skill ? (
+                <button type="button" className="terminal-root-link" title={S["skill.chip"](l.skill)} onMouseDown={keepFocus} onClick={() => setSkillOpen(l.skill!)}>
+                  {l.label}
+                </button>
               ) : l.cmd ? (
                 <button type="button" className="terminal-root-link" onMouseDown={keepFocus} onClick={() => submit(l.cmd!)}>
                   {l.label}
@@ -2410,6 +2418,7 @@ export function TerminalRoot({ persona, color, via, pwa = false, items, views, d
       data-lang={lang}
     >
       <style>{data.themes ? themeCss(data.themes) : THEME_CSS}</style>
+      {skillOpen ? <SkillEvidencePanel evidence={skillEvidence(data, skillOpen)} lang={lang} onClose={() => setSkillOpen(null)} /> : null}
       {saver !== "off" ? (
         <TerminalSaver
           cfg={portraitCfg}
