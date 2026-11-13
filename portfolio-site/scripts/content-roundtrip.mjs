@@ -26,6 +26,7 @@ const { emptyRecords } = await load("lib/content/records-assemble.ts");
 const { terminalData } = await load("lib/site/terminal-data.ts");
 const { buildNetflix, NETFLIX_PROFILES, hireSheetOf, storyOf, mediaOf } = await load("lib/site/netflix-data.ts");
 const { LEGACY } = await load("lib/site/legacy-content.ts");
+const { skillEvidence, skillEvidenceMap, findSkill, mentions } = await load("lib/site/skill-evidence.ts");
 const { CONTENT_SOURCE } = await load("lib/content/source.ts");
 
 let failed = 0;
@@ -117,6 +118,35 @@ check("story and media come from the record and equal the frozen copy", () => {
 });
 check("Netflix seasons equal on every profile", () => {
   for (const pr of NETFLIX_PROFILES) assert.deepEqual(json(buildNetflix(pr.id, dbData, [], [])), json(buildNetflix(pr.id, codeData, [], [])), pr.id);
+});
+check("skill evidence: linked records win, a dangling slug is dropped", () => {
+  const ev = skillEvidence(dbData, "C#");
+  assert.equal(ev.source, "linked");
+  assert.ok(ev.work[0]?.company.startsWith("Altimetrik"));
+  assert.ok(ev.projects.every((p) => dbData.projects.some((x) => x.slug === p.slug)));
+});
+check("skill evidence: unlinked skills match by name only (code copy)", () => {
+  const py = skillEvidence(codeData, "python");
+  assert.equal(py.source, "matched");
+  assert.equal(py.name, "Python");
+  assert.ok(py.work[0].bullets.every((b) => /python/i.test(b)));
+  assert.ok(py.certs.some((c) => /Python/.test(c.name)));
+  const git = skillEvidence(codeData, "Git");
+  assert.ok(git.work.every((w) => w.bullets.every((b) => mentions(b, "Git"))));
+});
+check("skill evidence: nothing found says none, never invents", () => {
+  const empty = skillEvidence({ stack: [], projects: [], resume: { skills: [], experience: [], certifications: [] } }, "Rust");
+  assert.equal(empty.source, "none");
+  assert.equal(empty.projects.length + empty.work.length + empty.certs.length, 0);
+});
+check("skill evidence: whole-word matching and lookup", () => {
+  assert.equal(mentions("GitHub Actions", "Git"), false);
+  assert.equal(mentions("React/TypeScript and .NET APIs", ".NET"), true);
+  assert.equal(mentions("ASP.NET MVC", ".NET"), false);
+  assert.equal(mentions("written in c# and sql", "C#"), true);
+  assert.equal(findSkill(codeData, "c#"), "C#");
+  assert.equal(findSkill(codeData, "nope-skill"), null);
+  assert.ok(Object.keys(skillEvidenceMap(codeData)).includes("c#"));
 });
 check("empty records give an honest empty state, not hard-coded content", () => {
   const e = terminalData(undefined, [], [], [], { records: emptyRecords() });
