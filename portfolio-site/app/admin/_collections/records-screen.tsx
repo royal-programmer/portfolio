@@ -8,7 +8,7 @@
  * (before and after), Revert, Duplicate, Hide with Undo, and Delete forever (only for a hidden record). Desktop
  * can show a live preview beside the form; a phone gets a Preview button.
  */
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { RecordType } from "@/lib/content/types";
 import { checkRecord, cleanData, diffValues, moveItem, RECORD_FORMS, validateImport, type RecordForm } from "../_lib/record-forms";
@@ -45,6 +45,10 @@ function Editor({ col, form, row, suggest, onSaved, onClose, onPreview }: { col:
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const { toast, show } = useToast();
   const key = draftKey(type, row?.id ?? "new");
+  const reviewRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (review) reviewRef.current?.scrollIntoView?.({ block: "center" });
+  }, [review]);
 
   const cleaned = useMemo(() => cleanData(form.fields, value), [form, value]);
   const base = useMemo(() => cleanData(form.fields, initial), [form, initial]);
@@ -182,7 +186,7 @@ function Editor({ col, form, row, suggest, onSaved, onClose, onPreview }: { col:
           </div>
         ) : null}
         {review ? (
-          <div className="adm-review" role="region" aria-label="What will change">
+          <div className="adm-review" role="region" aria-label="What will change" ref={reviewRef}>
             <h3 className="adm-h2">What will change</h3>
             {diff.length ? (
               <table className="adm-table">
