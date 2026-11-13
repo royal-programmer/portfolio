@@ -14,6 +14,7 @@ import { RECORD_SCHEMAS } from "@/lib/content/record-schemas";
 import { isRecordType, type RecordType } from "@/lib/content/types";
 import { getServerClient, isAdmin } from "@/lib/db/server";
 import { freeSlug, orderValues, recordMeta, validateImport } from "./_lib/record-forms";
+import { validateProjectImport } from "./_lib/project-forms";
 
 export type RecordResult = { ok?: boolean; error?: string; id?: string; message?: string };
 const VIS = ["private", "unlisted", "public"] as const;
@@ -78,7 +79,7 @@ export async function saveRecord(input: { type: string; id?: string; visibility:
 /** Set visibility on many rows at once (also the soft delete: `private`). */
 export async function setRecordsVisibility(type: string, ids: string[], visibility: string): Promise<RecordResult> {
   if (!(await isAdmin())) return NOT_ADMIN;
-  const t = typeOf(type) ?? (type === "project" ? ("project" as const) : null);
+  const t = typeOf(type) ?? (type === "project" || type === "skill_group" ? (type as "project" | "skill_group") : null);
   if (!t) return { error: "Unknown record type." };
   if (!isVis(visibility)) return { error: "Bad visibility." };
   if (!ids.length || ids.length > 200) return { error: "Pick between 1 and 200 rows." };
@@ -106,7 +107,7 @@ export async function restoreVisibility(type: string, before: { id: string; visi
 /** Delete forever. Only rows that are already hidden (private) go: the second confirm of a two-step delete. */
 export async function deleteRecordsForever(type: string, ids: string[]): Promise<RecordResult> {
   if (!(await isAdmin())) return NOT_ADMIN;
-  const t = typeOf(type) ?? (type === "project" ? ("project" as const) : null);
+  const t = typeOf(type) ?? (type === "project" || type === "skill_group" ? (type as "project" | "skill_group") : null);
   if (!t) return { error: "Unknown record type." };
   if (!ids.length || ids.length > 200) return { error: "Pick between 1 and 200 rows." };
   try {
@@ -148,7 +149,7 @@ export async function duplicateRecord(id: string): Promise<RecordResult> {
 /** Save a new sequence for one collection (drag on a desktop, Up/Down on a phone). */
 export async function reorderRecords(type: string, ids: string[]): Promise<RecordResult> {
   if (!(await isAdmin())) return NOT_ADMIN;
-  const t = typeOf(type) ?? (type === "project" ? ("project" as const) : null);
+  const t = typeOf(type) ?? (type === "project" || type === "skill_group" ? (type as "project" | "skill_group") : null);
   if (!t) return { error: "Unknown record type." };
   if (!ids.length || ids.length > 300) return { error: "Nothing to reorder." };
   try {
@@ -186,6 +187,32 @@ export async function importRecords(type: string, text: string): Promise<RecordR
       if (error) return { error: `Stopped at "${r.slug}": ${error.message}` };
     }
     refresh(t);
+    return { ok: true, message: plan.summary };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Unexpected error." };
+  }
+}
+
+/** Import projects after the dry run: new slugs are added, existing ones are updated with the story and media merged in, never replaced. */
+export async function importProjects(text: string): Promise<RecordResult> {
+  if (!(await isAdmin())) return NOT_ADMIN;
+  try {
+    const sb = await getServerClient();
+    const { data: have } = await sb.from("entries").select("id, slug, order, data").eq("persona_slug", "engineer").eq("type", "project");
+    const bySlug = new Map((have ?? []).map((r) => [String(r.slug), r]));
+    const plan = validateProjectImport(text, bySlug.keys());
+    if (!plan.ok) return { error: plan.summary };
+    let next = Math.max(-10, ...(have ?? []).map((r) => Number(r.order ?? 0))) + 10;
+    for (const r of plan.rows) {
+      const existing = bySlug.get(r.slug);
+      const base = { title: r.title, summary: r.summary, body: r.body, featured: r.featured, visibility: r.visibility };
+      const { error } = existing
+        ? await sb.from("entries").update({ ...base, data: { ...((existing.data as Record<string, unknown> | null) ?? {}), ...r.data }, ...(r.order !== undefined ? { order: r.order } : {}) }).eq("id", existing.id)
+        : await sb.from("entries").insert({ persona_slug: "engineer", type: "project", slug: r.slug, order: r.order ?? (next += 10), ...base, data: r.data });
+      if (error) return { error: `Stopped at "${r.slug}": ${error.message}` };
+    }
+    refresh("project");
+    revalidatePath("/admin/engineer/projects");
     return { ok: true, message: plan.summary };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Unexpected error." };

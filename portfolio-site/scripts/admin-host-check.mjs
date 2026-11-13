@@ -170,4 +170,57 @@ await t("draft: key and device label are clean", () => {
   assert.equal(D.deviceLabel("Mozilla/5.0 (Windows NT 10.0)"), "laptop");
 });
 
+// ---- project and post forms, health ---------------------------------------------------------------
+const P = await load("app/admin/_lib/project-forms.ts");
+const W = await load("app/admin/_lib/post-forms.ts");
+const HL = await load("app/admin/_lib/health.ts");
+await t("project: a blank value cleans equal to itself and a typed title is dirty", () => {
+  assert.equal(JSON.stringify(P.cleanProject(P.BLANK_PROJECT)), JSON.stringify(P.cleanProject({ ...P.BLANK_PROJECT })));
+  assert.notEqual(JSON.stringify(P.cleanProject({ ...P.BLANK_PROJECT, title: "x" })), JSON.stringify(P.cleanProject(P.BLANK_PROJECT)));
+  assert.deepEqual(P.cleanProject({ ...P.BLANK_PROJECT, techStack: " a, b ,,c" }).techStack, ["a", "b", "c"]);
+});
+await t("project: a draft merges onto the saved value and ignores junk keys", () => {
+  const m = P.mergeProjectDraft(P.BLANK_PROJECT, { title: "Keel", featured: true, story: { description: "d" }, evil: 1, summary: 5 });
+  assert.equal(m.title, "Keel");
+  assert.equal(m.featured, true);
+  assert.equal(m.summary, "");
+  assert.deepEqual(m.story, { description: "d" });
+  assert.equal("evil" in m, false);
+  assert.equal(P.mergeProjectDraft(P.BLANK_PROJECT, "nope"), P.BLANK_PROJECT);
+});
+await t("project: empty story and media compare as nothing", () => {
+  const x = P.cleanExtras({ description: "", beats: [] }, { screens: [], clips: [] });
+  assert.equal(x.assets, null);
+  assert.deepEqual(x.story, {});
+});
+await t("project import: dry run reports adds, updates, and bad rows", () => {
+  const ok = P.validateProjectImport(JSON.stringify([{ title: "Keel", visibility: "public", data: { techStack: ["Next"], role: "Builder" } }, { slug: "old", title: "Old" }]), ["old"]);
+  assert.equal(ok.ok, true);
+  assert.deepEqual(ok.rows.map((r) => [r.slug, r.action]), [["keel", "create"], ["old", "update"]]);
+  const bad = P.validateProjectImport(JSON.stringify([{ title: "" }, { title: "A", data: { techStack: "x" } }, { title: "Dup" }, { title: "Dup" }]), []);
+  assert.equal(bad.ok, false);
+  assert.equal(bad.errors.length, 3);
+  assert.equal(P.validateProjectImport("nope", []).ok, false);
+  assert.equal(P.validateProjectImport("{}", []).ok, false);
+});
+await t("post form: checks, slug and draft merge", () => {
+  assert.equal(W.checkPost(W.BLANK_POST).length, 1);
+  assert.equal(W.checkPost({ ...W.BLANK_POST, title: "t", visibility: "public" }).length, 1);
+  assert.equal(W.checkPost({ ...W.BLANK_POST, title: "t", body: "b", visibility: "public", publishedAt: "13/11" }).length, 1);
+  assert.deepEqual(W.checkPost({ ...W.BLANK_POST, title: "t", body: "b", visibility: "public", publishedAt: "2026-11-13" }), []);
+  assert.equal(W.postSlug({ slug: "", title: "Hello, World!" }), "hello-world");
+  assert.equal(W.mergePostDraft(W.BLANK_POST, { title: "x", tags: 3 }).title, "x");
+  assert.equal(W.dayOf("2026-11-13T00:00:00Z"), "2026-11-13");
+});
+await t("health: the Security row is amber until Access is on and always reminds about the redirect URL", () => {
+  const input = { bookCallHref: "x", certs: [], projects: [], hiring: {}, resumeBuilt: null, latestChange: null, ogOk: true, invalid: [], touched: [], now: Date.now() };
+  const off = HL.computeHealth({ ...input, security: { adminHost: true, hostName: "admin.ratulroy.me", accessOn: false, callbackUrl: "https://admin.ratulroy.me/auth/callback" } }).find((i) => i.id === "security");
+  assert.equal(off.status, "warn");
+  assert.match(off.examples.join(" "), /Access check is off/);
+  assert.match(off.examples.join(" "), /auth\/callback/);
+  const on = HL.computeHealth({ ...input, security: { adminHost: true, hostName: "admin.ratulroy.me", accessOn: true, callbackUrl: null } }).find((i) => i.id === "security");
+  assert.equal(on.status, "ok");
+  assert.equal(HL.computeHealth(input).some((i) => i.id === "security"), false);
+});
+
 console.log(`\n${n} checks passed`);

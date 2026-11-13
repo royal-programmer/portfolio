@@ -390,3 +390,40 @@ export async function saveSkillGroup(_prev: ActionState, formData: FormData): Pr
   revalidatePath("/admin/engineer/skills");
   return { ok: true, entryId, message: visibility === "public" ? "Published." : "Saved as a draft (the site keeps showing the last published version)." };
 }
+
+// ---- One entry point for the project editor -------------------------------------------------------------------
+
+export type ProjectInput = {
+  id?: string;
+  title: string;
+  summary: string;
+  body: string;
+  role: string;
+  techStack: string[];
+  deployedUrl: string;
+  repoUrl: string;
+  demoVideoUrl: string;
+  visibility: string;
+  featured: boolean;
+  /** The cleaned story object ({} removes it) and media object (null removes it), checked here with the record schemas. */
+  story: Record<string, unknown>;
+  assets: Record<string, unknown> | null;
+};
+
+/**
+ * Create or update a project from the editor's value (a plain action call, no form post). It builds the same
+ * form data the older actions read and hands it to them, so the merge-not-replace rule (story, media and the
+ * trailer's fields the form does not edit stay) and every validation stay in one place.
+ */
+export async function saveProject(input: ProjectInput): Promise<ActionState> {
+  if (!(await isAdmin())) return { error: "Not authorized." };
+  const fd = new FormData();
+  if (input.id) fd.set("id", String(input.id));
+  for (const k of ["title", "summary", "body", "role", "deployedUrl", "repoUrl", "demoVideoUrl", "visibility"] as const) fd.set(k, String(input[k] ?? ""));
+  fd.set("techStack", (Array.isArray(input.techStack) ? input.techStack : []).map(String).join(", "));
+  if (input.featured) fd.set("featured", "on");
+  fd.set("story", JSON.stringify(input.story ?? {}));
+  fd.set("assets", input.assets ? JSON.stringify(input.assets) : "");
+  const r = await (input.id ? updateProject({}, fd) : createProject({}, fd));
+  return r.ok ? { ...r, message: r.message ?? "Created." } : r;
+}

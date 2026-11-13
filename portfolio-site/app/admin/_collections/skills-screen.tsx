@@ -2,13 +2,17 @@
 
 /**
  * Skill groups: each skill can link the projects, roles and certificates that used it (what the site's skill
- * panel shows). Pick from the existing records by title, reorder, remove; save as a draft (private) or publish.
+ * panel shows). Pick from the existing records by title, reorder, remove; save hidden (a draft the site does not read) or publish, and delete a hidden group forever.
  * The links are record slugs, validated against the record's own schema on the server.
  */
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveSkillGroup, type ActionState } from "../entry-actions";
+import { deleteRecordsForever, restoreVisibility, setRecordsVisibility } from "../record-actions";
 import { setAdminDirty } from "../dirty";
+import { useDraft } from "../use-draft";
+import { draftKey } from "@/lib/admin/drafts";
+import { Toast, useToast } from "./shared";
 
 export type PickOption = { slug: string; label: string };
 export type SkillItemRow = { name: string; projects: string[]; experience: string[]; certifications: string[] };
@@ -76,9 +80,34 @@ function Picker({ label, options, value, onChange }: { label: string; options: P
 
 function Editor({ row, options, onSaved, onClose }: { row?: SkillGroupRow; options: SkillOptions; onSaved: (id: string) => void; onClose: () => void }) {
   const router = useRouter();
+  const { toast, show } = useToast();
+  const [busy, startBusy] = useTransition();
+  const [note, setNote] = useState<string | null>(null);
   const [group, setGroup] = useState(row?.group ?? "");
   const [items, setItems] = useState<SkillItemRow[]>(row?.items ?? []);
   const [state, action, pending] = useActionState<ActionState, FormData>(saveSkillGroup, {});
+  const baseSig = useMemo(() => JSON.stringify({ group: row?.group ?? "", items: row?.items ?? [] }), [row]);
+  const value = useMemo(() => ({ group, items }), [group, items]);
+  const dirty = JSON.stringify(value) !== baseSig;
+  // Drafts follow Ratul between devices: the server copy loads first, the browser copy is the offline fallback.
+  const draft = useDraft<{ group: string; items: SkillItemRow[] }>({
+    key: draftKey("skill_group", row?.id ?? "new"),
+    dirty,
+    value,
+    apply: (d) => {
+      if (typeof d?.group === "string") setGroup(d.group);
+      if (Array.isArray(d?.items)) setItems(d.items.map((i) => ({ name: String(i?.name ?? ""), projects: i?.projects ?? [], experience: i?.experience ?? [], certifications: i?.certifications ?? [] })));
+    },
+  });
+  useEffect(() => {
+    setAdminDirty(dirty);
+    return () => setAdminDirty(false);
+  }, [dirty]);
+  const revert = () => {
+    setGroup(row?.group ?? "");
+    setItems(row?.items ?? []);
+    draft.clear();
+  };
   const payload = useMemo(
     () =>
       JSON.stringify({
@@ -96,6 +125,7 @@ function Editor({ row, options, onSaved, onClose }: { row?: SkillGroupRow; optio
   useEffect(() => {
     if (state.ok) {
       setAdminDirty(false);
+      draft.clear();
       router.refresh();
       if (!row && state.entryId) onSaved(state.entryId);
     }
@@ -103,7 +133,6 @@ function Editor({ row, options, onSaved, onClose }: { row?: SkillGroupRow; optio
   }, [state]);
 
   const patch = (i: number, p: Partial<SkillItemRow>) => {
-    setAdminDirty(true);
     setItems((all) => all.map((x, k) => (k === i ? { ...x, ...p } : x)));
   };
 
@@ -115,6 +144,14 @@ function Editor({ row, options, onSaved, onClose }: { row?: SkillGroupRow; optio
           Close
         </button>
       </div>
+      {draft.notice ? (
+        <p className="adm-note is-ok" role="status">
+          {draft.notice}. Nothing is saved to the site until you press Publish.{" "}
+          <button type="button" className="adm-btn is-ghost" onClick={revert}>
+            Discard
+          </button>
+        </p>
+      ) : null}
       <form action={action} className="adm-form">
         {row ? <input type="hidden" name="id" value={row.id} /> : null}
         <input type="hidden" name="payload" value={payload} />
@@ -123,15 +160,12 @@ function Editor({ row, options, onSaved, onClose }: { row?: SkillGroupRow; optio
           <input
             className="adm-input"
             value={group}
-            onChange={(e) => {
-              setAdminDirty(true);
-              setGroup(e.target.value);
-            }}
+            onChange={(e) => setGroup(e.target.value)}
           />
         </label>
         {row ? (
           <p className="adm-hint">
-            Status: <em className={`adm-pill${row.visibility === "public" ? " is-ok" : ""}`}>{row.visibility === "public" ? "published" : "draft"}</em>
+            Status: <em className={`adm-pill${row.visibility === "public" ? " is-ok" : ""}`}>{row.visibility === "public" ? "published" : "hidden"}</em>
           </p>
         ) : null}
         {items.map((it, i) => (
@@ -158,25 +192,69 @@ function Editor({ row, options, onSaved, onClose }: { row?: SkillGroupRow; optio
           <button
             type="button"
             className="adm-btn"
-            onClick={() => {
-              setAdminDirty(true);
-              setItems((a) => [...a, { name: "", projects: [], experience: [], certifications: [] }]);
-            }}
+            onClick={() => setItems((a) => [...a, { name: "", projects: [], experience: [], certifications: [] }])}
           >
             Add a skill
           </button>
         </div>
-        {state.error ? <p className="adm-note is-bad">{state.error}</p> : null}
+        {state.error || note ? <p className="adm-note is-bad">{state.error ?? note}</p> : null}
         {state.ok ? <p className="adm-note is-ok">{state.message}</p> : null}
         <div className="adm-actions">
           <button type="submit" name="intent" value="draft" className="adm-btn" disabled={pending}>
-            {pending ? "Saving…" : "Save as draft"}
+            {pending ? "Saving…" : "Save hidden"}
           </button>
           <button type="submit" name="intent" value="publish" className="adm-btn is-primary" disabled={pending}>
             Publish
           </button>
+          <button type="button" className="adm-btn" disabled={pending || !dirty} onClick={revert}>
+            Revert
+          </button>
+          <span className="adm-hint adm-saved" aria-live="polite">
+            {dirty ? (draft.savedAt ? `Draft saved ${draft.server === "ok" ? "to your account" : "in this browser"} (not published)` : "Unsaved changes") : "Nothing to save"}
+          </span>
         </div>
       </form>
+      {row ? (
+        <div className="adm-actions">
+          {row.visibility !== "private" ? (
+            <button
+              type="button"
+              className="adm-btn is-ghost"
+              disabled={busy}
+              onClick={() => {
+                const was = row.visibility;
+                startBusy(async () => {
+                  const r = await setRecordsVisibility("skill_group", [row.id], "private");
+                  if (r.error) return setNote(r.error);
+                  router.refresh();
+                  show("Hidden from the site.", () => void restoreVisibility("skill_group", [{ id: row.id, visibility: was }]).then(() => router.refresh()));
+                });
+              }}
+            >
+              Hide (delete, can undo)
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="adm-btn is-ghost is-danger"
+              disabled={busy}
+              onClick={() => {
+                if (!window.confirm(`Delete "${row.group}" forever? This cannot be undone.`) || !window.confirm("Really delete forever?")) return;
+                startBusy(async () => {
+                  const r = await deleteRecordsForever("skill_group", [row.id]);
+                  if (r.error) return setNote(r.error);
+                  draft.clear();
+                  router.refresh();
+                  onClose();
+                });
+              }}
+            >
+              Delete forever
+            </button>
+          )}
+        </div>
+      ) : null}
+      <Toast toast={toast} />
     </div>
   );
 }
@@ -209,7 +287,7 @@ export function SkillsScreen({ rows, options, initialId }: { rows: SkillGroupRow
                   <span className="adm-hint">
                     {r.items.length} skills · {r.items.filter((i) => i.projects.length + i.experience.length + i.certifications.length).length} linked
                   </span>
-                  <em className={`adm-pill${r.visibility === "public" ? " is-ok" : ""}`}>{r.visibility === "public" ? "published" : "draft"}</em>
+                  <em className={`adm-pill${r.visibility === "public" ? " is-ok" : ""}`}>{r.visibility === "public" ? "published" : "hidden"}</em>
                 </button>
               </li>
             ))}
