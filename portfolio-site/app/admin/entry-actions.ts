@@ -6,7 +6,7 @@
  * work goes through the cookie-bound client so RLS (`is_admin()`) is enforced.
  */
 import { revalidatePath, updateTag } from "next/cache";
-import { RECORD_SCHEMAS } from "@/lib/content/record-schemas";
+import { projectMediaSchema, projectStorySchema, RECORD_SCHEMAS } from "@/lib/content/record-schemas";
 import { safeNext } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
@@ -141,6 +141,10 @@ export async function createProject(_prev: ActionState, formData: FormData): Pro
     },
   };
 
+  const extra = storyAndMedia(formData);
+  if (extra.error) return { error: extra.error };
+  Object.assign(row.data, extra.patch);
+
   const supabase = await getServerClient();
   const { data, error } = await supabase.from("entries").insert(row).select("id").single();
   if (error) {
@@ -236,6 +240,44 @@ function projectFields(formData: FormData) {
 
 const VISIBILITIES = ["private", "unlisted", "public"];
 
+/**
+ * The story and media a project form posts as JSON (`story`, `assets`). Absent fields mean "not on this form":
+ * the stored values stay. An empty story or no assets removes the key. Both are checked with the record schemas.
+ */
+function storyAndMedia(formData: FormData): { error?: string; patch: Record<string, unknown>; drop: string[] } {
+  const patch: Record<string, unknown> = {};
+  const drop: string[] = [];
+  const story = formData.get("story");
+  if (typeof story === "string") {
+    let raw: unknown;
+    try {
+      raw = story.trim() ? JSON.parse(story) : {};
+    } catch {
+      return { error: "Could not read the story.", patch, drop };
+    }
+    if (raw && typeof raw === "object" && Object.keys(raw).length) {
+      const r = projectStorySchema.safeParse(raw);
+      if (!r.success) return { error: `Story: ${r.error.issues[0]?.path.join(" > ") ? `${r.error.issues[0].path.join(" > ")}: ` : ""}${r.error.issues[0]?.message ?? "check it"}`, patch, drop };
+      patch.story = r.data;
+    } else drop.push("story");
+  }
+  const assets = formData.get("assets");
+  if (typeof assets === "string") {
+    if (assets.trim()) {
+      let raw: unknown;
+      try {
+        raw = JSON.parse(assets);
+      } catch {
+        return { error: "Could not read the media.", patch, drop };
+      }
+      const r = projectMediaSchema.safeParse(raw);
+      if (!r.success) return { error: `Media: ${r.error.issues[0]?.path.join(" > ") ? `${r.error.issues[0].path.join(" > ")}: ` : ""}${r.error.issues[0]?.message ?? "a poster is needed"}`, patch, drop };
+      patch.media = r.data;
+    } else drop.push("media");
+  }
+  return { patch, drop };
+}
+
 function refreshProjects(slug?: string) {
   revalidatePath("/engineer");
   if (slug) revalidatePath(`/engineer/${slug}`);
@@ -251,8 +293,16 @@ export async function updateProject(_prev: ActionState, formData: FormData): Pro
   if (!f.title) return { error: "Title is required." };
   if (!VISIBILITIES.includes(f.visibility)) return { error: "Bad visibility." };
 
+  const extra = storyAndMedia(formData);
+  if (extra.error) return { error: extra.error };
+
   const supabase = await getServerClient();
-  const { data, error } = await supabase.from("entries").update(f).eq("id", id).eq("type", "project").select("id, slug").maybeSingle();
+  // Keep what this form does not edit (story and media, the Netflix trailer's fields) instead of replacing `data` wholesale.
+  const { data: cur } = await supabase.from("entries").select("data").eq("id", id).eq("type", "project").maybeSingle();
+  const merged: Record<string, unknown> = { ...((cur?.data as Record<string, unknown> | null) ?? {}), ...f.data, ...extra.patch };
+  for (const k of extra.drop) delete merged[k];
+  for (const k of Object.keys(merged)) if (merged[k] === undefined) delete merged[k];
+  const { data, error } = await supabase.from("entries").update({ ...f, data: merged }).eq("id", id).eq("type", "project").select("id, slug").maybeSingle();
   if (error) return { error: error.message };
   if (!data) return { error: "Project not found." };
   refreshProjects(data.slug as string);

@@ -8,10 +8,16 @@
  */
 import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createProject, deleteProject, duplicateProject, updateProject, type ActionState } from "../entry-actions";
+import { createProject, duplicateProject, updateProject, type ActionState } from "../entry-actions";
 import type { Collection, CollectionField } from "../collections";
 import { setAdminDirty } from "../dirty";
 import { MediaUploader } from "./media-uploader";
+import { ProjectExtras, type PhotoChoice } from "./project-extras";
+import { BookingEditor } from "./booking-editor";
+import { deleteRecordsForever, reorderRecords, restoreVisibility, setRecordsVisibility } from "../record-actions";
+import { moveItem } from "../_lib/record-forms";
+import { downloadJson, Toast, useToast, VisibilityPill } from "./shared";
+import type { Settings } from "@/lib/settings/schema";
 
 export type ProjectRow = {
   id: string;
@@ -26,8 +32,15 @@ export type ProjectRow = {
   deployedUrl: string;
   repoUrl: string;
   demoVideoUrl: string;
+  /** The story and media stored in the project's data (the Netflix trailer's fields). */
+  story: Record<string, unknown>;
+  assets: Record<string, unknown>;
+  order: number;
+  photoChoices: PhotoChoice[];
   media: { id: string; thumbUrl: string; alt: string; entryId: string }[];
 };
+
+export type BookingProps = { draft: Settings["netflix"]; live: Settings["netflix"] };
 
 type Sel = string | "new" | null;
 
@@ -61,8 +74,9 @@ function FieldInput({ f, row }: { f: CollectionField; row?: ProjectRow }) {
   );
 }
 
-function Editor({ col, row, onSaved, onClose }: { col: Collection; row?: ProjectRow; onSaved: (id: string) => void; onClose: () => void }) {
+function Editor({ col, row, booking, onSaved, onClose }: { col: Collection; row?: ProjectRow; booking?: BookingProps; onSaved: (id: string) => void; onClose: () => void }) {
   const router = useRouter();
+  const { toast, show } = useToast();
   const [state, action, pending] = useActionState<ActionState, FormData>(row ? updateProject : createProject, {});
   const [busy, startBusy] = useTransition();
   const [note, setNote] = useState<string | null>(null);
@@ -99,6 +113,7 @@ function Editor({ col, row, onSaved, onClose }: { col: Collection; row?: Project
         {col.fields.map((f) => (
           <FieldInput key={f.key} f={f} row={row} />
         ))}
+        {col.id === "projects" ? <ProjectExtras story={row?.story ?? {}} assets={row?.assets ?? {}} photos={row?.photoChoices ?? []} /> : null}
         {state.error || note ? <p className="adm-note is-bad">{state.error ?? note}</p> : null}
         {state.ok ? <p className="adm-note is-ok">{state.message ?? "Created. You can add photos now."}</p> : null}
         <div className="adm-actions">
@@ -110,20 +125,41 @@ function Editor({ col, row, onSaved, onClose }: { col: Collection; row?: Project
               <button type="button" className="adm-btn" disabled={busy} onClick={() => run(() => duplicateProject(row.id), (r) => r.entryId && onSaved(r.entryId))}>
                 Duplicate
               </button>
-              <button
-                type="button"
-                className="adm-btn is-ghost"
-                disabled={busy}
-                onClick={() => {
-                  if (window.confirm(`Delete "${row.title}"? Its photos go with it. This cannot be undone.`)) run(() => deleteProject(row.id), () => onClose());
-                }}
-              >
-                Delete
-              </button>
+              {row.visibility !== "private" ? (
+                <button
+                  type="button"
+                  className="adm-btn is-ghost"
+                  disabled={busy}
+                  onClick={() => {
+                    const was = row.visibility;
+                    run(() => setRecordsVisibility("project", [row.id], "private"), () => show("Hidden from the site.", () => void restoreVisibility("project", [{ id: row.id, visibility: was }]).then(() => router.refresh())));
+                  }}
+                >
+                  Hide (delete, can undo)
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="adm-btn is-ghost is-danger"
+                  disabled={busy}
+                  onClick={() => {
+                    if (window.confirm(`Delete "${row.title}" forever? Its photos go with it.`) && window.confirm("Really delete forever? This cannot be undone.")) run(() => deleteRecordsForever("project", [row.id]), () => onClose());
+                  }}
+                >
+                  Delete forever
+                </button>
+              )}
             </>
           ) : null}
         </div>
       </form>
+      {col.id === "projects" && booking ? (
+        <details className="adm-set">
+          <summary className="adm-h2">Book a call (one link, shared by every project)</summary>
+          <BookingEditor draft={booking.draft} live={booking.live} />
+        </details>
+      ) : null}
+      <Toast toast={toast} />
       {col.uploads && row ? <Media row={row} /> : null}
       {col.uploads && !row && state.entryId ? <MediaUploader entryId={state.entryId} /> : null}
     </div>
@@ -147,15 +183,38 @@ function Media({ row }: { row: ProjectRow }) {
   );
 }
 
-export function CollectionScreen({ collection, rows, initialId, startNew }: { collection: Collection; rows: ProjectRow[]; initialId?: string; startNew?: boolean }) {
+export function CollectionScreen({ collection, rows, initialId, startNew, booking }: { collection: Collection; rows: ProjectRow[]; initialId?: string; startNew?: boolean; booking?: BookingProps }) {
+  const router = useRouter();
+  const { toast, show } = useToast();
+  const [busy, start] = useTransition();
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const sig = rows.map((r) => r.id).join(",");
+  // The shown order follows the server's rows; a local move overrides it until the rows change.
+  const [ord, setOrd] = useState({ sig, ids: sig ? sig.split(",") : [] });
+  if (ord.sig !== sig) setOrd({ sig, ids: sig ? sig.split(",") : [] });
+  const ids = ord.ids;
+  const setIds = (next: string[]) => setOrd({ sig: ord.sig, ids: next });
   const [sel, setSel] = useState<Sel>(startNew ? "new" : (rows.find((r) => r.id === initialId)?.id ?? null));
   const [q, setQ] = useState("");
   const [vis, setVis] = useState("all");
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return rows.filter((r) => (vis === "all" || r.visibility === vis) && (!needle || `${r.title} ${r.slug} ${r.techStack}`.toLowerCase().includes(needle)));
-  }, [rows, q, vis]);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const ordered = ids.map((i) => byId.get(i)).filter((r): r is ProjectRow => !!r);
+    return ordered.filter((r) => (vis === "all" || r.visibility === vis) && (!needle || `${r.title} ${r.slug} ${r.techStack}`.toLowerCase().includes(needle)));
+  }, [rows, ids, q, vis]);
+  const filtering = q.trim() !== "" || vis !== "all";
+  const pickedIds = [...picked].filter((i) => rows.some((r) => r.id === i));
+  const move = (from: number, to: number) => {
+    const next = moveItem(ids, from, to);
+    setIds(next);
+    start(async () => {
+      const r = await reorderRecords("project", next);
+      show(r.error ?? "Order saved.");
+      if (!r.error) router.refresh();
+    });
+  };
 
   const current = sel && sel !== "new" ? rows.find((r) => r.id === sel) : undefined;
   const close = () => {
@@ -186,28 +245,108 @@ export function CollectionScreen({ collection, rows, initialId, startNew }: { co
             <option value="private">Private</option>
           </select>
         </div>
+        <div className="adm-actions adm-toolrow">
+          <button
+            type="button"
+            className="adm-btn is-ghost"
+            disabled={!rows.length}
+            onClick={() => downloadJson(`${collection.id}.json`, rows.map((r) => ({ slug: r.slug, title: r.title, visibility: r.visibility, order: r.order, summary: r.summary, body: r.body, featured: r.featured, data: { role: r.role, techStack: r.techStack.split(",").map((x) => x.trim()).filter(Boolean), deployedUrl: r.deployedUrl, repoUrl: r.repoUrl, demoVideoUrl: r.demoVideoUrl, story: r.story, media: r.assets } })))}
+          >
+            Export JSON
+          </button>
+        </div>
+        {pickedIds.length ? (
+          <div className="adm-bulk" role="region" aria-label="Bulk actions">
+            <strong>{pickedIds.length} selected</strong>
+            {(["public", "private"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                className="adm-btn"
+                disabled={busy}
+                onClick={() => {
+                  const before = pickedIds.map((id) => ({ id, visibility: rows.find((r) => r.id === id)!.visibility }));
+                  start(async () => {
+                    const r = await setRecordsVisibility("project", pickedIds, v);
+                    if (r.error) return show(r.error);
+                    router.refresh();
+                    show(r.message ?? "Done.", () => void restoreVisibility("project", before).then(() => router.refresh()));
+                  });
+                }}
+              >
+                {v === "public" ? "Make public" : "Hide"}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="adm-btn is-ghost"
+              disabled={busy}
+              onClick={() => {
+                if (!window.confirm(`Delete ${pickedIds.length} forever? Only hidden ones are deleted.`) || !window.confirm("Really delete forever?")) return;
+                start(async () => {
+                  const r = await deleteRecordsForever("project", pickedIds);
+                  show(r.error ?? r.message ?? "Done.");
+                  setPicked(new Set());
+                  router.refresh();
+                });
+              }}
+            >
+              Delete forever
+            </button>
+            <button type="button" className="adm-btn is-ghost" onClick={() => setPicked(new Set())}>
+              Clear
+            </button>
+          </div>
+        ) : null}
         {shown.length === 0 ? (
           <p className="adm-hint">{rows.length ? "No match." : `No ${collection.label.toLowerCase()} yet.`}</p>
         ) : (
-          <ul className="adm-records">
-            {shown.map((r) => (
-              <li key={r.id}>
-                <button type="button" aria-current={sel === r.id ? "true" : undefined} onClick={() => open(r.id)}>
-                  <strong>{r.title}</strong>
-                  <span className="adm-hint">
-                    /{r.slug} · {r.media.length} photo{r.media.length === 1 ? "" : "s"}
-                  </span>
-                  <em className={`adm-pill${r.visibility === "public" ? " is-ok" : ""}`}>{r.visibility}</em>
-                </button>
-              </li>
-            ))}
+          <ul className="adm-records adm-reclist">
+            {shown.map((r) => {
+              const i = ids.indexOf(r.id);
+              return (
+                <li key={r.id}>
+                  <input
+                    type="checkbox"
+                    className="adm-pick"
+                    aria-label={`Select ${r.title}`}
+                    checked={picked.has(r.id)}
+                    onChange={() =>
+                      setPicked((s) => {
+                        const n = new Set(s);
+                        if (n.has(r.id)) n.delete(r.id);
+                        else n.add(r.id);
+                        return n;
+                      })
+                    }
+                  />
+                  <button type="button" className="adm-recmain" aria-current={sel === r.id ? "true" : undefined} onClick={() => open(r.id)}>
+                    <strong>{r.title}</strong>
+                    <span className="adm-hint">
+                      /{r.slug} · {r.media.length} photo{r.media.length === 1 ? "" : "s"}
+                    </span>
+                    <VisibilityPill v={r.visibility} />
+                  </button>
+                  {!filtering && !isMedia ? (
+                    <span className="adm-reorder">
+                      <button type="button" className="adm-icon" aria-label={`Move ${r.title} up`} disabled={i === 0 || busy} onClick={() => move(i, i - 1)}>
+                        Up
+                      </button>
+                      <button type="button" className="adm-icon" aria-label={`Move ${r.title} down`} disabled={i === ids.length - 1 || busy} onClick={() => move(i, i + 1)}>
+                        Down
+                      </button>
+                    </span>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
 
       <div className="adm-detail" role="region" aria-label="Editor">
         {sel === "new" ? (
-          <Editor key="new" col={collection} onSaved={(id) => setSel(id)} onClose={close} />
+          <Editor key="new" col={collection} booking={booking} onSaved={(id) => setSel(id)} onClose={close} />
         ) : current ? (
           isMedia ? (
             <div className="adm-editor">
@@ -220,13 +359,14 @@ export function CollectionScreen({ collection, rows, initialId, startNew }: { co
               <Media row={current} />
             </div>
           ) : (
-            <Editor key={current.id} col={collection} row={current} onSaved={(id) => setSel(id)} onClose={close} />
+            <Editor key={current.id} col={collection} row={current} booking={booking} onSaved={(id) => setSel(id)} onClose={close} />
           )
         ) : (
           <p className="adm-hint adm-empty">Pick a record on the left, or press New to add one.</p>
         )}
       </div>
 
+      <Toast toast={toast} />
       {!isMedia && !sel ? (
         <button type="button" className="adm-fab" onClick={() => open("new")} aria-label={`Quick add ${collection.singular}`}>
           + Quick add

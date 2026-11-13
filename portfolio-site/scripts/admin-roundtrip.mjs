@@ -16,6 +16,8 @@ const load = (p) => jiti.import(path.join(root, p));
 
 const F = await load("app/admin/_lib/record-forms.ts");
 const H = await load("app/admin/_lib/health.ts");
+const K = await load("app/admin/_lib/shortcuts.ts");
+const { NAV } = await load("app/admin/nav.ts");
 const { buildSeed } = await load("lib/content/records-seed.ts");
 
 let n = 0;
@@ -127,6 +129,22 @@ t("empty required fields are named", () => {
   assert.deepEqual(F.emptyRequired("experience", { company: "A", role: " ", period: { start: "2024-01", end: "" }, headline: "", bullets: [] }), ["Role", "Period", "Headline"]);
   assert.deepEqual(F.emptyRequired("certification", { issuer: "IBM", line: "x" }), []);
   assert.deepEqual(F.emptyRequired("skill_group", {}), []);
+});
+
+t("palette finds sections by name, shortcuts are unique, nothing is listed as coming", () => {
+  const items = [...K.QUICK_ACTIONS, ...K.sectionItems()];
+  assert.ok(K.filterPalette(items, "cert").slice(0, 3).some((i) => i.label === "Add certificate"));
+  assert.ok(K.filterPalette(items, "hiring").some((i) => i.href === "/admin/engineer/hiring"));
+  assert.equal(K.filterPalette(items, "zzzz").length, 0);
+  assert.equal(K.filterPalette(items, "").length, items.length);
+  assert.equal(new Set(K.SHORTCUTS.map((s) => s.key)).size, K.SHORTCUTS.length);
+  assert.equal(K.shortcutFor("P").href, "/admin/engineer/projects");
+  const eng = NAV.find((g) => g.id === "engineer").sections;
+  for (const id of ["experience", "certifications", "education", "events", "milestones", "architecture", "links", "hiring", "clock", "booking"]) {
+    const sec = eng.find((x) => x.id === id);
+    assert.ok(sec && sec.kind !== "soon", `${id} is editable`);
+  }
+  for (const sh of K.SHORTCUTS) assert.ok(items.some((i) => i.href === sh.href), `shortcut ${sh.key} lands on a real section`);
 });
 
 console.log(`\n${n} groups passed`);

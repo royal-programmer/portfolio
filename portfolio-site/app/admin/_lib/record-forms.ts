@@ -361,3 +361,23 @@ export function validateImport(type: RecordType, text: string, existingSlugs: It
   const summary = `${create} to add, ${update} to update, ${errors.length} with problems.${errors.length ? " Nothing is imported until every record is valid." : ""}`;
   return { ok: errors.length === 0 && rows.length > 0, rows, errors, summary };
 }
+
+// ---- empty required fields ----------------------------------------------------------------------------------
+
+/** Names of required text fields that are blank in a stored record (the schema allows "", the site should not show it). */
+export function emptyRequired(type: RecordType, data: unknown): string[] {
+  const form = (RECORD_FORMS as Record<string, RecordForm | undefined>)[type];
+  if (!form || !isObj(data)) return [];
+  const out: string[] = [];
+  for (const f of form.fields) {
+    if (!f.required || !visible(f, data)) continue;
+    if (f.kind === "text" || f.kind === "long" || f.kind === "url" || f.kind === "date" || f.kind === "month") {
+      if (String(data[f.key] ?? "").trim() === "") out.push(f.label);
+    } else if (f.kind === "period" && isObj(data[f.key])) {
+      const p = data[f.key] as Obj;
+      if (!String(p.start ?? "").trim() || !String(p.end ?? "").trim()) out.push(f.label);
+    }
+  }
+  return out;
+}
+type Obj = Record<string, unknown>;

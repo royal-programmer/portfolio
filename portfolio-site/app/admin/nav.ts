@@ -11,8 +11,8 @@ export type NavSection = {
   id: string;
   label: string;
   cluster?: "Content" | "Views" | "Copy";
-  /** `settings`: the typed Zod forms (tabs when several keys). `collection`: master-detail. `history`: change log. `soon`: placeholder. */
-  kind: "settings" | "collection" | "history" | "soon";
+  /** `settings`: the typed Zod forms (tabs when several keys). `collection`: master-detail. `history`: change log. `booking`: the book-a-call link. `soon`: placeholder. */
+  kind: "settings" | "collection" | "history" | "booking" | "soon";
   keys?: SettingKey[];
   note?: string;
 };
@@ -34,6 +34,9 @@ const ENGINEER_SETTINGS: NavSection[] = [
   { id: "views", label: "Views", cluster: "Views", kind: "settings", keys: ["engineer.views", "netflix", "engineer.themes"] },
   { id: "stage", label: "3D room and Swarm", cluster: "Views", kind: "soon", note: "Coming with the 3D round (gizmo editor) and the Swarm round." },
   { id: "copy", label: "Copy", cluster: "Copy", kind: "settings", keys: ["engineer.terminal", "engineer.resume", "engineer.i18n"] },
+  { id: "hiring", label: "Hiring facts", cluster: "Copy", kind: "settings", keys: ["engineer.hiring"] },
+  { id: "clock", label: "Visitor's clock", cluster: "Copy", kind: "settings", keys: ["engineer.clock"] },
+  { id: "booking", label: "Book a call", cluster: "Copy", kind: "booking" },
 ];
 
 const COMING: NavSection[] = [{ id: "soon", label: "Coming", kind: "soon", note: "This world's content and views are edited here once it ships." }];

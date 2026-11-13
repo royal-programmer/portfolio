@@ -2,13 +2,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { listEntries } from "@/lib/content";
 import { getAllSettings } from "@/lib/settings/read";
-import { isSettingKey } from "@/lib/settings/schema";
+import { isSettingKey, type Settings } from "@/lib/settings/schema";
 import { SettingEditor } from "../../../editor";
 import { SkillsScreen, type PickOption, type SkillGroupRow } from "../../../_collections/skills-screen";
 import { getServerClient } from "@/lib/db/server";
 import { parseRecordData } from "@/lib/content/record-schemas";
 import { CollectionScreen, type ProjectRow } from "../../../_collections/collection-screen";
 import { findCollection } from "../../../collections";
+import { RecordsScreen } from "../../../_collections/records-screen";
+import { BookingEditor } from "../../../_collections/booking-editor";
+import { loadRecordRows } from "../../../_lib/load";
+import type { RecordType } from "@/lib/content/types";
 import { findSection, sectionPath } from "../../../nav";
 
 type Props = { params: Promise<{ group: string; section: string }>; searchParams: Promise<{ key?: string; id?: string; new?: string }> };
@@ -30,12 +34,16 @@ export default async function AdminSection({ params, searchParams }: Props) {
   if (section.kind === "collection") {
     const col = findCollection(gid, sid);
     if (!col) notFound();
+    if (col.kind === "records" && col.recordType) {
+      const rows = await loadRecordRows(col.recordType as RecordType, col.uploads);
+      return <RecordsScreen collection={col} rows={rows} initialId={sp.id} startNew={sp.new === "1"} />;
+    }
     if (col.id === "skills") return <SkillsScreen {...(await loadSkills())} initialId={sp.id} />;
     const entries = col.kind === "entries" || col.kind === "media" ? await listEntries("engineer", { includeNonPublic: true }).catch(() => []) : [];
     const rows: ProjectRow[] = entries
       .filter((e) => e.type === "project")
       .map((e) => {
-        const d = e.data as { role?: string; techStack?: string[]; deployedUrl?: string; repoUrl?: string; demoVideoUrl?: string };
+        const d = e.data as { role?: string; techStack?: string[]; deployedUrl?: string; repoUrl?: string; demoVideoUrl?: string; story?: Record<string, unknown>; media?: Record<string, unknown> };
         return {
           id: e.id,
           slug: e.slug,
@@ -49,10 +57,20 @@ export default async function AdminSection({ params, searchParams }: Props) {
           deployedUrl: d.deployedUrl ?? "",
           repoUrl: d.repoUrl ?? "",
           demoVideoUrl: d.demoVideoUrl ?? "",
+          story: d.story ?? {},
+          assets: d.media ?? {},
+          order: e.order,
+          photoChoices: e.media.filter((m) => m.kind === "image" && m.width && m.height).map((m) => ({ src: m.optimizedUrl, w: m.width ?? 0, h: m.height ?? 0, alt: m.alt ?? "", label: m.alt || m.caption || m.id.slice(0, 8) })),
           media: e.media.map((m) => ({ id: m.id, thumbUrl: m.thumbUrl, alt: m.alt ?? "", entryId: e.id })),
         };
       });
-    return <CollectionScreen collection={col} rows={rows} initialId={sp.id} startNew={sp.new === "1"} />;
+    const nf = col.id === "projects" ? (await getAllSettings()).items.netflix : null;
+    return <CollectionScreen collection={col} rows={rows} initialId={sp.id} startNew={sp.new === "1"} booking={nf ? { draft: nf.draft as Settings["netflix"], live: nf.live as Settings["netflix"] } : undefined} />;
+  }
+
+  if (section.kind === "booking") {
+    const { items } = await getAllSettings();
+    return <BookingEditor draft={items.netflix.draft as Settings["netflix"]} live={items.netflix.live as Settings["netflix"]} />;
   }
 
   const keys = section.keys ?? [];

@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { signOut } from "./entry-actions";
 import { adminIsDirty } from "./dirty";
 import { NAV, sectionPath, type NavGroup } from "./nav";
+import { Palette } from "./palette";
 
 const LEAVE = "You have unsaved edits. Leave without saving?";
 const OPEN_KEY = "xp-admin-nav";
@@ -21,6 +22,7 @@ export function AdminShell({ differing, email, tableReady, error, children }: { 
   const path = usePathname();
   const [, activeGroup = "", activeSection = ""] = path.split("/").filter(Boolean);
   const [sheet, setSheet] = useState<string | null>(null);
+  const [findSignal, setFindSignal] = useState(0);
   const navRef = useRef<HTMLElement>(null);
   const sheetOpen = sheet === path;
 
@@ -71,6 +73,16 @@ export function AdminShell({ differing, email, tableReady, error, children }: { 
             <span>admin</span>
             <small>ratulroy</small>
           </div>
+          <button type="button" className="adm-search-btn" aria-label="Search (Ctrl+K)" title="Search (Ctrl+K)" onClick={() => setFindSignal((n) => n + 1)}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <span>Search</span>
+          </button>
+          <Link href="/admin" onClick={guard} className="adm-home-btn" aria-label="Home">
+            Home
+          </Link>
           <button type="button" className="adm-menu-btn" aria-expanded={sheetOpen} aria-controls="adm-nav" onClick={() => setSheet(sheetOpen ? null : path)}>
             {sheetOpen ? "Close" : "Menu"}
           </button>
@@ -112,6 +124,11 @@ export function AdminShell({ differing, email, tableReady, error, children }: { 
               </ul>
             </details>
           ))}
+          <form action={signOut} className="adm-nav-signout">
+            <button type="submit" className="adm-btn">
+              Sign out ({email})
+            </button>
+          </form>
         </nav>
         <div className="adm-account">
           <span className="adm-signed" title={email}>
@@ -124,6 +141,7 @@ export function AdminShell({ differing, email, tableReady, error, children }: { 
           </form>
         </div>
       </aside>
+      <Palette openSignal={findSignal} />
       <main className="adm-main">
         {!tableReady ? (
           <p className="adm-banner" role="alert">

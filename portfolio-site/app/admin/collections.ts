@@ -16,16 +16,16 @@ export type Collection = {
   id: string;
   label: string;
   singular: string;
-  /** `entries`: rows in the `entries` table. `media`: the media pipeline. `constants`: still a code constant. */
-  kind: "entries" | "media" | "constants";
+  /** `entries`: projects (rows in `entries`). `media`: the media pipeline. `records`: the generic record screen. `constants`: not built yet. */
+  kind: "entries" | "media" | "records" | "constants";
+  /** For `records`: which record type the screen edits (its form is `_lib/record-forms.ts`). */
+  recordType?: string;
   status: "live" | "coming";
   fields: CollectionField[];
   /** Photos (and, once the pipeline takes them, PDFs) can be attached. */
   uploads: boolean;
   note?: string;
 };
-
-const COMING_NOTE = "Coming: needs the content-layer move (today this comes from the RESUME constant in lib/site/terminal-data.ts).";
 
 export const COLLECTIONS: Record<string, Collection[]> = {
   engineer: [
@@ -69,10 +69,14 @@ export const COLLECTIONS: Record<string, Collection[]> = {
       fields: [],
       note: "Each skill can link the projects, roles and certificates that used it (what the skill panel shows). A skill with no links is matched by name instead.",
     },
-    { id: "experience", label: "Experience", singular: "role", kind: "constants", status: "coming", uploads: false, fields: [], note: COMING_NOTE },
-    { id: "certifications", label: "Certifications", singular: "certification", kind: "constants", status: "coming", uploads: true, fields: [], note: COMING_NOTE },
-    { id: "education", label: "Education", singular: "school", kind: "constants", status: "coming", uploads: false, fields: [], note: COMING_NOTE },
-    { id: "writing", label: "Writing", singular: "post", kind: "constants", status: "coming", uploads: false, fields: [], note: COMING_NOTE },
+    { id: "experience", label: "Experience", singular: "role", kind: "records", recordType: "experience", status: "live", uploads: false, fields: [] },
+    { id: "certifications", label: "Certifications", singular: "certificate", kind: "records", recordType: "certification", status: "live", uploads: true, fields: [], note: "Badge images use the same upload as project photos." },
+    { id: "education", label: "Education", singular: "school", kind: "records", recordType: "education", status: "live", uploads: false, fields: [] },
+    { id: "events", label: "Timeline events", singular: "event", kind: "records", recordType: "timeline_event", status: "live", uploads: false, fields: [] },
+    { id: "milestones", label: "Milestones", singular: "milestone", kind: "records", recordType: "milestone", status: "live", uploads: false, fields: [] },
+    { id: "architecture", label: "Architecture diagrams", singular: "diagram", kind: "records", recordType: "diagram", status: "live", uploads: false, fields: [] },
+    { id: "links", label: "Profile links", singular: "link", kind: "records", recordType: "profile_link", status: "live", uploads: false, fields: [] },
+    { id: "writing", label: "Writing", singular: "post", kind: "constants", status: "coming", uploads: false, fields: [], note: "Blog posts live in their own table; their editor is the next admin round." },
   ],
 };
 
