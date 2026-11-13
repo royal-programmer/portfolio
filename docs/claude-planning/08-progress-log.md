@@ -1484,7 +1484,12 @@ stripped service_role's table grants).
 - Privacy-first `site_events` (migration 0013, not applied), `/api/e`, `track()` and the hooks in Netflix, terminal and hub; admin Insights page with CSV; "Popular with visitors" row; persistent Open to work chip, one-sentence Hire line, Skim in 30 seconds, `?for=` share card, Fit check links; axe fixes on the terminal. Details in 17-persona-views.md section 29. Tests: `node --experimental-strip-types scripts/insights-check.mjs`.
 - Surprise: another builder's unbalanced `}` in `app/admin/admin.css` briefly broke the dev server's CSS for every page (a Turbopack build error overlay); it was fixed on their side.
 
-### Round 33 - the admin refined (2026-11-13)
+### Round 31 - Fit check inside the Netflix view (2026-11-13)
 
-- G1 admin host `admin.<root>` + Cloudflare Access JWT check (off until two env vars are set) + Security health row; G2 project form on the record-form pattern, server-side drafts (migration 0014, not applied), Writing screen, Build resume progress, Share link with a name, project import, skill delete, preview fallback; G3 `scripts/admin-smoke.mjs`. Details in `17-persona-views.md` section 32 and `16-admin-console.md` section 8. Tests: `node scripts/admin-host-check.mjs` (25).
-- Not run: the smoke script and any browser check (no route to Supabase from here). Ratul: apply 0014, set Cloudflare + Vercel env, run `node scripts/admin-smoke.mjs`.
+- The Fit check is native to the Netflix view: a paste dialog (modal / phone bottom sheet), a match card with ring, verdict and Matches / Adjacent / Not yet chips (matches open skill evidence), and Mail with this fit, Hire brief, Résumé, Book a call, Check another. Entry points: the Open to work chip, the phone Hire sheet, the hero, the `f` key. Reuses `fitMatch` from `terminal-fit.ts`; the terminal is unchanged. `fit_open` and `fit_check` (verdict level only) events. Details in 17-persona-views.md section 30.
+
+### Round 32 - the 3D room, P0 and P1 (2026-11-13)
+
+- P0 spike on `/stage-lab` (dev only) with stacked curved monitors, portrait monitors, tablet dock, neon; verdict **go** in `18-3d-room-plan.md` section 11. P1: `room3d` settings key (33 kinds, tiers, defaults from stage-data), tier selection and object budget, fallback chain, the kit and `<Room>`, viewer at `/stage-lab/room`. Checks: `node scripts/room3d-check.mjs`, `node scripts/settings-roundtrip.mjs`.
+- Left for the next round: re-express the real Stage through the kit (behind a flag first), the door and clock behaviours in the Stage, a real-phone test on the Vivo X200 Pro, then P2 (form editor).
+- Surprise: the sandbox browser has no network (Supabase unreachable), so today's Stage cannot be captured live; the earlier photo-mode capture is used as the comparison. Software GL makes frame times meaningless (listed only for relative cost).
