@@ -7,6 +7,7 @@
  * in `GROUPS` (admin rail), then read it with `getSetting("your.key")`. `scripts/settings-roundtrip.mjs` fails on drift.
  */
 import { z } from "zod";
+import { room3dSchema } from "@/lib/room3d/schema";
 
 // ---- field helpers (the `ui` meta picks the widget) ---------------------------------------------
 const str = (max = 200) => z.string().max(max);
@@ -226,6 +227,7 @@ export const SCHEMAS = {
   "engineer.themes": themesSchema,
   "site.switches": switchesSchema,
   netflix: netflixSchema,
+  room3d: room3dSchema,
 } as const;
 
 export type SettingKey = keyof typeof SCHEMAS;
