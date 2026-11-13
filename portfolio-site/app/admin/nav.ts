@@ -57,6 +57,7 @@ export const NAV: NavGroup[] = [
       { id: "hub", label: "Hub copy", kind: "settings", keys: ["hub.copy"] },
       { id: "personas", label: "Persona copy", kind: "settings", keys: ["personas.copy"], note: "Role, phrases and call to action for every world." },
       { id: "switches", label: "Switches", kind: "settings", keys: ["site.switches"] },
+      { id: "insights", label: "Insights", kind: "history", note: "What visitors opened and played, counted without cookies." },
       { id: "history", label: "History", kind: "history" },
       { id: "previews", label: "Previews", kind: "soon", note: "Use Preview site in any editor; a preview list is coming." },
     ],

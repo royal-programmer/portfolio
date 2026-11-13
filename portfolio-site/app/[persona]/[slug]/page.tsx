@@ -13,7 +13,7 @@ import { placeOnSpectrum } from "@/lib/site/spectrum";
 import { HomePage } from "../../components/home-page";
 import { WorldBoot } from "../../components/world-boot";
 import { ViewShell } from "../../components/views/view-shell";
-import { NETFLIX_PROFILES, hireSheetOf, buildNetflix, isNetflixProfile, type NetflixShow, type NetflixProfileId } from "@/lib/site/netflix-data";
+import { POPULAR, indexItems, NETFLIX_PROFILES, hireSheetOf, buildNetflix, isNetflixProfile, type NetflixShow, type NetflixProfileId } from "@/lib/site/netflix-data";
 import { netflixCard, netflixShareLink } from "@/lib/site/netflix-og";
 import { loadEngineerTerminalData } from "../../load-terminal-data";
 import { skillEvidenceMap } from "@/lib/site/skill-evidence";
@@ -22,6 +22,8 @@ import { NetflixView } from "../../components/views/netflix/netflix-view";
 import { loadHomeContent } from "../../load-home-content";
 import { shareMetadata, siteOrigin } from "@/lib/site/share-meta";
 import { SUBDOMAIN_BY_PERSONA } from "@/lib/site/hosts";
+import { getPopularTally } from "@/lib/site/popular";
+import { pickPopular } from "@/lib/site/insights";
 
 type ProjectDetailProps = {
   params: Promise<{ persona: string; slug: string }>;
@@ -196,9 +198,12 @@ async function PersonaViewPage({ persona, view, fromTerminal, via }: { persona: 
     const data = terminalData(personas.find((p) => p.slug === persona), engineerEntries, engineerBlogPosts, views, cfg);
     const series = Object.fromEntries(NETFLIX_PROFILES.map((p) => [p.id, buildNetflix(p.id, data, engineerEntries, engineerBlogPosts)])) as Record<NetflixProfileId, NetflixShow>;
     const tr = data.i18n ?? I18N;
+    // "Popular with visitors": real counts of the last 30 days, hidden below the threshold (null), cached an hour.
+    const tally = await getPopularTally(POPULAR).catch(() => ({ events: 0, scores: {} }));
+    const popular = pickPopular(tally, POPULAR, new Set(indexItems(Object.values(series)).keys())) ?? undefined;
     return (
       <ViewShell persona={persona} view={view} stripVia={fromTerminal}>
-        <NetflixView accent={accent} series={series} hire={hireSheetOf(data)} contact={data.contact} status={data.status} portrait={data.portrait} subData={{ uptime: data.uptime, i18n: { bn: { uptime: tr.bn.uptime, status: tr.bn.status }, hi: { uptime: tr.hi.uptime, status: tr.hi.status } } }} now={data.now} fitPool={{ stack: data.stack, resume: { skills: data.resume.skills } }} skillEv={skillEvidenceMap(data)} fast={via === "normal"} />
+        <NetflixView accent={accent} series={series} hire={hireSheetOf(data)} contact={data.contact} status={data.status} portrait={data.portrait} subData={{ uptime: data.uptime, i18n: { bn: { uptime: tr.bn.uptime, status: tr.bn.status }, hi: { uptime: tr.hi.uptime, status: tr.hi.status } } }} now={data.now} fitPool={{ stack: data.stack, resume: { skills: data.resume.skills } }} skillEv={skillEvidenceMap(data)} popular={popular} fast={via === "normal"} />
       </ViewShell>
     );
   }

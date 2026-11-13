@@ -28,7 +28,7 @@ import { applyViewIcon } from "@/lib/site/view-icons";
 import { track, setTrackContext } from "@/lib/site/track";
 import { classifyLink } from "@/lib/site/events";
 import { clearHistory, useCc, useLikes, useMyList, useProgress, useSound } from "./netflix-store";
-import { NETFLIX_PROFILES, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, top10Of, type HireSheet, TOP10_ROW_TITLE, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
+import { NETFLIX_PROFILES, POPULAR, becauseRows, castKeyOf, factsOf, indexItems, isNetflixProfile, mentionsCast, rowItems, seasonRecap, top10Of, type HireSheet, TOP10_ROW_TITLE, topEpisodeId, type NetflixProfileId, type NetflixShow, type NfItem } from "@/lib/site/netflix-data";
 import type { TermLink, TerminalData } from "@/lib/site/terminal-data";
 import { SkillEvidencePanel } from "@/app/components/skill-evidence-panel";
 import type { SkillEvidence } from "@/lib/site/skill-evidence";
@@ -52,6 +52,8 @@ export type NetflixViewProps = {
   fast: boolean;
   /** What each skill is backed by (lower-case name to evidence), built on the server: a skill card opens it instead of the detail modal. */
   skillEv?: Record<string, SkillEvidence>;
+  /** "Popular with visitors": title ids ranked from the last 30 days of real counts; absent while there are too few to say. */
+  popular?: string[];
 };
 
 type ToastAction = { label: string; run: () => void };
@@ -255,7 +257,7 @@ function ProfileGate({ onPick, notify }: { onPick: (id: NetflixProfileId) => voi
 
 type ModalState = { id: string; origin: DOMRect | null; play: boolean; playMs?: number };
 
-function NetflixBody({ show, series, profile, status, hire, fitPool, subData, now, fast, skillEv, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
+function NetflixBody({ show, series, profile, status, hire, fitPool, subData, now, fast, skillEv, popular, contact, onSwitch, onReplay, autoToken, notify }: NetflixViewProps & { show: NetflixShow; profile: NetflixProfileId; onSwitch: () => void; onReplay: () => void; autoToken: number; notify: Notify }) {
   const shows = useMemo(() => Object.values(series), [series]);
   const index = useMemo(() => indexItems(shows), [shows]);
   const topId = useMemo(() => topEpisodeId(shows), [shows]);
@@ -404,14 +406,16 @@ function NetflixBody({ show, series, profile, status, hire, fitPool, subData, no
     // Developer: right after Projects (the first row); Recruiter: before the work rows, after Continue / Because / My List.
     // D2: "Trending now" from live public commits: Developer's second row, Recruiter's right after Top 10 (never in Story).
     const trend: DisplayRow[] = profile === "story" ? [] : [{ id: "trending", title: "Trending now", trending: true }];
-    const withTop = profile === "developer" ? [base[0], ...trend, ...topRow, ...base.slice(1)] : [...topRow, ...trend, ...base];
+    const popularItems = (popular ?? []).map((id) => index.get(id)).filter((i): i is NfItem => !!i);
+    const popRow: DisplayRow[] = popularItems.length ? [{ id: "popular", title: POPULAR.title, items: popularItems }] : [];
+    const withTop = profile === "developer" ? [base[0], ...trend, ...topRow, ...popRow, ...base.slice(1)] : [...topRow, ...popRow, ...trend, ...base];
     return [
       ...(cont.length ? [{ id: "continue", title: "Continue watching", items: cont } as DisplayRow] : []),
       ...because,
       ...(mine.length ? [{ id: "mylist", title: "My List", items: mine } as DisplayRow] : []),
       ...withTop,
     ];
-  }, [index, progress.recent, list.ids, show, profile]);
+  }, [index, progress.recent, list.ids, show, profile, popular]);
 
   // N5: with a technology picked, every row keeps only the cards that mention it (rows left empty go).
   const shownRows = useMemo<DisplayRow[]>(() => {

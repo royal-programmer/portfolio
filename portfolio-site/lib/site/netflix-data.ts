@@ -749,6 +749,12 @@ export function bookOf(b?: BookCall): BookCall | undefined {
 
 export type HireSheet = { book?: BookCall; email?: string; resume: string; brief: string; /** The one availability line (`hiring.availability`). */ availability: string };
 
+/**
+ * "Popular with visitors": built from the last `windowDays` of title_open and play_complete counts, shown after Top 10
+ * for every profile, hidden until there are `minEvents` counted events (nothing is faked). Weights are data.
+ */
+export const POPULAR = { title: "Popular with visitors", windowDays: 30, minEvents: 20, max: 10, weights: { title_open: 1, play_complete: 3 } } as const;
+
 /** When the contextual Hire bar appears (D5): after this many opened titles or this long on the page; a dismissal is remembered this many days. Data. */
 export const HIRE_BAR = { afterOpens: 2, afterMs: 45_000, rememberDays: 7 } as const;
 

@@ -123,4 +123,10 @@ t("health checklist: red and green come from the data, unknown is never green", 
   assert.equal(H.healthSummary(H.computeHealth(base)), "7 of 8 green");
 });
 
+t("empty required fields are named", () => {
+  assert.deepEqual(F.emptyRequired("experience", { company: "A", role: " ", period: { start: "2024-01", end: "" }, headline: "", bullets: [] }), ["Role", "Period", "Headline"]);
+  assert.deepEqual(F.emptyRequired("certification", { issuer: "IBM", line: "x" }), []);
+  assert.deepEqual(F.emptyRequired("skill_group", {}), []);
+});
+
 console.log(`\n${n} groups passed`);

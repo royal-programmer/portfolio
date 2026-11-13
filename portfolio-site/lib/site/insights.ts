@@ -150,12 +150,31 @@ export type PopularRule = {
   max: number;
 };
 
-/** Ids ranked by weighted counts; `null` when there are fewer than `minEvents` counted events (or no ranked title). */
-export function rankPopular(all: readonly InsightRow[], rule: PopularRule, known: ReadonlySet<string>, now = Date.now()): string[] | null {
-  const rows = withinDays(all, rule.windowDays, now).filter((r) => r.ref && known.has(r.ref) && (rule.weights[r.kind] ?? 0) > 0);
-  if (rows.length < rule.minEvents) return null;
-  const score = new Map<string, number>();
-  for (const r of rows) score.set(r.ref!, (score.get(r.ref!) ?? 0) + (rule.weights[r.kind] ?? 0));
-  const ranked = [...score].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, rule.max);
+/** What the ranking is built from: counted events in the window and each title's weighted score. Small enough to cache. */
+export type PopularTally = { events: number; scores: Record<string, number> };
+
+/** Weighted score per title over the window. `events` counts every weighted event, known title or not. */
+export function tallyPopular(all: readonly InsightRow[], rule: PopularRule, now = Date.now()): PopularTally {
+  const scores: Record<string, number> = {};
+  let events = 0;
+  for (const r of withinDays(all, rule.windowDays, now)) {
+    const w = rule.weights[r.kind] ?? 0;
+    if (!r.ref || w <= 0) continue;
+    events += 1;
+    scores[r.ref] = (scores[r.ref] ?? 0) + w;
+  }
+  return { events, scores };
+}
+
+/** Ids ranked by score, only titles that exist; `null` below `minEvents` events (or when no title qualifies): the row stays hidden. */
+export function pickPopular(tally: PopularTally, rule: PopularRule, known: ReadonlySet<string>): string[] | null {
+  if (tally.events < rule.minEvents) return null;
+  const ranked = Object.entries(tally.scores)
+    .filter(([id]) => known.has(id))
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, rule.max);
   return ranked.length ? ranked.map(([id]) => id) : null;
 }
+
+/** The two steps together, for tests and one-shot callers. */
+export const rankPopular = (all: readonly InsightRow[], rule: PopularRule, known: ReadonlySet<string>, now = Date.now()) => pickPopular(tallyPopular(all, rule, now), rule, known);
