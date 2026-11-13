@@ -23,7 +23,7 @@ import { Room } from "./room";
 let lastGoodRoom: Room3d | null = null;
 
 const SAVED_KEY = "room3d-q";
-const WORLDS = [
+export const WORLDS = [
   { label: "Engineer", color: "#3b82f6" },
   { label: "Trader", color: "#22c55e" },
   { label: "Photographer", color: "#f59e0b" },
@@ -36,7 +36,7 @@ type Interaction = NonNullable<RoomObject["interaction"]>;
 export type RunInfo = { interaction: Interaction; object: RoomObject };
 
 /** Milliseconds to add to the device clock so it matches the server's: read once from a HEAD request's Date header. */
-function useClockOffset(): number {
+export function useClockOffset(): number {
   const [offset, setOffset] = useState(0);
   useEffect(() => {
     let live = true;
@@ -56,16 +56,16 @@ function useClockOffset(): number {
   return offset;
 }
 
-function readProbe() {
+export function readProbe() {
   const nav = navigator as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean } };
   return { cores: nav.hardwareConcurrency, memory: nav.deviceMemory, saveData: nav.connection?.saveData === true, phone: window.matchMedia("(max-width: 767px)").matches };
 }
 
 /** Counts renderer.info per frame and the frame times; read from `window.__room` by tests. */
-function Stats({ onMedian, probe }: { onMedian: (ms: number) => void; probe: boolean }) {
+export function Stats({ onMedian, probe }: { onMedian: (ms: number) => void; probe: boolean }) {
   const gl = useThree((s) => s.gl);
   const get = useThree((s) => s.get);
-  const stats = useRef({ calls: 0, triangles: 0, geometries: 0, textures: 0, frameMs: [] as number[] });
+  const stats = useRef({ calls: 0, triangles: 0, geometries: 0, textures: 0, frameMs: [] as number[], callsLog: [] as number[] });
   const done = useRef(false);
   useEffect(() => {
     get().gl.info.autoReset = false;
@@ -79,7 +79,29 @@ function Stats({ onMedian, probe }: { onMedian: (ms: number) => void; probe: boo
       v.project(camera);
       return [((v.x + 1) / 2) * size.width, ((1 - v.y) / 2) * size.height];
     };
-    (window as unknown as { __room: unknown }).__room = Object.assign(stats.current, { pick });
+    // Estimated texture memory (MB) from the maps on the scene's materials and its environment (RGBA, with mips).
+    const texMB = () => {
+      const { scene } = get();
+      const seen = new Set<THREE.Texture>();
+      const add = (t: unknown) => {
+        if (t && (t as THREE.Texture).isTexture) seen.add(t as THREE.Texture);
+      };
+      add(scene.environment);
+      scene.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+        for (const mat of Array.isArray(m) ? m : m ? [m] : []) for (const v of Object.values(mat)) add(v);
+      });
+      let bytes = 0;
+      seen.forEach((t) => {
+        const img = t.image as { width?: number; height?: number } | undefined;
+        const rt = (t as THREE.Texture & { isRenderTargetTexture?: boolean }).isRenderTargetTexture;
+        const w = img?.width ?? (rt ? 512 : 0);
+        const h = img?.height ?? (rt ? 256 : 0);
+        bytes += w * h * 4 * (t.generateMipmaps ? 1.33 : 1);
+      });
+      return bytes / 1048576;
+    };
+    (window as unknown as { __room: unknown }).__room = Object.assign(stats.current, { pick, texMB });
   }, [get]);
   useFrame((_, dt) => {
     const s = stats.current;
@@ -87,6 +109,8 @@ function Stats({ onMedian, probe }: { onMedian: (ms: number) => void; probe: boo
     s.triangles = gl.info.render.triangles;
     s.geometries = gl.info.memory.geometries;
     s.textures = gl.info.memory.textures;
+    s.callsLog.push(s.calls);
+    if (s.callsLog.length > 400) s.callsLog.shift();
     gl.info.reset();
     s.frameMs.push(dt * 1000);
     if (s.frameMs.length > 600) s.frameMs.shift();
@@ -187,6 +211,7 @@ export default function RoomCanvas({ value, onRun, still = false }: { value?: un
           consoleOn={consoleOn}
           worlds={WORLDS}
           clockOffsetMs={clockOffsetMs}
+          onMerged={(s) => void ((window as unknown as { __roomMerge?: unknown }).__roomMerge = s)}
           onHover={(id, label) => setHover({ id, label })}
           onRun={run}
         />

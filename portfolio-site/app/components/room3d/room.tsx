@@ -8,13 +8,15 @@
  */
 import { AccumulativeShadows, ContactShadows, Environment, Lightformer, RandomizedLight } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, type ComponentType } from "react";
+import { memo, useEffect, useMemo, useRef, type ComponentType } from "react";
 import * as THREE from "three";
 import type { KindId, ObjectOf, Room as RoomData, RoomObject, Tier } from "@/lib/room3d/schema";
 import { trimToBudget } from "@/lib/room3d/tiers";
-import { EnvCtx, Kit, type Env } from "./kit-core";
+import { EnvCtx, Halo, Kit, useEnv, type Env, type StageExtras } from "./kit-core";
 import * as Decor from "./kit-decor";
+import * as Stage from "./kit-stage";
 import * as Work from "./kit-work";
+import { mergeStatic, type MergeStats } from "./static-merge";
 import { woodTexture } from "./textures";
 
 type Interaction = NonNullable<RoomObject["interaction"]>;
@@ -55,6 +57,8 @@ export const KINDS: KindMap = {
   box: Decor.Box,
   cylinder: Decor.Cylinder,
   sphere: Decor.Sphere,
+  projectShelf: Stage.ProjectShelf,
+  constellation: Stage.Constellation,
 };
 
 export type RoomProps = {
@@ -71,12 +75,20 @@ export type RoomProps = {
   consoleOn: boolean;
   worlds: Array<{ label: string; color: string }>;
   clockOffsetMs: number;
+  /** The Stage's project cases and stars (see `StageExtras`). */
+  stage?: StageExtras;
+  /** The Stage's live terminal texture, for a monitor whose screen is `terminal`. */
+  liveScreen?: THREE.Texture | null;
+  /** Merge the parts that never move into a few meshes (default on); the Stage's draw-call cap depends on it. */
+  merge?: boolean;
+  onMerged?: (s: MergeStats) => void;
   onHover: (id: string | null, label: string | null) => void;
   onRun: (i: Interaction, o: RoomObject) => void;
 };
 
 function Placed({ o, onHover, onRun }: { o: RoomObject; onHover: RoomProps["onHover"]; onRun: RoomProps["onRun"] }) {
   const Kind = KINDS[o.kind] as ComponentType<{ o: RoomObject }>;
+  const env = useEnv();
   const it = o.interaction;
   const handlers = it
     ? {
@@ -99,6 +111,7 @@ function Placed({ o, onHover, onRun }: { o: RoomObject; onHover: RoomProps["onHo
   return (
     <group name={o.id} position={pos} rotation={[0, rotY, 0]} scale={scale} {...handlers}>
       <Kind o={o} />
+      {env.hoverId === o.id && o.interaction && o.kind !== "door" ? <Halo position={[0, 0.12, 0.08]} size={[0.45, 0.45]} color={env.accent} opacity={0.4} /> : null}
     </group>
   );
 }
@@ -113,6 +126,46 @@ function sunPosition(room: RoomData): [number, number, number] {
   return [x - nx * 5 + nz * 1.5, 3.4, z - nz * 5 - nx * 1.5];
 }
 
+type Light = RoomData["lighting"]["day"];
+
+/**
+ * The lightformer environment. Memoised on plain values: drei re-bakes the cube map whenever its children change
+ * identity, and a parent that re-renders often (the Stage does) must not cost a bake each time.
+ */
+const Sky = memo(function Sky({ light, bandId, textureSize, W, D }: { light: Light; bandId: string; textureSize: number; W: number; D: number }) {
+  return (
+    <Environment frames={1} resolution={textureSize >= 512 ? 256 : 128} environmentIntensity={0.8 + light.ambient.intensity * 0.6} key={light.key.color + bandId + textureSize}>
+      <Lightformer form="rect" intensity={Math.max(0.2, light.windowLight.intensity * 4)} color={light.windowLight.color} position={[2, 2, -D]} scale={[3, 2.2, 1]} />
+      <Lightformer form="ring" intensity={0.8 + light.key.intensity * 1.4} color={light.key.color} position={[0, 5, 0]} rotation-x={Math.PI / 2} scale={3} />
+      <Lightformer form="rect" intensity={2.4 * light.emissiveBoost} color="#ff3da0" position={[-W, 1.5, 0]} rotation-y={Math.PI / 2} scale={[3, 1.2, 1]} />
+      <Lightformer form="rect" intensity={1.6 * light.emissiveBoost} color="#2fd0ff" position={[W, 1, 2]} rotation-y={-Math.PI / 2} scale={[3, 1.2, 1]} />
+    </Environment>
+  );
+});
+
+/** Accumulated floor shadows (or one contact shadow on a phone) and the desk's own; memoised so a re-render never restarts a bake. */
+const Shadows = memo(function Shadows({ aoOn, big, W, D, deskX, deskZ, deskH, deskW, deskD }: { aoOn: boolean; big: boolean; W: number; D: number; deskX?: number; deskZ?: number; deskH?: number; deskW?: number; deskD?: number }) {
+  const scale = Math.max(W, D) * 1.6;
+  const [dx, dh, dz, dw, dd] = [deskX ?? 0, deskH ?? 0, deskZ ?? 0, deskW ?? 0, deskD ?? 0];
+  const has = deskX !== undefined;
+  const deskPos = useMemo<[number, number, number]>(() => [dx, dh + 0.025, dz], [dx, dh, dz]);
+  const deskScale = useMemo<[number, number]>(() => [dw, dd], [dw, dd]);
+  return (
+    <>
+      {aoOn ? (
+        <AccumulativeShadows temporal frames={big ? 70 : 40} alphaTest={0.9} scale={scale} position={FLOOR_AT} color="#06060c" opacity={0.85} resolution={big ? 1024 : 512}>
+          <RandomizedLight amount={8} radius={3.5} ambient={0.55} intensity={1} position={LIGHT_AT} bias={0.001} />
+        </AccumulativeShadows>
+      ) : (
+        <ContactShadows frames={1} position={FLOOR_AT} scale={scale} blur={2.4} opacity={0.6} far={2.2} resolution={256} />
+      )}
+      {has ? <ContactShadows frames={1} position={deskPos} scale={deskScale} blur={1.6} opacity={0.5} far={0.6} resolution={256} /> : null}
+    </>
+  );
+});
+const FLOOR_AT: [number, number, number] = [0, 0.02, 0];
+const LIGHT_AT: [number, number, number] = [2.2, 5, 1.5];
+
 export function Room(props: RoomProps) {
   const { room, tier, bandId, accent, phone, includeDraft = false } = props;
   const light = room.lighting[bandId] ?? room.lighting.day;
@@ -120,8 +173,8 @@ export function Room(props: RoomProps) {
   useEffect(() => () => kit.dispose(), [kit]);
   const objects = useMemo(() => trimToBudget(room.objects, tier.objectBudget, { phone, includeDraft }), [room.objects, tier.objectBudget, phone, includeDraft]);
   const env = useMemo<Env>(
-    () => ({ kit, light, accent, phone, tier, hoverId: props.hoverId, openIds: props.openIds, consoleOn: props.consoleOn, reduced: props.reduced, worlds: props.worlds, clockOffsetMs: props.clockOffsetMs }),
-    [kit, light, accent, phone, tier, props.hoverId, props.openIds, props.consoleOn, props.reduced, props.worlds, props.clockOffsetMs],
+    () => ({ kit, light, accent, phone, tier, hoverId: props.hoverId, openIds: props.openIds, consoleOn: props.consoleOn, reduced: props.reduced, worlds: props.worlds, clockOffsetMs: props.clockOffsetMs, stage: props.stage, liveScreen: props.liveScreen }),
+    [kit, light, accent, phone, tier, props.hoverId, props.openIds, props.consoleOn, props.reduced, props.worlds, props.clockOffsetMs, props.stage, props.liveScreen],
   );
   const { width: W, depth: D, height: H } = room.shell;
   const floorTex = useMemo(() => {
@@ -137,17 +190,26 @@ export function Room(props: RoomProps) {
     l.target.position.set(0, 0, 0);
     l.target.updateMatrixWorld();
   }, [sun]);
+  // Merge what never moves into a few meshes, once the objects are mounted (and again when their materials change).
+  const root = useRef<THREE.Group>(null);
+  const { merge = true } = props;
+  const onMerged = useRef(props.onMerged);
+  useEffect(() => {
+    onMerged.current = props.onMerged;
+  });
+  useEffect(() => {
+    const g = root.current;
+    if (!g || !merge) return;
+    const m = mergeStatic(g);
+    onMerged.current?.(m.stats);
+    return m.restore;
+  }, [merge, objects, kit, bandId, accent, props.consoleOn, room.shell, floorTex]);
   const desk = room.objects.find((o) => o.kind === "desk") as ObjectOf<"desk"> | undefined;
   const sunOn = light.windowLight.intensity > 0.1;
   return (
     <EnvCtx.Provider value={env}>
       <color attach="background" args={["#0a0c14"]} />
-      <Environment frames={1} resolution={tier.textureSize >= 512 ? 256 : 128} environmentIntensity={0.8 + light.ambient.intensity * 0.6} key={light.key.color + bandId + tier.textureSize}>
-        <Lightformer form="rect" intensity={Math.max(0.2, light.windowLight.intensity * 4)} color={light.windowLight.color} position={[2, 2, -D]} scale={[3, 2.2, 1]} />
-        <Lightformer form="ring" intensity={0.8 + light.key.intensity * 1.4} color={light.key.color} position={[0, 5, 0]} rotation-x={Math.PI / 2} scale={3} />
-        <Lightformer form="rect" intensity={2.4 * light.emissiveBoost} color="#ff3da0" position={[-W, 1.5, 0]} rotation-y={Math.PI / 2} scale={[3, 1.2, 1]} />
-        <Lightformer form="rect" intensity={1.6 * light.emissiveBoost} color="#2fd0ff" position={[W, 1, 2]} rotation-y={-Math.PI / 2} scale={[3, 1.2, 1]} />
-      </Environment>
+      <Sky light={light} bandId={bandId} textureSize={tier.textureSize} W={W} D={D} />
       <hemisphereLight args={[light.ambient.color, "#1a1410", 0.6 + light.ambient.intensity * 0.9]} />
       <directionalLight
         ref={sunRef}
@@ -165,6 +227,7 @@ export function Room(props: RoomProps) {
         shadow-bias={-0.0004}
         shadow-normalBias={0.02}
       />
+      <group ref={root}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[W, D]} />
         <meshStandardMaterial map={room.shell.floorMaterial === "wood" ? floorTex : null} color={room.shell.floorColor} roughness={0.5} metalness={0.02} envMapIntensity={0.7} />
@@ -182,16 +245,8 @@ export function Room(props: RoomProps) {
       {objects.map((o) => (
         <Placed key={o.id} o={o} onHover={props.onHover} onRun={props.onRun} />
       ))}
-      {tier.aoOn ? (
-        <AccumulativeShadows temporal frames={tier.shadowRes >= 2048 ? 70 : 40} alphaTest={0.9} scale={Math.max(W, D) * 1.6} position={[0, 0.02, 0]} color="#06060c" opacity={0.85} resolution={tier.shadowRes >= 2048 ? 1024 : 512}>
-          <RandomizedLight amount={8} radius={3.5} ambient={0.55} intensity={1} position={[2.2, 5, 1.5]} bias={0.001} />
-        </AccumulativeShadows>
-      ) : (
-        <ContactShadows frames={1} position={[0, 0.02, 0]} scale={Math.max(W, D) * 1.6} blur={2.4} opacity={0.6} far={2.2} resolution={256} />
-      )}
-      {desk ? (
-        <ContactShadows frames={1} position={[desk.transform.pos[0], desk.params.h + 0.025, desk.transform.pos[2]]} scale={[desk.params.w, desk.params.d]} blur={1.6} opacity={0.5} far={0.6} resolution={256} />
-      ) : null}
+      </group>
+      <Shadows aoOn={tier.aoOn} big={tier.shadowRes >= 2048} W={W} D={D} deskX={desk?.transform.pos[0]} deskZ={desk?.transform.pos[2]} deskH={desk?.params.h} deskW={desk?.params.w} deskD={desk?.params.d} />
     </EnvCtx.Provider>
   );
 }

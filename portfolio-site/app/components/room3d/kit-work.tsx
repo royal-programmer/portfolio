@@ -10,7 +10,7 @@ import { useFrame } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { KindId, ObjectOf } from "@/lib/room3d/schema";
-import { Halo, Inst, useEnv, useImageTexture, useMat, type Env } from "./kit-core";
+import { fitLive, Halo, Inst, useEnv, useImageTexture, useMat, type Env } from "./kit-core";
 import { clockFaceTexture, homeScreenTexture, screenTexture } from "./textures";
 
 type P<K extends KindId> = { o: ObjectOf<K> };
@@ -73,7 +73,11 @@ export function Monitor({ o }: P<"monitor">) {
   const img = useImageTexture(screen === "image" ? o.params.image : undefined, o.params.image?.alt ?? "", aspect);
   const body = useMat(o.material);
   const steel = useMat(STEEL);
-  const map = screen === "image" && img.state !== "none" ? img.tex : tex;
+  const live = screen === "terminal" ? env.liveScreen ?? null : null;
+  useEffect(() => {
+    if (live) fitLive(live, aspect, form === "curved");
+  }, [live, aspect, form]);
+  const map = live ?? (screen === "image" && img.state !== "none" ? img.tex : tex);
   const glow = env.light.emissiveBoost;
   const th = w / R;
   const screenMat = useMemo(() => new THREE.MeshBasicMaterial({ map, toneMapped: false, color: new THREE.Color("#ffffff").multiplyScalar(1.1 * glow), side: form === "curved" ? THREE.BackSide : THREE.FrontSide }), [map, glow, form]);
@@ -476,17 +480,17 @@ export function Clock({ o }: P<"clock">) {
         <circleGeometry args={[r, 40]} />
         <meshBasicMaterial map={face} toneMapped={false} />
       </mesh>
-      <group ref={hHand} position={[0, 0, 0.034]}>
+      <group ref={hHand} position={[0, 0, 0.034]} userData={{ dynamic: true }}>
         <mesh position={[0, r * 0.25, 0]} material={hand}>
           <boxGeometry args={[0.012, r * 0.5, 0.002]} />
         </mesh>
       </group>
-      <group ref={mHand} position={[0, 0, 0.036]}>
+      <group ref={mHand} position={[0, 0, 0.036]} userData={{ dynamic: true }}>
         <mesh position={[0, r * 0.38, 0]} material={hand}>
           <boxGeometry args={[0.008, r * 0.76, 0.002]} />
         </mesh>
       </group>
-      <group ref={sHand} position={[0, 0, 0.038]}>
+      <group ref={sHand} position={[0, 0, 0.038]} userData={{ dynamic: true }}>
         <mesh position={[0, r * 0.4, 0]} material={sec}>
           <boxGeometry args={[0.004, r * 0.85, 0.002]} />
         </mesh>

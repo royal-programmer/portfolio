@@ -66,7 +66,7 @@ export function resolveTier(args: { query: string | null; saved: string | null; 
 /** What is cut first when the budget bites: lower number = kept longer. Anything unlisted goes last. */
 const PRIORITY: Partial<Record<RoomObject["kind"], number>> = {
   desk: 0, monitor: 0, door: 0, window: 0, chair: 1, tv: 1, bed: 1, pcTower: 1, keyboard: 1, tablet: 2, phone: 2, wardrobe: 2, lamp: 2, neonStrip: 2, clock: 3, frame: 3, shelf: 3, rug: 3,
-  console: 3, mouse: 3, guitar: 4, midiKeyboard: 4, plant: 4, bag: 4, ridingSet: 4, capRow: 5, keyRack: 5, headset: 5, speaker: 5, bookStack: 6, box: 7, cylinder: 7, sphere: 7,
+  console: 3, mouse: 3, guitar: 4, midiKeyboard: 4, plant: 4, bag: 4, ridingSet: 4, capRow: 5, keyRack: 5, headset: 5, speaker: 5, bookStack: 6, projectShelf: 1, constellation: 2, box: 7, cylinder: 7, sphere: 7,
 };
 
 /** The objects to draw: drafts and (on a phone) `hideOnPhone` ones dropped, then cut to the budget by kind priority (stable). */

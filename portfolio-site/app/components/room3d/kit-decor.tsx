@@ -262,7 +262,7 @@ export function Door({ o }: P<"door">) {
           <boxGeometry args={[bw, bh, 0.08]} />
         </mesh>
       ))}
-      <group ref={pivot} position={[-w / 2, 0, 0.0]}>
+      <group ref={pivot} position={[-w / 2, 0, 0.0]} userData={{ dynamic: true }}>
         <RoundedBox args={[w - 0.01, h - 0.01, 0.04]} radius={0.005} smoothness={2} position={[w / 2, h / 2, 0.02]} castShadow receiveShadow material={leaf} />
         <mesh position={[w - 0.08, h * 0.48, 0.055]} material={knob}>
           <sphereGeometry args={[0.025, 12, 8]} />

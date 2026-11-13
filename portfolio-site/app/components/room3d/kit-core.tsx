@@ -7,7 +7,10 @@
  */
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import type { MutableRefObject } from "react";
 import type { Room, Tier } from "@/lib/room3d/schema";
+import type { Constellation } from "@/lib/site/stage-constellation";
+import type { ShelfCase } from "@/lib/site/stage-data";
 import { fabricTexture, labelTexture, noiseNormal, woodTexture } from "./textures";
 
 export type Lighting = Room["lighting"]["day"];
@@ -119,12 +122,40 @@ export type Env = {
   worlds: Array<{ label: string; color: string }>;
   /** Milliseconds to add to the device clock so it matches the server's (from the Date header). */
   clockOffsetMs: number;
+  /** The Stage's data for the project shelf and the constellation (absent in the lab viewer). */
+  stage?: StageExtras;
+  /** The live terminal texture (the Stage's, redrawn by the page): a monitor whose `screen` is `terminal` shows it. */
+  liveScreen?: THREE.Texture | null;
+};
+
+/** What the Stage hands the room beyond the room's own objects: the project cases and the stars, and how they answer. */
+export type StageExtras = {
+  accent: THREE.Color;
+  reduced: boolean;
+  cases: ShelfCase[];
+  caseFocus: string | null;
+  openId: string | null;
+  onOpenCase: (item: ShelfCase, rect: { x: number; y: number; w: number; h: number } | null) => void;
+  onPickCase: (id: string) => void;
+  constellation: Constellation | null;
+  /** Read each frame: the stars answer the pointer only while the camera is looking at them. */
+  starsActive: MutableRefObject<boolean>;
+  story?: MutableRefObject<{ p: number; on: boolean }>;
+  onRunCommand: (cmd: string) => void;
 };
 export const EnvCtx = createContext<Env | null>(null);
 export function useEnv(): Env {
   const e = useContext(EnvCtx);
   if (!e) throw new Error("room3d kinds render inside <Room>");
   return e;
+}
+
+/** The live terminal's canvas is 1024 x 640; a screen of another shape shows all of it, the spare edge filled with the canvas's own edge colour. */
+export function fitLive(t: THREE.Texture, screenAspect: number, flipX: boolean) {
+  const rx = Math.max(1, screenAspect / 1.6);
+  const ry = Math.max(1, 1.6 / screenAspect);
+  t.repeat.set((flipX ? -1 : 1) * rx, ry);
+  t.offset.set(flipX ? 0.5 + rx / 2 : (1 - rx) / 2, (1 - ry) / 2);
 }
 
 /** A material for the kind's own `material` block, from the shared cache. */

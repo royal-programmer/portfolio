@@ -134,6 +134,10 @@ export const KIND_SCHEMAS = {
   box: kind("box", z.strictObject({ w: num(0.001, 4), h: num(0.001, 4), d: num(0.001, 4), round: num(0, 0.2) })),
   cylinder: kind("cylinder", z.strictObject({ r: num(0.01, 2), h: num(0.01, 4) })),
   sphere: kind("sphere", z.strictObject({ r: num(0.01, 2) })),
+  /** The Stage's project shelf: one case per public project (the cases come from the content layer, not from here); the object's scale sizes it. */
+  projectShelf: kind("projectShelf", z.strictObject({ max: z.number().int().min(1).max(12) })),
+  /** The Stage's skill constellation: one star per technology (from the terminal's stack, at most `stars`); the object's scale sizes the cap. */
+  constellation: kind("constellation", z.strictObject({ stars: z.number().int().min(4).max(40) })),
 } as const;
 
 export type KindId = keyof typeof KIND_SCHEMAS;
@@ -174,6 +178,8 @@ export const objectSchema = z.discriminatedUnion("kind", [
   KIND_SCHEMAS.box,
   KIND_SCHEMAS.cylinder,
   KIND_SCHEMAS.sphere,
+  KIND_SCHEMAS.projectShelf,
+  KIND_SCHEMAS.constellation,
 ]);
 export type RoomObject = z.infer<typeof objectSchema>;
 export type ObjectOf<K extends KindId> = Extract<RoomObject, { kind: K }>;

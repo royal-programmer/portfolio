@@ -4,7 +4,7 @@
  * `STAGE_PROPS`) plus the work room's furniture from the P0 look-dev spike. Plain data, safe on server and
  * client. `scripts/settings-roundtrip.mjs` proves it parses.
  */
-import { STAGE_DOOR, STAGE_LIGHTING, STAGE_PROPS, STAGE_TIERS } from "@/lib/site/stage-data";
+import { SHELF_MAX, STAGE_DOOR, STAGE_LIGHTING, STAGE_PROPS, STAGE_TIERS } from "@/lib/site/stage-data";
 import type { KindId, Room, Room3d, RoomObject, Tier } from "./schema";
 import { BAND_IDS } from "./schema";
 
@@ -80,6 +80,9 @@ const workRoom: Room = {
     obj("neon-corner", "neonStrip", [-2.95, 0, -2.45], { length: 2.2, vertical: true, lift: 0.2, intensity: 3.2 }, { material: M("emissive", "#2fd0ff", 0.5) }),
     obj("poster-a", "frame", [-2.97, 1.5, -0.6], { variant: "poster", w: 0.7, h: 0.5, title: "poster" }, { rotY: Math.PI / 2 }),
     obj("poster-b", "frame", [-2.97, 1.35, 0.1], { variant: "poster", w: 0.32, h: 0.42, title: "poster" }, { rotY: Math.PI / 2 }),
+    // The Stage's own two: the project cases on the right wall, the skill stars above the desk (data comes from the page).
+    obj("project-shelf", "projectShelf", [2.86, 0.72, -0.4], { max: SHELF_MAX }, { rotY: -Math.PI / 2, scale: 0.35 }),
+    obj("constellation", "constellation", [0.3, 2.15, -1.9], { stars: STAGE_TIERS.best.stars }, { scale: 0.5 }),
     obj("rug", "rug", [0.2, 0, -1.1], { w: 2.2, d: 1.6, shape: "rect" }),
     obj("door", "door", [-2.98, 0, 1.2], { w: STAGE_DOOR.size[0], h: STAGE_DOOR.size[1], swing: OPEN_RAD, leadsTo: STAGE_DOOR.label }, { rotY: Math.PI / 2, material: M("wood", "#6b4a30", 0.6), interaction: { label: STAGE_DOOR.label, href: `/?${STAGE_DOOR.query}` } }),
   ],
