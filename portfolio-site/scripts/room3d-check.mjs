@@ -16,6 +16,10 @@ const { room3dSchema, KIND_IDS, MAX_OBJECTS } = await jiti.import(path.join(root
 const { ROOM3D_DEFAULT } = await jiti.import(path.join(root, "lib/room3d/defaults.ts"));
 const { pickTier, stepDown, parseQuality, resolveTier, trimToBudget, activeRoom } = await jiti.import(path.join(root, "lib/room3d/tiers.ts"));
 
+const { stageKitOn, stageKitTier, stageAction, stageStops, propForObject, STAGE_PROP_OBJECT, GATE_TIER } = await jiti.import(path.join(root, "lib/room3d/stage-kit.ts"));
+const { resolveRoom3d } = await jiti.import(path.join(root, "lib/room3d/resolve.ts"));
+const { STAGE_PROPS, SHELF_MAX, STAGE_TIERS } = await jiti.import(path.join(root, "lib/site/stage-data.ts"));
+
 let failed = 0;
 const check = (name, ok, extra = "") => {
   if (!ok) failed++;
@@ -92,6 +96,52 @@ check("auto uses the probe", resolveTier({ query: null, saved: null, setting: "a
   hidden[6].visibility = "draft";
   check("phone drops hideOnPhone, public drops drafts", trimToBudget(hidden, 200, { phone: true, includeDraft: false }).length === objs.length - 2);
   check("preview keeps drafts", trimToBudget(hidden, 200, { phone: false, includeDraft: true }).length === objs.length);
+}
+
+// the Stage on the kit (round 34): flag, tier from the hub gate, stops, clicks, the Stage's own kinds
+check("the flag is off with no query and no env", stageKitOn("", undefined) === false && stageKitOn("?x=1", "") === false);
+check("?kit=1 turns it on, ?kit=0 off", stageKitOn("?kit=1", undefined) && stageKitOn("?kit=true", "") && !stageKitOn("?kit=0", "1") && !stageKitOn("?kit=off", "true"));
+check("the env default turns it on, the query still wins", stageKitOn("", "1") && stageKitOn("", "true") && !stageKitOn("?kit=0", "1") && stageKitOn("?kit=1", "0"));
+check("the gate's three words map to the kit's tiers", GATE_TIER.performance === "low" && GATE_TIER.balanced === "medium" && GATE_TIER.best === "high");
+{
+  const probe = { cores: 16, memory: 16 };
+  const t = (a) => stageKitTier({ query: null, gate: null, stepped: null, setting: "auto", probe, ...a });
+  check("the gate's pick sets the tier", t({ gate: "performance" }) === "low" && t({ gate: "balanced" }) === "medium" && t({ gate: "best" }) === "high");
+  check("?q= beats the gate", t({ query: "low", gate: "best" }) === "low" && t({ query: "Quality", gate: "performance" }) === "high");
+  check("?q=auto is ignored", t({ query: "auto", gate: "balanced" }) === "medium");
+  check("no gate: the setting, auto probes the device", t({ setting: "medium" }) === "medium" && t({}) === "high" && t({ probe: { cores: 2, memory: 2 } }) === "low");
+  check("a step-down only lowers", t({ gate: "best", stepped: "balanced" }) === "medium" && t({ gate: "performance", stepped: "balanced" }) === "low" && t({ stepped: "performance" }) === "low");
+  check("a step-down does not override ?q=", t({ query: "high", gate: "best", stepped: "performance" }) === "high");
+}
+check("the desk props map to room objects (headphones are the headset)", STAGE_PROPS.every((p) => room.objects.some((o) => o.id === STAGE_PROP_OBJECT[p.id])) && propForObject("headset") === "headphones" && propForObject("desk") === null);
+{
+  const act = (id) => stageAction(room.objects.find((o) => o.id === id));
+  check("the terminal monitor zooms", act("monitor-low").do === "zoom");
+  check("the door goes to the hub", act("door").do === "door");
+  check("a desk prop runs as a prop", act("mug").do === "prop" && act("mug").prop === "mug" && act("headset").prop === "headphones");
+  check("an object with no interaction does nothing", act("plant").do === "none");
+  check("a card interaction is a card", act("clock").do === "card");
+}
+{
+  const stops = stageStops(room);
+  check("the room gives the shelf, constellation and window stops", stops.map((x) => x.id).join() === "shelf,constellation,window");
+  check("every stop's eye stands inside the room and looks at something near it", stops.every((x) => Math.abs(x.eye[0]) <= room.shell.width / 2 && Math.abs(x.eye[2]) <= room.shell.depth / 2 && Math.hypot(x.eye[0] - x.look[0], x.eye[2] - x.look[2]) > 1));
+  const bare = clone(room);
+  bare.objects = bare.objects.filter((o) => o.kind !== "projectShelf");
+  check("a room without a shelf has no shelf stop", !stageStops(bare).some((x) => x.id === "shelf"));
+}
+{
+  const kinds = new Set(room.objects.map((o) => o.kind));
+  check("the default room holds the Stage's own kinds", kinds.has("projectShelf") && kinds.has("constellation"));
+  const shelf = room.objects.find((o) => o.kind === "projectShelf");
+  check("the shelf holds the Stage's case cap", shelf.params.max === SHELF_MAX);
+  check("the constellation's stars follow the Quality tier", room.objects.find((o) => o.kind === "constellation").params.stars === STAGE_TIERS.best.stars);
+  const low = trimToBudget(room.objects, ROOM3D_DEFAULT.tiers.low.objectBudget, { phone: true, includeDraft: false });
+  check("the low tier's budget keeps the shelf and the door", low.some((o) => o.kind === "projectShelf") && low.some((o) => o.kind === "door"));
+  check("every tier's budget holds the default room", ["low", "medium", "high"].every((t) => ROOM3D_DEFAULT.tiers[t].objectBudget >= 10) && room.objects.length <= ROOM3D_DEFAULT.tiers.medium.objectBudget);
+  const bad = clone(ROOM3D_DEFAULT);
+  bad.rooms[0].objects.find((o) => o.kind === "projectShelf").params.max = 99;
+  check("a shelf over its cap is rejected, the page falls back", !room3dSchema.safeParse(bad).success && resolveRoom3d(bad, null).source === "default" && resolveRoom3d(bad, ROOM3D_DEFAULT).source === "last-good");
 }
 
 console.log(failed ? `\n${failed} failing` : "\nall room3d checks pass");
