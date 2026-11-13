@@ -91,7 +91,7 @@ const en = {
   "skill.none": "No linked work yet",
   "skill.close": "Close",
   "skill.verify": "Verify",
-  "skill.in": (g: string) => `in ${g}`,
+  "skill.in": (g: string) => `${g} skills`,
   "skill.chip": (n: string) => `What I did with ${n}`,
   "skill.linked": "Linked by hand.",
   "skill.matched": "Matched by name in the projects, roles and credentials; nothing is guessed.",

@@ -74,7 +74,7 @@ export const bn: TerminalStrings = {
   "skill.none": "এখনও কোনো যুক্ত কাজ নেই",
   "skill.close": "বন্ধ করুন",
   "skill.verify": "যাচাই করুন",
-  "skill.in": (g) => `${g} গ্রুপে`,
+  "skill.in": (g) => `${g} দক্ষতা`,
   "skill.chip": (n) => `${n} দিয়ে আমি কী করেছি`,
   "skill.linked": "হাতে যুক্ত করা।",
   "skill.matched": "প্রজেক্ট, ভূমিকা ও সার্টিফিকেটে নাম মিলিয়ে পাওয়া; কিছু আন্দাজ করা হয়নি।",
