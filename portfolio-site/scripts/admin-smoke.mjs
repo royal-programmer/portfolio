@@ -201,7 +201,16 @@ for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => void cleanup().fi
 async function main() {
   await takeSnapshot();
   const { chromium } = loadPlaywright();
-  const browser = await chromium.launch({ headless: !flag("--headed") });
+  // Use the bundled Chromium when it is installed; otherwise fall back to the Chrome or Edge already on the PC.
+  let browser;
+  for (const channel of [undefined, "chrome", "msedge"]) {
+    try {
+      browser = await chromium.launch({ headless: !flag("--headed"), ...(channel ? { channel } : {}) });
+      break;
+    } catch (e) {
+      if (channel === "msedge") throw e;
+    }
+  }
   try {
     // ---- sign in with a one-time token --------------------------------------------------------------------
     const gen = await sb.auth.admin.generateLink({ type: "magiclink", email: fileEnv.ADMIN_TEST_EMAIL });
