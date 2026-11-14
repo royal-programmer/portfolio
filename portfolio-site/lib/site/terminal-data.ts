@@ -215,6 +215,8 @@ export type TerminalData = {
   book?: { label: string; href: string };
   /** "Skim in 30 seconds" (`netflix.skim`): up to three title ids; absent means the featured trio. */
   skim?: string[];
+  /** The `room3d` setting when it differs from the default (see `loadTerminalConfig`); the kit Stage draws it. */
+  room3d?: Settings["room3d"];
 };
 
 const MAX_BODY = 6000;
@@ -264,6 +266,8 @@ export type TerminalConfig = Partial<{
   hiring: Settings["engineer.hiring"];
   clock: Settings["engineer.clock"];
   netflix: Settings["netflix"];
+  /** The 3D room, only when the admin has changed it from the code's default (the Stage on the kit reads it; absent means the default room). */
+  room3d: Settings["room3d"];
   /**
    * The engineer records read from the database (`CONTENT_SOURCE=db`). When present they build the résumé lists,
    * timeline, diagrams, profiles and contact instead of the frozen copy; `hiring` and `clock` then come from
@@ -321,5 +325,6 @@ export function terminalData(persona: Persona | undefined, entries: Entry[], pos
     themes: cfg.themes?.palettes,
     book: cfg.netflix ? cfg.netflix.bookCall : fromDb ? undefined : LEGACY.BOOK_CALL,
     skim: cfg.netflix?.skim?.length ? cfg.netflix.skim : undefined,
+    ...(cfg.room3d ? { room3d: cfg.room3d } : {}),
   };
 }

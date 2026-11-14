@@ -14,6 +14,8 @@ import type { RecordType } from "@/lib/content/types";
 import { checkRecord, cleanData, diffValues, moveItem, RECORD_FORMS, validateImport, type RecordForm } from "../_lib/record-forms";
 import { deleteRecordsForever, duplicateRecord, importRecords, reorderRecords, restoreVisibility, saveRecord, setRecordsVisibility } from "../record-actions";
 import { setAdminDirty } from "../dirty";
+import { useDraft } from "../use-draft";
+import { draftKey } from "@/lib/admin/drafts";
 import type { Collection } from "../collections";
 import { FieldList } from "./record-fields";
 import { MediaUploader } from "./media-uploader";
@@ -25,9 +27,6 @@ export type RecordRowView = { id: string; slug: string; title: string; visibilit
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 const VIS_LABEL: Record<string, string> = { public: "Public", unlisted: "Unlisted", private: "Hidden" };
 
-function draftKey(type: string, id: string) {
-  return `adm-draft:${type}:${id}`;
-}
 
 function Editor({ col, form, row, suggest, onSaved, onClose, onPreview }: { col: Collection; form: RecordForm; row?: RecordRowView; suggest: Record<string, string[]>; onSaved: (id: string) => void; onClose: () => void; onPreview: (manual: boolean) => void }) {
   const router = useRouter();
@@ -36,15 +35,12 @@ function Editor({ col, form, row, suggest, onSaved, onClose, onPreview }: { col:
   const initialVis = row?.visibility ?? "private";
   const [value, setValue] = useState<Obj>(initial);
   const [visibility, setVisibility] = useState(initialVis);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [restored, setRestored] = useState(false);
   const [review, setReview] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
   const [busy, start] = useTransition();
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const { toast, show } = useToast();
-  const key = draftKey(type, row?.id ?? "new");
   const reviewRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (review) reviewRef.current?.scrollIntoView?.({ block: "center" });
@@ -55,63 +51,32 @@ function Editor({ col, form, row, suggest, onSaved, onClose, onPreview }: { col:
   const dirty = JSON.stringify(cleaned) !== JSON.stringify(base) || visibility !== initialVis;
   const diff = useMemo(() => [...(visibility !== initialVis ? [{ path: "visibility", before: VIS_LABEL[initialVis], after: VIS_LABEL[visibility] }] : []), ...diffValues(base, cleaned)], [base, cleaned, visibility, initialVis]);
 
-  // Restore a local draft once, on open.
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) return;
-      const d = JSON.parse(raw) as { value: Obj; visibility: string };
-      setValue(d.value);
-      setVisibility(d.visibility);
-      setRestored(true);
-    } catch {
-      /* storage blocked or bad JSON: start clean */
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Autosave (debounced) to this browser only: it never publishes.
+  // Drafts follow Ratul between devices: the server copy loads first, the browser copy is the offline fallback.
+  const draftValue = useMemo(() => ({ value, visibility }), [value, visibility]);
+  const draft = useDraft<{ value: Obj; visibility: string }>({
+    key: draftKey(type, row?.id ?? "new"),
+    dirty,
+    value: draftValue,
+    apply: (d) => {
+      if (d?.value && typeof d.value === "object") setValue(d.value);
+      if (typeof d?.visibility === "string") setVisibility(d.visibility);
+    },
+  });
   useEffect(() => {
     setAdminDirty(dirty);
-    if (!dirty) {
-      try {
-        localStorage.removeItem(key);
-      } catch {
-        /* ignore */
-      }
-      return;
-    }
-    const t = setTimeout(() => {
-      try {
-        localStorage.setItem(key, JSON.stringify({ value, visibility }));
-        setSavedAt(Date.now());
-      } catch {
-        /* ignore */
-      }
-    }, 600);
+    if (!dirty) return;
     const warn = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener("beforeunload", warn);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener("beforeunload", warn);
-    };
-  }, [dirty, value, visibility, key]);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
   useEffect(() => () => setAdminDirty(false), []);
   useEffect(() => {
-    if (!savedAt) return;
+    if (!draft.savedAt) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [savedAt]);
+  }, [draft.savedAt]);
 
-  const clearDraft = () => {
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      /* ignore */
-    }
-    setSavedAt(null);
-    setRestored(false);
-  };
+  const clearDraft = draft.clear;
   const revert = () => {
     setValue(clone(initial));
     setVisibility(initialVis);
@@ -150,7 +115,7 @@ function Editor({ col, form, row, suggest, onSaved, onClose, onPreview }: { col:
     });
 
   const title = row ? row.title : `New ${col.singular}`;
-  const ago = savedAt ? Math.max(0, Math.round((now - savedAt) / 1000)) : null;
+  const ago = draft.savedAt ? Math.max(0, Math.round((now - draft.savedAt) / 1000)) : null;
   return (
     <div className="adm-editor">
       <div className="adm-editor-head">
@@ -164,7 +129,14 @@ function Editor({ col, form, row, suggest, onSaved, onClose, onPreview }: { col:
           </button>
         </div>
       </div>
-      {restored ? <p className="adm-note is-ok">Restored your unsaved draft from this browser. Nothing is published until you press Publish.</p> : null}
+      {draft.notice ? (
+        <p className="adm-note is-ok" role="status">
+          {draft.notice}. Nothing is published until you press Publish.{" "}
+          <button type="button" className="adm-btn is-ghost" onClick={revert}>
+            Discard
+          </button>
+        </p>
+      ) : null}
       <div className="adm-form">
         <FieldList fields={form.fields} value={value} onChange={setValue} suggest={suggest} />
         <label className="adm-field is-block">
@@ -233,7 +205,7 @@ function Editor({ col, form, row, suggest, onSaved, onClose, onPreview }: { col:
             Revert
           </button>
           <span className="adm-hint adm-saved" aria-live="polite">
-            {dirty ? (ago === null ? "Unsaved changes" : `Draft saved here ${ago < 2 ? "just now" : `${ago} s ago`} (not published)`) : "Nothing to publish"}
+            {dirty ? (ago === null ? "Unsaved changes" : `Draft saved ${draft.server === "ok" ? "to your account" : "in this browser"} ${ago < 2 ? "just now" : `${ago} s ago`} (not published)`) : "Nothing to publish"}
           </span>
         </div>
         {row ? (

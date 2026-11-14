@@ -1483,3 +1483,20 @@ stripped service_role's table grants).
 
 - Privacy-first `site_events` (migration 0013, not applied), `/api/e`, `track()` and the hooks in Netflix, terminal and hub; admin Insights page with CSV; "Popular with visitors" row; persistent Open to work chip, one-sentence Hire line, Skim in 30 seconds, `?for=` share card, Fit check links; axe fixes on the terminal. Details in 17-persona-views.md section 29. Tests: `node --experimental-strip-types scripts/insights-check.mjs`.
 - Surprise: another builder's unbalanced `}` in `app/admin/admin.css` briefly broke the dev server's CSS for every page (a Turbopack build error overlay); it was fixed on their side.
+
+### Round 31 - Fit check inside the Netflix view (2026-11-13)
+
+- The Fit check is native to the Netflix view: a paste dialog (modal / phone bottom sheet), a match card with ring, verdict and Matches / Adjacent / Not yet chips (matches open skill evidence), and Mail with this fit, Hire brief, Résumé, Book a call, Check another. Entry points: the Open to work chip, the phone Hire sheet, the hero, the `f` key. Reuses `fitMatch` from `terminal-fit.ts`; the terminal is unchanged. `fit_open` and `fit_check` (verdict level only) events. Details in 17-persona-views.md section 30.
+
+### Round 32 - the 3D room, P0 and P1 (2026-11-13)
+
+- P0 spike on `/stage-lab` (dev only) with stacked curved monitors, portrait monitors, tablet dock, neon; verdict **go** in `18-3d-room-plan.md` section 11. P1: `room3d` settings key (33 kinds, tiers, defaults from stage-data), tier selection and object budget, fallback chain, the kit and `<Room>`, viewer at `/stage-lab/room`. Checks: `node scripts/room3d-check.mjs`, `node scripts/settings-roundtrip.mjs`.
+- Left for the next round: re-express the real Stage through the kit (behind a flag first), the door and clock behaviours in the Stage, a real-phone test on the Vivo X200 Pro, then P2 (form editor).
+- Surprise: the sandbox browser has no network (Supabase unreachable), so today's Stage cannot be captured live; the earlier photo-mode capture is used as the comparison. Software GL makes frame times meaningless (listed only for relative cost).
+
+### Round 34 - the Stage on the room kit (2026-11-14)
+
+- `?kit=1` / `NEXT_PUBLIC_STAGE_KIT` draws the Stage through `<Room>` from `room3d` (props as commands, live terminal monitor with zoom, shelf, constellation, door to hub, photo mode, tiers from the hub gate and `?q=`); default stays the old scene. New kinds `projectShelf` and `constellation`; `room3d` reaches the page through `terminalData` only when changed.
+- Draw calls: static merge by material, memoised sky and shadows. Settled frame: low 90 to 56, medium 173 to 86, high 192 to 105 (cap 120). Table and honest differences in `17-persona-views.md` section 33.
+- Checks: `node scripts/room3d-check.mjs` extended (flag, tiers, stops, actions, kinds); Playwright at 1280 and 393 in `tmp/r34/`.
+- Surprise: the first measurement of 930 calls was the shadow accumulation frames, which last about 60 frames in software GL; and a parent re-render was re-baking the shadows every few seconds until sky and shadows were memoised.

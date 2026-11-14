@@ -1,6 +1,6 @@
 # 18 — The 3D room and the dream room (plan, revised after the Keel critic, 2026-11-11)
 
-Status: **plan only.** Build starts after the Netflix, terminal and hub polish (Ratul, 2026-11-11).
+Status (2026-11-14): **P0 done (verdict go, section 11); P1 built; round 34: the Stage can be drawn through the kit behind `?kit=1` (default still the old scene), desktop medium and high at or under 120 draw calls.** Details in `17-persona-views.md` sections 31 and 33.
 Owner decisions: rename Stage to **3D**; plan the whole room first; objects are generic (a curved
 or 48-inch monitor, not a brand); **every object configurable in the admin console** (position,
 size, rotation, add, remove); a **phone option and a quality setting**; the dream room is entered
@@ -136,3 +136,84 @@ About 3 to 5 builder rounds for P0 to P5. The full plan with gizmo, uploads and 
   `TransformControls`, snap to grid and walls, undo) as P2b. Touch editing stays desktop-first.
 - **Swarm is a third view mode**, alongside **3D** and **Netflix**. It is its own view, not a
   replacement for the Stage; the Engineer view picker lists Terminal, 3D, Netflix and Swarm.
+
+## 10. The dream room: Ratul's brief (2026-11-13)
+
+One room, entered through the door from the work room. The same room serves every world; only the light and colour change
+(Code: bright daytime; Trader: dim, strong RGB; others later). Everything below is an object in `room3d` (position, size,
+rotation, add, remove, hide on phone), so Ratul can rearrange it in the admin.
+
+Desk wall: a **curved monitor in the middle that tilts up and down** (an arm), **two vertical monitors, one each side**, a
+full high-end gaming PC (glass tower, RGB fans), keyboard, mouse, mouse mat, headset, a gaming chair.
+Wall art: many **anime posters** (Jujutsu Kaisen, Solo Leveling and more), uploaded by Ratul (neutral frames by default).
+TV wall: a **very big TV**, a **PS5** with controllers on a low unit, a rug.
+Riding wall: a **full riding set** hung up (helmet, jacket, gloves, boots), a key rack with **many bike and car keys**,
+**a row of caps** hanging.
+Floor and shelf props: a **football**, a **Rubik's cube**, a **guitar** on a stand, a **MIDI keyboard**.
+Bedroom side: a **single bed**, a **wardrobe full of clothes** (doors open), **bags with company branding** (a text or
+uploaded image per bag, so it shows where he works).
+
+Interactions (ideas, each is data): the curved monitor runs the live terminal and tilts on drag; the guitar and MIDI keyboard
+play synthesised notes (Web Audio, no audio files); the Rubik's cube turns on drag; the football bounces on click; the keys
+show their labels on hover; each cap and bag shows a label; the riding set opens the rides page; the TV plays a reel of the
+project clips; the PS5 links to the gamer world; posters show their titles.
+
+Copyright note: posters are the owner's own uploads; the default is blank frames with a title. Brand marks on the bags are
+text labels or images the owner uploads, never bundled logos.
+
+### 10.1 Additions (2026-11-13, later the same day)
+- **Two curved monitors stacked** in the middle (one above the other), a vertical monitor on each side; a **tablet** (Xiaomi Pad 5 class, generic) standing on a **dock** in front, and a **phone** (X200 Pro class, generic) on a stand. Object kinds `tablet`, `phone` (no brand marks).
+- A **canvas** (a painting on an easel or the wall): an image object whose picture is the owner's, linked to the Artist world.
+- A **wall clock** synced with real time: analog face with a sweeping second hand and a digital line; shows the owner's time (Asia/Kolkata) and the visitor's. The room's light follows the visitor's local time; the clock offset is corrected from the server's `Date` header so a wrong device clock still reads right.
+- **Entry from a wall door:** click the door, it swings open, the camera moves in; the same door goes back. The room loads lazily on the click; reduced motion cuts the swing.
+- **Images:** every image field (posters, canvas, bag logos, TV idle picture) takes an **image URL or an upload**. A URL host must allow cross-origin image use for a texture; the editor says so when a picture cannot load and offers the upload.
+- **PS5 turns the TV into a console home screen** whose tiles are the worlds (Engineer, Trader, Photographer, Artist, Rider, Gamer). The TV's idle reel is decided later.
+- **Size:** about 6.0 m wide, 5.0 m deep, 2.8 m high, with zones (work, play, rest, ride corner) and a clear walking lane of at least 1.2 m.
+
+## 11. P0 result (look-dev spike, 2026-11-13)
+
+Spike: `/stage-lab` (development only, a production build 404s), code in `app/components/room3d/lab-scene.tsx` and `textures.ts`.
+One desk corner: 2.0 m desk, **two stacked curved monitors** (the upper one on a tilt), **two vertical monitors**, a tablet on a dock,
+a phone on a stand, keyboard with RGB, mouse and mat, lamp, shelf with instanced books, mug, plant, frame, an office chair, a rug, a
+window with sun and a time-of-day tint, a pink and a cyan neon strip, a plant of 26 instanced leaves. Query: `?tier=low|medium|high`,
+`?hour=0..23` or `?band=`, `?still=1`, `?shaft=1` (the light shaft; off by default).
+
+Built only from what the plan allows: drei `Environment` + `Lightformer`s (0 bytes), `AccumulativeShadows` (desktop) or one
+`ContactShadows` (phone), a 1k or 2k directional shadow map on medium and high, emissive above 1 with `toneMapped = false`, bloom
+(`luminanceThreshold = 1`) and SMAA on high, SMAA only on medium, no post-processing on low (MSAA on), procedural canvas textures at
+512 px (256 on low): wood grain, woven fabric, a plaster normal map. Rounded boxes for soft edges. `@react-three/postprocessing`
+and `postprocessing` were already dependencies, so nothing was installed.
+
+**Verdict: GO.** It clearly beats today's Stage (compare `tmp/r32/stage-today-1280.png`, the Stage's own photo capture: flat grey
+shapes, no shadows, no texture, no colour in the light, against `tmp/r32/lab-high-1280.png`: soft contact and floor shadows, window
+sun patch, wood grain, glowing neon with bloom, lit screens, a lamp pool). The stacked and portrait monitors, tablet dock and phone
+read well at 1280 and at 393. It does **not** need curated glTF props for P1 or for the work room; parametric kinds plus
+instancing carry it. glTF is still the right route for the organic or branded pieces of the dream room (guitar, PS5, riding set,
+bike), as the plan says (P4).
+
+What reads weak and what to do about it: the plant's leaves are faceted discs (a leaf-card texture or a glTF plant would fix it);
+the chair is blocky; wall frames are plain colour until the image field lands; the plaster normal map must stay subtle (at the
+first strength it looked like stucco). The light shaft as additive geometry produced a hard diagonal edge and is off by default;
+the window's sun patch from the directional light does the job. The monitors' back shell must be an open cylinder (a closed one
+fans a cap from the curve's axis, a metre long).
+
+Numbers (renderer.info in the last frame once shadows had accumulated; Chromium headless with SwiftShader, so **frame times are
+software-GL and meaningless as device speed, 200 to 800 ms here**; they are listed only to show the relative cost: high is about
+4x low at the same page):
+
+| tier | viewport | draw calls | triangles | textures (GPU) | texture memory (est.) | programs |
+|------|----------|-----------:|----------:|---------------:|----------------------:|---------:|
+| low | 393x852 @3x (canvas 589x1278, dpr cap 1.5) | 83 | 28.9k | 24 | 5.6 MB | 23 |
+| medium | 1280x800 | 157 | 59.5k | 49 | 10.3 MB | 36 |
+| high | 1280x800 | 174 (shadow-accumulation frames 700+) | 59.6k | 66 | 10.3 MB | 39 |
+
+Bytes: the room ships **0 image or model bytes** (everything is procedural); the 9 MB the script counted is the Next dev server's
+unminified bundles, not the production size. Under 4x CPU throttle the low tier's software frame time did not move (the software
+renderer, not the page's JS, is the bottleneck), so the throttle numbers say nothing here: the real test is the Vivo X200 Pro
+through `chrome://inspect` (not done; no device in this session).
+
+Phone tier settings the spike needs: dpr cap 1.5, no composer (MSAA on), one contact shadow instead of accumulation, no shadow map,
+256 px textures, glow sprites instead of bloom, **83 draw calls and 29k triangles is inside the plan's 150k / 150 budget with room
+for about 2x more objects**. Medium (SMAA, no bloom, 1k shadow map) is the sensible default for an integrated-GPU laptop; high adds
+bloom and the 2k shadow map and should be a visitor choice. Draw calls on medium and high are about double low because of the
+shadow-map pass, so the 120-call desktop cap needs instancing for repeated props (books, keys, clothes, caps) as the plan says.

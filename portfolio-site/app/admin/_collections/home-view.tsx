@@ -1,7 +1,8 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- /admin/preview is a route handler (sets a cookie, redirects), not a page */
 import Link from "next/link";
 import { healthSummary, type HealthItem } from "../_lib/health";
-import { RevertButton, ShareButton } from "./home-bits";
+import { RESUME_FILES } from "@/lib/resume/files";
+import { BuildResume, RevertButton, ShareButton } from "./home-bits";
 
 export type HomeData = {
   email: string;
@@ -65,9 +66,7 @@ export function HomeView({ email, preview, source, lastPublish, loaded, health, 
         <Link className="adm-btn" href="/admin/engineer/hiring">
           Edit hiring facts
         </Link>
-        <Link className="adm-btn" href="/admin/engineer/copy?key=engineer.resume">
-          Build résumé
-        </Link>
+        <BuildResume submittedOn={RESUME_FILES.submitted.updatedAt} />
         <ShareButton />
         <a className="adm-btn is-ghost" href="/admin/backup" download>
           Backup now

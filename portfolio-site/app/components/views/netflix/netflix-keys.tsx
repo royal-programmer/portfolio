@@ -7,6 +7,7 @@
  * Nothing here touches touch or wheel scrolling. Where a card is focused it is announced politely.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { openFit } from "./netflix-fit-sheet";
 
 /** Anything a remote can land on in the page body. Cast tiles and cards are plain buttons; poster cards carry the attribute on their title. */
 const CARD = "[data-nf-card], [data-nf-nav]";
@@ -90,6 +91,11 @@ export function useNetflixKeys({ modalOpen, toggleMute, toggleKeys, keysOpen }: 
         o.toggleMute();
         return;
       }
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        openFit("key");
+        return;
+      }
       if (e.key === "p" || e.key === "P") {
         e.preventDefault();
         document.querySelector<HTMLElement>(".nf-bar-profile")?.click();
@@ -153,6 +159,7 @@ const KEYS: Array<[string, string]> = [
   ["/", "Search"],
   ["m", "Mute or unmute"],
   ["p", "Profile menu (the avatar, top right)"],
+  ["f", "Fit check: paste a job description"],
   ["?", "This list"],
 ];
 

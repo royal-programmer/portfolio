@@ -8,6 +8,8 @@
  * canvas only provides the clock, the state and a camera standing where the climb's would.
  */
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Bloom, EffectComposer, SMAA, ToneMapping } from "@react-three/postprocessing";
+import { ToneMappingMode } from "postprocessing";
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
@@ -21,6 +23,15 @@ import { useExperience } from "../experience-provider";
 import { bandFor } from "@/lib/site/terminal-clock";
 import { CLOCK, type TerminalData } from "@/lib/site/terminal-data";
 import { paletteFor } from "@/lib/site/terminal-themes";
+import { ROOM3D_DEFAULT } from "@/lib/room3d/defaults";
+import { resolveRoom3d } from "@/lib/room3d/resolve";
+import type { Room3d, RoomObject } from "@/lib/room3d/schema";
+import { STAGE_PROP_OBJECT, stageAction, stageKitOn, stageKitTier, stageStops } from "@/lib/room3d/stage-kit";
+import { activeRoom } from "@/lib/room3d/tiers";
+import type { StageExtras } from "./room3d/kit-core";
+import { Room } from "./room3d/room";
+import { readProbe, Stats, useClockOffset, WORLDS } from "./room3d/room-canvas";
+import { KitLabel, KitRig } from "./stage/kit-rig";
 import { StageProps } from "./stage/props";
 import { StageDoor, type DoorGo } from "./stage/door";
 import { hubHref } from "@/lib/site/persona-link";
@@ -352,6 +363,9 @@ function Setup({ slug, world, media, stage }: { slug: PersonaSlug; world: World;
   }
 }
 
+/** The last `room3d` value that passed validation (the kit Stage falls back to it, then to the default room). */
+let lastGoodKit: Room3d | null = null;
+
 const THEME_KEY = "xp-term-theme";
 const TIER_ORDER: StageTierId[] = ["performance", "balanced", "best"];
 
@@ -378,12 +392,25 @@ export default function WorldStage3D({ slug, t, entries, terminal, story, photo,
   const state = useRef<VrState>(createVrState());
   const ctx = useMemo(() => ({ clock, state }), []);
   const world = useMemo<World>(() => ({ slug, t, c: C }), [slug, t]);
+  // The Stage on the room kit (`?kit=1`, or NEXT_PUBLIC_STAGE_KIT): the engineer's room drawn through <Room> from the `room3d` setting.
+  const kitOn = useMemo(() => slug === "engineer" && stageKitOn(window.location.search, process.env.NEXT_PUBLIC_STAGE_KIT), [slug]);
+  // Keyed by content: a parent that hands over a fresh but equal `terminal` must not rebuild (and re-merge) the room.
+  const kitKey = terminal?.room3d ? JSON.stringify(terminal.room3d) : "";
+  const kitResolved = useMemo(() => resolveRoom3d(kitKey ? JSON.parse(kitKey) : ROOM3D_DEFAULT, lastGoodKit), [kitKey]);
+  useEffect(() => {
+    if (kitResolved.source === "given") lastGoodKit = kitResolved.value;
+  }, [kitResolved]);
+  const kitData = kitResolved.value;
+  const kitRoom = useMemo(() => activeRoom(kitData), [kitData]);
   // The gate's graphics choice drives the stage (S7); a slow first two seconds steps it down once, for this visit only.
   const { quality } = useExperience();
   const saved: StageTierId = quality ?? "balanced";
   const [stepped, setStepped] = useState<StageTierId | null>(null);
   const tier: StageTierId = stepped && TIER_ORDER.indexOf(stepped) < TIER_ORDER.indexOf(saved) ? stepped : saved;
   const cfg = STAGE_TIERS[tier];
+  // The kit's tier: `?q=`, else the gate's pick (a step-down only lowers it), else the setting (auto probes the device).
+  const kitTierId = useMemo(() => stageKitTier({ query: new URLSearchParams(window.location.search).get("q"), gate: quality ?? null, stepped, setting: kitData.quality, probe: readProbe() }), [quality, stepped, kitData.quality]);
+  const kitTier = kitData.tiers[kitTierId];
   const tierRef = useRef(tier);
   useEffect(() => {
     tierRef.current = tier;
@@ -449,6 +476,7 @@ export default function WorldStage3D({ slug, t, entries, terminal, story, photo,
     return () => window.clearInterval(id);
   }, []);
   const zoomRef = useRef<Scratch["zoom"] | null>(null);
+  const [doorOpen, setDoorOpen] = useState(false);
   const screenRef = useRef<TerminalScreen | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const doorRef = useRef<DoorGo>({ on: false, t0: 0, e: 0, fired: false });
@@ -518,6 +546,7 @@ export default function WorldStage3D({ slug, t, entries, terminal, story, photo,
       d.on = false;
       d.fired = false;
       d.e = 0;
+      setDoorOpen(false);
     };
     window.addEventListener("pageshow", reset);
     return () => {
@@ -564,6 +593,7 @@ export default function WorldStage3D({ slug, t, entries, terminal, story, photo,
     d.on = true;
     d.fired = false;
     d.t0 = clock.current.t;
+    setDoorOpen(true);
     const el = overlayRef.current;
     if (el) {
       el.style.transition = "none";
@@ -616,9 +646,10 @@ export default function WorldStage3D({ slug, t, entries, terminal, story, photo,
   const constellation = useMemo(() => {
     if (slug !== "engineer" || !terminal) return null;
     const d = terminal;
-    const max = Math.round(cfg.stars / (window.matchMedia("(max-width: 767px)").matches ? 2 : 1));
+    const own = kitOn ? (kitRoom.objects.find((o) => o.kind === "constellation")?.params as { stars?: number } | undefined)?.stars : undefined;
+    const max = Math.round(Math.min(cfg.stars, own ?? cfg.stars) / (window.matchMedia("(max-width: 767px)").matches ? 2 : 1));
     return buildConstellation({ stack: d.stack, skills: d.resume.skills.flatMap((g) => g.items), arch: d.arch, projects: d.projects }, max);
-  }, [slug, terminal, cfg.stars]);
+  }, [slug, terminal, cfg.stars, kitOn, kitRoom]);
   const starsActive = useRef(true);
   const onTap = useCallback((id: string) => {
     setTapId(id);
@@ -706,6 +737,63 @@ export default function WorldStage3D({ slug, t, entries, terminal, story, photo,
       window.removeEventListener("pageshow", reset);
     };
   }, []);
+  // --- The kit Stage: what a click means, which object a HUD focus lights, the data the shelf and the stars take. ---
+  const kitPhone = useMemo(() => window.matchMedia("(max-width: 767px)").matches, []);
+  const kitWorlds = WORLDS;
+  const clockOffsetMs = useClockOffset();
+  const [kitHover, setKitHover] = useState<string | null>(null);
+  const doorObj = useMemo(() => kitRoom.objects.find((o) => o.kind === "door"), [kitRoom]);
+  const monitorObj = useMemo(() => kitRoom.objects.find((o) => o.kind === "monitor" && o.params.screen === "terminal"), [kitRoom]);
+  const openIds = useMemo<ReadonlySet<string>>(() => (doorOpen && doorObj ? new Set([doorObj.id]) : new Set<string>()), [doorOpen, doorObj]);
+  const kitStops = useMemo(() => stageStops(kitRoom), [kitRoom]);
+  // The object the label and the glow are on: the pointer's, else the HUD's focus, else a phone's first tap.
+  const litId = kitHover ?? (focusId ? STAGE_PROP_OBJECT[focusId] : null) ?? (doorFocus && doorObj ? doorObj.id : null) ?? (tapId ? STAGE_PROP_OBJECT[tapId] : null) ?? null;
+  const litText = litId ? kitRoom.objects.find((o) => o.id === litId)?.interaction?.label ?? null : null;
+  const onKitRun = useCallback(
+    (_i: unknown, o: RoomObject) => {
+      const a = stageAction(o);
+      switch (a.do) {
+        case "zoom":
+          return go();
+        case "door":
+          return goDoor();
+        case "prop": {
+          // Phones: the first tap names the prop, the second runs it.
+          if (window.matchMedia("(pointer: coarse)").matches && tapId !== a.prop) return onTap(a.prop);
+          const p = STAGE_PROPS.find((x) => x.id === a.prop);
+          return p ? runProp(p) : undefined;
+        }
+        case "cmd":
+          return runCommand(a.cmd);
+        case "href":
+          return window.location.assign(a.href);
+        default:
+          return;
+      }
+    },
+    [go, goDoor, tapId, onTap, runProp, runCommand],
+  );
+  const kitExtras = useMemo<StageExtras>(
+    () => ({ accent, reduced: reducedMotion(), cases, caseFocus, openId, onOpenCase: openCase, onPickCase: setOpenId, constellation, starsActive, story, onRunCommand: runCommand }),
+    [accent, cases, caseFocus, openId, openCase, constellation, story, runCommand],
+  );
+  // One frame's housekeeping, whichever scene is drawn: the fps window, the stars' gate, the live screen, the overlay's fades.
+  const onFrame = () => {
+    measureFps();
+    // Stars answer the pointer only while the camera is looking at them.
+    starsActive.current = Boolean(story?.current.on) && Math.abs((story?.current.p ?? 0) - 2) < 0.7;
+    screenRef.current?.tick(reducedMotion() ? 99 : clock.current.t, performance.now());
+    // The live texture is on the glass once it has been drawn and a frame has gone by with it bound.
+    if (!screenMarked.current && screenRef.current?.drawn() && liveScreenBound.current) {
+      screenMarked.current = true;
+      window.requestAnimationFrame(() => mark("stage:screen-live"));
+    }
+    const z = zoomRef.current;
+    const el = overlayRef.current;
+    const dd = doorRef.current;
+    if (dd.on && el && dd.t0 > -1e8) el.style.opacity = String(Math.max(0, Math.min(1, dd.e)));
+    if (z && el && z.on) el.style.opacity = String(Math.max(0, Math.min(1, (z.e - 0.55) / 0.45)));
+  };
   const stage = useMemo<StageHooks>(() => ({ liveScreen, flat: !envReady, onScreenGo: go, look, extra:
         slug === "engineer" ? (
           <>
@@ -716,6 +804,83 @@ export default function WorldStage3D({ slug, t, entries, terminal, story, photo,
           </>
         ) : undefined,
     }), [liveScreen, envReady, go, look, slug, accent, focusId, soundOn, runProp, tapId, onTap, cases, caseFocus, openId, openCase, constellation, runCommand, story, goDoor, doorFocus]);
+
+  if (kitOn) {
+    const accentHex = `#${accent.getHexString()}`;
+    const phoneRun = kitPhone;
+    return (
+      <Canvas
+        key={kitTierId}
+        shadows={kitTier.shadowRes > 0 ? "percentage" : false}
+        dpr={[1, kitTier.dprCap]}
+        camera={{ position: [4, 1.9, 3], fov: 34, near: 0.1, far: 60 }}
+        gl={{ antialias: !kitTier.bloomOn, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping }}
+        onCreated={({ gl }) => {
+          gl.domElement.addEventListener("webglcontextlost", (e) => e.preventDefault());
+        }}
+        onPointerMove={(e) => {
+          const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          state.current.px = ((e.clientX - r.left) / r.width) * 2 - 1;
+          state.current.py = -(((e.clientY - r.top) / r.height) * 2 - 1);
+        }}
+        onPointerLeave={() => {
+          state.current.px = 0;
+          state.current.py = 0;
+        }}
+        style={{ background: "#05060a" }}
+      >
+        <VrContext.Provider value={ctx}>
+          <Room
+            room={kitRoom}
+            tier={kitTier}
+            bandId={band.id as keyof typeof kitRoom.lighting}
+            accent={accentHex}
+            phone={phoneRun}
+            reduced={reducedMotion()}
+            hoverId={litId}
+            openIds={openIds}
+            consoleOn={false}
+            worlds={kitWorlds}
+            clockOffsetMs={clockOffsetMs}
+            stage={kitExtras}
+            liveScreen={liveScreen}
+            onMerged={(m) => {
+              // Test handle: how the room's parts merged, and how many times it has (it should be once).
+              const w = window as unknown as { __roomMerge?: { n?: number } };
+              w.__roomMerge = { ...m, n: (w.__roomMerge?.n ?? 0) + 1 };
+            }}
+            onHover={(id) => setKitHover(id)}
+            onRun={onKitRun}
+          />
+          <KitRig
+            room={kitRoom}
+            stops={kitStops}
+            zoomRef={zoomRef}
+            monitorId={monitorObj?.id ?? null}
+            doorId={doorObj?.id ?? null}
+            story={story}
+            photo={photo}
+            door={doorRef}
+            onDoorDone={toHub}
+            onFrame={onFrame}
+            onZoomDone={navigate}
+            onFirstFrame={onFirstFrame}
+            mark={mark}
+          />
+          <KitLabel room={kitRoom} id={litId} text={litText} accent={accentHex} />
+          {capture ? <PhotoCapture capture={capture} /> : null}
+          {process.env.NODE_ENV !== "production" ? <Stats probe={false} onMedian={() => {}} /> : null}
+          {kitTier.bloomOn ? (
+            <EffectComposer multisampling={0} enableNormalPass={false}>
+              <Bloom mipmapBlur luminanceThreshold={1} luminanceSmoothing={0.2} intensity={0.9} radius={0.7} />
+              <SMAA />
+              <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+            </EffectComposer>
+          ) : null}
+        </VrContext.Provider>
+      </Canvas>
+    );
+  }
 
   return (
     <Canvas
@@ -744,22 +909,7 @@ export default function WorldStage3D({ slug, t, entries, terminal, story, photo,
           photo={photo}
           door={doorRef}
           onDoorDone={toHub}
-          onFrame={() => {
-            measureFps();
-            // Stars answer the pointer only while the camera is looking at them.
-            starsActive.current = Boolean(story?.current.on) && Math.abs((story?.current.p ?? 0) - 2) < 0.7;
-            screenRef.current?.tick(reducedMotion() ? 99 : clock.current.t, performance.now());
-            // The live texture is on the glass once it has been drawn and a frame has gone by with it bound.
-            if (!screenMarked.current && screenRef.current?.drawn() && liveScreenBound.current) {
-              screenMarked.current = true;
-              window.requestAnimationFrame(() => mark("stage:screen-live"));
-            }
-            const z = zoomRef.current;
-            const el = overlayRef.current;
-            const dd = doorRef.current;
-            if (dd.on && el && dd.t0 > -1e8) el.style.opacity = String(Math.max(0, Math.min(1, dd.e)));
-            if (z && el && z.on) el.style.opacity = String(Math.max(0, Math.min(1, (z.e - 0.55) / 0.45)));
-          }}
+          onFrame={onFrame}
           onZoomDone={navigate}
           onFirstFrame={onFirstFrame}
         />

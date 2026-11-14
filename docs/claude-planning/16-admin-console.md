@@ -227,3 +227,40 @@ node scripts/import-content.mjs --apply --overwrite      # also replaces rows th
 - Project story and media are merged into the existing project row (`api-test-center`); a missing project is reported and skipped, never created.
 - Settings: `engineer.resume` (header), `engineer.hiring`, `engineer.clock` are written only when the key has no row; `netflix` only gains `bookCall`. Each write adds a `settings_history` row.
 - Needs `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`; nothing is printed. Keep it in the repo for future re-seeds. Then set `CONTENT_SOURCE=db` (Vercel and `.env.local`) once the site looks right.
+
+## 8. Zero trust: the admin host and Cloudflare Access (round 33)
+
+The console lives at **`admin.ratulroy.me`** (`admin.ratulroy.localhost:3000` locally). Two locks: Cloudflare Access (who may even reach the page) and the Supabase sign-in (who the app lets in). Either failing means no console.
+
+### How the host works (code)
+
+- `lib/site/admin-host.ts`: the label is `admin`; env `ADMIN_HOST_LABEL` overrides it (`console`, or `apex` / `none` to keep the old `ratulroy.me/admin`).
+- On `admin.<root>` the proxy serves the console at the root: `/` is the home, `/login`, `/auth/callback`, `/engineer/projects` (internally rewritten to `/admin/...`).
+- `/admin/...` on any other routed host (`ratulroy.me`, `code.`) redirects to the admin host with a **301 in production**. In development it passes through unless `ADMIN_HOST_STRICT=1`. Old bookmarks work through that one redirect (one hop, no loop). POSTs and client-router fetches are never redirected.
+- On the admin host an old `/admin/x` document request redirects to the clean `/x`.
+- Magic-link `emailRedirectTo` is `https://admin.ratulroy.me/auth/callback`; the callback and sign-in redirects stay on the admin host.
+- `*.vercel.app` previews and plain `localhost` are unrouted: `/admin` works there by path, as before.
+
+### Cloudflare steps (do these once)
+
+1. **DNS** (Cloudflare dashboard, `ratulroy.me`, DNS, Records, Add record): Type `CNAME`, Name `admin`, Target `cname.vercel-dns.com`, **Proxy status: Proxied (orange cloud)**. Access only protects proxied records. SSL/TLS, Overview: set the mode to **Full (strict)**.
+2. **Zero Trust** (one.dash.cloudflare.com): choose the free plan, pick a **team name** (for example `ratulroy`). Your team domain is `ratulroy.cloudflareaccess.com`.
+3. **Access, Applications, Add an application, Self-hosted.** Application name `Portfolio admin`. **Session duration: 24 hours** (7 days if you accept fewer sign-ins; shorter is safer). Public hostname: subdomain `admin`, domain `ratulroy.me`, path empty (the whole host).
+4. **Policy:** name `Ratul only`, action **Allow**, include rule **Emails** equals `ratul.arya.roy@gmail.com`. Identity provider: One-time PIN is on by default (a code emailed to that address); add Google later if you want one tap. No other policy, so everyone else is denied.
+5. **Copy the two values** the app needs. Team domain: Zero Trust, Settings, Custom Pages (or the URL you picked in step 2), written `ratulroy.cloudflareaccess.com`. **AUD tag:** Access, Applications, `Portfolio admin`, Edit (the three dots), the **Overview** tab, "Application Audience (AUD) Tag", a 64-character hex string.
+6. **Vercel env** (Project, Settings, Environment Variables, Production only): `CF_ACCESS_TEAM_DOMAIN` = `ratulroy.cloudflareaccess.com` (the short `ratulroy` also works) and `CF_ACCESS_AUD` = the tag. Redeploy. Leave them unset on Preview and locally: with either missing the check is off and nothing changes. Never put the tag in the repo.
+7. **Supabase** (Authentication, URL Configuration): add `https://admin.ratulroy.me/auth/callback` to Redirect URLs and `https://admin.ratulroy.me` is fine as the Site URL only if the admin is the only sign-in (otherwise leave the Site URL). Keep the old `https://ratulroy.me/admin/auth/callback` while bookmarks are in use.
+
+### What the app checks when the two env vars are set
+
+`proxy.ts` (every admin page and server-action POST) and `isAdmin()` (every action, route and page) require the header `Cf-Access-Jwt-Assertion`: RS256 signature against `https://<team>/cdn-cgi/access/certs` (cached an hour, refetched at most once a minute on an unknown key id, Web Crypto only), the `aud`, the `iss` (`https://<team>`), `exp`, and an `email` equal to the signed-in Supabase admin's email. A failure returns **403** with a plain text page; the token is never logged. Tested without network in `scripts/admin-host-check.mjs` (a local RSA key pair and a fake JWKS).
+
+Because the Access email must equal the Supabase admin's email, sign in to the console with `ratul.arya.roy@gmail.com` (the address in the Access policy).
+
+### Vercel: does `admin.ratulroy.me` need adding?
+
+The persona subdomains (`code.`, `trade.` ...) resolve through a wildcard `*.ratulroy.me` on the Vercel project, and `admin.` matches that wildcard, so **nothing needs adding** if the wildcard is on the project's Domains list. If you would rather be explicit (or the wildcard is not there): Vercel, Project, Settings, Domains, Add, type `admin.ratulroy.me`, leave it on Production, and keep the Cloudflare CNAME above. The admin host serves whatever the production branch (`main`) deploys.
+
+### Health checklist
+
+Home shows a "Security" row: whether this request came in on the admin host, whether the Access check is on, and a reminder of the Supabase redirect URL to allow-list. It is amber while Access is off.

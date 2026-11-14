@@ -14,6 +14,8 @@ export const EVENT_KINDS = [
   "skill_open",
   "resume_download",
   "hire_open",
+  "fit_open",
+  "fit_check",
   "mail_click",
   "book_click",
   "visit_click",

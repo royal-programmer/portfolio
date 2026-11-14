@@ -263,3 +263,9 @@ kbd { padding: .05rem .4rem; border: 1px solid var(--dim); border-radius: .25rem
   .adm-bullets li > .adm-input { flex: 1 1 100%; }
   .adm-bullets li .adm-icon { flex: 1; }
 }
+
+/* Round 33: share-link field, résumé build progress, blocked preview */
+.adm-sharebox, .adm-buildbox { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .4rem; max-width: 100%; }
+.adm-sharebox .adm-input { min-width: 0; }
+.adm-buildbox progress { width: 6rem; vertical-align: middle; }
+.adm-bad { color: #f87171; }

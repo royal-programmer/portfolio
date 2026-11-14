@@ -750,7 +750,7 @@ export function bookOf(b?: BookCall): BookCall | undefined {
   return b && /^https:\/\//i.test(b.href.trim()) ? { label: b.label, href: b.href.trim() } : undefined;
 }
 
-export type HireSheet = { book?: BookCall; email?: string; resume: string; brief: string; /** The sheet's first line: role, level, place and availability in one sentence (`hireLine`). */ line: string; /** The one availability line (`hiring.availability`). */ availability: string };
+export type HireSheet = { book?: BookCall; email?: string; resume: string; brief: string; /** The sheet's first line: role, level, place and availability in one sentence (`hireLine`). */ line: string; /** The one availability line (`hiring.availability`). */ availability: string; /** The role and stack the `mail --fit` seed names (the terminal's own `hb.seed`). */ seedRole: string; seedStack: string };
 
 /**
  * "Popular with visitors": built from the last `windowDays` of title_open and play_complete counts, shown after Top 10
@@ -780,7 +780,7 @@ export function hireSheetOf(data: TerminalData): HireSheet {
     ...(["linkedin", "github"] as const).flatMap((k) => (link(k) ? [`  ${k.padEnd(9)} ${link(k)}`] : [])),
     `  resume    ${h.links.site}${h.links.resume}`,
   ];
-  return { book: bookOf(data.book), email, resume: h.links.resume, brief: lines.join("\n"), line: hireLine(h), availability: h.availability };
+  return { book: bookOf(data.book), email, resume: h.links.resume, brief: lines.join("\n"), line: hireLine(h), availability: h.availability, seedRole: h.roles[0] ?? "", seedStack: h.stack.core.slice(0, 5).join(", ") };
 }
 
 /* ---------- C5: Previously on... ---------- */

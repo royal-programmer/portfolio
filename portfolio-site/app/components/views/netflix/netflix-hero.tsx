@@ -14,6 +14,7 @@ import { tick as tickSound } from "./netflix-sound";
 import { NfArt } from "./netflix-art";
 import { NfPoster } from "./netflix-media";
 import { useForName } from "./use-for-name";
+import { openFit } from "./netflix-fit-sheet";
 import { t } from "@/lib/site/terminal-strings";
 
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -211,6 +212,9 @@ export function NetflixHero({ series, profile, status, fast, firstRowId, feature
               }}
             >
               Trailer
+            </button>
+            <button type="button" className="nf-btn nf-btn-glass nf-hero-fit" onClick={() => openFit("hero")}>
+              {t("nf.fit.open", "en")}
             </button>
             <a className="nf-btn nf-btn-glass" href="/Ratul_Roy_Resume.pdf" target="_blank" rel="noreferrer">
               View résumé

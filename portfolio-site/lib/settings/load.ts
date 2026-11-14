@@ -7,9 +7,10 @@ import type { LaunchedPersona, PersonaView } from "@/lib/content/types";
 import type { TerminalConfig } from "@/lib/site/terminal-data";
 import { fromDb } from "@/lib/content/source";
 import { loadRecords } from "@/lib/content/records";
+import { ROOM3D_DEFAULT } from "@/lib/room3d/defaults";
 import { getSettingValues } from "./read";
 
-const TERMINAL_KEYS = ["identity", "engineer.terminal", "engineer.resume", "engineer.i18n", "engineer.timeline", "engineer.arch", "engineer.themes", "engineer.views", "engineer.hiring", "engineer.clock", "netflix"] as const;
+const TERMINAL_KEYS = ["identity", "engineer.terminal", "engineer.resume", "engineer.i18n", "engineer.timeline", "engineer.arch", "engineer.themes", "engineer.views", "engineer.hiring", "engineer.clock", "netflix", "room3d"] as const;
 
 /** What `terminalData()` takes (each key independently falls back to the code), plus the enabled views. */
 export async function loadTerminalConfig(): Promise<{ cfg: TerminalConfig; views: PersonaView[] }> {
@@ -25,6 +26,8 @@ export async function loadTerminalConfig(): Promise<{ cfg: TerminalConfig; views
     hiring: s["engineer.hiring"],
     clock: s["engineer.clock"],
     netflix: s.netflix,
+    // Only when the admin changed it: the default room is in the code already, so the page does not carry it.
+    ...(JSON.stringify(s.room3d) === JSON.stringify(ROOM3D_DEFAULT) ? {} : { room3d: s.room3d }),
     // Only under CONTENT_SOURCE=db: without records the frozen copy answers, exactly as before.
     ...(records ? { records } : {}),
   };
