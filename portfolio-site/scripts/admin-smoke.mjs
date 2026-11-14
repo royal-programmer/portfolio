@@ -221,7 +221,22 @@ async function main() {
     page.on("dialog", (d) => void d.accept());
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
-    const go = (p) => page.goto(base + adminPath(base, p), { waitUntil: "domcontentloaded", timeout: 60000 });
+    // Clicking or typing before React has hydrated is lost (a controlled input snaps back, a click does nothing),
+    // so wait until the screen's own buttons carry React handlers before the script touches anything.
+    const hydrated = (pg) =>
+      pg.waitForFunction(
+        () => {
+          const els = [...document.querySelectorAll("main button, .adm-master button, .adm-editor button, form button, button")];
+          return els.length > 0 && els.some((e) => Object.keys(e).some((k) => k.startsWith("__reactProps")));
+        },
+        null,
+        { timeout: 30000 },
+      );
+    const go = async (p) => {
+      const res = await page.goto(base + adminPath(base, p), { waitUntil: "domcontentloaded", timeout: 60000 });
+      await hydrated(page);
+      return res;
+    };
 
     await check("sign in (one-time link)", async () => {
       await page.goto(base + callbackPath(base, hashed), { waitUntil: "domcontentloaded", timeout: 60000 });
