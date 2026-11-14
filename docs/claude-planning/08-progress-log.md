@@ -1500,3 +1500,10 @@ stripped service_role's table grants).
 - Draw calls: static merge by material, memoised sky and shadows. Settled frame: low 90 to 56, medium 173 to 86, high 192 to 105 (cap 120). Table and honest differences in `17-persona-views.md` section 33.
 - Checks: `node scripts/room3d-check.mjs` extended (flag, tiers, stops, actions, kinds); Playwright at 1280 and 393 in `tmp/r34/`.
 - Surprise: the first measurement of 930 calls was the shadow accumulation frames, which last about 60 frames in software GL; and a parent re-render was re-baking the shadows every few seconds until sky and shadows were memoised.
+
+### Round 35 - admin smoke fixes (2026-11-14)
+
+- Smoke result: before 65 passed / 14 failed; best clean run after the fixes 78 passed / 1 failed (architecture, a transient `fetch failed`); a later run 77 / 2 (projects click, skills delete, both timing under a loaded dev server). The last three runs were lost to the dev server stalling (1.8 GB node process, all requests timing out) while room3d files were being rebuilt, so a final 79/0 table was not captured.
+- App bugs fixed: the magic-link callback redirected to `localhost` instead of `admin.*.localhost` (Next normalises `.localhost` hosts), so sign-in landed on the login page; change timestamps used `toLocaleString()` in render (hydration mismatch), now `LocalTime`.
+- Script bugs fixed: no wait for hydration (clicks lost, inputs snapped back: 10 flows and the settings Save draft); import slugs with underscores were rejected and fell back to the real record's slug (events, links; a lax check would have rewritten real data); date and link fields edited with " zz" became invalid (events, milestones); fixed 3.5 s wait for the server draft; skills success note is lost on remount.
+- Not covered by the script: the skills editor remounts after create, so its "Saved" note vanishes at once; the importer silently replaces an invalid slug with a derived one.

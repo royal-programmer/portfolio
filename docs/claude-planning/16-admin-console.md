@@ -264,3 +264,7 @@ The persona subdomains (`code.`, `trade.` ...) resolve through a wildcard `*.rat
 ### Health checklist
 
 Home shows a "Security" row: whether this request came in on the admin host, whether the Access check is on, and a reminder of the Supabase redirect URL to allow-list. It is amber while Access is off.
+
+### Smoke test result (round 35)
+
+`node scripts/admin-smoke.mjs` against the dev server: before 65 passed, 14 failed; after the fixes 78 passed, 1 failed in the best clean run (the failure was a transient network error, cleanup left 0 `zz-smoke` rows after clearing it). Two app bugs (magic-link callback host in dev, hydration-unsafe timestamps) and several script bugs (no hydration wait, underscore import slugs, editing date and link fields, fixed draft wait) were behind the 14. If the dev server is slow, rerun when it is idle; the script waits for hydration but a stalled server still times out.
