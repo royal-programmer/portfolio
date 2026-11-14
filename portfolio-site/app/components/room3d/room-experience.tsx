@@ -488,8 +488,9 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
         }
       }
     };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
+    // In the capture phase, so an Esc that backs out of a place is ours before the view shell (which would leave the page) sees it.
+    window.addEventListener("keydown", key, true);
+    return () => window.removeEventListener("keydown", key, true);
   }, [openTerminal, room]);
 
   // The full-screen state of the document (hides the view shell's own button, locks scroll).
@@ -610,14 +611,10 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
               className="rx-chip"
               aria-current={z.id === zone.id ? "true" : undefined}
               onClick={() => {
-                if (z.id === zone.id && !panel && !override && z.panel) {
-                  if (z.panel === "terminal") {
-                    const m = (room.objects as RoomObject[]).find((o) => o.kind === "monitor" && (o.params as { screen?: string }).screen === "terminal");
-                    if (m) openTerminal(m);
-                  } else {
-                    const pid = parsePanel(`panel:${z.panel}`);
-                    if (pid) openPanel(pid);
-                  }
+                // A second press on the place you are at opens its card (the desk's is the terminal: that is the monitor, not the chip).
+                const pid = z.panel && z.panel !== "terminal" ? parsePanel(`panel:${z.panel}`) : null;
+                if (z.id === zone.id && !panel && !override && pid) {
+                  openPanel(pid);
                 } else goZone(z.id);
               }}
             >
