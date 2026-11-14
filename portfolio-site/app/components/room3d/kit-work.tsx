@@ -10,7 +10,7 @@ import { useFrame } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { KindId, ObjectOf } from "@/lib/room3d/schema";
-import { fitLive, Halo, Inst, useEnv, useImageTexture, useMat, type Env } from "./kit-core";
+import { fitLive, flipTexX, Halo, Inst, useEnv, useImageTexture, useMat, type Env } from "./kit-core";
 import { clockFaceTexture, homeScreenTexture, screenTexture } from "./textures";
 
 type P<K extends KindId> = { o: ObjectOf<K> };
@@ -18,7 +18,7 @@ const IN = 0.0254;
 const STEEL = { preset: "metal", color: "#14151a", roughness: 0.35 } as const;
 
 /** A screen texture for a source, cached per look in the kit. */
-function useScreen(env: Env, source: "terminal" | "code" | "console" | "image", accent: string, portrait: boolean, flipX: boolean): THREE.Texture {
+function useScreen(env: Env, source: "terminal" | "code" | "console" | "image" | "projects", accent: string, portrait: boolean, flipX: boolean): THREE.Texture {
   const key = `screen:${source}:${accent}:${portrait}:${flipX}:${source === "console" ? env.consoleOn : ""}`;
   return env.kit.tex(key, () => {
     const t = source === "console" ? homeScreenTexture(env.worlds, portrait ? 288 : 512, portrait ? 512 : 288) : screenTexture(portrait ? 256 : 512, portrait ? 384 : 256, accent);
@@ -69,15 +69,20 @@ export function Monitor({ o }: P<"monitor">) {
   const w = aspect * h;
   const portrait = aspect < 1;
   const accent = accentFor(env, o.id);
-  const tex = useScreen(env, screen === "image" ? "code" : screen, accent, portrait, form === "curved");
+  const tex = useScreen(env, screen === "image" || screen === "projects" ? "code" : screen, accent, portrait, form === "curved");
   const img = useImageTexture(screen === "image" ? o.params.image : undefined, o.params.image?.alt ?? "", aspect);
+  // The projects carousel is drawn by the page from the content layer; without it the screen shows the code look.
+  const board = screen === "projects" ? env.boards?.[o.id] ?? null : null;
+  useEffect(() => {
+    if (board && form === "curved") flipTexX(board);
+  }, [board, form]);
   const body = useMat(o.material);
   const steel = useMat(STEEL);
   const live = screen === "terminal" ? env.liveScreen ?? null : null;
   useEffect(() => {
     if (live) fitLive(live, aspect, form === "curved");
   }, [live, aspect, form]);
-  const map = live ?? (screen === "image" && img.state !== "none" ? img.tex : tex);
+  const map = live ?? board ?? (screen === "image" && img.state !== "none" ? img.tex : tex);
   const glow = env.light.emissiveBoost;
   const th = w / R;
   const screenMat = useMemo(() => new THREE.MeshBasicMaterial({ map, toneMapped: false, color: new THREE.Color("#ffffff").multiplyScalar(1.1 * glow), side: form === "curved" ? THREE.BackSide : THREE.FrontSide }), [map, glow, form]);
@@ -118,9 +123,9 @@ export function Monitor({ o }: P<"monitor">) {
   );
 }
 
-function Slab({ w, h, t, source, accent, material }: { w: number; h: number; t: number; source: "terminal" | "code" | "console" | "image"; accent: string; material: THREE.Material }) {
+function Slab({ w, h, t, source, accent, material }: { w: number; h: number; t: number; source: "terminal" | "code" | "console" | "image" | "projects"; accent: string; material: THREE.Material }) {
   const env = useEnv();
-  const tex = useScreen(env, source === "image" ? "code" : source, accent, h > w, false);
+  const tex = useScreen(env, source === "image" || source === "projects" ? "code" : source, accent, h > w, false);
   const mat = useMemo(() => new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, color: new THREE.Color("#ffffff").multiplyScalar(1.05 * env.light.emissiveBoost) }), [tex, env.light.emissiveBoost]);
   useEffect(() => () => mat.dispose(), [mat]);
   return (
@@ -371,12 +376,13 @@ export function Tv({ o }: P<"tv">) {
   const w = (16 / 9) * h;
   const body = useMat(o.material);
   const steel = useMat(STEEL);
-  const home = mode === "home" || env.consoleOn;
-  const img = useImageTexture(!home ? image : undefined, image?.alt ?? "", 16 / 9);
+  const reel = mode === "reel" ? env.boards?.[o.id] ?? null : null;
+  const home = !reel && (mode === "home" || mode === "reel" || env.consoleOn);
+  const img = useImageTexture(!home && !reel ? image : undefined, image?.alt ?? "", 16 / 9);
   const homeTex = useScreen(env, "console", env.accent, false, false);
   const idle = useScreen(env, "code", env.accent, false, false);
-  const map = home ? homeTex : image && img.state !== "none" ? img.tex : idle;
-  const mat = useMemo(() => new THREE.MeshBasicMaterial({ map, toneMapped: false, color: new THREE.Color("#ffffff").multiplyScalar(home ? 1.15 : 0.55) }), [map, home]);
+  const map = reel ?? (home ? homeTex : image && img.state !== "none" ? img.tex : idle);
+  const mat = useMemo(() => new THREE.MeshBasicMaterial({ map, toneMapped: false, color: new THREE.Color("#ffffff").multiplyScalar(home || reel ? 1.15 : 0.55) }), [map, home, reel]);
   useEffect(() => () => mat.dispose(), [mat]);
   return (
     <group>

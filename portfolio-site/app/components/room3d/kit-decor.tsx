@@ -191,6 +191,29 @@ export function Frame({ o }: P<"frame">) {
   );
 }
 
+/** A content board: a framed panel on the wall whose face the page draws from the content layer (lib/room3d/content.ts). */
+export function Board({ o }: P<"board">) {
+  const env = useEnv();
+  const { w, h, lift, style } = o.params;
+  const body = useMat(o.material);
+  const tex = env.boards?.[o.id] ?? null;
+  // Lit like a printed board, with a little self-light so it stays readable in the evening bands.
+  const face = useMemo(() => new THREE.MeshStandardMaterial({ map: tex, color: "#ffffff", roughness: 0.82, metalness: 0, emissive: "#ffffff", emissiveMap: tex, emissiveIntensity: 0.34 }), [tex]);
+  useEffect(() => () => face.dispose(), [face]);
+  const shelf = style === "spines";
+  return (
+    <group position={[0, lift, 0]}>
+      <RoundedBox args={[w + 0.05, h + 0.05, 0.035]} radius={0.008} smoothness={2} position={[0, 0, 0.0175]} castShadow receiveShadow material={body} />
+      <mesh position={[0, 0, 0.0365]} userData={{ noShadow: true, board: true }} material={face}>
+        <planeGeometry args={[w, h]} />
+      </mesh>
+      {shelf ? (
+        <RoundedBox args={[w + 0.08, 0.03, 0.14]} radius={0.008} smoothness={2} position={[0, -h / 2 - 0.03, 0.07]} castShadow receiveShadow material={body} />
+      ) : null}
+    </group>
+  );
+}
+
 export function Window({ o }: P<"window">) {
   const env = useEnv();
   const { w, h, lift, panes } = o.params;

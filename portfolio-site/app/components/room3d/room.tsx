@@ -59,6 +59,7 @@ export const KINDS: KindMap = {
   sphere: Decor.Sphere,
   projectShelf: Stage.ProjectShelf,
   constellation: Stage.Constellation,
+  board: Decor.Board,
 };
 
 export type RoomProps = {
@@ -79,11 +80,13 @@ export type RoomProps = {
   stage?: StageExtras;
   /** The Stage's live terminal texture, for a monitor whose screen is `terminal`. */
   liveScreen?: THREE.Texture | null;
+  /** Content boards by object id (see `Env.boards`). */
+  boards?: Record<string, THREE.Texture>;
   /** Merge the parts that never move into a few meshes (default on); the Stage's draw-call cap depends on it. */
   merge?: boolean;
   onMerged?: (s: MergeStats) => void;
   onHover: (id: string | null, label: string | null) => void;
-  onRun: (i: Interaction, o: RoomObject) => void;
+  onRun: (i: Interaction, o: RoomObject, e?: ThreeEvent<MouseEvent>) => void;
 };
 
 function Placed({ o, onHover, onRun }: { o: RoomObject; onHover: RoomProps["onHover"]; onRun: RoomProps["onRun"] }) {
@@ -103,7 +106,7 @@ function Placed({ o, onHover, onRun }: { o: RoomObject; onHover: RoomProps["onHo
         },
         onClick: (e: ThreeEvent<MouseEvent>) => {
           e.stopPropagation();
-          onRun(it, o);
+          onRun(it, o, e);
         },
       }
     : {};
@@ -173,8 +176,8 @@ export function Room(props: RoomProps) {
   useEffect(() => () => kit.dispose(), [kit]);
   const objects = useMemo(() => trimToBudget(room.objects, tier.objectBudget, { phone, includeDraft }), [room.objects, tier.objectBudget, phone, includeDraft]);
   const env = useMemo<Env>(
-    () => ({ kit, light, accent, phone, tier, hoverId: props.hoverId, openIds: props.openIds, consoleOn: props.consoleOn, reduced: props.reduced, worlds: props.worlds, clockOffsetMs: props.clockOffsetMs, stage: props.stage, liveScreen: props.liveScreen }),
-    [kit, light, accent, phone, tier, props.hoverId, props.openIds, props.consoleOn, props.reduced, props.worlds, props.clockOffsetMs, props.stage, props.liveScreen],
+    () => ({ kit, light, accent, phone, tier, hoverId: props.hoverId, openIds: props.openIds, consoleOn: props.consoleOn, reduced: props.reduced, worlds: props.worlds, clockOffsetMs: props.clockOffsetMs, stage: props.stage, liveScreen: props.liveScreen, boards: props.boards }),
+    [kit, light, accent, phone, tier, props.hoverId, props.openIds, props.consoleOn, props.reduced, props.worlds, props.clockOffsetMs, props.stage, props.liveScreen, props.boards],
   );
   const { width: W, depth: D, height: H } = room.shell;
   const floorTex = useMemo(() => {
@@ -203,7 +206,7 @@ export function Room(props: RoomProps) {
     const m = mergeStatic(g);
     onMerged.current?.(m.stats);
     return m.restore;
-  }, [merge, objects, kit, bandId, accent, props.consoleOn, room.shell, floorTex]);
+  }, [merge, objects, kit, bandId, accent, props.consoleOn, props.boards, room.shell, floorTex]);
   const desk = room.objects.find((o) => o.kind === "desk") as ObjectOf<"desk"> | undefined;
   const sunOn = light.windowLight.intensity > 0.1;
   return (

@@ -60,7 +60,8 @@ const base = {
 
 const kind = <K extends string, P extends z.ZodType>(k: K, params: P) => z.strictObject({ ...base, kind: z.literal(k), params });
 
-const screenSource = z.enum(["terminal", "code", "console", "image"]);
+/** `projects`: the project carousel drawn from the content layer; `terminal`: the live terminal; `reel`/`console`: see the TV. */
+const screenSource = z.enum(["terminal", "code", "console", "image", "projects"]);
 const dims = (w: [number, number], h: [number, number], d: [number, number]) => ({ w: num(...w), h: num(...h), d: num(...d) });
 
 export const KIND_SCHEMAS = {
@@ -122,7 +123,7 @@ export const KIND_SCHEMAS = {
       digital: z.boolean(),
     }),
   ),
-  tv: kind("tv", z.strictObject({ inches: num(20, 100), lift: num(0.2, 2), mode: z.enum(["idle", "home"]), image: imageSchema.optional() })),
+  tv: kind("tv", z.strictObject({ inches: num(20, 100), lift: num(0.2, 2), mode: z.enum(["idle", "home", "reel"]), image: imageSchema.optional() })),
   console: kind("console", z.strictObject({ controllers: z.number().int().min(0).max(4) })),
   pcTower: kind("pcTower", z.strictObject({ h: num(0.3, 0.7), glass: z.boolean(), rgb: z.boolean(), fans: z.number().int().min(0).max(6) })),
   guitar: kind("guitar", z.strictObject({ stand: z.boolean() })),
@@ -138,6 +139,12 @@ export const KIND_SCHEMAS = {
   projectShelf: kind("projectShelf", z.strictObject({ max: z.number().int().min(1).max(12) })),
   /** The Stage's skill constellation: one star per technology (from the terminal's stack, at most `stars`); the object's scale sizes the cap. */
   constellation: kind("constellation", z.strictObject({ stars: z.number().int().min(4).max(40) })),
+  /**
+   * A content board: a flat panel whose face is drawn from the content layer (never from this object): skill spines
+   * for a shelf, certificate and education frames or key-moment cards for a wall. Clicking it opens the matching
+   * panel; the item under the pointer is found from the layout (lib/room3d/board-layout.ts).
+   */
+  board: kind("board", z.strictObject({ source: z.enum(["skills", "credentials", "moments"]), style: z.enum(["spines", "frames", "cards"]), w: num(0.3, 3), h: num(0.2, 2), lift: num(0, 2.6) })),
 } as const;
 
 export type KindId = keyof typeof KIND_SCHEMAS;
@@ -180,6 +187,7 @@ export const objectSchema = z.discriminatedUnion("kind", [
   KIND_SCHEMAS.sphere,
   KIND_SCHEMAS.projectShelf,
   KIND_SCHEMAS.constellation,
+  KIND_SCHEMAS.board,
 ]);
 export type RoomObject = z.infer<typeof objectSchema>;
 export type ObjectOf<K extends KindId> = Extract<RoomObject, { kind: K }>;
@@ -206,6 +214,22 @@ export const shellSchema = z.strictObject({
   floorColor: color(),
 });
 
+/**
+ * A camera zone: where the camera stands and looks (metres, inside the room), the objects it is about, and what
+ * Enter opens (`panel`, one of lib/room3d/panels.ts's ids; empty = nothing). `order` sets the chip order and the
+ * wheel / swipe / arrow stepping.
+ */
+export const zoneSchema = z.strictObject({
+  id: z.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/, "lowercase letters, digits and dashes"),
+  label: str(30),
+  order: num(0, 99),
+  eye: vec3(),
+  look: vec3(),
+  objects: z.array(z.string().max(40)).max(16),
+  panel: str(24).optional(),
+});
+export type Zone = z.infer<typeof zoneSchema>;
+
 export const roomSchema = z
   .strictObject({
     id: z.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/),
@@ -213,10 +237,18 @@ export const roomSchema = z
     shell: shellSchema,
     lighting: z.record(z.enum(BAND_IDS), lightingSchema),
     objects: z.array(objectSchema).max(MAX_OBJECTS),
+    /** Camera zones; absent means the defaults in lib/room3d/zones.ts. At most 16. */
+    zones: z.array(zoneSchema).max(16).optional(),
   })
   .superRefine((room, ctx) => {
     const seen = new Set<string>();
     const { width, depth, height } = room.shell;
+    const zoneIds = new Set<string>();
+    (room.zones ?? []).forEach((zn, i) => {
+      if (zoneIds.has(zn.id)) ctx.addIssue({ code: "custom", path: ["zones", i, "id"], message: `duplicate zone id "${zn.id}"` });
+      zoneIds.add(zn.id);
+      if (Math.abs(zn.eye[0]) > width / 2 || Math.abs(zn.eye[2]) > depth / 2 || zn.eye[1] > height) ctx.addIssue({ code: "custom", path: ["zones", i, "eye"], message: "the camera would stand outside the room" });
+    });
     room.objects.forEach((o, i) => {
       if (seen.has(o.id)) ctx.addIssue({ code: "custom", path: ["objects", i, "id"], message: `duplicate id "${o.id}"` });
       seen.add(o.id);

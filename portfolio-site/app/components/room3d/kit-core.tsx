@@ -126,6 +126,8 @@ export type Env = {
   stage?: StageExtras;
   /** The live terminal texture (the Stage's, redrawn by the page): a monitor whose `screen` is `terminal` shows it. */
   liveScreen?: THREE.Texture | null;
+  /** Content boards drawn from the content layer, by object id: a `board` object's face, the projects monitor, the TV's reel. */
+  boards?: Record<string, THREE.Texture>;
 };
 
 /** What the Stage hands the room beyond the room's own objects: the project cases and the stars, and how they answer. */
@@ -156,6 +158,13 @@ export function fitLive(t: THREE.Texture, screenAspect: number, flipX: boolean) 
   const ry = Math.max(1, 1.6 / screenAspect);
   t.repeat.set((flipX ? -1 : 1) * rx, ry);
   t.offset.set(flipX ? 0.5 + rx / 2 : (1 - rx) / 2, (1 - ry) / 2);
+}
+
+/** Mirror a texture left to right (a curved monitor's glass is seen from inside, so its picture is flipped to read the right way round). */
+export function flipTexX(t: THREE.Texture) {
+  t.wrapS = THREE.RepeatWrapping;
+  t.repeat.x = -1;
+  t.offset.x = 1;
 }
 
 /** A material for the kind's own `material` block, from the shared cache. */
