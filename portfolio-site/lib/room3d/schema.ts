@@ -49,6 +49,12 @@ export const interactionSchema = z.union([
   z.strictObject({ label: str(60), card: str(240) }),
 ]);
 
+/** An optional glTF model or texture map for an object (a https URL or a /path in public/). Declared now, drawn from round 37d; nothing reads them yet. */
+const assetUrl = () => z.string().max(500).regex(/^(https:\/\/|\/)/, "an https:// URL or a /path");
+
+/** The chords a guitar can strum (see lib/room3d/chord.ts for their notes). */
+export const CHORD_IDS = ["Em", "Am", "C", "G", "D", "E", "A", "Dm"] as const;
+
 const base = {
   id: z.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/, "lowercase letters, digits and dashes"),
   transform: transformSchema,
@@ -56,6 +62,9 @@ const base = {
   interaction: interactionSchema.optional(),
   visibility: z.enum(["public", "draft"]),
   hideOnPhone: z.boolean(),
+  /** Later: a CC0 glTF model that replaces the drawn shape, and a texture map for the material. Optional and unused for now. */
+  model: assetUrl().optional(),
+  map: assetUrl().optional(),
 };
 
 const kind = <K extends string, P extends z.ZodType>(k: K, params: P) => z.strictObject({ ...base, kind: z.literal(k), params });
@@ -95,7 +104,7 @@ export const KIND_SCHEMAS = {
   bookStack: kind("bookStack", z.strictObject({ count: z.number().int().min(1).max(30), layout: z.enum(["row", "pile"]) })),
   plant: kind("plant", z.strictObject({ height: num(0.2, 2.5), leaves: z.number().int().min(4).max(60), pot: z.enum(["round", "square"]) })),
   chair: kind("chair", z.strictObject({ style: z.enum(["office", "gaming", "stool"]) })),
-  bed: kind("bed", z.strictObject({ size: z.enum(["single", "double"]), pillows: z.number().int().min(0).max(4) })),
+  bed: kind("bed", z.strictObject({ size: z.enum(["single", "double"]), pillows: z.number().int().min(0).max(4), blanket: z.boolean(), headboard: z.boolean() })),
   wardrobe: kind("wardrobe", z.strictObject({ w: num(0.6, 3), h: num(1.2, 2.6), d: num(0.4, 0.8), open: z.boolean(), clothes: z.number().int().min(0).max(40) })),
   frame: kind(
     "frame",
@@ -126,12 +135,16 @@ export const KIND_SCHEMAS = {
   tv: kind("tv", z.strictObject({ inches: num(20, 100), lift: num(0.2, 2), mode: z.enum(["idle", "home", "reel"]), image: imageSchema.optional() })),
   console: kind("console", z.strictObject({ controllers: z.number().int().min(0).max(4) })),
   pcTower: kind("pcTower", z.strictObject({ h: num(0.3, 0.7), glass: z.boolean(), rgb: z.boolean(), fans: z.number().int().min(0).max(6) })),
-  guitar: kind("guitar", z.strictObject({ stand: z.boolean() })),
+  /** `stand` true: on a floor stand; false: hung on a wall hook. A click strums the next chord of `chords` (Web Audio, only while the site's sound is on). */
+  guitar: kind("guitar", z.strictObject({ stand: z.boolean(), chords: z.array(z.enum(CHORD_IDS)).min(1).max(6) })),
   midiKeyboard: kind("midiKeyboard", z.strictObject({ keys: z.number().int().min(25).max(88) })),
   capRow: kind("capRow", z.strictObject({ count: z.number().int().min(1).max(30), spacing: num(0.08, 0.4), lift: num(0.5, 2.5) })),
-  keyRack: kind("keyRack", z.strictObject({ keys: z.number().int().min(1).max(30), w: num(0.2, 1.5), lift: num(0.5, 2.5) })),
+  /** `labels` are the small tags under the first keys (admin-editable text). */
+  keyRack: kind("keyRack", z.strictObject({ keys: z.number().int().min(1).max(30), w: num(0.2, 1.5), lift: num(0.5, 2.5), labels: z.array(str(16)).max(30) })),
   bag: kind("bag", z.strictObject({ label: str(40), image: imageSchema.optional() })),
-  ridingSet: kind("ridingSet", z.strictObject({ helmet: z.boolean(), jacket: z.boolean(), gloves: z.boolean(), boots: z.boolean() })),
+  ridingSet: kind("ridingSet", z.strictObject({ helmet: z.boolean(), jacket: z.boolean(), pants: z.boolean(), gloves: z.boolean(), boots: z.boolean() })),
+  football: kind("football", z.strictObject({ r: num(0.05, 0.3) })),
+  puzzleCube: kind("puzzleCube", z.strictObject({ size: num(0.03, 0.2) })),
   box: kind("box", z.strictObject({ w: num(0.001, 4), h: num(0.001, 4), d: num(0.001, 4), round: num(0, 0.2) })),
   cylinder: kind("cylinder", z.strictObject({ r: num(0.01, 2), h: num(0.01, 4) })),
   sphere: kind("sphere", z.strictObject({ r: num(0.01, 2) })),
@@ -182,6 +195,8 @@ export const objectSchema = z.discriminatedUnion("kind", [
   KIND_SCHEMAS.keyRack,
   KIND_SCHEMAS.bag,
   KIND_SCHEMAS.ridingSet,
+  KIND_SCHEMAS.football,
+  KIND_SCHEMAS.puzzleCube,
   KIND_SCHEMAS.box,
   KIND_SCHEMAS.cylinder,
   KIND_SCHEMAS.sphere,
@@ -227,6 +242,8 @@ export const zoneSchema = z.strictObject({
   look: vec3(),
   objects: z.array(z.string().max(40)).max(16),
   panel: str(24).optional(),
+  /** The id of the object that Enter (or a second press on the chip) acts on, as a click would: opens the wardrobe, strums the guitar. */
+  act: z.string().max(40).optional(),
 });
 export type Zone = z.infer<typeof zoneSchema>;
 

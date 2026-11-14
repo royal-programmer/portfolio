@@ -7,18 +7,27 @@
 import type { Room, Zone } from "./schema";
 
 /**
- * The defaults for the 6.0 x 5.0 x 2.8 m room. The desk stands against the back wall, the Stage's project cases and
- * the skills board on the right wall, the TV on the front wall, the certificate and moment boards and the door on
- * the left wall. `panel` names what Enter opens (see panels.ts).
+ * The defaults for the 8.0 x 6.0 x 3.0 m room (round 37a). Work: the desk on the back wall, left. Window wall: the
+ * back wall, right. Sleep: the bed, the guitar and the MIDI keyboard on the right wall, back half. Shelf: the project
+ * cases, the skills board and the skill stars on the right wall, front half. Chill: the TV, the console, the football and
+ * the cube on the front wall, right. Wardrobe and entry: the wardrobe and the caps on the front wall, left; the key rack
+ * and the riding set on the left wall, front half, with the door beside them; Wall: the certificates and the key moments
+ * on the left wall, back half. `panel` names what Enter opens (see panels.ts); `act` names the object Enter acts on as a
+ * click would (the wardrobe's doors, the guitar's chord). Zone ids are stable: the page, the tests and saved rooms use them.
  */
 export const DEFAULT_ZONES: Zone[] = [
-  { id: "desk", label: "Desk", order: 0, eye: [0.3, 1.6, 0.2], look: [0.3, 1.1, -2.3], objects: ["monitor-low", "keyboard", "mug", "notebook", "headset"], panel: "terminal" },
-  { id: "screens", label: "Projects", order: 1, eye: [0.3, 1.4, -0.6], look: [0.3, 1.3, -2.3], objects: ["monitor-high"], panel: "projects" },
-  { id: "shelf", label: "Shelf", order: 2, eye: [-0.3, 1.45, 0.55], look: [2.95, 1.15, 0.55], objects: ["board-skills", "project-shelf"], panel: "skills" },
-  { id: "tv", label: "TV", order: 3, eye: [0.4, 1.15, 0.3], look: [0.4, 0.8, 2.45], objects: ["tv", "console"], panel: "tv" },
-  { id: "wall", label: "Wall", order: 4, eye: [0.3, 1.4, -0.6], look: [-3, 1.15, -0.75], objects: ["board-credentials", "board-moments"], panel: "credentials" },
-  { id: "door", label: "Door", order: 5, eye: [1.0, 1.45, 1.2], look: [-3, 1.1, 1.2], objects: ["door"], panel: "worlds" },
-  { id: "hire", label: "Hire", order: 6, eye: [0.1, 1.3, -0.4], look: [-0.15, 0.9, -1.87], objects: ["phone", "sticky"], panel: "hire" },
+  { id: "desk", label: "Desk", order: 0, eye: [-1.2, 1.6, -0.3], look: [-1.2, 1.1, -2.8], objects: ["monitor-low", "keyboard", "mug", "notebook", "headset"], panel: "terminal" },
+  { id: "screens", label: "Projects", order: 1, eye: [-1.2, 1.4, -1.1], look: [-1.2, 1.3, -2.8], objects: ["monitor-high"], panel: "projects" },
+  { id: "hire", label: "Hire", order: 2, eye: [-1.4, 1.3, -0.9], look: [-1.65, 0.9, -2.37], objects: ["phone", "sticky"], panel: "hire" },
+  { id: "window", label: "Window", order: 3, eye: [1.2, 1.5, -0.6], look: [1.7, 1.5, -3], objects: ["window"] },
+  { id: "sleep", label: "Sleep", order: 4, eye: [1.0, 1.55, -0.3], look: [3.5, 0.65, -1.7], objects: ["bed", "guitar", "midi"], act: "guitar" },
+  { id: "shelf", label: "Shelf", order: 5, eye: [0.6, 1.45, 1.15], look: [3.95, 1.2, 1.2], objects: ["board-skills", "project-shelf", "constellation"], panel: "skills" },
+  { id: "tv", label: "TV", order: 6, eye: [1.4, 1.15, 0.6], look: [1.4, 0.8, 2.95], objects: ["tv", "console"], panel: "tv" },
+  { id: "chill", label: "Chill", order: 7, eye: [-0.2, 1.5, 0.3], look: [1.7, 0.45, 2.8], objects: ["football", "cube"] },
+  { id: "wardrobe", label: "Wardrobe", order: 8, eye: [-1.0, 1.5, 0.5], look: [-2.9, 1.0, 2.8], objects: ["wardrobe", "caps"], act: "wardrobe" },
+  { id: "gear", label: "Riding", order: 9, eye: [-1.6, 1.45, 1.0], look: [-4, 1.1, 2.1], objects: ["riding-set", "key-rack"] },
+  { id: "door", label: "Door", order: 10, eye: [-0.8, 1.45, 0.8], look: [-4, 1.1, 0.8], objects: ["door"], panel: "worlds" },
+  { id: "wall", label: "Wall", order: 11, eye: [-0.8, 1.4, -1.1], look: [-4, 1.15, -1.35], objects: ["board-credentials", "board-moments"], panel: "credentials" },
 ];
 
 /** The room's zones, in chip order (a room without any gets the defaults). Ties keep the stored order. */

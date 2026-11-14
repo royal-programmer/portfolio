@@ -14,6 +14,7 @@ import type { KindId, ObjectOf, Room as RoomData, RoomObject, Tier } from "@/lib
 import { trimToBudget } from "@/lib/room3d/tiers";
 import { EnvCtx, Halo, Kit, useEnv, type Env, type StageExtras } from "./kit-core";
 import * as Decor from "./kit-decor";
+import * as Dream from "./kit-dream";
 import * as Stage from "./kit-stage";
 import * as Work from "./kit-work";
 import { mergeStatic, type MergeStats } from "./static-merge";
@@ -41,19 +42,21 @@ export const KINDS: KindMap = {
   shelf: Decor.Shelf,
   bookStack: Decor.BookStack,
   plant: Decor.Plant,
-  bed: Decor.Bed,
-  wardrobe: Decor.Wardrobe,
+  bed: Dream.Bed,
+  wardrobe: Dream.Wardrobe,
   frame: Decor.Frame,
   window: Decor.Window,
   door: Decor.Door,
   rug: Decor.Rug,
   neonStrip: Decor.NeonStrip,
-  guitar: Decor.Guitar,
+  guitar: Dream.Guitar,
   midiKeyboard: Decor.MidiKeyboard,
-  capRow: Decor.CapRow,
-  keyRack: Decor.KeyRack,
+  capRow: Dream.CapRow,
+  keyRack: Dream.KeyRack,
   bag: Decor.Bag,
-  ridingSet: Decor.RidingSet,
+  ridingSet: Dream.RidingSet,
+  football: Dream.Football,
+  puzzleCube: Dream.PuzzleCube,
   box: Decor.Box,
   cylinder: Decor.Cylinder,
   sphere: Decor.Sphere,
