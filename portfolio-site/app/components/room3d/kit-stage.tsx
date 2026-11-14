@@ -32,7 +32,7 @@ export function ProjectShelf({ o }: P<"projectShelf">) {
 
 export function Constellation({ o }: P<"constellation">) {
   const st = useEnv().stage;
-  if (!st || !st.constellation) return null;
+  if (!st || !st.constellation || st.skyOn === false) return null;
   void o;
   return (
     <group position={[-SKY_MIDDLE[0], -SKY_MIDDLE[1], -SKY_MIDDLE[2]]}>

@@ -84,6 +84,26 @@ function hangerGeometry() {
   return g;
 }
 
+/**
+ * One garment in unit coordinates (x thickness, y length, z shoulder width, the body centred): the body and its two sleeves in one
+ * geometry, so a whole wardrobe of them is a single instanced draw. The instance scale turns the units into metres per garment.
+ */
+function garmentGeometry() {
+  const parts: THREE.BufferGeometry[] = [new THREE.BoxGeometry(1, 1, 1)];
+  for (const side of [-1, 1]) parts.push(new THREE.BoxGeometry(0.9, 0.78, 0.2).rotateX(side * 0.07).translate(0, 0.085, side * 0.55));
+  const g = mergeGeometries(parts.map((x) => x.toNonIndexed()))!;
+  parts.forEach((x) => x.dispose());
+  return g;
+}
+
+/** A door leaf with its raised panel in one geometry (centred): one mesh, one shadow draw per leaf. */
+function leafGeometry(w: number, h: number) {
+  const parts = [new THREE.BoxGeometry(w / 2 - 0.01, h - 0.02, 0.022), new THREE.BoxGeometry(w / 2 - 0.16, h - 0.2, 0.006).translate(0, 0, 0.0135)];
+  const g = mergeGeometries(parts.map((x) => x.toNonIndexed()))!;
+  parts.forEach((x) => x.dispose());
+  return g;
+}
+
 export function Wardrobe({ o }: P<"wardrobe">) {
   const env = useEnv();
   const { w, h, d, open, clothes } = o.params;
@@ -91,8 +111,9 @@ export function Wardrobe({ o }: P<"wardrobe">) {
   const inner = env.kit.mat("wood", "#2a2018", 0.8);
   const rod = env.kit.mat("metal", "#b8bcc6", 0.3);
   const handle = env.kit.mat("metal", "#a9adb8", 0.3);
-  const unit = env.kit.geo("unit-box", () => new THREE.BoxGeometry(1, 1, 1));
   const hanger = env.kit.geo("hanger", hangerGeometry);
+  const garments = env.kit.geo("garment", garmentGeometry);
+  const leafGeo = env.kit.geo(`wardrobe-leaf:${w}:${h}`, () => leafGeometry(w, h));
   const cloth = env.kit.mat("fabric", "#ffffff", 0.9);
   const hangerMat = env.kit.mat("plastic", "#2a2a30", 0.5);
   const rodY = h * 0.8;
@@ -117,30 +138,14 @@ export function Wardrobe({ o }: P<"wardrobe">) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [clothes, w, h],
   );
-  const fillSleeve = useCallback(
-    (j: number, p: THREE.Object3D, c: THREE.Color) => {
-      const i = j >> 1;
-      const side = j & 1 ? 1 : -1;
-      const g = garment(i);
-      const len = g.len * 0.78;
-      const yaw = 0.1 * ((i % 3) - 1);
-      // The sleeve hangs from the shoulder, a little outside the body, in the garment's own (turned) frame.
-      const zo = side * (g.width * 0.43 + 0.02);
-      p.position.set(xAt(i) + Math.sin(yaw) * zo, rodY - 0.09 - len / 2, Math.cos(yaw) * zo);
-      p.rotation.set(side * 0.07, yaw, 0);
-      p.scale.set(g.thick * 0.9, len, 0.08);
-      c.set(g.color);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [clothes, w, h],
-  );
   const leaves = useRef<(THREE.Group | null)[]>([null, null]);
   const angle = useRef(0);
   const toggled = env.openIds.has(o.id);
   const isOpen = open ? !toggled : toggled;
   useFrame((_, dt) => {
     const target = isOpen ? 1.75 : 0;
-    angle.current = env.reduced ? target : angle.current + (target - angle.current) * Math.min(1, dt * 5);
+    // Frame-rate independent easing (a long frame cannot snap the doors shut or open); reduced motion cuts.
+    angle.current = env.reduced ? target : angle.current + (target - angle.current) * (1 - Math.exp(-5 * Math.min(dt, 0.05)));
     [-1, 1].forEach((s, k) => {
       const g = leaves.current[k];
       if (g) g.rotation.y = s * angle.current;
@@ -171,18 +176,12 @@ export function Wardrobe({ o }: P<"wardrobe">) {
       {clothes > 0 ? (
         <>
           <Inst count={clothes} geometry={hanger} material={hangerMat} fill={fillHanger} cast={false} />
-          <Inst count={clothes} geometry={unit} material={cloth} fill={fillBody} />
-          <Inst count={clothes * 2} geometry={unit} material={cloth} fill={fillSleeve} cast={false} />
+          <Inst count={clothes} geometry={garments} material={cloth} fill={fillBody} />
         </>
       ) : null}
       {[-1, 1].map((s, k) => (
         <group key={s} ref={(g) => void (leaves.current[k] = g)} position={[s * (w / 2 - 0.01), 0, d / 2 - 0.01]} userData={{ dynamic: true }}>
-          <mesh position={[-s * (w / 4 - 0.005), h / 2, 0]} castShadow material={body}>
-            <boxGeometry args={[w / 2 - 0.01, h - 0.02, 0.022]} />
-          </mesh>
-          <mesh position={[-s * (w / 4 - 0.005), h / 2, 0.0135]} castShadow receiveShadow material={body}>
-            <boxGeometry args={[w / 2 - 0.16, h - 0.2, 0.006]} />
-          </mesh>
+          <mesh geometry={leafGeo} position={[-s * (w / 4 - 0.005), h / 2, 0]} castShadow receiveShadow material={body} />
           <mesh position={[-s * 0.05, h * 0.5, 0.035]} rotation={[0, 0, 0]} material={handle}>
             <cylinderGeometry args={[0.009, 0.009, 0.16, 8]} />
           </mesh>
@@ -311,26 +310,22 @@ export function Guitar({ o }: P<"guitar">) {
 export function CapRow({ o }: P<"capRow">) {
   const env = useEnv();
   const { count, spacing, lift } = o.params;
-  const dome = env.kit.geo("cap-dome", () => new THREE.SphereGeometry(0.1, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2));
-  const brim = env.kit.geo("cap-brim", () => new THREE.CylinderGeometry(0.09, 0.09, 0.008, 14, 1, false, 0, Math.PI));
+  // The crown (a squashed half sphere, its open side to the wall) and the visor (a half disc hanging below the rim, drooping toward the viewer) in one geometry.
+  const cap = env.kit.geo("cap", () => {
+    const dome = new THREE.SphereGeometry(0.1, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.9, 1).rotateX(Math.PI / 2 - 0.2).translate(0, 0, 0.1);
+    const brim = new THREE.CylinderGeometry(0.095, 0.095, 0.01, 16, 1, false, 0, Math.PI).rotateX(Math.PI / 2).rotateZ(-Math.PI / 2).rotateX(-0.45).translate(0, -0.078, 0.112);
+    const g = mergeGeometries([dome.toNonIndexed(), brim.toNonIndexed()])!;
+    dome.dispose();
+    brim.dispose();
+    return g;
+  });
   const mat = env.kit.mat("fabric", "#ffffff", 0.9);
   const wood = env.kit.mat("wood", "#4a3422", 0.5);
   const peg = env.kit.mat("metal", "#b8bcc6", 0.3);
-  const hue = (i: number) => new THREE.Color().setHSL(((i * 2 * 0.137) % 1 + 1) % 1, 0.55, 0.4);
-  const fillD = useCallback(
+  const fill = useCallback(
     (i: number, p: THREE.Object3D, c: THREE.Color) => {
-      p.position.set(i * spacing, lift, 0.1);
-      p.rotation.x = Math.PI / 2 - 0.2;
-      c.copy(hue(i));
-    },
-    [spacing, lift],
-  );
-  const fillB = useCallback(
-    (i: number, p: THREE.Object3D, c: THREE.Color) => {
-      p.position.set(i * spacing, lift - 0.015, 0.2);
-      p.rotation.set(0.15, Math.PI / 2, 0);
-      p.scale.set(1, 1, 1.4);
-      c.copy(hue(i).multiplyScalar(0.85));
+      p.position.set(i * spacing, lift, 0);
+      c.setHSL((((i * 2 * 0.137) % 1) + 1) % 1, 0.55, 0.4);
     },
     [spacing, lift],
   );
@@ -344,8 +339,7 @@ export function CapRow({ o }: P<"capRow">) {
         </mesh>
       ))}
       <group position={[x0, 0, 0]}>
-        <Inst count={count} geometry={dome} material={mat} fill={fillD} />
-        <Inst count={count} geometry={brim} material={mat} fill={fillB} />
+        <Inst count={count} geometry={cap} material={mat} fill={fill} />
       </group>
     </group>
   );
@@ -380,7 +374,15 @@ export function KeyRack({ o }: P<"keyRack">) {
   const board = useMat(o.material);
   const peg = env.kit.mat("metal", "#b8bcc6", 0.3);
   const unit = env.kit.geo("unit-box", () => new THREE.BoxGeometry(1, 1, 1));
-  const ring = env.kit.geo("key-ring", () => new THREE.TorusGeometry(0.011, 0.0018, 6, 14));
+  // The blade and the ring of a key, relative to its head's middle, in one geometry.
+  const bladeRing = env.kit.geo("key-blade-ring", () => {
+    const blade = new THREE.BoxGeometry(0.009, 0.05, 0.003).translate(0, -0.045, 0);
+    const ring = new THREE.TorusGeometry(0.011, 0.0018, 6, 14).translate(0, 0.042, 0);
+    const g = mergeGeometries([blade.toNonIndexed(), ring.toNonIndexed()])!;
+    blade.dispose();
+    ring.dispose();
+    return g;
+  });
   const metal = env.kit.mat("metal", "#ffffff", 0.3);
   const plastic = env.kit.mat("plastic", "#ffffff", 0.45);
   const xAt = (i: number) => (keys === 1 ? 0 : -w / 2 + 0.05 + (i * (w - 0.1)) / (keys - 1));
@@ -392,7 +394,7 @@ export function KeyRack({ o }: P<"keyRack">) {
       const fob = i % 2 === 1;
       p.position.set(xAt(i), lift - 0.075, 0.045);
       p.rotation.z = ((i % 5) - 2) * 0.04;
-      p.scale.set(fob ? 0.03 : 0.024, fob ? 0.052 : 0.036, 0.011);
+      p.scale.set(fob ? 0.03 : 0.026, fob ? 0.052 : 0.042, 0.011);
       c.set(fob ? "#15161b" : "#d9801f");
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -400,19 +402,9 @@ export function KeyRack({ o }: P<"keyRack">) {
   );
   const fillBlade = useCallback(
     (i: number, p: THREE.Object3D, c: THREE.Color) => {
-      const fob = i % 2 === 1;
-      p.position.set(xAt(i), lift - (fob ? 0.13 : 0.115), 0.045);
+      p.position.set(xAt(i), lift - 0.075, 0.045);
       p.rotation.z = ((i % 5) - 2) * 0.04;
-      p.scale.set(0.009, fob ? 0.036 : 0.05, 0.003);
-      c.set(fob ? "#9aa0ad" : "#cfd3dc");
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [keys, w, lift],
-  );
-  const fillRing = useCallback(
-    (i: number, p: THREE.Object3D, c: THREE.Color) => {
-      p.position.set(xAt(i), lift - 0.033, 0.045);
-      c.set("#c8ccd6");
+      c.set(i % 2 === 1 ? "#9aa0ad" : "#cfd3dc");
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [keys, w, lift],
@@ -426,8 +418,7 @@ export function KeyRack({ o }: P<"keyRack">) {
         </mesh>
       ))}
       <Inst count={keys} geometry={unit} material={plastic} fill={fillHead} cast={false} />
-      <Inst count={keys} geometry={unit} material={metal} fill={fillBlade} cast={false} />
-      <Inst count={keys} geometry={ring} material={metal} fill={fillRing} cast={false} />
+      <Inst count={keys} geometry={bladeRing} material={metal} fill={fillBlade} cast={false} />
       {labels.length > 0 ? (
         <mesh position={[0, lift - 0.205, 0.0305]} userData={{ noShadow: true }} material={tagMat}>
           <planeGeometry args={[w - 0.02, (w - 0.02) / 8]} />
@@ -444,10 +435,8 @@ export function RidingSet({ o }: P<"ridingSet">) {
   const shell = env.kit.mat("plastic", o.material.color, 0.22);
   const dark = env.kit.mat("rubber", "#111216", 0.6);
   const legs = env.kit.mat("fabric", "#20232a", 0.85);
-  const visor = env.kit.mat("plastic", "#14161d", 0.12);
   const backing = env.kit.mat("wood", "#2b2b30", 0.6);
   const steel = env.kit.mat("metal", "#b8bcc6", 0.3);
-  const accent = env.kit.mat("plastic", "#e8e6ee", 0.4);
   return (
     <group>
       <Rb a={[0.86, 1.9, 0.02]} p={[0, 1.2, 0.01]} r={0.01} m={backing} cast={false} />
@@ -458,10 +447,10 @@ export function RidingSet({ o }: P<"ridingSet">) {
             <sphereGeometry args={[0.14, 24, 16]} />
           </mesh>
           <Rb a={[0.17, 0.085, 0.14]} p={[0, -0.095, 0.075]} r={0.035} m={shell} />
-          <mesh position={[0, 0.0, 0.1]} scale={[1, 0.5, 0.55]} material={visor}>
+          <mesh position={[0, 0.0, 0.1]} scale={[1, 0.5, 0.55]} material={dark}>
             <sphereGeometry args={[0.125, 18, 10]} />
           </mesh>
-          <mesh position={[0, 0.115, 0.0]} scale={[0.06, 0.012, 0.9]} material={accent}>
+          <mesh position={[0, 0.115, 0.0]} scale={[0.06, 0.012, 0.9]} material={steel}>
             <sphereGeometry args={[1, 8, 6]} />
           </mesh>
         </group>

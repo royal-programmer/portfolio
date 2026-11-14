@@ -101,7 +101,8 @@ export function Stats({ onMedian, probe }: { onMedian: (ms: number) => void; pro
       });
       return bytes / 1048576;
     };
-    (window as unknown as { __room: unknown }).__room = Object.assign(stats.current, { pick, texMB });
+    // `scene` hands tests the live scene graph (a leaf's angle, whether any line or point is drawn).
+    (window as unknown as { __room: unknown }).__room = Object.assign(stats.current, { pick, texMB, scene: () => get().scene });
   }, [get]);
   useFrame((_, dt) => {
     const s = stats.current;

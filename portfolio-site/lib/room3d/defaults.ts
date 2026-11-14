@@ -93,7 +93,7 @@ const workRoom: Room = {
     // Shelf (right wall, front half): the Stage's project cases, the skills board and the skill stars.
     obj("project-shelf", "projectShelf", [3.86, 0.72, 0.9], { max: SHELF_MAX }, { rotY: -Math.PI / 2, scale: 0.35 }),
     obj("board-skills", "board", [3.97, 0, 2.3], { source: "skills", style: "spines", w: 1.3, h: 0.95, lift: 0.85 }, { rotY: -Math.PI / 2, interaction: { label: "skills", cmd: "panel:skills" } }),
-    obj("constellation", "constellation", [2.6, 2.1, 1.0], { stars: STAGE_TIERS.best.stars }, { rotY: -Math.PI / 2, scale: 0.5 }),
+    obj("constellation", "constellation", [3.3, 2.1, 1.5], { stars: STAGE_TIERS.best.stars }, { rotY: -Math.PI / 2, scale: 0.4 }),
     // Chill (front wall, right): the TV on its low unit with the console, a football, a Rubik's cube.
     obj("tv-unit", "box", [1.4, 0, 2.79], { w: 1.8, h: 0.42, d: 0.42, round: 0.012 }, { material: M("wood", "#4a3422", 0.5) }),
     obj("tv", "tv", [1.4, 0, 2.97], { inches: 55, lift: 0.44, mode: "reel" }, { rotY: Math.PI, material: M("plastic", "#0b0c10", 0.4), interaction: { label: "project reel", cmd: "panel:tv" } }),

@@ -21,6 +21,7 @@ import { buildRoomContent, parsePanel } from "@/lib/room3d/content";
 import { pickItem } from "@/lib/room3d/board-layout";
 import { resolveRoom3d } from "@/lib/room3d/resolve";
 import type { Room3d, RoomObject, Zone } from "@/lib/room3d/schema";
+import { strumChord, type ChordId } from "@/lib/room3d/chord";
 import { stageKitTier } from "@/lib/room3d/stage-kit";
 import { activeRoom, parseQuality, stepDown } from "@/lib/room3d/tiers";
 import { flick, lookFromDrag, orderedZones, stepZone, zoneForObject } from "@/lib/room3d/zones";
@@ -305,6 +306,33 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
     [persona],
   );
 
+  // Objects that answer a click in the room itself: the wardrobe's doors, the guitar's chord.
+  const toggleOpen = useCallback(
+    (id: string) =>
+      setSwing((prev) => {
+        const n = new Set(prev);
+        if (n.has(id)) n.delete(id);
+        else n.add(id);
+        return n;
+      }),
+    [],
+  );
+  const chordAt = useRef<Record<string, number>>({});
+  const strum = useCallback(
+    (o: RoomObject) => {
+      const chords = ((o.params as { chords?: ChordId[] }).chords ?? ["Em"]) as ChordId[];
+      const i = chordAt.current[o.id] ?? 0;
+      const chord = chords[i % chords.length];
+      // The strings shiver (the guitar listens, and holds still under reduced motion); the chord sounds, and the progression moves on, only while the site's sound is on.
+      window.dispatchEvent(new CustomEvent("room3d:strum", { detail: { id: o.id, chord, audio: sound } }));
+      if (sound) {
+        chordAt.current[o.id] = i + 1;
+        strumChord(chord);
+      } else flash("Sound is off. Turn Sound on to hear the guitar.");
+    },
+    [sound, flash],
+  );
+
   // A click on an object.
   const drag = useRef({ down: false, moved: false, x: 0, y: 0, t: 0, yaw: 0, pitch: 0 });
   const onRun = useCallback(
@@ -314,6 +342,9 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
       const cmd = it && "cmd" in it ? it.cmd : undefined;
       if (o.kind === "monitor" && (o.params as { screen?: string }).screen === "terminal") return openTerminal(o);
       if (cmd === "sound") return toggleSound();
+      if (cmd === "play:guitar") return strum(o);
+      if (o.kind === "wardrobe") return toggleOpen(o.id);
+      if (o.kind === "ridingSet" && it && "card" in it) return flash(it.card ? `${it.label}. ${it.card}` : it.label);
       const target = zoneForObject(zones, o.id);
       const pid = parsePanel(cmd) ?? (o.kind === "door" ? "worlds" : null);
       if (pid) {
@@ -340,7 +371,15 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
       }
       if (it && "card" in it) flash(it.card);
     },
-    [boards, flash, leave, openTerminal, runCommand, toggleSound, zoneId, zones],
+    [boards, flash, leave, openTerminal, runCommand, strum, toggleOpen, toggleSound, zoneId, zones],
+  );
+  /** What a zone's `act` does: the click of that object, from the keyboard or the chip. */
+  const activate = useCallback(
+    (id: string | undefined) => {
+      const o = id ? objectsById.get(id) : undefined;
+      if (o) onRun(null, o);
+    },
+    [objectsById, onRun],
   );
   const extras = useMemo<StageExtras>(
     () => ({
@@ -359,12 +398,13 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
       },
       onPickCase: (id) => setCaseOpen(id),
       constellation,
+      skyOn: zone.objects.includes("constellation"),
       starsActive,
       onRunCommand: () => {
         setPanel({ id: "skills", item: null });
       },
     }),
-    [accent3, reduced, cases, caseOpen, constellation, content.projects, zones],
+    [accent3, reduced, cases, caseOpen, constellation, content.projects, zones, zone.objects],
   );
 
   // Pointer: drag looks around, a sideways flick steps, the wheel steps.
@@ -372,10 +412,12 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
   const zonesRef = useRef(zones);
   const zoneIdRef = useRef(zoneId);
   const panelRef = useRef(panel);
+  const swingRef = useRef(swing);
   useEffect(() => {
     zonesRef.current = zones;
     zoneIdRef.current = zoneId;
     panelRef.current = panel;
+    swingRef.current = swing;
   });
   useEffect(() => {
     const el = stageRef.current;
@@ -478,8 +520,18 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
             e.preventDefault();
             openTerminal(m);
           }
+        } else if (z?.act) {
+          e.preventDefault();
+          activate(z.act);
         }
       } else if (e.key === "Escape") {
+        // Doors that are open close first, then the camera walks back to the desk.
+        const openDoors = (room.objects as RoomObject[]).filter((o) => o.kind === "wardrobe" && (o.params as { open: boolean }).open !== swingRef.current.has(o.id));
+        if (openDoors.length > 0) {
+          e.preventDefault();
+          openDoors.forEach((o) => toggleOpen(o.id));
+          return;
+        }
         if (zoneIdRef.current !== zs[0].id || lookRef.current.yaw !== 0 || lookRef.current.pitch !== 0) {
           e.preventDefault();
           lookRef.current = { yaw: 0, pitch: 0 };
@@ -491,7 +543,7 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
     // In the capture phase, so an Esc that backs out of a place is ours before the view shell (which would leave the page) sees it.
     window.addEventListener("keydown", key, true);
     return () => window.removeEventListener("keydown", key, true);
-  }, [openTerminal, room]);
+  }, [openTerminal, room, activate, toggleOpen]);
 
   // The full-screen state of the document (hides the view shell's own button, locks scroll).
   useEffect(() => {
@@ -615,6 +667,8 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
                 const pid = z.panel && z.panel !== "terminal" ? parsePanel(`panel:${z.panel}`) : null;
                 if (z.id === zone.id && !panel && !override && pid) {
                   openPanel(pid);
+                } else if (z.id === zone.id && !panel && !override && z.act) {
+                  activate(z.act);
                 } else goZone(z.id);
               }}
             >

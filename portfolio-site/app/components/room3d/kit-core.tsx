@@ -140,6 +140,11 @@ export type StageExtras = {
   onOpenCase: (item: ShelfCase, rect: { x: number; y: number; w: number; h: number } | null) => void;
   onPickCase: (id: string) => void;
   constellation: Constellation | null;
+  /**
+   * Show the stars and their lines. False hides them cleanly (no fade): up close they read as stray lines and dots under
+   * the ceiling, so the room shows them only while the camera is at the zone that is about them. Absent = shown (the old scene).
+   */
+  skyOn?: boolean;
   /** Read each frame: the stars answer the pointer only while the camera is looking at them. */
   starsActive: MutableRefObject<boolean>;
   story?: MutableRefObject<{ p: number; on: boolean }>;
