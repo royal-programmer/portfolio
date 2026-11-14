@@ -10,15 +10,16 @@ import { TIER_IDS } from "./schema";
 import { parseQuality, pickTier, type DeviceProbe } from "./tiers";
 
 /**
- * Is the Stage drawn through the kit? `?kit=1` (or true / on) turns it on, `?kit=0` (or false / off) turns it off, and
- * without a query the build's `NEXT_PUBLIC_STAGE_KIT` decides (off unless it says 1, true or on).
+ * Is the engineer's 3D view the full-screen room (the kit)? `?kit=0` (or false / off) falls back to the old scene for
+ * this release and `?kit=1` forces the room; without a query the build's `NEXT_PUBLIC_STAGE_KIT` decides: the room
+ * is the default (round 36), so only 0, false or off turns it off.
  */
 export function stageKitOn(search: string, env?: string | null): boolean {
   const q = new URLSearchParams(search).get("kit")?.toLowerCase();
   if (q === "1" || q === "true" || q === "on") return true;
   if (q === "0" || q === "false" || q === "off") return false;
   const e = (env ?? "").trim().toLowerCase();
-  return e === "1" || e === "true" || e === "on";
+  return !(e === "0" || e === "false" || e === "off");
 }
 
 /** The hub gate's three choices, as the kit's tiers. */

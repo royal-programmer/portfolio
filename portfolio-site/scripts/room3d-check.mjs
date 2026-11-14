@@ -18,7 +18,7 @@ const { pickTier, stepDown, parseQuality, resolveTier, trimToBudget, activeRoom 
 
 const { stageKitOn, stageKitTier, stageAction, stageStops, propForObject, STAGE_PROP_OBJECT, GATE_TIER } = await jiti.import(path.join(root, "lib/room3d/stage-kit.ts"));
 const { resolveRoom3d } = await jiti.import(path.join(root, "lib/room3d/resolve.ts"));
-const { DEFAULT_ZONES, orderedZones, stepZone, zoneForObject, lookFromDrag, LOOK_LIMIT, flick, fovFor, damp } = await jiti.import(path.join(root, "lib/room3d/zones.ts"));
+const { DEFAULT_ZONES, orderedZones, stepZone, zoneForObject, lookFromDrag, LOOK_LIMIT, flick, fovFor, approachFor, damp } = await jiti.import(path.join(root, "lib/room3d/zones.ts"));
 const { resolveReader, lowEnd } = await jiti.import(path.join(root, "lib/room3d/reader.ts"));
 const { layoutBoard, pickItem, BOARD_MAX } = await jiti.import(path.join(root, "lib/room3d/board-layout.ts"));
 const { buildRoomContent, boardItems, parsePanel, PANEL_IDS } = await jiti.import(path.join(root, "lib/room3d/content.ts"));
@@ -103,9 +103,9 @@ check("auto uses the probe", resolveTier({ query: null, saved: null, setting: "a
 }
 
 // the Stage on the kit (round 34): flag, tier from the hub gate, stops, clicks, the Stage's own kinds
-check("the flag is off with no query and no env", stageKitOn("", undefined) === false && stageKitOn("?x=1", "") === false);
-check("?kit=1 turns it on, ?kit=0 off", stageKitOn("?kit=1", undefined) && stageKitOn("?kit=true", "") && !stageKitOn("?kit=0", "1") && !stageKitOn("?kit=off", "true"));
-check("the env default turns it on, the query still wins", stageKitOn("", "1") && stageKitOn("", "true") && !stageKitOn("?kit=0", "1") && stageKitOn("?kit=1", "0"));
+check("the room is the default: on with no query and no env", stageKitOn("", undefined) === true && stageKitOn("?x=1", "") === true);
+check("?kit=0 (or off, false) is the old scene, ?kit=1 the room", stageKitOn("?kit=1", undefined) && stageKitOn("?kit=true", "") && !stageKitOn("?kit=0", "1") && !stageKitOn("?kit=off", "true") && !stageKitOn("?kit=false", ""));
+check("the env can turn it off, the query still wins", !stageKitOn("", "0") && !stageKitOn("", "off") && !stageKitOn("", "false") && stageKitOn("", "1") && stageKitOn("?kit=1", "0") && !stageKitOn("?kit=0", "1"));
 check("the gate's three words map to the kit's tiers", GATE_TIER.performance === "low" && GATE_TIER.balanced === "medium" && GATE_TIER.best === "high");
 {
   const probe = { cores: 16, memory: 16 };
@@ -196,6 +196,7 @@ check("the desk props map to room objects (headphones are the headset)", STAGE_P
   check("a drag right turns further the same way, proportionally", b.yaw > 0.1 && b.yaw < LOOK_LIMIT.yaw);
   check("a fast long sideways flick steps (left = next), a slow one or a vertical one does not", flick(-160, 10, 200) === 1 && flick(160, 10, 200) === -1 && flick(160, 10, 900) === 0 && flick(40, 0, 100) === 0 && flick(120, 200, 150) === 0);
   check("the field of view widens as the screen narrows", fovFor(1.6) === 34 && fovFor(0.46) > fovFor(1) && fovFor(0.46) <= 70 && fovFor(3) === 34);
+  check("a narrow screen stands closer, a wide one does not", approachFor(1.6) === 1 && approachFor(0.46) < 0.8 && approachFor(0.46) >= 0.7 && approachFor(0.9) < 1 && approachFor(1.3) === 1);
   check("easing: reduced motion (rate 0) cuts, otherwise a fraction that grows with dt", damp(0.016, 0) === 1 && damp(0.016, 3) > 0 && damp(0.1, 3) > damp(0.016, 3) && damp(1, 3) < 1);
 }
 {
