@@ -17,13 +17,16 @@ function ago(iso: string, now: number): string {
 }
 
 export const TrendingRow = memo(function TrendingRow({ id, title }: { id: string; title: string }) {
-  const [state, setState] = useState<{ commits: Commit[]; at: number } | null>(null);
+  const [state, setState] = useState<{ commits: Commit[]; at: number; now: number } | null>(null);
   useEffect(() => {
     let live = true;
     fetch("/api/github/recent")
       .then((r) => (r.ok ? r.json() : null))
       .then((j: { commits?: Commit[]; at?: string } | null) => {
-        if (live && j?.commits?.length) setState({ commits: j.commits, at: j.at ? Date.parse(j.at) : Date.now() });
+        if (live && j?.commits?.length) {
+          const now = Date.now();
+          setState({ commits: j.commits, at: j.at ? Date.parse(j.at) : now, now });
+        }
       })
       .catch(() => {});
     return () => {
@@ -31,7 +34,7 @@ export const TrendingRow = memo(function TrendingRow({ id, title }: { id: string
     };
   }, []);
   if (!state) return null;
-  const now = Date.now();
+  const now = state.now;
   return (
     <section className="nf-row" id={`nf-row-${id}`} aria-labelledby={`nf-h-${id}`}>
       <h2 className="nf-row-title" id={`nf-h-${id}`}>
