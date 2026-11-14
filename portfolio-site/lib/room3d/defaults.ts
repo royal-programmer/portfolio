@@ -84,9 +84,8 @@ const workRoom: Room = {
     obj("board-moments", "board", [-2.97, 0, -0.15], { source: "moments", style: "cards", w: 1.2, h: 0.85, lift: 1.0 }, { rotY: Math.PI / 2, interaction: { label: "key moments", cmd: "panel:moments" } }),
     // The skills board on the right wall, beside the project cases.
     obj("board-skills", "board", [2.97, 0, 1.0], { source: "skills", style: "spines", w: 1.3, h: 0.95, lift: 0.85 }, { rotY: -Math.PI / 2, interaction: { label: "skills", cmd: "panel:skills" } }),
-    obj("skills-shelf", "shelf", [2.88, 0, 1.0], { w: 1.3, d: 0.1, tiers: 1, lift: 0.8 }, { rotY: -Math.PI / 2 }),
     // The TV wall (front wall, facing the desk): the project reel, or the console's home with a tile per world.
-    obj("tv-unit", "box", [0.4, 0.21, 2.3], { w: 1.8, h: 0.42, d: 0.42, round: 0.012 }, { material: M("wood", "#4a3422", 0.5) }),
+    obj("tv-unit", "box", [0.4, 0, 2.3], { w: 1.8, h: 0.42, d: 0.42, round: 0.012 }, { material: M("wood", "#4a3422", 0.5) }),
     obj("tv", "tv", [0.4, 0, 2.47], { inches: 55, lift: 0.44, mode: "reel" }, { rotY: Math.PI, material: M("plastic", "#0b0c10", 0.4), interaction: { label: "project reel", cmd: "panel:tv" } }),
     obj("console", "console", [-0.2, 0.42, 2.3], { controllers: 2 }, { rotY: Math.PI, material: M("plastic", "#e8e8ee", 0.4), interaction: { label: "the worlds", cmd: "panel:worlds" } }),
     // The Stage's own two: the project cases on the right wall, the skill stars above the desk (data comes from the page).

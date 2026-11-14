@@ -219,7 +219,7 @@ function drawSpines(g: Ctx, W: number, H: number, items: BoardItem[], rects: Rec
     g.translate(x + w / 2, y + h * 0.86);
     g.rotate(-Math.PI / 2);
     g.fillStyle = "#fff8e8";
-    const fs = Math.round(Math.max(14, Math.min(w * 0.3, 54)));
+    const fs = Math.round(Math.max(14, Math.min(w * 0.26, 40)));
     g.font = `700 ${fs}px ${SANS}`;
     g.textBaseline = "middle";
     g.textAlign = "left";

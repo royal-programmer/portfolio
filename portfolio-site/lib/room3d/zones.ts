@@ -12,10 +12,10 @@ import type { Room, Zone } from "./schema";
  * the left wall. `panel` names what Enter opens (see panels.ts).
  */
 export const DEFAULT_ZONES: Zone[] = [
-  { id: "desk", label: "Desk", order: 0, eye: [0.3, 1.5, -0.2], look: [0.3, 1.1, -2.3], objects: ["monitor-low", "keyboard", "mug", "notebook", "headset"], panel: "terminal" },
+  { id: "desk", label: "Desk", order: 0, eye: [0.3, 1.6, 0.2], look: [0.3, 1.1, -2.3], objects: ["monitor-low", "keyboard", "mug", "notebook", "headset"], panel: "terminal" },
   { id: "screens", label: "Projects", order: 1, eye: [0.3, 1.4, -0.6], look: [0.3, 1.3, -2.3], objects: ["monitor-high"], panel: "projects" },
   { id: "shelf", label: "Shelf", order: 2, eye: [-0.3, 1.45, 0.55], look: [2.95, 1.15, 0.55], objects: ["board-skills", "project-shelf"], panel: "skills" },
-  { id: "tv", label: "TV", order: 3, eye: [0.4, 1.2, -0.2], look: [0.4, 0.85, 2.45], objects: ["tv", "console"], panel: "tv" },
+  { id: "tv", label: "TV", order: 3, eye: [0.4, 1.15, 0.3], look: [0.4, 0.8, 2.45], objects: ["tv", "console"], panel: "tv" },
   { id: "wall", label: "Wall", order: 4, eye: [0.3, 1.4, -0.6], look: [-3, 1.15, -0.75], objects: ["board-credentials", "board-moments"], panel: "credentials" },
   { id: "door", label: "Door", order: 5, eye: [1.0, 1.45, 1.2], look: [-3, 1.1, 1.2], objects: ["door"], panel: "worlds" },
   { id: "hire", label: "Hire", order: 6, eye: [0.1, 1.3, -0.4], look: [-0.15, 0.9, -1.87], objects: ["phone", "sticky"], panel: "hire" },
@@ -57,9 +57,14 @@ export function flick(dx: number, dy: number, ms: number): 1 | -1 | 0 {
   return dx < 0 ? 1 : -1;
 }
 
-/** The camera's vertical field of view: 34 degrees on a landscape screen, wider as the screen narrows so the same view still fits across (portrait 393 x 852 is about 70). */
+/** The camera's vertical field of view: 34 degrees on a landscape screen, wider as the screen narrows so more of the same view fits across (portrait 393 x 852 is about 62). */
 export function fovFor(aspect: number): number {
-  return 34 + Math.max(0, Math.min(36, (1.4 - aspect) * 45));
+  return 34 + Math.max(0, Math.min(28, (1.4 - aspect) * 38));
+}
+
+/** How much closer to its target the camera stands on a narrow screen (1 = as the zone says): a phone sees a 1.3 m board only if it comes in. */
+export function approachFor(aspect: number): number {
+  return 1 - Math.max(0, Math.min(1, (1.2 - aspect) / 0.8)) * 0.3;
 }
 
 /** Frame rate independent easing: the fraction of the remaining distance to cover this frame (`rate` per second; 0 = at once, for reduced motion). */

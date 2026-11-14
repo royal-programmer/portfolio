@@ -23,11 +23,13 @@ export function layoutBoard(style: BoardStyle, count: number, aspect: number): R
   }
   if (style === "spines") {
     const gap = 0.012;
-    const w = (1 - pad * 1.2 - gap * (n - 1)) / n;
+    // A few groups are books, not slabs: a spine is at most 14% of the board wide, the row is centred.
+    const w = Math.min(0.14, (1 - pad * 1.2 - gap * (n - 1)) / n);
+    const x0 = (1 - (n * w + gap * (n - 1))) / 2;
     // Deterministic heights (a shelf of different books), the tallest at 90% of the board.
     return Array.from({ length: n }, (_, i) => {
       const h = 0.9 - ((i * 37) % 5) * 0.045;
-      return { x: pad * 0.6 + i * (w + gap), y: 1 - 0.05 - h, w, h };
+      return { x: x0 + i * (w + gap), y: 1 - 0.05 - h, w, h };
     });
   }
   // frames and cards: a grid whose cells come closest to the style's own shape.
