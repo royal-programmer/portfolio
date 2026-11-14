@@ -19,6 +19,9 @@ import { cleanFor, forLink } from "@/lib/site/netflix-for";
 import { loadEngineerTerminalData } from "../../load-terminal-data";
 import { skillEvidenceMap } from "@/lib/site/skill-evidence";
 import { I18N, terminalData } from "@/lib/site/terminal-data";
+import { RoomGate } from "../../components/room3d/room-gate";
+import { ReaderPage } from "../../components/room3d/reader-page";
+import { buildRoomContent } from "@/lib/room3d/content";
 import { NetflixView } from "../../components/views/netflix/netflix-view";
 import { loadHomeContent } from "../../load-home-content";
 import { shareMetadata, siteOrigin } from "@/lib/site/share-meta";
@@ -195,7 +198,18 @@ async function PersonaViewPage({ persona, view, fromTerminal, via }: { persona: 
       <ViewShell persona={persona} view={view} stripVia={fromTerminal}>
         {/* The terminal already printed this view's boot: no second entry animation. */}
         {fromTerminal ? null : <WorldBoot slug={persona} color={accent} t={t} via="normal" items={items} />}
-        <HomePage routePersona={persona} personas={personas} engineerEntries={engineerEntries} engineerBlogPosts={engineerBlogPosts} terminal={stageData} />
+        {/* Engineer: the full-screen room, or Reader mode (a plain page), or `?kit=0` the old scene (round 36). */}
+        {stageData ? (
+          <RoomGate
+            data={stageData}
+            entries={engineerEntries}
+            persona={persona}
+            reader={<ReaderPage content={buildRoomContent(stageData)} persona="engineer" />}
+            legacy={<HomePage routePersona={persona} personas={personas} engineerEntries={engineerEntries} engineerBlogPosts={engineerBlogPosts} terminal={stageData} />}
+          />
+        ) : (
+          <HomePage routePersona={persona} personas={personas} engineerEntries={engineerEntries} engineerBlogPosts={engineerBlogPosts} terminal={stageData} />
+        )}
       </ViewShell>
     );
   }
