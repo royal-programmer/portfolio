@@ -9,7 +9,11 @@ import { getServerClient } from "@/lib/db/server";
  * with a short message and no detail about why.
  */
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = request.nextUrl;
+  const { searchParams, protocol } = request.nextUrl;
+  // NextURL rewrites `*.localhost` hosts to plain `localhost`, which would send the freshly signed-in browser to a
+  // host that does not hold its cookie. In dev, keep the host the request came in on (as proxy.ts hostUrl does).
+  const host = request.headers.get("host") ?? "";
+  const origin = /^[a-z0-9.-]+\.localhost(:\d+)?$/i.test(host) ? `${protocol}//${host}` : request.nextUrl.origin;
   const to = safeNext(searchParams.get("next")) ?? "/admin";
   const fail = (msg: string) => NextResponse.redirect(new URL(`/admin/login?error=${encodeURIComponent(msg)}`, origin));
 
