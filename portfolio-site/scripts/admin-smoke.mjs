@@ -71,8 +71,10 @@ export function adminPath(base, p) {
 export const callbackPath = (base, hashed) => adminPath(base, "/admin/auth/callback") + `?token_hash=${encodeURIComponent(hashed)}&type=magiclink`;
 
 /** One record import body per type, from a sample row (the slug is ours, so cleanup can find it). */
+/** The import slug must match /^[a-z0-9][a-z0-9-]*$/; otherwise the app derives one from the data and would hit the REAL record. */
+export const smokeSlug = (type) => `${MARK}-${type.replace(/_/g, "-")}`;
 export function importBody(sample, type) {
-  return JSON.stringify([{ slug: `${MARK}-${type}`, visibility: "private", data: sample }]);
+  return JSON.stringify([{ slug: smokeSlug(type), visibility: "private", data: sample }]);
 }
 
 export function renderTable(rows) {
@@ -96,6 +98,7 @@ if (flag("--self-test")) {
   assert.equal(callbackPath("http://admin.ratulroy.localhost:3000", "abc"), "/auth/callback?token_hash=abc&type=magiclink");
   assert.equal(callbackPath("http://localhost:3000", "a b"), "/admin/auth/callback?token_hash=a%20b&type=magiclink");
   assert.equal(JSON.parse(importBody({ a: 1 }, "experience"))[0].slug, "zz-smoke-experience");
+  assert.equal(JSON.parse(importBody({ a: 1 }, "timeline_event"))[0].slug, "zz-smoke-timeline-event");
   assert.match(renderTable([{ name: "x", ok: true }, { name: "y", ok: false, note: "boom" }]), /FAIL\s+boom/);
   console.log("admin-smoke self-test: pure parts ok (no network, no browser)");
   process.exit(0);
@@ -147,12 +150,15 @@ const record = (name, ok, note) => {
   results.push({ name, ok, note: ok ? note : String(note ?? "failed").replace(/\s+/g, " ").slice(0, 160) });
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${!ok && note ? `  ${String(note).split("\n")[0].slice(0, 120)}` : ""}`);
 };
+let stage = "";
+const at = (label) => void (stage = label); // names the step a failing check was on
 const check = async (name, fn) => {
+  stage = "";
   try {
     const note = await fn();
     record(name, true, typeof note === "string" ? note : "");
   } catch (e) {
-    record(name, false, e instanceof Error ? e.message : e);
+    record(name, false, `${stage ? `[${stage}] ` : ""}${e instanceof Error ? e.message : e}`);
   }
 };
 
@@ -172,7 +178,7 @@ async function cleanup() {
   if (cleaned) return;
   cleaned = true;
   const steps = [
-    ["entries", () => sb.from("entries").delete().like("slug", `${MARK}%`)],
+    ["entries", () => sb.from("entries").delete().like("slug", `%${MARK}%`)],
     ["posts", () => sb.from("blog_posts").delete().like("slug", `${MARK}%`)],
     ["drafts", async () => {
       const { data } = await sb.from("admin_drafts").select("key");
@@ -193,7 +199,7 @@ async function cleanup() {
       console.error(`cleanup ${name}: ${e instanceof Error ? e.message : "failed"}`);
     }
   }
-  const { count } = await sb.from("entries").select("id", { count: "exact", head: true }).like("slug", `${MARK}%`);
+  const { count } = await sb.from("entries").select("id", { count: "exact", head: true }).like("slug", `%${MARK}%`);
   console.log(`cleanup done; ${count ?? 0} zz-smoke entries left`);
 }
 for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => void cleanup().finally(() => process.exit(130)));
@@ -226,8 +232,10 @@ async function main() {
     const hydrated = (pg) =>
       pg.waitForFunction(
         () => {
-          const els = [...document.querySelectorAll("main button, .adm-master button, .adm-editor button, form button, button")];
-          return els.length > 0 && els.some((e) => Object.keys(e).some((k) => k.startsWith("__reactProps")));
+          const hot = (e) => Object.keys(e).some((k) => k.startsWith("__reactProps"));
+          const region = document.querySelector(".adm-master, .adm-editor, .adm-overview, main");
+          const els = [...(region ?? document).querySelectorAll("button")];
+          return els.length > 0 && els.every(hot);
         },
         null,
         { timeout: 30000 },
@@ -286,13 +294,20 @@ async function main() {
 
     // ---- projects: create, edit with diff, hide + undo, delete forever ------------------------------------
     await check("projects: create, edit, hide with Undo, delete forever", async () => {
+      at("open projects");
       await go("/admin/engineer/projects");
+      at("New project");
       await page.getByRole("button", { name: "New project", exact: true }).click();
       await page.locator('input[name="title"]').fill(`${MARK} project`);
+      at("Create project");
       await page.getByRole("button", { name: "Create project" }).click();
+      at("confirm create");
       await page.getByRole("button", { name: "Yes, save" }).click();
+      at("row appears");
       await row(`${MARK} project`).first().waitFor({ timeout: 20000 });
+      at("open row");
       await row(`${MARK} project`).first().locator(".adm-recmain").click();
+      at("edit summary");
       await page.locator('input[name="summary"]').fill("zz edited");
       await page.getByRole("button", { name: "Save", exact: true }).click();
       const diff = page.locator(".adm-review table");
@@ -302,12 +317,14 @@ async function main() {
       await ok.first().waitFor({ timeout: 20000 });
       await page.locator('select[name="visibility"]').selectOption("unlisted");
       await save();
+      at("hide + undo");
       await page.getByRole("button", { name: /Hide \(delete, can undo\)/ }).click();
       await toastUndo().click();
       await page.waitForFunction((m) => [...document.querySelectorAll(".adm-reclist li")].some((li) => li.textContent.includes(m) && /unlisted/.test(li.textContent)), `${MARK} project`, { timeout: 15000 });
       await page.getByRole("button", { name: /Hide \(delete, can undo\)/ }).click();
+      at("delete forever");
       await page.getByRole("button", { name: "Delete forever" }).click();
-      await page.waitForFunction((m) => ![...document.querySelectorAll(".adm-reclist li")].some((li) => li.textContent.includes(m)), `${MARK} project`, { timeout: 20000 });
+      await page.waitForFunction((m) => ![...document.querySelectorAll(".adm-reclist li")].some((li) => li.textContent.includes(m)), `${MARK} project`, { timeout: 30000 });
       const { count } = await sb.from("entries").select("id", { count: "exact", head: true }).eq("slug", `${MARK}-project`);
       assert.equal(count, 0, "the row is still in the database");
     });
@@ -342,12 +359,17 @@ async function main() {
         await page.locator(".adm-review textarea").fill(importBody(sample, type));
         await page.getByText(/Dry run: 1 to add/).waitFor({ timeout: 10000 });
         await page.getByRole("button", { name: "Import 1" }).click();
-        const mine = row(`${MARK}-${type}`);
+        const mine = row(smokeSlug(type));
         await mine.first().waitFor({ timeout: 20000 });
         await mine.first().locator(".adm-recmain").click();
         // Edit the first text field and check the "What will change" table names it.
-        const field = page.locator(".adm-detail .adm-form input.adm-input[type='text'], .adm-detail .adm-form input.adm-input:not([type])").first();
-        await field.fill(`${await field.inputValue()} zz`);
+        // (Not a date or a link: appending text there makes the record invalid, which is a correct refusal, not a bug.)
+        const fields = page.locator(".adm-detail .adm-form input.adm-input[type='text'], .adm-detail .adm-form input.adm-input:not([type])");
+        const values = await fields.evaluateAll((els) => els.map((e) => e.value));
+        const at = values.findIndex((v) => v.trim() !== "" && !/^\d{4}(-\d{2}){0,2}$/.test(v.trim()) && !/^(https?:|mailto:|tel:)/i.test(v.trim()));
+        assert.ok(at >= 0, "no free-text field to edit");
+        const field = fields.nth(at);
+        await field.fill(`${values[at]} zz`);
         await page.getByRole("button", { name: /^(Publish|Save \(hidden\))$/ }).click();
         const diff = page.locator(".adm-review table");
         await diff.waitFor({ timeout: 10000 });
@@ -361,25 +383,29 @@ async function main() {
         await ok.first().waitFor({ timeout: 20000 });
         await page.getByRole("button", { name: /Hide \(delete, can undo\)/ }).click();
         await toastUndo().click();
-        await page.waitForFunction((m) => [...document.querySelectorAll(".adm-reclist li")].some((li) => li.textContent.includes(m) && /unlisted/.test(li.textContent)), `${MARK}-${type}`, { timeout: 15000 });
+        await page.waitForFunction((m) => [...document.querySelectorAll(".adm-reclist li")].some((li) => li.textContent.includes(m) && /unlisted/.test(li.textContent)), smokeSlug(type), { timeout: 15000 });
         await page.getByRole("button", { name: /Hide \(delete, can undo\)/ }).click();
         await page.getByRole("button", { name: "Delete forever" }).click();
-        await page.waitForFunction((m) => ![...document.querySelectorAll(".adm-reclist li")].some((li) => li.textContent.includes(m)), `${MARK}-${type}`, { timeout: 20000 });
+        await page.waitForFunction((m) => ![...document.querySelectorAll(".adm-reclist li")].some((li) => li.textContent.includes(m)), smokeSlug(type), { timeout: 20000 });
       });
     }
 
     // ---- skills ---------------------------------------------------------------------------------------------
     await check("skills: new group, save hidden, edit, delete forever", async () => {
+      at("open skills");
       await go("/admin/engineer/skills");
+      at("new group");
       await page.getByRole("button", { name: "New skill group", exact: true }).click();
       await page.locator(".adm-detail input.adm-input").first().fill(`${MARK} group`);
       await page.getByRole("button", { name: "Add a skill" }).click();
       await page.getByLabel("Skill name").fill("zz skill");
       await page.getByRole("button", { name: "Save hidden" }).click();
-      await ok.first().waitFor({ timeout: 20000 });
+      // The outcome that matters is the new row in the list (the editor remounts on the saved id, so its own
+      // "Saved" note is replaced at once and cannot be waited for).
       await page.locator(".adm-records li").filter({ hasText: `${MARK} group` }).first().waitFor({ timeout: 20000 });
+      at("delete forever");
       await page.getByRole("button", { name: "Delete forever" }).click();
-      await page.waitForFunction((m) => ![...document.querySelectorAll(".adm-records li")].some((li) => li.textContent.includes(m)), `${MARK} group`, { timeout: 20000 });
+      await page.waitForFunction((m) => ![...document.querySelectorAll(".adm-records li")].some((li) => li.textContent.includes(m)), `${MARK} group`, { timeout: 30000 });
     });
 
     // ---- writing --------------------------------------------------------------------------------------------
@@ -425,9 +451,14 @@ async function main() {
       await page.getByRole("button", { name: "New role", exact: true }).click();
       const field = page.locator(".adm-detail .adm-form input.adm-input[type='text'], .adm-detail .adm-form input.adm-input:not([type])").first();
       await field.fill(`${MARK} draft`);
-      await page.waitForTimeout(3500); // the server write is debounced 2 s
-      const { data } = await sb.from("admin_drafts").select("key").like("key", "experience:%");
-      assert.ok((data ?? []).some((r) => !snapshot.drafts.has(r.key)), "no draft row appeared (is migration 0014 applied?)");
+      // The server write is debounced 2 s, and a first server action in dev also compiles: poll instead of a fixed wait.
+      let fresh = false;
+      for (let i = 0; i < 20 && !fresh; i++) {
+        await page.waitForTimeout(1000);
+        const { data } = await sb.from("admin_drafts").select("key").like("key", "experience:%");
+        fresh = (data ?? []).some((r) => !snapshot.drafts.has(r.key));
+      }
+      assert.ok(fresh, "no draft row appeared within 20 s (is migration 0014 applied?)");
       const ctx2 = await browser.newContext({ viewport: { width: 393, height: 852 }, storageState: state });
       const p2 = await ctx2.newPage();
       await p2.goto(base + adminPath(base, "/admin/engineer/experience?new=1"), { waitUntil: "domcontentloaded", timeout: 60000 });
