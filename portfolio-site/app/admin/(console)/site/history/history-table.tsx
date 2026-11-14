@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { revertToHistory } from "../../../actions";
+import { LocalTime } from "../../../local-time";
 
 export type HistoryRow = { id: number; key: string; action: string; by: string | null; at: string; summary: string; canRevert: boolean };
 
@@ -33,7 +34,7 @@ export function HistoryTable({ rows }: { rows: HistoryRow[] }) {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
-                <td>{new Date(r.at).toLocaleString()}</td>
+                <td><LocalTime iso={r.at} /></td>
                 <td>
                   <code>{r.key}</code>
                 </td>

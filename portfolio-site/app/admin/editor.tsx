@@ -10,6 +10,7 @@ import { SchemaForm } from "@/lib/settings/form";
 import { SCHEMAS, type SettingKey, type Settings } from "@/lib/settings/schema";
 import { discardDraft, publishSetting, saveDraft, type SettingActionResult } from "./actions";
 import { setAdminDirty } from "./dirty";
+import { LocalTime } from "./local-time";
 import { ArchPreview, ThemesPreview, TimelinePreview, ViewsPreview } from "./previews";
 
 type Props = {
@@ -87,7 +88,7 @@ export function SettingEditor({ settingKey, title, draft, live, fallback, stored
           <span className={`adm-pill ${dirty ? "is-warn" : differs ? "is-warn" : "is-ok"}`}>
             {dirty ? "unsaved edits" : differs ? "draft differs from live" : stored ? "draft = live" : "code defaults"}
           </span>
-          {updatedAt ? <span className="adm-hint">changed {new Date(updatedAt).toLocaleString()}</span> : null}
+          {updatedAt ? <span className="adm-hint">changed <LocalTime iso={updatedAt} /></span> : null}
         </div>
         <div className="adm-actions">
           <button type="button" className="adm-btn" onClick={save} disabled={pending || !dirty || !tableReady}>
