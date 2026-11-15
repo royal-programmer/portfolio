@@ -27,6 +27,7 @@ export const DEFAULT_ZONES: Zone[] = [
   { id: "wardrobe", label: "Wardrobe", order: 8, eye: [1.0, 1.8, -0.2], look: [-2.6, 1.0, 2.7], objects: ["wardrobe", "caps"], act: "wardrobe" },
   { id: "gear", label: "Riding", order: 9, eye: [-1.4, 1.5, -0.2], look: [-4, 1.15, 2.4], objects: ["riding-set", "key-rack"] },
   { id: "door", label: "Door", order: 10, eye: [-0.8, 1.45, 0.8], look: [-4, 1.1, 0.8], objects: ["door"], panel: "worlds" },
+  { id: "guitar-play", label: "Guitar", order: 12, hidden: true, eye: [2.2, 1.2, -1.0], look: [3.5, 0.7, -1.3], objects: ["guitar"] },
   { id: "wall", label: "Wall", order: 11, eye: [-0.8, 1.4, -1.1], look: [-4, 1.15, -1.35], objects: ["board-credentials", "board-moments"], panel: "credentials" },
 ];
 
@@ -35,6 +36,9 @@ export function orderedZones(room: Pick<Room, "zones">): Zone[] {
   const z = room.zones && room.zones.length > 0 ? room.zones : DEFAULT_ZONES;
   return z.map((x, i) => ({ x, i })).sort((a, b) => a.x.order - b.x.order || a.i - b.i).map((p) => p.x);
 }
+
+/** The zones a visitor can browse: the chips and the stepping skip a `hidden` stop (the guitar's close-up). */
+export const visibleZones = (zones: readonly Zone[]): Zone[] => zones.filter((z) => !z.hidden);
 
 /** The zone one step on (`dir` 1) or back (-1) from `id`, wrapping at both ends; the first zone when `id` is unknown. */
 export function stepZone(zones: readonly Zone[], id: string | null, dir: 1 | -1): Zone {

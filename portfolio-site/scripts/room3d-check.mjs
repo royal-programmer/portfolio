@@ -18,7 +18,7 @@ const { pickTier, stepDown, parseQuality, resolveTier, trimToBudget, activeRoom 
 
 const { stageKitOn, stageKitTier, stageAction, stageStops, propForObject, STAGE_PROP_OBJECT, GATE_TIER } = await jiti.import(path.join(root, "lib/room3d/stage-kit.ts"));
 const { resolveRoom3d } = await jiti.import(path.join(root, "lib/room3d/resolve.ts"));
-const { DEFAULT_ZONES, orderedZones, stepZone, zoneForObject, lookFromDrag, LOOK_LIMIT, flick, fovFor, approachFor, damp } = await jiti.import(path.join(root, "lib/room3d/zones.ts"));
+const { DEFAULT_ZONES, orderedZones, visibleZones, stepZone, zoneForObject, lookFromDrag, LOOK_LIMIT, flick, fovFor, approachFor, damp } = await jiti.import(path.join(root, "lib/room3d/zones.ts"));
 const { resolveReader, lowEnd } = await jiti.import(path.join(root, "lib/room3d/reader.ts"));
 const { layoutBoard, pickItem, BOARD_MAX } = await jiti.import(path.join(root, "lib/room3d/board-layout.ts"));
 const { buildRoomContent, boardItems, parsePanel, PANEL_IDS } = await jiti.import(path.join(root, "lib/room3d/content.ts"));
@@ -182,7 +182,7 @@ check("the desk props map to room objects (headphones are the headset)", STAGE_P
   check("stepping goes forward and wraps at the end", stepZone(zs, "b", 1).id === "c" && stepZone(zs, "c", 1).id === "a");
   check("stepping goes back and wraps at the start", stepZone(zs, "b", -1).id === "a2" && stepZone(zs, "a", -1).id === "c");
   check("an unknown or empty zone id steps to the first", stepZone(zs, "nope", 1).id === "a" && stepZone(zs, null, -1).id === "a");
-  const dz = orderedZones(room);
+  const dz = visibleZones(orderedZones(room));
   const walk = [];
   let cur = dz[0];
   for (let i = 0; i < dz.length; i++) {
@@ -276,7 +276,7 @@ check("the desk props map to room objects (headphones are the headset)", STAGE_P
   check("the wardrobe is about 1.2 x 0.6 x 2.1 m", wd.w === 1.2 && wd.d === 0.6 && wd.h === 2.1);
   check("the riding set has a helmet, a jacket, pants and boots", ["helmet", "jacket", "pants", "boots"].every((k) => byId("riding-set").params[k] === true));
   check("the key rack's tags come from data (bike and car)", byId("key-rack").params.labels.join() === "Bike,Car" && byId("key-rack").params.keys === 2);
-  check("small things hide on a phone", ["football", "cube", "key-rack", "midi"].every((id) => byId(id).hideOnPhone === true));
+  check("small things hide on a phone (the football shows: the low tier has the room, round 37d)", byId("football").hideOnPhone === false && ["cube", "key-rack", "midi"].every((id) => byId(id).hideOnPhone === true));
   const lane = laneReport(room, LANE);
   check(`the walking lane (${LANE} m) is clear: one connected stretch through the middle`, lane.connected && lane.cells > 200, JSON.stringify({ cells: lane.cells, main: lane.main }));
   check("every floor object can be walked up to", lane.unreachable.length === 0, lane.unreachable.join());

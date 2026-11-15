@@ -21,11 +21,11 @@ import { buildRoomContent, parsePanel } from "@/lib/room3d/content";
 import { pickItem } from "@/lib/room3d/board-layout";
 import { resolveRoom3d } from "@/lib/room3d/resolve";
 import type { Room3d, RoomObject, Zone } from "@/lib/room3d/schema";
-import { strumChord, type ChordId } from "@/lib/room3d/chord";
+import type { ChordId } from "@/lib/room3d/guitar";
 import { thud } from "@/lib/room3d/thud";
 import { stageKitTier } from "@/lib/room3d/stage-kit";
 import { activeRoom, parseQuality, stepDown } from "@/lib/room3d/tiers";
-import { flick, lookFromDrag, orderedZones, stepZone, zoneForObject } from "@/lib/room3d/zones";
+import { flick, lookFromDrag, orderedZones, stepZone, visibleZones, zoneForObject } from "@/lib/room3d/zones";
 import { hubHref, personaHref } from "@/lib/site/persona-link";
 import { ogLines } from "@/lib/site/og-lines";
 import { skillEvidence } from "@/lib/site/skill-evidence";
@@ -42,6 +42,7 @@ import { KitLabel } from "../stage/kit-rig";
 import { createTerminalScreen, type TerminalScreen } from "../stage/terminal-screen";
 import { useViewExit } from "../views/view-shell";
 import { createBoards, pickRow, type BoardSet } from "./boards";
+import { GuitarPlay } from "./guitar-play";
 import type { StageExtras } from "./kit-core";
 import { Room } from "./room";
 import { readProbe, Stats, useClockOffset, WORLDS } from "./room-canvas";
@@ -98,7 +99,8 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
   }, [resolved]);
   const kitData = resolved.value;
   const room = useMemo(() => activeRoom(kitData), [kitData]);
-  const zones = useMemo(() => orderedZones(room), [room]);
+  const allZones = useMemo(() => orderedZones(room), [room]);
+  const zones = useMemo(() => visibleZones(allZones), [allZones]);
   const objectsById = useMemo(() => new Map((room.objects as RoomObject[]).map((o) => [o.id, o])), [room]);
 
   // Tier: ?q= wins, then the visitor's gate pick, then the setting; the first frames can only lower it (not under ?q=).
@@ -139,7 +141,8 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
 
   // Camera state.
   const [zoneId, setZoneId] = useState<string>(zones[0].id);
-  const zone: Zone = zones.find((z) => z.id === zoneId) ?? zones[0];
+  const zone: Zone = allZones.find((z) => z.id === zoneId) ?? zones[0];
+  const playing = zone.id === "guitar-play";
   const [panel, setPanel] = useState<PanelState | null>(null);
   const [override, setOverride] = useState<Pose | null>(null);
   const lookRef = useRef<LookOffset>({ yaw: 0, pitch: 0 });
@@ -318,21 +321,16 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
       }),
     [],
   );
-  const chordAt = useRef<Record<string, number>>({});
-  const strum = useCallback(
-    (o: RoomObject) => {
-      const chords = ((o.params as { chords?: ChordId[] }).chords ?? ["Em"]) as ChordId[];
-      const i = chordAt.current[o.id] ?? 0;
-      const chord = chords[i % chords.length];
-      // The strings shiver (the guitar listens, and holds still under reduced motion); the chord sounds, and the progression moves on, only while the site's sound is on.
-      window.dispatchEvent(new CustomEvent("room3d:strum", { detail: { id: o.id, chord, audio: sound } }));
-      if (sound) {
-        chordAt.current[o.id] = i + 1;
-        strumChord(chord);
-      } else flash("Sound is off. Turn Sound on to hear the guitar.");
-    },
-    [sound, flash],
-  );
+  // The guitar: a click (or Enter at Sleep) zooms to it and the fretboard overlay becomes the instrument; Esc or Back return to Sleep.
+  const guitar = useMemo(() => (room.objects as RoomObject[]).find((o) => o.kind === "guitar"), [room]);
+  const guitarChords = useMemo(() => ((guitar?.params as { chords?: ChordId[] } | undefined)?.chords ?? ["Em", "C", "G", "D"]) as ChordId[], [guitar]);
+  const enterGuitar = useCallback(() => {
+    lookRef.current = { yaw: 0, pitch: 0 };
+    setOverride(null);
+    setPanel(null);
+    setZoneId("guitar-play");
+  }, []);
+  const exitGuitar = useCallback(() => goZone(zones.find((z) => z.id === "sleep")?.id ?? zones[0].id), [goZone, zones]);
 
   // A click on the football: it flies away from the camera (the ray's direction); the thud sounds only while Sound is on.
   const kickBall = useCallback(
@@ -353,7 +351,7 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
       const cmd = it && "cmd" in it ? it.cmd : undefined;
       if (o.kind === "monitor" && (o.params as { screen?: string }).screen === "terminal") return openTerminal(o);
       if (cmd === "sound") return toggleSound();
-      if (cmd === "play:guitar") return strum(o);
+      if (cmd === "play:guitar") return enterGuitar();
       if (cmd === "kick:football") return kickBall(o, (e as { ray?: THREE.Ray } | undefined)?.ray);
       if (o.kind === "wardrobe") return toggleOpen(o.id);
       if (o.kind === "ridingSet" && it && "card" in it) return flash(it.card ? `${it.label}. ${it.card}` : it.label);
@@ -383,7 +381,7 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
       }
       if (it && "card" in it) flash(it.card);
     },
-    [boards, flash, kickBall, leave, openTerminal, runCommand, strum, toggleOpen, toggleSound, zoneId, zones],
+    [boards, enterGuitar, flash, kickBall, leave, openTerminal, runCommand, toggleOpen, toggleSound, zoneId, zones],
   );
   /** What a zone's `act` does: the click of that object, from the keyboard or the chip. */
   const activate = useCallback(
@@ -425,7 +423,9 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
   const zoneIdRef = useRef(zoneId);
   const panelRef = useRef(panel);
   const swingRef = useRef(swing);
+  const exitGuitarRef = useRef(exitGuitar);
   useEffect(() => {
+    exitGuitarRef.current = exitGuitar;
     zonesRef.current = zones;
     zoneIdRef.current = zoneId;
     panelRef.current = panel;
@@ -441,7 +441,7 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
       setZoneId(z.id);
     };
     const down = (e: PointerEvent) => {
-      if (e.button > 0) return;
+      if (e.button > 0 || zoneIdRef.current === "guitar-play") return;
       const d = drag.current;
       d.down = true;
       d.moved = false;
@@ -479,7 +479,7 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
     };
     let wheelAt = 0;
     const wheel = (e: WheelEvent) => {
-      if (panelRef.current || Math.abs(e.deltaY) + Math.abs(e.deltaX) < 8) return;
+      if (panelRef.current || zoneIdRef.current === "guitar-play" || Math.abs(e.deltaY) + Math.abs(e.deltaX) < 8) return;
       e.preventDefault();
       const now = performance.now();
       if (now - wheelAt < 650) return;
@@ -512,6 +512,14 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
       if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      if (zoneIdRef.current === "guitar-play") {
+        // At the guitar, Esc walks back to Sleep; the other keys do nothing (the fretboard is the instrument).
+        if (e.key === "Escape") {
+          e.preventDefault();
+          exitGuitarRef.current();
+        }
+        return;
+      }
       if (panelRef.current) return; // the card owns Esc and Tab while it is open
       const zs = zonesRef.current;
       if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowUp") {
@@ -689,6 +697,7 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
           ))}
         </div>
       </nav>
+      {playing ? <GuitarPlay chords={guitarChords} sound={sound} onBack={exitGuitar} onSilent={() => flash("Sound is off. Turn Sound on to hear the guitar.")} /> : null}
       {panel ? <RoomPanel key={`${panel.id}`} panel={panel} content={content} worlds={worlds} landing={landing} hrefs={hrefs} evidenceOf={evidenceOf} onItem={(item) => setPanel((p) => (p ? { ...p, item } : p))} onClose={closePanel} onWorld={goWorld} /> : null}
       {note ? (
         <div className="rx-note-bar" role="status">

@@ -255,6 +255,8 @@ export const zoneSchema = z.strictObject({
   panel: str(24).optional(),
   /** The id of the object that Enter (or a second press on the chip) acts on, as a click would: opens the wardrobe, strums the guitar. */
   act: z.string().max(40).optional(),
+  /** A stop that is not a place to browse (no chip, no stepping to it): the guitar's close-up, reached by clicking the guitar. */
+  hidden: z.boolean().optional(),
 });
 export type Zone = z.infer<typeof zoneSchema>;
 
