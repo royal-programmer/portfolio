@@ -210,6 +210,43 @@ function stringsGeometry() {
   return g;
 }
 
+/** The guitar's floor stand (a pole, a three-legged foot, a cradle and a neck rest) or, hung on the wall, its hook. Shared by the drawn guitar and the glTF one. */
+export function GuitarStand({ stand }: { stand: boolean }) {
+  const env = useEnv();
+  const dark = env.kit.mat("plastic", "#0b0b0e", 0.6);
+  const steel = dark;
+  const base = stand ? 0.5 : 1.3;
+  return (
+    <>
+      {stand ? (
+        <>
+          <mesh position={[0, 0.32, -0.06]} rotation={[-0.14, 0, 0]} castShadow material={steel}>
+            <cylinderGeometry args={[0.011, 0.011, 0.64, 8]} />
+          </mesh>
+          {[0, 1, 2].map((i) => {
+            const a = (i * Math.PI * 2) / 3;
+            return (
+              <mesh key={i} position={[Math.sin(a) * 0.11, 0.012, Math.cos(a) * 0.11 - 0.05]} rotation={[0, a, 0]} material={steel}>
+                <boxGeometry args={[0.018, 0.018, 0.24]} />
+              </mesh>
+            );
+          })}
+          <mesh position={[0, 0.24, 0.0]} material={dark}>
+            <boxGeometry args={[0.11, 0.02, 0.07]} />
+          </mesh>
+          <mesh position={[0, 0.72, -0.1]} material={dark}>
+            <boxGeometry args={[0.06, 0.02, 0.05]} />
+          </mesh>
+        </>
+      ) : (
+        <mesh position={[0, base + 0.78, 0.025]} castShadow material={steel}>
+          <boxGeometry args={[0.012, 0.05, 0.05]} />
+        </mesh>
+      )}
+    </>
+  );
+}
+
 export function Guitar({ o }: P<"guitar">) {
   const env = useEnv();
   const { stand } = o.params;
@@ -241,31 +278,7 @@ export function Guitar({ o }: P<"guitar">) {
   const lean = stand ? -0.14 : 0;
   return (
     <group>
-      {stand ? (
-        <>
-          <mesh position={[0, 0.32, -0.06]} rotation={[-0.14, 0, 0]} castShadow material={steel}>
-            <cylinderGeometry args={[0.011, 0.011, 0.64, 8]} />
-          </mesh>
-          {[0, 1, 2].map((i) => {
-            const a = (i * Math.PI * 2) / 3;
-            return (
-              <mesh key={i} position={[Math.sin(a) * 0.11, 0.012, Math.cos(a) * 0.11 - 0.05]} rotation={[0, a, 0]} material={steel}>
-                <boxGeometry args={[0.018, 0.018, 0.24]} />
-              </mesh>
-            );
-          })}
-          <mesh position={[0, 0.24, 0.0]} material={dark}>
-            <boxGeometry args={[0.11, 0.02, 0.07]} />
-          </mesh>
-          <mesh position={[0, 0.72, -0.1]} material={dark}>
-            <boxGeometry args={[0.06, 0.02, 0.05]} />
-          </mesh>
-        </>
-      ) : (
-        <mesh position={[0, base + 0.78, 0.025]} castShadow material={steel}>
-          <boxGeometry args={[0.012, 0.05, 0.05]} />
-        </mesh>
-      )}
+      <GuitarStand stand={stand} />
       <group position={[0, base - 0.2, stand ? 0.04 : 0.065]} rotation={[lean, 0, 0]}>
         {/* body: two bouts and a waist, a soundboard, a hole, a bridge */}
         <mesh scale={[1, 1, 0.3]} position={[0, -0.11, 0]} castShadow receiveShadow material={body}>

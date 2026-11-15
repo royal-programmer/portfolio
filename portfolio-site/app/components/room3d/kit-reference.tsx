@@ -7,8 +7,9 @@
  * materials so the static merge folds it into a few draws; repeated things are instanced, and what moves (a closet's leaves, the fan's
  * blades) sits in a `dynamic` group.
  */
+import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { closetOpenness, closetPairs, foldPose, panelCells, panelCorners, pegGrid } from "@/lib/room3d/reference";
@@ -16,6 +17,7 @@ import type { KindId, ObjectOf } from "@/lib/room3d/schema";
 import { Rb } from "./kit-dream";
 import { MidiKeyboard } from "./kit-decor";
 import { Inst, useEnv, useMat } from "./kit-core";
+import { ModelBoundary } from "./kit-model";
 import { pegTexture } from "./textures";
 
 type P<K extends KindId> = { o: ObjectOf<K> };
@@ -52,6 +54,29 @@ function plushGeometry() {
 /** A bi-fold leaf `a` wide and `h` tall, centred: a slab with a raised panel on its front, in one geometry. */
 function leafGeometry(a: number, h: number) {
   return merged([new THREE.BoxGeometry(a - 0.004, h - 0.06, 0.02), new THREE.BoxGeometry(a * 0.72, (h - 0.06) * 0.84, 0.006).translate(0, 0, 0.012)]);
+}
+
+/** The plush toys from a glTF (the object's `model`: one vertex-coloured mesh, upright, facing +z), fitted to 0.16 m tall and drawn instanced. */
+function PlushModel({ url, count, fill }: { url: string; count: number; fill: (i: number, p: THREE.Object3D, c: THREE.Color) => void }) {
+  const { scene } = useGLTF(url, false);
+  const geo = useMemo(() => {
+    let g: THREE.BufferGeometry | null = null;
+    scene.traverse((m) => {
+      const mesh = m as THREE.Mesh;
+      if (!g && mesh.isMesh) g = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+    });
+    const out = (g as THREE.BufferGeometry | null) ?? new THREE.SphereGeometry(0.07);
+    out.computeBoundingBox();
+    const b = out.boundingBox!;
+    const k = 0.16 / Math.max(1e-6, b.max.y - b.min.y);
+    out.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2);
+    out.scale(k, k, k);
+    return out;
+  }, [scene]);
+  useEffect(() => () => geo.dispose(), [geo]);
+  const mat = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 }), []);
+  useEffect(() => () => mat.dispose(), [mat]);
+  return <Inst count={count} geometry={geo} material={mat} fill={fill} cast={false} />;
 }
 
 export function Closet({ o }: P<"closet">) {
@@ -207,7 +232,17 @@ export function Closet({ o }: P<"closet">) {
           <Inst count={total} geometry={garments} material={cloth} fill={fillGarment} cast={false} />
         </>
       ) : null}
-      {plushes > 0 ? <Inst count={plushes} geometry={plush} material={plushMat} fill={fillPlush} cast={false} /> : null}
+      {plushes > 0 ? (
+        o.model ? (
+          <ModelBoundary fallback={<Inst count={plushes} geometry={plush} material={plushMat} fill={fillPlush} cast={false} />}>
+            <Suspense fallback={<Inst count={plushes} geometry={plush} material={plushMat} fill={fillPlush} cast={false} />}>
+              <PlushModel url={o.model} count={plushes} fill={fillPlush} />
+            </Suspense>
+          </ModelBoundary>
+        ) : (
+          <Inst count={plushes} geometry={plush} material={plushMat} fill={fillPlush} cast={false} />
+        )
+      ) : null}
       {crates.length > 0 ? <Inst count={crates.length} geometry={unit} material={paper} fill={fillCrate} cast={false} /> : null}
       {floorItem !== "none" ? (
         <group>

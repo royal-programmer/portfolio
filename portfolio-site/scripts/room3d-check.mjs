@@ -30,7 +30,7 @@ const { DRAW_CAPS } = await jiti.import(path.join(root, "lib/room3d/tiers.ts"));
 const { newBall, stepBall, kick, kickFromRay, SLEEP_AFTER } = await jiti.import(path.join(root, "lib/room3d/ball.ts"));
 const G = await jiti.import(path.join(root, "lib/room3d/guitar.ts"));
 const { THUD } = await jiti.import(path.join(root, "lib/room3d/thud.ts"));
-const { modelHeight } = await jiti.import(path.join(root, "lib/room3d/models.ts"));
+const { modelHeight, MODEL_PARTS, MODEL_TINT } = await jiti.import(path.join(root, "lib/room3d/models.ts"));
 const { STAGE_PROPS, SHELF_MAX, STAGE_TIERS } = await jiti.import(path.join(root, "lib/site/stage-data.ts"));
 
 let failed = 0;
@@ -358,7 +358,7 @@ check("the desk props map to room objects (headphones are the headset)", STAGE_P
   const noLicence = credits.split("\n").filter((l) => l.startsWith("| `portfolio-site/public/") && !/CC0|CC BY|CC-BY/.test(l));
   check("every credits row for an asset names a licence (CC0 or CC-BY)", noLicence.length === 0, noLicence.join());
   const withModel = room.objects.filter((o) => o.model);
-  check("every object's model path exists in public/ and its kind has a model slot", withModel.every((o) => fs.existsSync(path.join(pub, o.model)) && modelHeight(o) !== null));
+  check("every object's model path exists in public/ and its kind has a model slot", withModel.every((o) => fs.existsSync(path.join(pub, o.model)) && (modelHeight(o) !== null || MODEL_PARTS.includes(o.kind))));
   check("the shell's HDRI exists in public/hdri and is under 1.6 MB", fs.existsSync(path.join(pub, room.shell.hdri)) && fs.statSync(path.join(pub, room.shell.hdri)).size < 1.6 * 1048576);
   check("the guitar samples named in guitar.ts all exist as Ogg files", G.SAMPLES.every((x) => fs.existsSync(path.join(pub, "audio/guitar", x.id + ".ogg"))));
   check("the guitar samples total under 1.2 MB", G.SAMPLES.reduce((n, x) => n + fs.statSync(path.join(pub, "audio/guitar", x.id + ".ogg")).size, 0) < 1.2 * 1048576);

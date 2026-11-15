@@ -27,3 +27,12 @@ export function modelHeight(o: RoomObject): number | null {
 
 /** Kinds whose `model` is honoured. */
 export const MODEL_KINDS: ReadonlyArray<RoomObject["kind"]> = ["plant", "chair", "guitar", "football", "puzzleCube", "lamp"];
+
+/** Kinds whose `model` is a part the kit uses itself (a closet's plush toy), not a replacement for the whole shape. */
+export const MODEL_PARTS: ReadonlyArray<RoomObject["kind"]> = ["closet"];
+
+/**
+ * Kinds whose model is recoloured from the object's own material colour (so the owner can change it in the admin): the model's biggest
+ * material (the body of a guitar, the cushions of a chair) takes the colour; its other materials keep theirs.
+ */
+export const MODEL_TINT: ReadonlyArray<RoomObject["kind"]> = ["guitar", "chair"];
