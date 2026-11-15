@@ -59,6 +59,40 @@ export function woodTexture(size: number, base = "#7a5233", repeat: [number, num
   return finish(c, true, repeat);
 }
 
+/**
+ * Glossy ceramic floor tiles with light grout: the map covers 2 x 2 tiles (a tile is `TILE_M` metres, so a texture tile is twice that)
+ * with a slight tone difference from tile to tile, and a roughness map that is smooth on the tile and rough in the grout.
+ */
+export const TILE_M = 0.45;
+export function tileTextures(size: number, repeat: [number, number]): { map: THREE.CanvasTexture; rough: THREE.CanvasTexture } {
+  const half = size / 2;
+  const grout = Math.max(1.5, size / 170);
+  const r = rng(53);
+  const col = canvas(size);
+  const g = col.getContext("2d")!;
+  g.fillStyle = "#b9bdc6";
+  g.fillRect(0, 0, size, size);
+  const ro = canvas(size);
+  const gr = ro.getContext("2d")!;
+  gr.fillStyle = "#e6e6e6";
+  gr.fillRect(0, 0, size, size);
+  for (let j = 0; j < 2; j++) {
+    for (let i = 0; i < 2; i++) {
+      const tone = 244 + Math.round((r() - 0.5) * 8);
+      const x = i * half + grout / 2;
+      const y = j * half + grout / 2;
+      const grad = g.createLinearGradient(x, y, x + half, y + half);
+      grad.addColorStop(0, `rgb(${tone},${tone},${tone + 3})`);
+      grad.addColorStop(1, `rgb(${tone - 5},${tone - 5},${tone - 2})`);
+      g.fillStyle = grad;
+      g.fillRect(x, y, half - grout, half - grout);
+      gr.fillStyle = "#2b2b2b";
+      gr.fillRect(x, y, half - grout, half - grout);
+    }
+  }
+  return { map: finish(col, true, repeat), rough: finish(ro, false, repeat) };
+}
+
 /** A woven fabric: crossing threads on a tinted ground. */
 export function fabricTexture(size: number, base = "#3c4466", repeat: [number, number] = [1, 1]): THREE.CanvasTexture {
   const c = canvas(size);
@@ -77,37 +111,44 @@ export function fabricTexture(size: number, base = "#3c4466", repeat: [number, n
   return finish(c, true, repeat);
 }
 
-/** A soft plaster/noise height field, as a tangent-space normal map (a subtle surface, not bumps). */
-export function noiseNormal(size: number, strength = 1.2, repeat: [number, number] = [1, 1]): THREE.CanvasTexture {
+/**
+ * A tileable value-noise height field in 0..1: one layer per `[cellsX, cellsY, amplitude]` (cells per tile, so a layer
+ * with many cells across and few down is a streak). Grids wrap, so the tile repeats without a seam.
+ */
+function heightField(size: number, layers: Array<[number, number, number]>, seed: number): Float32Array {
   const h = new Float32Array(size * size);
-  const r = rng(23);
-  // Value noise at three scales.
-  const grid = (n: number) => Float32Array.from({ length: (n + 1) * (n + 1) }, () => r());
-  const layers = [grid(8), grid(32), grid(128)];
-  const amp = [0.55, 0.3, 0.15];
+  const r = rng(seed);
   const sm = (t: number) => t * t * (3 - 2 * t);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      let v = 0;
-      for (let l = 0; l < 3; l++) {
-        const n = [8, 32, 128][l];
-        const fx = (x / size) * n;
-        const fy = (y / size) * n;
+  let total = 0;
+  for (const [cx, cy, amp] of layers) {
+    const nx = Math.max(2, Math.min(cx, size / 2));
+    const ny = Math.max(2, Math.min(cy, size / 2));
+    total += amp;
+    const G = Float32Array.from({ length: nx * ny }, () => r());
+    for (let y = 0; y < size; y++) {
+      const fy = (y / size) * ny;
+      const y0 = Math.floor(fy);
+      const ty = sm(fy - y0);
+      const y1 = (y0 + 1) % ny;
+      for (let x = 0; x < size; x++) {
+        const fx = (x / size) * nx;
         const x0 = Math.floor(fx);
-        const y0 = Math.floor(fy);
         const tx = sm(fx - x0);
-        const ty = sm(fy - y0);
-        const G = layers[l];
-        const w = n + 1;
-        const a = G[y0 * w + x0];
-        const b = G[y0 * w + (x0 + 1) % n];
-        const c2 = G[((y0 + 1) % n) * w + x0];
-        const d = G[((y0 + 1) % n) * w + (x0 + 1) % n];
-        v += amp[l] * (a + (b - a) * tx + (c2 - a) * ty + (a - b - c2 + d) * tx * ty);
+        const x1 = (x0 + 1) % nx;
+        const a = G[y0 * nx + x0];
+        const b = G[y0 * nx + x1];
+        const c = G[y1 * nx + x0];
+        const d = G[y1 * nx + x1];
+        h[y * size + x] += amp * (a + (b - a) * tx + (c - a) * ty + (a - b - c + d) * tx * ty);
       }
-      h[y * size + x] = v;
     }
   }
+  for (let i = 0; i < h.length; i++) h[i] /= total;
+  return h;
+}
+
+/** A height field as a tangent-space normal map (RGB), repeating at the tile edge. */
+function normalFromHeight(h: Float32Array, size: number, strength: number, repeat: [number, number]): THREE.CanvasTexture {
   const c = canvas(size);
   const g = c.getContext("2d")!;
   const img = g.createImageData(size, size);
@@ -127,6 +168,70 @@ export function noiseNormal(size: number, strength = 1.2, repeat: [number, numbe
   }
   g.putImageData(img, 0, 0);
   return finish(c, false, repeat);
+}
+
+/** A height field as a grey roughness map (three reads the green channel and multiplies it with the material's roughness): `lo`..`hi` of the material's value. */
+function roughnessFromHeight(h: Float32Array, size: number, lo: number, hi: number, repeat: [number, number]): THREE.CanvasTexture {
+  const c = canvas(size);
+  const g = c.getContext("2d")!;
+  const img = g.createImageData(size, size);
+  let min = 1;
+  let max = 0;
+  for (let i = 0; i < h.length; i++) {
+    if (h[i] < min) min = h[i];
+    if (h[i] > max) max = h[i];
+  }
+  const span = Math.max(1e-6, max - min);
+  for (let i = 0; i < h.length; i++) {
+    const v = (lo + ((h[i] - min) / span) * (hi - lo)) * 255;
+    img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v;
+    img.data[i * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  return finish(c, false, repeat);
+}
+
+/** The surface kinds a material preset can ask for (see `Kit.mat`): the height field behind each, as a normal map and a roughness map. */
+export type SurfaceKind = "plaster" | "streak" | "brushed" | "grain" | "weave" | "blotch";
+
+function surfaceHeight(kind: SurfaceKind, size: number): Float32Array {
+  switch (kind) {
+    case "plaster":
+      // Fine and even, no big waves: the old three-scale noise (8 cells across) read as ripples on an 8 m wall.
+      return heightField(size, [[48, 48, 0.2], [96, 96, 0.35], [192, 192, 0.45]], 23);
+    case "streak":
+      // Grain running down the tile.
+      return heightField(size, [[40, 3, 0.5], [90, 5, 0.3], [160, 2, 0.2]], 31);
+    case "brushed":
+      // Fine streaks running across the tile.
+      return heightField(size, [[3, 120, 0.6], [4, 220, 0.4]], 37);
+    case "grain":
+      return heightField(size, [[64, 64, 0.4], [128, 128, 0.6]], 41);
+    case "weave": {
+      const h = new Float32Array(size * size);
+      const k = (Math.PI * 2) / Math.max(4, size / 24);
+      const n = heightField(size, [[64, 64, 1]], 43);
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) h[y * size + x] = 0.7 * (0.5 + 0.5 * Math.sin(x * k) * Math.sin(y * k)) + 0.3 * n[y * size + x];
+      return h;
+    }
+    case "blotch":
+      return heightField(size, [[6, 6, 0.5], [18, 18, 0.3], [48, 48, 0.2]], 47);
+  }
+}
+
+/** A normal map for a surface kind (a subtle one: `strength` is small for grain and fabric, larger for plaster). */
+export function surfaceNormal(kind: SurfaceKind, size: number, strength: number, repeat: [number, number] = [1, 1]): THREE.CanvasTexture {
+  return normalFromHeight(surfaceHeight(kind, size), size, strength, repeat);
+}
+
+/** A roughness map for a surface kind: the material's roughness times a value between `lo` and `hi` (1 = unchanged). */
+export function surfaceRoughness(kind: SurfaceKind, size: number, lo: number, hi: number, repeat: [number, number] = [1, 1]): THREE.CanvasTexture {
+  return roughnessFromHeight(surfaceHeight(kind, size), size, lo, hi, repeat);
+}
+
+/** A soft plaster/noise height field, as a tangent-space normal map (a subtle surface, not bumps). Kept for the lab scene. */
+export function noiseNormal(size: number, strength = 1.2, repeat: [number, number] = [1, 1]): THREE.CanvasTexture {
+  return normalFromHeight(heightField(size, [[8, 8, 0.55], [32, 32, 0.3], [128, 128, 0.15]], 23), size, strength, repeat);
 }
 
 /** A code-editor look for a monitor: dark ground, coloured token runs, a status bar. */

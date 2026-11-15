@@ -39,15 +39,16 @@ export function Bed({ o }: P<"bed">) {
   const w = size === "single" ? 0.9 : 1.4;
   const wood = env.kit.mat("wood", "#6b4a30", 0.6);
   const sheet = useMat(o.material);
-  const mattress = env.kit.mat("fabric", "#e9e6df", 0.95);
-  const fold = env.kit.mat("fabric", "#cdbb9c", 0.95);
+  const mattress = env.kit.mat("fabric", "#f1f0ee", 0.95);
+  const base = env.kit.mat("fabric", "#6b6f78", 0.95);
+  const fold = env.kit.mat("fabric", "#9ca1ab", 0.95);
   const legGeo = env.kit.geo("bed-leg", () => new THREE.BoxGeometry(0.05, 0.1, 0.05));
   return (
     <group>
       {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => [sx, sz] as const)).map(([sx, sz]) => (
         <mesh key={`${sx}${sz}`} geometry={legGeo} position={[sx * (w / 2 - 0.0), 0.05, sz * 0.94]} castShadow material={wood} />
       ))}
-      <Rb a={[w + 0.08, 0.16, 2.0]} p={[0, 0.18, 0]} r={0.03} m={wood} />
+      <Rb a={[w + 0.08, 0.16, 2.0]} p={[0, 0.18, 0]} r={0.03} m={base} />
       <Rb a={[w, 0.18, 1.9]} p={[0, 0.35, 0.0]} r={0.05} m={mattress} />
       {headboard ? (
         <>
@@ -210,7 +211,7 @@ export function Guitar({ o }: P<"guitar">) {
   const steel = dark;
   const board = dark;
   const bright = env.kit.mat("metal", "#cfd3dc", 0.25);
-  const top = env.kit.mat("wood", "#d9a566", 0.4);
+  const top = env.kit.mat("wood", "#26262b", 0.4);
   const strings = env.kit.geo("guitar-strings", stringsGeometry);
   const stringRef = useRef<THREE.Mesh>(null);
   const strum = useRef({ t0: -10 });
@@ -432,6 +433,7 @@ export function RidingSet({ o }: P<"ridingSet">) {
   const { helmet, jacket, pants, gloves, boots } = o.params;
   const body = useMat(o.material);
   const shell = env.kit.mat("plastic", o.material.color, 0.22);
+  const chin = env.kit.mat("plastic", "#f4f4f6", 0.22);
   const dark = env.kit.mat("rubber", "#111216", 0.6);
   const legs = dark;
   const backing = dark;
@@ -445,7 +447,7 @@ export function RidingSet({ o }: P<"ridingSet">) {
           <mesh scale={[0.95, 1.0, 1.15]} castShadow material={shell}>
             <sphereGeometry args={[0.14, 24, 16]} />
           </mesh>
-          <Rb a={[0.17, 0.085, 0.14]} p={[0, -0.095, 0.075]} r={0.035} m={shell} />
+          <Rb a={[0.17, 0.085, 0.14]} p={[0, -0.095, 0.075]} r={0.035} m={chin} />
           <mesh position={[0, 0.0, 0.1]} scale={[1, 0.5, 0.55]} material={dark}>
             <sphereGeometry args={[0.125, 18, 10]} />
           </mesh>

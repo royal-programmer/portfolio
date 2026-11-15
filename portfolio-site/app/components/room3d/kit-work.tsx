@@ -40,7 +40,7 @@ const accentFor = (env: Env, id: string) => {
 export function Desk({ o }: P<"desk">) {
   const { w, h, d, shape } = o.params;
   const top = useMat(o.material);
-  const leg = useMat({ preset: "metal", color: "#1a1c23", roughness: 0.45 });
+  const leg = useMat({ preset: "metal", color: "#eceef3", roughness: 0.45 });
   const wing = shape === "l";
   return (
     <group>
@@ -324,12 +324,13 @@ export function Chair({ o }: P<"chair">) {
   const fabric = useMat(o.material);
   const steel = useMat(STEEL);
   const wheel = useMat({ preset: "rubber", color: "#0b0b0e", roughness: 0.6 });
+  const seat = useMat({ preset: "fabric", color: "#16171c", roughness: 0.8 });
   const seatY = style === "stool" ? 0.62 : 0.5;
   const env = useEnv();
   const accent = env.accent;
   return (
     <group>
-      <RoundedBox args={[0.5, 0.09, 0.48]} radius={0.04} smoothness={4} position={[0, seatY, 0]} castShadow receiveShadow material={fabric} />
+      <RoundedBox args={[0.5, 0.09, 0.48]} radius={0.04} smoothness={4} position={[0, seatY, 0]} castShadow receiveShadow material={style === "gaming" ? seat : fabric} />
       {style !== "stool" ? (
         <RoundedBox args={[0.46, style === "gaming" ? 0.75 : 0.55, 0.08]} radius={0.04} smoothness={4} position={[0, seatY + (style === "gaming" ? 0.42 : 0.35), -0.24]} rotation={[0.12, 0, 0]} castShadow receiveShadow material={fabric} />
       ) : null}
@@ -401,9 +402,13 @@ export function Console({ o }: P<"console">) {
   const env = useEnv();
   const body = useMat(o.material);
   const pad = useMat({ preset: "plastic", color: "#e8e8ee", roughness: 0.4 });
+  const strip = useMat({ preset: "plastic", color: "#0e0f13", roughness: 0.4 });
   return (
     <group>
       <RoundedBox args={[0.1, 0.38, 0.26]} radius={0.02} smoothness={3} position={[0, 0.19, 0]} castShadow receiveShadow material={body} />
+      <mesh position={[0.0, 0.19, 0]} material={strip}>
+        <boxGeometry args={[0.102, 0.36, 0.06]} />
+      </mesh>
       <mesh position={[0.052, 0.19, 0]} userData={{ noShadow: true }} material={env.kit.glow(env.consoleOn ? "#4f8cff" : "#222530", env.consoleOn ? 2.5 : 1)}>
         <boxGeometry args={[0.004, 0.34, 0.012]} />
       </mesh>

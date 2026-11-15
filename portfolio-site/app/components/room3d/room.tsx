@@ -8,7 +8,7 @@
  */
 import { AccumulativeShadows, ContactShadows, Environment, Lightformer, RandomizedLight } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
-import { memo, useEffect, useMemo, useRef, type ComponentType } from "react";
+import { Component, memo, Suspense, useEffect, useMemo, useRef, type ComponentType, type ReactNode } from "react";
 import * as THREE from "three";
 import type { KindId, ObjectOf, Room as RoomData, RoomObject, Tier } from "@/lib/room3d/schema";
 import { trimToBudget } from "@/lib/room3d/tiers";
@@ -18,7 +18,7 @@ import * as Dream from "./kit-dream";
 import * as Stage from "./kit-stage";
 import * as Work from "./kit-work";
 import { mergeStatic, type MergeStats } from "./static-merge";
-import { woodTexture } from "./textures";
+import { tileTextures, TILE_M, woodTexture } from "./textures";
 
 type Interaction = NonNullable<RoomObject["interaction"]>;
 type KindMap = { [K in KindId]: ComponentType<{ o: ObjectOf<K> }> };
@@ -134,18 +134,55 @@ function sunPosition(room: RoomData): [number, number, number] {
 
 type Light = RoomData["lighting"]["day"];
 
-/**
- * The lightformer environment. Memoised on plain values: drei re-bakes the cube map whenever its children change
- * identity, and a parent that re-renders often (the Stage does) must not cost a bake each time.
- */
-const Sky = memo(function Sky({ light, bandId, textureSize, W, D }: { light: Light; bandId: string; textureSize: number; W: number; D: number }) {
+/** The lightformers: the window, the key light's ring and the two neon strips as bright shapes, which add the day's colour to the environment. */
+function Formers({ light, W, D }: { light: Light; W: number; D: number }) {
   return (
-    <Environment frames={1} resolution={textureSize >= 512 ? 256 : 128} environmentIntensity={0.8 + light.ambient.intensity * 0.6} key={light.key.color + bandId + textureSize}>
+    <>
       <Lightformer form="rect" intensity={Math.max(0.2, light.windowLight.intensity * 4)} color={light.windowLight.color} position={[2, 2, -D]} scale={[3, 2.2, 1]} />
       <Lightformer form="ring" intensity={0.8 + light.key.intensity * 1.4} color={light.key.color} position={[0, 5, 0]} rotation-x={Math.PI / 2} scale={3} />
+      {/* The white floor's bounce: without it the lower half of the environment is dark and the glossy tiles mirror a black room. */}
+      <Lightformer form="rect" intensity={0.5 + light.ambient.intensity * 1.6} color="#f1f4ff" position={[0, -2.5, 0]} rotation-x={Math.PI / 2} scale={[24, 24, 1]} />
       <Lightformer form="rect" intensity={2.4 * light.emissiveBoost} color="#ff3da0" position={[-W, 1.5, 0]} rotation-y={Math.PI / 2} scale={[3, 1.2, 1]} />
       <Lightformer form="rect" intensity={1.6 * light.emissiveBoost} color="#2fd0ff" position={[W, 1, 2]} rotation-y={-Math.PI / 2} scale={[3, 1.2, 1]} />
+    </>
+  );
+}
+
+/** A failed HDRI download or decode shows the fallback (the lightformers) instead of taking the page down. */
+class EnvBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+/**
+ * The environment (image-based light). With an HDRI (`hdri`, a /hdri/ file from the shell settings, loaded through the
+ * `files` prop, never a drei preset, which would fetch from a CDN) the file is the base and the lightformers add the day's
+ * colour on top, baked once into a cube map; the lightformers alone are the fallback while it loads, when it fails, and the
+ * phone tier's choice. Memoised on plain values: drei re-bakes the cube map whenever its children change identity, and a
+ * parent that re-renders often (the Stage does) must not cost a bake each time. The HDRI's own light is scaled with the part of the
+ * day (a bright interior at noon, a dim one at night); the lamps, the window sun and the screens carry the rest.
+ */
+const Sky = memo(function Sky({ light, bandId, textureSize, W, D, hdri }: { light: Light; bandId: string; textureSize: number; W: number; D: number; hdri?: string }) {
+  const k = light.key.color + bandId + textureSize;
+  const formersOnly = (
+    <Environment frames={1} resolution={textureSize >= 512 ? 256 : 128} environmentIntensity={0.8 + light.ambient.intensity * 0.6} key={k}>
+      <Formers light={light} W={W} D={D} />
     </Environment>
+  );
+  if (!hdri) return formersOnly;
+  return (
+    <EnvBoundary fallback={formersOnly}>
+      <Suspense fallback={formersOnly}>
+        <Environment frames={1} resolution={256} files={hdri} environmentIntensity={0.14 + light.ambient.intensity * 1.2} key={k + hdri}>
+          <Formers light={light} W={W} D={D} />
+        </Environment>
+      </Suspense>
+    </EnvBoundary>
   );
 });
 
@@ -159,7 +196,7 @@ const Shadows = memo(function Shadows({ aoOn, big, W, D, deskX, deskZ, deskH, de
   return (
     <>
       {aoOn ? (
-        <AccumulativeShadows temporal frames={big ? 70 : 40} alphaTest={0.9} scale={scale} position={FLOOR_AT} color="#06060c" opacity={0.85} resolution={big ? 1024 : 512}>
+        <AccumulativeShadows temporal frames={big ? 70 : 40} alphaTest={0.9} scale={scale} position={FLOOR_AT} color="#4a5170" opacity={0.22} resolution={big ? 1024 : 512}>
           <RandomizedLight amount={8} radius={3.5} ambient={0.55} intensity={1} position={LIGHT_AT} bias={0.001} />
         </AccumulativeShadows>
       ) : (
@@ -183,11 +220,25 @@ export function Room(props: RoomProps) {
     [kit, light, accent, phone, tier, props.hoverId, props.openIds, props.consoleOn, props.reduced, props.worlds, props.clockOffsetMs, props.stage, props.liveScreen, props.boards],
   );
   const { width: W, depth: D, height: H } = room.shell;
-  const floorTex = useMemo(() => {
-    const t = woodTexture(tier.textureSize, "#d8c3a0", [W / 1.8, D / 1.8]);
-    return t;
-  }, [tier.textureSize, W, D]);
-  useEffect(() => () => floorTex.dispose(), [floorTex]);
+  const tiled = room.shell.floorMaterial === "tile";
+  // The floor's maps: planks (wood) or glossy tiles with grout (a tile is 0.45 m), repeating per metre of floor, not once across it.
+  const floor = useMemo(() => {
+    if (tiled) {
+      const t = tileTextures(tier.textureSize, [W / (2 * TILE_M), D / (2 * TILE_M)]);
+      return { map: t.map, rough: t.rough as THREE.Texture | null };
+    }
+    return { map: woodTexture(tier.textureSize, "#d8c3a0", [W / 1.8, D / 1.8]), rough: null };
+  }, [tier.textureSize, W, D, tiled]);
+  const floorTex = floor.map;
+  useEffect(
+    () => () => {
+      floor.map.dispose();
+      floor.rough?.dispose();
+    },
+    [floor],
+  );
+  // The boards' tiling follows the floor's size: one plank pattern per 1.8 m, as the floor texture does.
+  const floorMaps = useMemo(() => kit.tiledMaps("wood", W, D, 1.8), [kit, W, D]);
   const sun = useMemo(() => sunPosition(room), [room]);
   const sunRef = useRef<THREE.DirectionalLight>(null);
   useEffect(() => {
@@ -215,7 +266,7 @@ export function Room(props: RoomProps) {
   return (
     <EnvCtx.Provider value={env}>
       <color attach="background" args={["#0a0c14"]} />
-      <Sky light={light} bandId={bandId} textureSize={tier.textureSize} W={W} D={D} />
+      <Sky light={light} bandId={bandId} textureSize={tier.textureSize} W={W} D={D} hdri={tier.envMap === "hdri" ? room.shell.hdri : undefined} />
       <hemisphereLight args={[light.ambient.color, "#1a1410", 0.6 + light.ambient.intensity * 0.9]} />
       <directionalLight
         ref={sunRef}
@@ -236,7 +287,11 @@ export function Room(props: RoomProps) {
       <group ref={root}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[W, D]} />
-        <meshStandardMaterial map={room.shell.floorMaterial === "wood" ? floorTex : null} color={room.shell.floorColor} roughness={0.5} metalness={0.02} envMapIntensity={0.7} />
+        {tiled ? (
+          <meshStandardMaterial map={floor.map} roughnessMap={floor.rough} color={room.shell.floorColor} roughness={0.95} metalness={0.02} envMapIntensity={1} />
+        ) : (
+          <meshStandardMaterial map={room.shell.floorMaterial === "wood" ? floorTex : null} {...floorMaps} color={room.shell.floorColor} roughness={0.5} metalness={0.02} envMapIntensity={0.7} />
+        )}
       </mesh>
       {[
         { p: [0, H / 2, -D / 2] as const, r: 0, w: W },
@@ -244,7 +299,7 @@ export function Room(props: RoomProps) {
         { p: [W / 2, H / 2, 0] as const, r: -Math.PI / 2, w: D },
         { p: [0, H / 2, D / 2] as const, r: Math.PI, w: W },
       ].map((s, i) => (
-        <mesh key={i} position={s.p} rotation={[0, s.r, 0]} receiveShadow material={kit.mat("plaster", room.shell.wallColor, 0.92)}>
+        <mesh key={i} position={s.p} rotation={[0, s.r, 0]} receiveShadow material={kit.wall(room.shell.wallColor, 0.92, s.w, H)}>
           <planeGeometry args={[s.w, H]} />
         </mesh>
       ))}

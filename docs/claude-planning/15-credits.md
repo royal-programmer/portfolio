@@ -43,3 +43,4 @@ Every file under `portfolio-site/public/models`, `hdri`, `textures` and `audio` 
 
 | File | Source URL | Author | Licence | Downloaded | Notes |
 |------|------------|--------|---------|------------|-------|
+| `portfolio-site/public/hdri/unfinished_office_1k.exr` (911 KB) | https://polyhaven.com/a/unfinished_office | Sergej Majboroda (Poly Haven) | CC0 1.0 | 2026-11-15 | 1k EXR, image-based light for the medium and high tiers; the lightformers are the low tier and the fallback |

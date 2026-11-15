@@ -11,32 +11,50 @@ import type { MutableRefObject } from "react";
 import type { Room, Tier } from "@/lib/room3d/schema";
 import type { Constellation } from "@/lib/site/stage-constellation";
 import type { ShelfCase } from "@/lib/site/stage-data";
-import { fabricTexture, labelTexture, noiseNormal, woodTexture } from "./textures";
+import { fabricTexture, labelTexture, surfaceNormal, surfaceRoughness, woodTexture, type SurfaceKind } from "./textures";
 
 export type Lighting = Room["lighting"]["day"];
 type Preset = Room["objects"][number]["material"]["preset"];
 
-const PRESET: Record<Preset, { metalness: number; map?: "wood" | "fabric"; normal?: boolean; transparent?: number; env?: number }> = {
-  wood: { metalness: 0.02, map: "wood", normal: true },
-  metal: { metalness: 0.75 },
-  plastic: { metalness: 0.15 },
-  fabric: { metalness: 0, map: "fabric" },
-  ceramic: { metalness: 0.05 },
-  paper: { metalness: 0 },
-  glass: { metalness: 0.1, transparent: 0.28, env: 1.4 },
-  rubber: { metalness: 0 },
-  plaster: { metalness: 0, normal: true },
-  leaf: { metalness: 0 },
+type PresetLook = {
+  metalness: number;
+  map?: "wood" | "fabric";
+  /** The surface the normal map shows, and how hard (every preset has one: nothing is perfectly flat). */
+  bump?: { kind: SurfaceKind; strength: number; scale: number };
+  /** The surface the roughness map shows, and how far down it multiplies the material's roughness (lo..1). */
+  rough?: { kind: SurfaceKind; lo: number };
+  transparent?: number;
+  env?: number;
+};
+
+const PRESET: Record<Preset, PresetLook> = {
+  wood: { metalness: 0.02, map: "wood", bump: { kind: "streak", strength: 0.4, scale: 0.06 }, rough: { kind: "streak", lo: 0.8 } },
+  metal: { metalness: 0.75, bump: { kind: "brushed", strength: 0.3, scale: 0.04 }, rough: { kind: "brushed", lo: 0.55 } },
+  plastic: { metalness: 0.15, bump: { kind: "grain", strength: 0.3, scale: 0.04 }, rough: { kind: "blotch", lo: 0.7 } },
+  fabric: { metalness: 0, map: "fabric", bump: { kind: "weave", strength: 0.4, scale: 0.12 }, rough: { kind: "blotch", lo: 0.85 } },
+  ceramic: { metalness: 0.05, bump: { kind: "grain", strength: 0.2, scale: 0.03 }, rough: { kind: "blotch", lo: 0.7 } },
+  paper: { metalness: 0, bump: { kind: "grain", strength: 0.5, scale: 0.05 }, rough: { kind: "blotch", lo: 0.9 } },
+  glass: { metalness: 0.1, transparent: 0.28, env: 1.4, bump: { kind: "blotch", strength: 0.1, scale: 0.02 }, rough: { kind: "blotch", lo: 0.45 } },
+  rubber: { metalness: 0, bump: { kind: "grain", strength: 0.6, scale: 0.08 }, rough: { kind: "blotch", lo: 0.85 } },
+  plaster: { metalness: 0, bump: { kind: "plaster", strength: 0.5, scale: 0.07 }, rough: { kind: "blotch", lo: 0.85 } },
+  leaf: { metalness: 0, bump: { kind: "grain", strength: 0.4, scale: 0.06 }, rough: { kind: "blotch", lo: 0.75 } },
   emissive: { metalness: 0 },
 };
+
+/** One metre of wall or floor holds a tile of plaster this wide (metres): the pattern repeats per metre, whatever the size of the surface. */
+export const PLASTER_TILE = 1.5;
 
 /** Materials, geometries and textures shared by every object in a room; `dispose` frees them all. */
 export class Kit {
   private mats = new Map<string, THREE.Material>();
   private geos = new Map<string, THREE.BufferGeometry>();
   private texs = new Map<string, THREE.Texture>();
-  private wallNormal = new THREE.Vector2(0.12, 0.12);
   constructor(readonly texSize: number) {}
+
+  /** The size of the surface maps (a normal or roughness map is never bigger than 256, and no bigger than the tier's textures). */
+  private get surf() {
+    return Math.min(this.texSize, 256);
+  }
 
   tex(key: string, make: () => THREE.Texture): THREE.Texture {
     let t = this.texs.get(key);
@@ -56,6 +74,24 @@ export class Kit {
     return g as G;
   }
 
+  /** The normal and roughness maps of a surface kind, shared by every material that asks for one. */
+  surfaceMaps(kind: SurfaceKind, strength: number, lo: number) {
+    return {
+      normal: this.tex(`n:${kind}:${strength}`, () => surfaceNormal(kind, this.surf, strength)),
+      rough: this.tex(`r:${kind}:${lo}`, () => surfaceRoughness(kind, this.surf, lo, 1)),
+    };
+  }
+
+  /** A copy of a map with its own repeat that shares the image (one upload): for a surface whose size sets the tiling. */
+  tiled(key: string, from: THREE.Texture, repeat: [number, number]): THREE.Texture {
+    return this.tex(`${key}:${repeat[0].toFixed(2)}:${repeat[1].toFixed(2)}`, () => {
+      const t = from.clone();
+      t.repeat.set(repeat[0], repeat[1]);
+      t.needsUpdate = true;
+      return t;
+    });
+  }
+
   /** A standard material for a preset, tinted by `color`; the same arguments return the same object. */
   mat(preset: Preset, color: string, roughness: number): THREE.Material {
     const key = `m:${preset}:${color}:${roughness}`;
@@ -67,10 +103,11 @@ export class Kit {
         const std = new THREE.MeshStandardMaterial({ color, roughness, metalness: p.metalness });
         if (p.map === "wood") std.map = this.tex("wood", () => woodTexture(this.texSize, "#d8c3a0", [1, 1]));
         if (p.map === "fabric") std.map = this.tex("fabric", () => fabricTexture(this.texSize, "#d4d4d4", [2, 2]));
-        if (p.normal) {
-          std.normalMap = this.tex("plaster", () => noiseNormal(Math.min(this.texSize, 256), 0.9, [1.5, 1]));
-          std.normalScale = this.wallNormal;
+        if (p.bump) {
+          std.normalMap = this.surfaceMaps(p.bump.kind, p.bump.strength, 1).normal;
+          std.normalScale = new THREE.Vector2(p.bump.scale, p.bump.scale);
         }
+        if (p.rough) std.roughnessMap = this.surfaceMaps(p.rough.kind, 1, p.rough.lo).rough;
         if (p.transparent) {
           std.transparent = true;
           std.opacity = p.transparent;
@@ -79,6 +116,31 @@ export class Kit {
         }
         m = std;
       }
+      this.mats.set(key, m);
+    }
+    return m;
+  }
+
+  /** The normal and roughness maps of a preset repeating once per `tile` metres of a `w` x `h` metre surface (shared images, own repeat). */
+  tiledMaps(preset: Preset, w: number, h: number, tile = PLASTER_TILE) {
+    const p = PRESET[preset];
+    const rep: [number, number] = [w / tile, h / tile];
+    return {
+      normalMap: p.bump ? this.tiled(`tn:${p.bump.kind}`, this.surfaceMaps(p.bump.kind, p.bump.strength, 1).normal, rep) : null,
+      normalScale: new THREE.Vector2(p.bump?.scale ?? 0, p.bump?.scale ?? 0),
+      roughnessMap: p.rough ? this.tiled(`tr:${p.rough.kind}`, this.surfaceMaps(p.rough.kind, 1, p.rough.lo).rough, rep) : null,
+    };
+  }
+
+  /**
+   * A wall material whose maps repeat per metre of the surface (`w` x `h` metres), not once across it: the plaster tile is
+   * `PLASTER_TILE` metres wide whatever the room's size. Same images as `mat`, so no extra upload.
+   */
+  wall(color: string, roughness: number, w: number, h: number): THREE.MeshStandardMaterial {
+    const key = `w:${color}:${roughness}:${w}:${h}`;
+    let m = this.mats.get(key) as THREE.MeshStandardMaterial | undefined;
+    if (!m) {
+      m = new THREE.MeshStandardMaterial({ color, roughness, metalness: 0, ...this.tiledMaps("plaster", w, h) });
       this.mats.set(key, m);
     }
     return m;

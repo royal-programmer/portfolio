@@ -78,7 +78,7 @@ Rules from the critic:
 - **Asset paths:** an object's `model` and `map` accept only `/models/...` and `/textures/...` paths in `public/` (no https;
   `schema.ts` enforces it). **Asset rule:** every committed asset is CC0 (or CC-BY with a credit) and has a line in
   `15-credits.md` (file, source URL, author, licence, download date, notes); `scripts/room3d-check.mjs` fails on a file in
-  `public/models|hdri|audio|textures` with no credits line. No trademarked shapes or marks; the console stays generic.
+  `public/models|hdri|audio|textures` with no credits line. Logos are the owner's choice (his own belongings); CC0/CC-BY licence hygiene still applies to every committed file. A missing or failed logo texture (`map`) falls back to the plain material, never blank.
 - **Curated glTF catalog, committed to `portfolio-site/public/models/`** (CC0 from Poly Haven,
   Kenney, Quaternius; CC-BY only with a credits line in `15-credits.md`). Pre-optimised with
   `gltf-transform` (meshopt, KTX2, triangle and texture caps) before commit, referenced by id with

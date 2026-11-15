@@ -230,8 +230,14 @@ export const shellSchema = z.strictObject({
   depth: num(2, 14),
   height: num(2, 5),
   wallColor: color(),
-  floorMaterial: z.enum(["wood", "plaster", "fabric"]),
+  floorMaterial: z.enum(["wood", "plaster", "fabric", "tile"]),
   floorColor: color(),
+  /** The image-based lighting file (a CC0 HDRI in public/hdri, .exr or .hdr), used by the tiers whose `envMap` is "hdri". Absent: the lightformers. */
+  hdri: z
+    .string()
+    .max(120)
+    .regex(/^\/hdri\/[A-Za-z0-9][A-Za-z0-9._-]*\.(exr|hdr)$/, "a /hdri/... .exr or .hdr path")
+    .optional(),
 });
 
 /**
@@ -290,6 +296,8 @@ export const tierSchema = z.strictObject({
   /** Post-processing (SMAA + bloom) on; off falls back to MSAA and glow sprites. */
   bloomOn: z.boolean(),
   textureSize: z.union([z.literal(128), z.literal(256), z.literal(512)]),
+  /** The room's image-based light: the HDRI named by the shell (a download of about 0.9 MB), or the zero-byte lightformers (the phone tier). */
+  envMap: z.enum(["hdri", "lightformers"]).default("hdri"),
   /** Most objects drawn; the rest are trimmed by priority (see `trimToBudget`). */
   objectBudget: z.number().int().min(10).max(MAX_OBJECTS),
 });
