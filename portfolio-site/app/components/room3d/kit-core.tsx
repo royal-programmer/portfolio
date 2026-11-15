@@ -147,6 +147,21 @@ export class Kit {
     return m;
   }
 
+  /**
+   * A cloth with no weave pattern, only a soft normal map (folds for a duvet, long pile for a rug); `repeat` sets how many
+   * times the map tiles across the surface it is on. The same arguments return the same material.
+   */
+  soft(color: string, roughness: number, kind: "wrinkle" | "shag", strength: number, scale: number, repeat: [number, number] = [1, 1]): THREE.MeshStandardMaterial {
+    const key = `s:${color}:${roughness}:${kind}:${strength}:${scale}:${repeat[0].toFixed(2)}:${repeat[1].toFixed(2)}`;
+    let m = this.mats.get(key) as THREE.MeshStandardMaterial | undefined;
+    if (!m) {
+      const base = this.surfaceMaps(kind, strength, 1).normal;
+      m = new THREE.MeshStandardMaterial({ color, roughness, metalness: 0, normalMap: this.tiled(`soft:${kind}:${strength}`, base, repeat), normalScale: new THREE.Vector2(scale, scale) });
+      this.mats.set(key, m);
+    }
+    return m;
+  }
+
   /** An unlit material that glows past 1 (bloom picks it up; `toneMapped` off keeps the colour). */
   glow(color: string, k: number): THREE.MeshBasicMaterial {
     const key = `g:${color}:${k.toFixed(2)}`;

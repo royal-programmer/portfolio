@@ -27,6 +27,8 @@ function local(o: RoomObject): Local | null {
       return box(o.params.size === "single" ? 0.98 : 1.53, 2.06, 0.9);
     case "wardrobe":
       return box(o.params.w, o.params.d, o.params.h);
+    case "cubeShelf":
+      return y < 0.05 ? box(o.params.cols * o.params.cell, o.params.d, o.params.rows * o.params.cell) : null;
     case "chair":
       return box(0.62, 0.62, 1.0);
     case "pcTower":

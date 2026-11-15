@@ -36,29 +36,36 @@ const garment = (i: number) => {
 
 export function Bed({ o }: P<"bed">) {
   const env = useEnv();
-  const { size, pillows, blanket, headboard } = o.params;
+  const { size, pillows, blanket, headboard, baseColor, pillowColor, throwColor, headboardColor, led, ledColor } = o.params;
   const w = size === "single" ? 0.9 : 1.4;
-  const wood = env.kit.mat("wood", "#6b4a30", 0.6);
-  const sheet = useMat(o.material);
-  const mattress = env.kit.mat("fabric", "#f1f0ee", 0.95);
-  const base = env.kit.mat("fabric", "#6b6f78", 0.95);
-  const fold = env.kit.mat("fabric", "#9ca1ab", 0.95);
+  const leg = env.kit.mat("plastic", "#2a2c33", 0.6);
+  // The duvet and the throw have a soft fold normal and no weave pattern; the base and the headboard are fabric.
+  const duvet = env.kit.soft(o.material.color, Math.max(0.9, o.material.roughness), "wrinkle", 1, 0.55, [1, 2]);
+  const mattress = env.kit.mat("fabric", o.material.color, 0.95);
+  const base = env.kit.mat("fabric", baseColor, 0.97);
+  const fold = env.kit.soft(throwColor, 0.95, "wrinkle", 1, 0.45, [1, 1]);
+  const pillow = env.kit.soft(pillowColor, 0.9, "wrinkle", 0.8, 0.35, [1, 1]);
+  const head = env.kit.mat("fabric", headboardColor, 0.95);
   const legGeo = env.kit.geo("bed-leg", () => new THREE.BoxGeometry(0.05, 0.1, 0.05));
   return (
     <group>
       {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => [sx, sz] as const)).map(([sx, sz]) => (
-        <mesh key={`${sx}${sz}`} geometry={legGeo} position={[sx * (w / 2 - 0.0), 0.05, sz * 0.94]} castShadow material={wood} />
+        <mesh key={`${sx}${sz}`} geometry={legGeo} position={[sx * (w / 2 - 0.0), 0.05, sz * 0.94]} castShadow material={leg} />
       ))}
       <Rb a={[w + 0.08, 0.16, 2.0]} p={[0, 0.18, 0]} r={0.03} m={base} />
+      {led && env.tier.aoOn ? (
+        <mesh position={[0, 0.098, 0]} userData={{ noShadow: true }} material={env.kit.glow(ledColor, 2.4 * env.light.emissiveBoost)}>
+          <boxGeometry args={[w + 0.1, 0.012, 2.02]} />
+        </mesh>
+      ) : null}
       <Rb a={[w, 0.18, 1.9]} p={[0, 0.35, 0.0]} r={0.05} m={mattress} />
       {headboard ? (
         <>
-          <Rb a={[w + 0.1, 0.92, 0.05]} p={[0, 0.46, -1.025]} r={0.02} m={wood} />
-          <Rb a={[w - 0.1, 0.5, 0.025]} p={[0, 0.7, -0.99]} r={0.015} m={wood} />
-          <Rb a={[w + 0.08, 0.4, 0.05]} p={[0, 0.2, 1.025]} r={0.02} m={wood} />
+          <Rb a={[w + 0.1, 0.92, 0.05]} p={[0, 0.46, -1.025]} r={0.02} m={head} />
+          <Rb a={[w - 0.1, 0.5, 0.025]} p={[0, 0.7, -0.99]} r={0.015} m={head} />
         </>
       ) : null}
-      <Rb a={[w - 0.02, 0.07, 1.3]} p={[0, 0.475, 0.25]} r={0.035} m={sheet} />
+      <Rb a={[w - 0.02, 0.07, 1.3]} p={[0, 0.475, 0.25]} r={0.035} m={duvet} />
       {blanket ? (
         <>
           <Rb a={[w - 0.04, 0.1, 0.46]} p={[0, 0.54, 0.62]} r={0.04} m={fold} />
@@ -68,7 +75,7 @@ export function Bed({ o }: P<"bed">) {
       {Array.from({ length: pillows }, (_, i) => {
         const two = pillows > 1;
         const pw = two ? w / 2 - 0.06 : Math.min(0.6, w - 0.2);
-        return <Rb key={i} a={[pw, 0.12, 0.34]} p={[two ? (i % 2 ? 1 : -1) * (w / 4) : 0, 0.54 + Math.floor(i / 2) * 0.1, -0.78]} rot={[-0.1, 0, 0]} r={0.05} m={mattress} />;
+        return <Rb key={i} a={[pw, 0.12, 0.34]} p={[two ? (i % 2 ? 1 : -1) * (w / 4) : 0, 0.54 + Math.floor(i / 2) * 0.1, -0.78]} rot={[-0.1, 0, 0]} r={0.05} m={pillow} />;
       })}
     </group>
   );
@@ -310,25 +317,36 @@ export function Guitar({ o }: P<"guitar">) {
 
 export function CapRow({ o }: P<"capRow">) {
   const env = useEnv();
-  const { count, spacing, lift } = o.params;
-  // The crown (a squashed half sphere, its open side to the wall) and the visor (a half disc hanging below the rim, drooping toward the viewer) in one geometry.
+  const { count, spacing, lift, capColor, brimColor } = o.params;
+  // Geometry of a cap's visor: a half disc hanging below the rim, drooping toward the viewer (`r` its radius, `t` its thickness, `dy` a drop below the visor's plane).
+  const brimGeo = (r: number, t: number, dy: number) => new THREE.CylinderGeometry(r, r, t, 16, 1, false, 0, Math.PI).rotateX(Math.PI / 2).rotateZ(-Math.PI / 2).rotateX(-0.45).translate(0, -0.078 - dy * 0.9, 0.112 - dy * 0.45);
+  // The crown (a squashed half sphere, its open side to the wall) with the visor, and the visor's red edge (a slightly larger, thin disc under it): two instanced draws.
   const cap = env.kit.geo("cap", () => {
     const dome = new THREE.SphereGeometry(0.1, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.9, 1).rotateX(Math.PI / 2 - 0.2).translate(0, 0, 0.1);
-    const brim = new THREE.CylinderGeometry(0.095, 0.095, 0.01, 16, 1, false, 0, Math.PI).rotateX(Math.PI / 2).rotateZ(-Math.PI / 2).rotateX(-0.45).translate(0, -0.078, 0.112);
+    const brim = brimGeo(0.095, 0.01, 0);
     const g = mergeGeometries([dome.toNonIndexed(), brim.toNonIndexed()])!;
     dome.dispose();
     brim.dispose();
     return g;
   });
+  const edge = env.kit.geo("cap-edge", () => brimGeo(0.101, 0.007, 0.0065));
   const mat = env.kit.mat("fabric", "#ffffff", 0.9);
+  const edgeMat = env.kit.mat("plastic", "#ffffff", 0.5);
   const wood = env.kit.mat("wood", "#4a3422", 0.5);
   const peg = env.kit.mat("metal", "#b8bcc6", 0.3);
   const fill = useCallback(
     (i: number, p: THREE.Object3D, c: THREE.Color) => {
       p.position.set(i * spacing, lift, 0);
-      c.setHSL((((i * 2 * 0.137) % 1) + 1) % 1, 0.55, 0.4);
+      c.set(capColor);
     },
-    [spacing, lift],
+    [spacing, lift, capColor],
+  );
+  const fillEdge = useCallback(
+    (i: number, p: THREE.Object3D, c: THREE.Color) => {
+      p.position.set(i * spacing, lift, 0);
+      c.set(brimColor);
+    },
+    [spacing, lift, brimColor],
   );
   const x0 = (-(count - 1) * spacing) / 2;
   return (
@@ -341,6 +359,7 @@ export function CapRow({ o }: P<"capRow">) {
       ))}
       <group position={[x0, 0, 0]}>
         <Inst count={count} geometry={cap} material={mat} fill={fill} />
+        <Inst count={count} geometry={edge} material={edgeMat} fill={fillEdge} cast={false} />
       </group>
     </group>
   );
@@ -369,12 +388,36 @@ function tagTexture(labels: string[], keys: number, w: number): THREE.CanvasText
   return t;
 }
 
+/** A bike key's head: black, angular (a chamfered polygon, 11 mm thick), centred. */
+function bikeHeadGeometry() {
+  const s = new THREE.Shape();
+  [[-0.011, -0.03], [0.011, -0.03], [0.017, -0.004], [0.013, 0.027], [-0.013, 0.03], [-0.017, -0.004]].forEach(([x, y], i) => (i ? s.lineTo(x, y) : s.moveTo(x, y)));
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.011, bevelEnabled: false });
+  g.translate(0, 0, -0.0055);
+  return g;
+}
+
+/** A car-key fob: a round black disc with a plain quartered face (two opposite quarters one colour, two the other), vertex-coloured. */
+function fobGeometry(dark: string, a: string, b: string) {
+  const parts: THREE.BufferGeometry[] = [];
+  const paint = (g: THREE.BufferGeometry, hex: string) => {
+    const col = new THREE.Color(hex);
+    const n = g.getAttribute("position").count;
+    g.setAttribute("color", new THREE.BufferAttribute(Float32Array.from({ length: n * 3 }, (_, i) => [col.r, col.g, col.b][i % 3]), 3));
+    return g.toNonIndexed();
+  };
+  parts.push(paint(new THREE.CylinderGeometry(0.03, 0.03, 0.009, 24).rotateX(Math.PI / 2), dark));
+  for (let k = 0; k < 4; k++) parts.push(paint(new THREE.CircleGeometry(0.025, 8, (k * Math.PI) / 2, Math.PI / 2).translate(0, 0, 0.0047), k % 2 ? b : a));
+  const g = mergeGeometries(parts)!;
+  parts.forEach((x) => x.dispose());
+  return g;
+}
+
 export function KeyRack({ o }: P<"keyRack">) {
   const env = useEnv();
-  const { keys, w, lift, labels } = o.params;
+  const { keys, w, lift, labels, headColor, fobColors } = o.params;
   const board = useMat(o.material);
   const peg = env.kit.mat("metal", "#b8bcc6", 0.3);
-  const unit = env.kit.geo("unit-box", () => new THREE.BoxGeometry(1, 1, 1));
   // The blade and the ring of a key, relative to its head's middle, in one geometry.
   const bladeRing = env.kit.geo("key-blade-ring", () => {
     const blade = new THREE.BoxGeometry(0.009, 0.05, 0.003).translate(0, -0.045, 0);
@@ -384,19 +427,34 @@ export function KeyRack({ o }: P<"keyRack">) {
     ring.dispose();
     return g;
   });
+  const bikeGeo = env.kit.geo("bike-head", bikeHeadGeometry);
+  const fobGeo = env.kit.geo(`fob:${headColor}:${fobColors.join()}`, () => fobGeometry(headColor, fobColors[0], fobColors[1]));
   const metal = env.kit.mat("metal", "#ffffff", 0.3);
   const plastic = env.kit.mat("plastic", "#ffffff", 0.45);
+  const vcol = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.1 }), []);
+  useEffect(() => () => vcol.dispose(), [vcol]);
+  const bikes = Math.ceil(keys / 2);
+  const fobs = Math.floor(keys / 2);
   const xAt = (i: number) => (keys === 1 ? 0 : -w / 2 + 0.05 + (i * (w - 0.1)) / (keys - 1));
   const tex = env.kit.tex(`tags:${w}:${keys}:${labels.join("|")}`, () => tagTexture(labels, keys, w));
   const tagMat = useMemo(() => new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7, emissive: "#ffffff", emissiveMap: tex, emissiveIntensity: 0.22 }), [tex]);
   useEffect(() => () => tagMat.dispose(), [tagMat]);
-  const fillHead = useCallback(
+  // Even keys are bike keys (a black angular head), odd ones car fobs.
+  const fillBike = useCallback(
     (i: number, p: THREE.Object3D, c: THREE.Color) => {
-      const fob = i % 2 === 1;
-      p.position.set(xAt(i), lift - 0.075, 0.045);
-      p.rotation.z = ((i % 5) - 2) * 0.04;
-      p.scale.set(fob ? 0.03 : 0.026, fob ? 0.052 : 0.042, 0.011);
-      c.set(fob ? "#15161b" : "#d9801f");
+      const k = i * 2;
+      p.position.set(xAt(k), lift - 0.075, 0.045);
+      p.rotation.z = ((k % 5) - 2) * 0.04;
+      c.set(headColor);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [keys, w, lift, headColor],
+  );
+  const fillFob = useCallback(
+    (i: number, p: THREE.Object3D) => {
+      const k = i * 2 + 1;
+      p.position.set(xAt(k), lift - 0.08, 0.045);
+      p.rotation.z = ((k % 5) - 2) * 0.04;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [keys, w, lift],
@@ -418,7 +476,8 @@ export function KeyRack({ o }: P<"keyRack">) {
           <cylinderGeometry args={[0.005, 0.005, 0.03, 8]} />
         </mesh>
       ))}
-      <Inst count={keys} geometry={unit} material={plastic} fill={fillHead} cast={false} />
+      <Inst count={bikes} geometry={bikeGeo} material={plastic} fill={fillBike} cast={false} />
+      {fobs > 0 ? <Inst count={fobs} geometry={fobGeo} material={vcol} fill={fillFob} cast={false} /> : null}
       <Inst count={keys} geometry={bladeRing} material={metal} fill={fillBlade} cast={false} />
       {labels.length > 0 ? (
         <mesh position={[0, lift - 0.205, 0.0305]} userData={{ noShadow: true }} material={tagMat}>
@@ -429,79 +488,87 @@ export function KeyRack({ o }: P<"keyRack">) {
   );
 }
 
+/**
+ * The riding kit on the wall: a one-piece race suit hung from a hanger (torso, arms and legs are one silhouette), black with neon panels
+ * on the chest, shoulders and knees and a grey chest stripe; black boots with three buckle bands; a full-face helmet (red shell, white chin
+ * bar, dark visor, two vent slots). Colours are the object's data (`base`, `panel`, `stripe`; the material is the shell).
+ */
 export function RidingSet({ o }: P<"ridingSet">) {
   const env = useEnv();
-  const { helmet, jacket, pants, gloves, boots } = o.params;
-  const body = useMat(o.material);
-  const shell = env.kit.mat("plastic", o.material.color, 0.22);
-  const chin = env.kit.mat("plastic", "#f4f4f6", 0.22);
-  const dark = env.kit.mat("rubber", "#111216", 0.6);
-  const legs = dark;
-  const backing = dark;
-  const steel = env.kit.mat("metal", "#b8bcc6", 0.3);
+  const { helmet, jacket, pants, gloves, boots, base, panel, stripe } = o.params;
+  const k = env.kit;
+  const black = k.mat("rubber", base, 0.55);
+  const neon = k.mat("plastic", panel, 0.45);
+  const grey = k.mat("plastic", stripe, 0.4);
+  const shell = k.mat("plastic", o.material.color, 0.22);
+  const chin = k.mat("plastic", "#f4f4f6", 0.22);
+  const visor = k.mat("plastic", "#0c0d11", 0.12);
+  const steel = k.mat("metal", "#b8bcc6", 0.3);
+  const visorGeo = k.geo("helmet-visor", () => new THREE.SphereGeometry(0.1425, 20, 10, Math.PI / 2 - 0.85, 1.7, 1.12, 0.6));
   return (
     <group>
-      <Rb a={[0.86, 1.9, 0.02]} p={[0, 1.2, 0.01]} r={0.01} m={backing} cast={false} />
-      {helmet ? (
-        <group position={[0, 1.93, 0.17]}>
-          <Rb a={[0.2, 0.025, 0.2]} p={[0, -0.16, -0.05]} r={0.008} m={steel} />
-          <mesh scale={[0.95, 1.0, 1.15]} castShadow material={shell}>
-            <sphereGeometry args={[0.14, 24, 16]} />
-          </mesh>
-          <Rb a={[0.17, 0.085, 0.14]} p={[0, -0.095, 0.075]} r={0.035} m={chin} />
-          <mesh position={[0, 0.0, 0.1]} scale={[1, 0.5, 0.55]} material={dark}>
-            <sphereGeometry args={[0.125, 18, 10]} />
-          </mesh>
-          <mesh position={[0, 0.115, 0.0]} scale={[0.06, 0.012, 0.9]} material={steel}>
-            <sphereGeometry args={[1, 8, 6]} />
-          </mesh>
-        </group>
-      ) : null}
-      {gloves
-        ? [-1, 1].map((s) => (
-            <group key={s} position={[s * 0.33, 1.9, 0.05]} rotation={[0, 0, s * 0.08]}>
-              <Rb a={[0.085, 0.13, 0.04]} p={[0, 0, 0]} r={0.02} m={dark} />
-              <Rb a={[0.075, 0.07, 0.036]} p={[0, -0.095, 0]} r={0.02} m={dark} />
-            </group>
-          ))
-        : null}
+      <mesh position={[0, 1.9, 0.02]} rotation={[Math.PI / 2, 0, 0]} material={steel}>
+        <cylinderGeometry args={[0.008, 0.008, 0.06, 8]} />
+      </mesh>
+      {jacket || pants ? <Rb a={[0.46, 0.018, 0.018]} p={[0, 1.845, 0.075]} r={0.005} m={steel} cast={false} /> : null}
       {jacket ? (
-        <group position={[0, 1.38, 0.08]}>
-          <Rb a={[0.5, 0.58, 0.11]} p={[0, 0, 0]} r={0.04} m={body} />
-          <Rb a={[0.5, 0.05, 0.116]} p={[0, -0.1, 0]} r={0.015} m={dark} />
-          <Rb a={[0.012, 0.58, 0.118]} p={[0, 0, 0.0]} r={0.004} m={dark} />
-          <Rb a={[0.22, 0.05, 0.1]} p={[0, 0.3, 0]} r={0.02} m={dark} />
+        <group>
+          <Rb a={[0.42, 0.56, 0.13]} p={[0, 1.54, 0.085]} r={0.04} m={black} />
+          <Rb a={[0.52, 0.1, 0.14]} p={[0, 1.78, 0.085]} r={0.04} m={black} />
+          <Rb a={[0.3, 0.2, 0.138]} p={[0, 1.63, 0.085]} r={0.03} m={neon} />
+          <Rb a={[0.3, 0.032, 0.141]} p={[0, 1.5, 0.085]} r={0.012} m={grey} />
           {[-1, 1].map((s) => (
             <group key={s}>
-              <Rb a={[0.12, 0.54, 0.1]} p={[s * 0.34, -0.03, 0]} rot={[0, 0, s * 0.1]} r={0.04} m={body} />
-              <mesh position={[s * 0.285, 0.27, 0]} scale={[1.2, 0.8, 1.1]} castShadow material={dark}>
-                <sphereGeometry args={[0.06, 12, 8]} />
-              </mesh>
-              <Rb a={[0.1, 0.1, 0.107]} p={[s * 0.36, -0.06, 0]} rot={[0, 0, s * 0.1]} r={0.03} m={dark} />
+              <Rb a={[0.11, 0.62, 0.11]} p={[s * 0.285, 1.46, 0.09]} rot={[0, 0, s * 0.07]} r={0.04} m={black} />
+              <Rb a={[0.13, 0.09, 0.145]} p={[s * 0.235, 1.8, 0.085]} r={0.03} m={neon} />
+              <Rb a={[0.115, 0.04, 0.115]} p={[s * 0.3, 1.2, 0.09]} rot={[0, 0, s * 0.07]} r={0.015} m={grey} />
             </group>
           ))}
         </group>
       ) : null}
       {pants ? (
-        <group position={[0, 0.68, 0.07]}>
-          <Rb a={[0.38, 0.06, 0.11]} p={[0, 0.35, 0]} r={0.02} m={dark} />
+        <group>
+          <Rb a={[0.42, 0.1, 0.13]} p={[0, 1.2, 0.085]} r={0.03} m={black} />
           {[-1, 1].map((s) => (
             <group key={s}>
-              <Rb a={[0.18, 0.74, 0.1]} p={[s * 0.1, 0, 0]} r={0.04} m={legs} />
-              <Rb a={[0.1, 0.12, 0.02]} p={[s * 0.1, -0.05, 0.055]} r={0.012} m={dark} />
+              <Rb a={[0.19, 0.84, 0.12]} p={[s * 0.1, 0.76, 0.085]} r={0.04} m={black} />
+              <Rb a={[0.15, 0.17, 0.128]} p={[s * 0.1, 0.78, 0.089]} r={0.03} m={neon} />
             </group>
           ))}
         </group>
       ) : null}
+      {gloves
+        ? [-1, 1].map((s) => (
+            <group key={s} position={[s * 0.34, 1.12, 0.09]}>
+              <Rb a={[0.085, 0.13, 0.04]} p={[0, 0, 0]} r={0.02} m={black} />
+              <Rb a={[0.075, 0.07, 0.036]} p={[0, -0.095, 0]} r={0.02} m={black} />
+            </group>
+          ))
+        : null}
       {boots
         ? [-1, 1].map((s) => (
             <group key={s} position={[s * 0.115, 0, 0.17]}>
-              <Rb a={[0.11, 0.26, 0.12]} p={[0, 0.17, -0.01]} r={0.035} m={dark} />
-              <Rb a={[0.11, 0.07, 0.26]} p={[0, 0.045, 0.06]} r={0.03} m={dark} />
+              <Rb a={[0.11, 0.28, 0.12]} p={[0, 0.17, -0.01]} r={0.035} m={black} />
+              <Rb a={[0.11, 0.07, 0.26]} p={[0, 0.045, 0.06]} r={0.03} m={black} />
+              {[0.1, 0.18, 0.26].map((y) => (
+                <Rb key={y} a={[0.118, 0.016, 0.128]} p={[0, y, -0.01]} r={0.004} m={steel} cast={false} />
+              ))}
               <Rb a={[0.112, 0.014, 0.265]} p={[0, 0.008, 0.06]} r={0.005} m={steel} cast={false} />
             </group>
           ))
         : null}
+      {helmet ? (
+        <group position={[0, 2.0, 0.17]}>
+          <mesh scale={[0.95, 1.0, 1.15]} castShadow material={shell}>
+            <sphereGeometry args={[0.14, 24, 16]} />
+          </mesh>
+          <mesh geometry={visorGeo} scale={[0.95, 1.0, 1.15]} material={visor} />
+          <Rb a={[0.17, 0.085, 0.14]} p={[0, -0.095, 0.075]} r={0.035} m={chin} />
+          {[-1, 1].map((s) => (
+            <Rb key={s} a={[0.018, 0.006, 0.1]} p={[s * 0.034, 0.128, 0.015]} rot={[-0.1, 0, 0]} r={0.003} m={visor} cast={false} />
+          ))}
+        </group>
+      ) : null}
     </group>
   );
 }
@@ -641,6 +708,105 @@ export function PuzzleCube({ o }: P<"puzzleCube">) {
         <Rb a={[s, s, s]} p={[0, 0, 0]} r={s * 0.06} m={core} />
         <Inst count={54} geometry={plane} material={mat} fill={fill} cast={false} />
       </group>
+    </group>
+  );
+}
+
+/**
+ * White cube shelving (the TV unit): `cols` x `rows` open cells. The first `books` cells (spread through the unit by a fixed step)
+ * hold a row of book spines, the next `boxes` hold a box; the rest stay empty. Spines and boxes are one instanced draw each.
+ */
+export function CubeShelf({ o }: P<"cubeShelf">) {
+  const env = useEnv();
+  const { cols, rows, cell, d, books, boxes } = o.params;
+  const white = useMat(o.material);
+  const unit = env.kit.geo("unit-box", () => new THREE.BoxGeometry(1, 1, 1));
+  const paper = env.kit.mat("paper", "#ffffff", 0.7);
+  const t = 0.018;
+  const W = cols * cell;
+  const H = rows * cell;
+  const items = useMemo(() => {
+    const total = cols * rows;
+    const order: number[] = [];
+    const seen = new Set<number>();
+    for (let i = 0; order.length < total; i++) {
+      const c = (i * 5 + 2) % total;
+      if (!seen.has(c)) {
+        seen.add(c);
+        order.push(c);
+      }
+      if (i > total * 8) break;
+    }
+    const spines: Array<{ x: number; y: number; w: number; h: number; lean: number; hue: number }> = [];
+    const crates: Array<{ x: number; y: number; w: number; h: number; hue: number }> = [];
+    order.slice(0, Math.min(books, total)).forEach((c, bi) => {
+      const col = c % cols;
+      const row = Math.floor(c / cols);
+      const cx = -W / 2 + (col + 0.5) * cell;
+      const floorY = row * cell + t / 2;
+      const n = 4 + (bi % 3);
+      let x = cx - cell / 2 + t + 0.012;
+      for (let s = 0; s < n; s++) {
+        const sw = 0.022 + ((s + bi) % 3) * 0.006;
+        const sh = Math.min(cell - 0.05, 0.16 + ((s * 7 + bi) % 5) * 0.022);
+        spines.push({ x: x + sw / 2, y: floorY + sh / 2, w: sw, h: sh, lean: s === n - 1 && bi % 2 ? -0.18 : 0, hue: ((bi * 3 + s) * 0.137) % 1 });
+        x += sw + 0.003;
+      }
+    });
+    order.slice(Math.min(books, total), Math.min(books + boxes, total)).forEach((c, bi) => {
+      const col = c % cols;
+      const row = Math.floor(c / cols);
+      crates.push({ x: -W / 2 + (col + 0.5) * cell, y: row * cell + t / 2 + cell * 0.2, w: cell * 0.72, h: cell * 0.4, hue: 0.08 + bi * 0.19 });
+    });
+    return { spines, crates };
+  }, [cols, rows, cell, books, boxes, W]);
+  const fillSpine = useCallback(
+    (i: number, p: THREE.Object3D, c: THREE.Color) => {
+      const s = items.spines[i];
+      p.position.set(s.x, s.y, 0.0);
+      p.rotation.z = s.lean;
+      p.scale.set(s.w, s.h, d * 0.72);
+      c.setHSL(s.hue, 0.42, 0.38);
+    },
+    [items, d],
+  );
+  const fillCrate = useCallback(
+    (i: number, p: THREE.Object3D, c: THREE.Color) => {
+      const s = items.crates[i];
+      p.position.set(s.x, s.y, 0.0);
+      p.scale.set(s.w, s.h, d * 0.78);
+      c.setHSL(s.hue, 0.2, 0.74);
+    },
+    [items, d],
+  );
+  return (
+    <group>
+      <mesh position={[0, H - t / 2, 0]} castShadow receiveShadow material={white}>
+        <boxGeometry args={[W, t, d]} />
+      </mesh>
+      <mesh position={[0, t / 2, 0]} castShadow receiveShadow material={white}>
+        <boxGeometry args={[W, t, d]} />
+      </mesh>
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * (W / 2 - t / 2), H / 2, 0]} castShadow receiveShadow material={white}>
+          <boxGeometry args={[t, H, d]} />
+        </mesh>
+      ))}
+      <mesh position={[0, H / 2, -d / 2 + t / 2]} receiveShadow material={white}>
+        <boxGeometry args={[W, H, t]} />
+      </mesh>
+      {Array.from({ length: cols - 1 }, (_, i) => (
+        <mesh key={`v${i}`} position={[-W / 2 + (i + 1) * cell, H / 2, 0]} castShadow receiveShadow material={white}>
+          <boxGeometry args={[t, H, d]} />
+        </mesh>
+      ))}
+      {Array.from({ length: rows - 1 }, (_, i) => (
+        <mesh key={`h${i}`} position={[0, (i + 1) * cell, 0]} castShadow receiveShadow material={white}>
+          <boxGeometry args={[W, t, d]} />
+        </mesh>
+      ))}
+      {items.spines.length > 0 ? <Inst count={items.spines.length} geometry={unit} material={paper} fill={fillSpine} /> : null}
+      {items.crates.length > 0 ? <Inst count={items.crates.length} geometry={unit} material={paper} fill={fillCrate} /> : null}
     </group>
   );
 }

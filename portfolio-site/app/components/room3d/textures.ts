@@ -104,7 +104,7 @@ export function fabricTexture(size: number, base = "#3c4466", repeat: [number, n
   for (let y = 0; y < size; y += step) {
     for (let x = 0; x < size; x += step) {
       const o = (x / step + y / step) % 2 === 0;
-      g.fillStyle = o ? `rgba(255,255,255,${0.04 + r() * 0.05})` : `rgba(0,0,0,${0.06 + r() * 0.06})`;
+      g.fillStyle = o ? `rgba(255,255,255,${0.012 + r() * 0.014})` : `rgba(0,0,0,${0.018 + r() * 0.018})`;
       g.fillRect(x, y, step - 1, step - 1);
     }
   }
@@ -192,7 +192,7 @@ function roughnessFromHeight(h: Float32Array, size: number, lo: number, hi: numb
 }
 
 /** The surface kinds a material preset can ask for (see `Kit.mat`): the height field behind each, as a normal map and a roughness map. */
-export type SurfaceKind = "plaster" | "streak" | "brushed" | "grain" | "weave" | "blotch";
+export type SurfaceKind = "plaster" | "streak" | "brushed" | "grain" | "weave" | "blotch" | "wrinkle" | "shag";
 
 function surfaceHeight(kind: SurfaceKind, size: number): Float32Array {
   switch (kind) {
@@ -216,6 +216,12 @@ function surfaceHeight(kind: SurfaceKind, size: number): Float32Array {
     }
     case "blotch":
       return heightField(size, [[6, 6, 0.5], [18, 18, 0.3], [48, 48, 0.2]], 47);
+    case "wrinkle":
+      // Soft folds of a duvet: a few long low waves and a little cloth grain, nothing sharp.
+      return heightField(size, [[3, 2, 0.5], [6, 4, 0.3], [12, 9, 0.15], [64, 64, 0.05]], 53);
+    case "shag":
+      // Long pile seen from a distance: fine, dense, uneven.
+      return heightField(size, [[64, 64, 0.3], [128, 128, 0.4], [256, 256, 0.3]], 59);
   }
 }
 
@@ -358,5 +364,73 @@ export function clockFaceTexture(size = 256): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
+  return t;
+}
+
+/**
+ * A door's panels as a normal map: `cols` x `rows` recessed panels with a soft bevel on a flat frame (the grooves are in
+ * the map, not the geometry). Tangent space, so it works on the front face of a box.
+ */
+export function panelNormal(size: number, cols: number, rows: number, strength = 1): THREE.CanvasTexture {
+  const h = new Float32Array(size * size);
+  const m = 0.1; // frame margin, as a fraction of the door
+  const bevel = 0.02;
+  const ramp = (v: number) => Math.max(0, Math.min(1, v));
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const v = y / size;
+      let depth = 1;
+      const cw = (1 - 2 * m - (cols - 1) * m) / cols;
+      const rh = (1 - 2 * m - (rows - 1) * m) / rows;
+      for (let c = 0; c < cols; c++) {
+        for (let r = 0; r < rows; r++) {
+          const x0 = m + c * (cw + m);
+          const y0 = m + r * (rh + m);
+          const d = Math.min(u - x0, x0 + cw - u, v - y0, y0 + rh - v);
+          if (d > 0) depth = Math.min(depth, 1 - ramp(d / bevel));
+        }
+      }
+      h[y * size + x] = depth;
+    }
+  }
+  return normalFromHeight(h, size, strength * 0.8, [1, 1]);
+}
+
+/** A pegboard: white with a grid of dark holes (the holes are colour, the board is flat); `holes` per tile side. */
+export function pegTexture(size: number, holes = 8): THREE.CanvasTexture {
+  const c = canvas(size);
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#f4f5f8";
+  g.fillRect(0, 0, size, size);
+  const step = size / holes;
+  g.fillStyle = "#9096a6";
+  for (let j = 0; j < holes; j++)
+    for (let i = 0; i < holes; i++) {
+      g.beginPath();
+      g.arc((i + 0.5) * step, (j + 0.5) * step, Math.max(1.2, step * 0.11), 0, Math.PI * 2);
+      g.fill();
+    }
+  return finish(c, true, [1, 1]);
+}
+
+/** White horizontal blinds as one picture: a stripe per slat with a lit top edge and a shaded underside (no per-slat meshes). */
+export function blindsTexture(slats: number): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 8;
+  c.height = 256;
+  const g = c.getContext("2d")!;
+  const step = 256 / slats;
+  for (let i = 0; i < slats; i++) {
+    const y = i * step;
+    const gr = g.createLinearGradient(0, y, 0, y + step);
+    gr.addColorStop(0, "#fbfcff");
+    gr.addColorStop(0.7, "#e4e7ee");
+    gr.addColorStop(1, "#a9aebb");
+    g.fillStyle = gr;
+    g.fillRect(0, y, 8, step);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }

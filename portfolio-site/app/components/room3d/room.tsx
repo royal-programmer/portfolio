@@ -57,6 +57,7 @@ export const KINDS: KindMap = {
   keyRack: Dream.KeyRack,
   bag: Decor.Bag,
   ridingSet: Dream.RidingSet,
+  cubeShelf: Dream.CubeShelf,
   football: Dream.Football,
   puzzleCube: Dream.PuzzleCube,
   box: Decor.Box,

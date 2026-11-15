@@ -320,21 +320,44 @@ export function PcTower({ o }: P<"pcTower">) {
 }
 
 export function Chair({ o }: P<"chair">) {
-  const { style } = o.params;
+  const { style, trim } = o.params;
   const fabric = useMat(o.material);
   const steel = useMat(STEEL);
   const wheel = useMat({ preset: "rubber", color: "#0b0b0e", roughness: 0.6 });
-  const seat = useMat({ preset: "fabric", color: "#16171c", roughness: 0.8 });
+  const seat = useMat({ preset: "fabric", color: style === "gaming" ? trim : "#16171c", roughness: 0.8 });
   const seatY = style === "stool" ? 0.62 : 0.5;
-  const env = useEnv();
-  const accent = env.accent;
+  const gaming = style === "gaming";
   return (
     <group>
-      <RoundedBox args={[0.5, 0.09, 0.48]} radius={0.04} smoothness={4} position={[0, seatY, 0]} castShadow receiveShadow material={style === "gaming" ? seat : fabric} />
-      {style !== "stool" ? (
-        <RoundedBox args={[0.46, style === "gaming" ? 0.75 : 0.55, 0.08]} radius={0.04} smoothness={4} position={[0, seatY + (style === "gaming" ? 0.42 : 0.35), -0.24]} rotation={[0.12, 0, 0]} castShadow receiveShadow material={fabric} />
+      <RoundedBox args={[0.5, 0.09, 0.48]} radius={0.04} smoothness={4} position={[0, seatY, 0]} castShadow receiveShadow material={seat} />
+      {gaming
+        ? [-1, 1].map((s) => (
+            <RoundedBox key={s} args={[0.07, 0.11, 0.46]} radius={0.03} smoothness={3} position={[s * 0.215, seatY + 0.02, 0]} castShadow receiveShadow material={fabric} />
+          ))
+        : null}
+      {style === "office" ? (
+        <RoundedBox args={[0.46, 0.55, 0.08]} radius={0.04} smoothness={4} position={[0, seatY + 0.35, -0.24]} rotation={[0.12, 0, 0]} castShadow receiveShadow material={fabric} />
       ) : null}
-      {style === "gaming" ? <mesh position={[0, seatY + 0.5, -0.285]} rotation={[0.12, 0, 0]} material={env.kit.glow(accent, 1.4)}><boxGeometry args={[0.05, 0.5, 0.004]} /></mesh> : null}
+      {gaming ? (
+        <group position={[0, seatY + 0.42, -0.24]} rotation={[0.12, 0, 0]}>
+          <RoundedBox args={[0.34, 0.76, 0.08]} radius={0.04} smoothness={4} castShadow receiveShadow material={seat} />
+          {[-1, 1].map((s) => (
+            <RoundedBox key={s} args={[0.08, 0.72, 0.11]} radius={0.035} smoothness={3} position={[s * 0.21, 0, 0.012]} castShadow receiveShadow material={fabric} />
+          ))}
+          <RoundedBox args={[0.22, 0.13, 0.07]} radius={0.04} smoothness={3} position={[0, 0.34, 0.07]} castShadow material={fabric} />
+          <RoundedBox args={[0.24, 0.1, 0.06]} radius={0.04} smoothness={3} position={[0, -0.12, 0.07]} castShadow material={fabric} />
+        </group>
+      ) : null}
+      {gaming
+        ? [-1, 1].map((s) => (
+            <group key={s}>
+              <mesh position={[s * 0.31, seatY + 0.07, 0.02]} castShadow material={seat}>
+                <boxGeometry args={[0.04, 0.2, 0.04]} />
+              </mesh>
+              <RoundedBox args={[0.06, 0.035, 0.3]} radius={0.015} smoothness={2} position={[s * 0.31, seatY + 0.19, 0.02]} castShadow material={seat} />
+            </group>
+          ))
+        : null}
       <mesh position={[0, seatY / 2 + 0.03, 0]} castShadow material={steel}>
         <cylinderGeometry args={[0.025, 0.03, seatY - 0.1, 12]} />
       </mesh>

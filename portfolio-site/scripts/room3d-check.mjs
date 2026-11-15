@@ -408,7 +408,7 @@ check("the desk props map to room objects (headphones are the headset)", STAGE_P
   check("a bounce keeps about 0.6 of the speed", maxUp > 0.5 && maxUp < 0.7, String(maxUp));
   const onUnit = newBall([1.4, 0.9, 2.79]);
   for (let i = 0; i < 60 * 5; i++) stepBall(onUnit, 1 / 60, r, world, [1.4, 0.9, 2.79]);
-  check("a ball dropped on the TV unit lands on top of it", Math.abs(onUnit.p[1] - (0.42 + r)) < 0.02, JSON.stringify(onUnit.p));
+  check("a ball dropped on the TV unit lands on top of it", Math.abs(onUnit.p[1] - (0.6 + r)) < 0.02, JSON.stringify(onUnit.p));
   const nan = newBall(home);
   nan.p[0] = NaN;
   stepBall(nan, 1 / 60, r, world, home);

@@ -13,6 +13,8 @@ import { z } from "zod";
 const str = (max = 120) => z.string().max(max);
 const color = () => z.string().regex(/^#[0-9a-fA-F]{6}$/, "a #rrggbb colour").meta({ ui: "color" });
 const num = (min: number, max: number) => z.number().min(min).max(max);
+/** A colour field with its default (old saved rooms without the field still parse). */
+const colorD = (d: string) => color().default(d);
 const metres = (max = 12) => num(-max, max);
 const vec3 = () => z.tuple([metres(), metres(6), metres()]).meta({ ui: "vec3" });
 
@@ -108,8 +110,24 @@ export const KIND_SCHEMAS = {
   shelf: kind("shelf", z.strictObject({ w: num(0.3, 3), d: num(0.1, 0.5), tiers: z.number().int().min(1).max(5), lift: num(0, 3) })),
   bookStack: kind("bookStack", z.strictObject({ count: z.number().int().min(1).max(30), layout: z.enum(["row", "pile"]) })),
   plant: kind("plant", z.strictObject({ height: num(0.2, 2.5), leaves: z.number().int().min(4).max(60), pot: z.enum(["round", "square"]) })),
-  chair: kind("chair", z.strictObject({ style: z.enum(["office", "gaming", "stool"]) })),
-  bed: kind("bed", z.strictObject({ size: z.enum(["single", "double"]), pillows: z.number().int().min(0).max(4), blanket: z.boolean(), headboard: z.boolean() })),
+  /** `trim` is the second tone of a gaming chair (the object's material is the first). */
+  chair: kind("chair", z.strictObject({ style: z.enum(["office", "gaming", "stool"]), trim: colorD("#14151a") })),
+  /** The object's material is the duvet; the rest of the bed's colours are here. `led`: a glow line under the base (medium and high tiers). */
+  bed: kind(
+    "bed",
+    z.strictObject({
+      size: z.enum(["single", "double"]),
+      pillows: z.number().int().min(0).max(4),
+      blanket: z.boolean(),
+      headboard: z.boolean(),
+      baseColor: colorD("#8a8d93"),
+      pillowColor: colorD("#ffffff"),
+      throwColor: colorD("#8c9098"),
+      headboardColor: colorD("#f1f2f5"),
+      led: z.boolean().default(true),
+      ledColor: colorD("#9ab4ff"),
+    }),
+  ),
   wardrobe: kind("wardrobe", z.strictObject({ w: num(0.6, 3), h: num(1.2, 2.6), d: num(0.4, 0.8), open: z.boolean(), clothes: z.number().int().min(0).max(40) })),
   frame: kind(
     "frame",
@@ -143,11 +161,20 @@ export const KIND_SCHEMAS = {
   /** `stand` true: on a floor stand; false: hung on a wall hook. A click strums the next chord of `chords` (Web Audio, only while the site's sound is on). */
   guitar: kind("guitar", z.strictObject({ stand: z.boolean(), chords: z.array(z.enum(CHORD_IDS)).min(1).max(6) })),
   midiKeyboard: kind("midiKeyboard", z.strictObject({ keys: z.number().int().min(25).max(88) })),
-  capRow: kind("capRow", z.strictObject({ count: z.number().int().min(1).max(30), spacing: num(0.08, 0.4), lift: num(0.5, 2.5) })),
+  capRow: kind("capRow", z.strictObject({ count: z.number().int().min(1).max(30), spacing: num(0.08, 0.4), lift: num(0.5, 2.5), capColor: colorD("#111216"), brimColor: colorD("#d1202b") })),
   /** `labels` are the small tags under the first keys (admin-editable text). */
-  keyRack: kind("keyRack", z.strictObject({ keys: z.number().int().min(1).max(30), w: num(0.2, 1.5), lift: num(0.5, 2.5), labels: z.array(str(16)).max(30) })),
+  keyRack: kind(
+    "keyRack",
+    z.strictObject({ keys: z.number().int().min(1).max(30), w: num(0.2, 1.5), lift: num(0.5, 2.5), labels: z.array(str(16)).max(30), headColor: colorD("#0e0f12"), fobColors: z.tuple([color(), color()]).default(["#1c63d6", "#f4f6fa"]) }),
+  ),
   bag: kind("bag", z.strictObject({ label: str(40), image: imageSchema.optional() })),
-  ridingSet: kind("ridingSet", z.strictObject({ helmet: z.boolean(), jacket: z.boolean(), pants: z.boolean(), gloves: z.boolean(), boots: z.boolean() })),
+  /** One-piece race suit (jacket = torso and arms, pants = legs): `base` black, `panel` the neon panels, `stripe` the chest stripe; the object's material is the helmet shell. */
+  ridingSet: kind(
+    "ridingSet",
+    z.strictObject({ helmet: z.boolean(), jacket: z.boolean(), pants: z.boolean(), gloves: z.boolean(), boots: z.boolean(), base: colorD("#101114"), panel: colorD("#ff3b1f"), stripe: colorD("#8a8e96") }),
+  ),
+  /** White cube shelving (the TV unit): `cols` x `rows` cells of `cell` metres; `books` cells hold book spines, `boxes` cells hold boxes. */
+  cubeShelf: kind("cubeShelf", z.strictObject({ cols: z.number().int().min(1).max(8), rows: z.number().int().min(1).max(4), cell: num(0.2, 0.5), d: num(0.15, 0.5), books: z.number().int().min(0).max(32), boxes: z.number().int().min(0).max(32) })),
   football: kind("football", z.strictObject({ r: num(0.05, 0.3) })),
   puzzleCube: kind("puzzleCube", z.strictObject({ size: num(0.03, 0.2) })),
   box: kind("box", z.strictObject({ w: num(0.001, 4), h: num(0.001, 4), d: num(0.001, 4), round: num(0, 0.2) })),
@@ -200,6 +227,7 @@ export const objectSchema = z.discriminatedUnion("kind", [
   KIND_SCHEMAS.keyRack,
   KIND_SCHEMAS.bag,
   KIND_SCHEMAS.ridingSet,
+  KIND_SCHEMAS.cubeShelf,
   KIND_SCHEMAS.football,
   KIND_SCHEMAS.puzzleCube,
   KIND_SCHEMAS.box,
