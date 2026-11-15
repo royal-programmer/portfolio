@@ -1,6 +1,6 @@
 # 19. Room style references (owner-supplied, 2026-11-15)
 
-Ratul sent 17 reference photos. They are not committed (not ours to publish); this file records what they show so every 3D round builds toward the same look. Everything below becomes `room3d` settings data (colours, materials, object params); nothing is hard-coded.
+Ratul sent 17 reference photos (photos 1-5 are a **reference** room he likes, not his own; the 37e build says what is built and what is not, below). They are not committed (not ours to publish); this file records what they show so every 3D round builds toward the same look. Everything below becomes `room3d` settings data (colours, materials, object params); nothing is hard-coded.
 
 ## The room (photos 1-5: one white, neon-lit bedroom-studio)
 - **Palette:** white walls, white textured (popcorn) ceiling, **glossy white ceramic floor tiles about 45 cm with light grout**, a **white long-pile shag rug** covering most of the floor between bed and shelves. Everything cool-white; the only colour is the LED light and screen content.
@@ -14,23 +14,26 @@ Ratul sent 17 reference photos. They are not committed (not ours to publish); th
 ## Alternate mood (photo 6: dark studio)
 Dark grey wall, warm walnut desk, wood floor, warm lamps, one red-orange neon line, three portrait prints, speakers, a vertical PC with red glow, a plant. This is the **dark variant of the same room**: map it to the Trader world (dim, strong accent light); Code stays the white room. Only `lighting` and material colours change per world, as already planned.
 
-## Objects (photos 7-17), colours as data, logos only via owner upload
-| Object | Reference | Shape and colour to build | Note |
-|---|---|---|---|
-| Riding suit | one-piece leather race suit | black base, **neon red-orange** panels on chest, shoulders, knees; grey chest stripe; white accents; knee sliders | brand marks are trademarks: generic panels, logo texture only if the owner uploads one |
-| Riding boots | adventure boots | black, three buckles, textured shin plate | |
-| Helmet | full-face MTB style | **red shell, white chin bar and visor**, large vents | |
-| Bike key | KTM-style | black angular plastic head, steel blade | plain head; "KTM" text only via upload |
-| Car key | BMW-style with roundel fob | black key, round blue/white quartered fob on a ring | plain quartered disc, no letters |
-| Console | PS5 slim style | **white vertical slab with black centre strip**, white controller beside | already "generic console"; keep the two-tone |
-| Gaming PC | white glass-sided case | **white case, glass front and side, 6-9 white RGB fans**, white GPU, cool-white light | two case styles shown; pick the first (tall, front glass) |
-| Gaming chair | racing style | **blue and black** leather, headrest and lumbar pillows, black 5-star base | |
-| Guitar | black acoustic cutaway | **black body, cutaway, white binding, black headstock**, strap hanging | matches the guitar-app round |
-| Cap | Bulls-style | **black cap with red brim edge**; the bull logo is a trademark, blank front or owner upload | |
-| Monitors wallpaper | manga collage | black/white panels with lavender tint | owner uploads real images; placeholder is a procedural monochrome collage |
+## Objects (photos 7-17), colours as data; logos allowed, but only as the owner's own uploads (never bundled), and every object has a plain fallback
+| Object | Reference | Shape and colour to build | Note | Built (round 37e) |
+|---|---|---|---|---|
+| Riding suit | one-piece leather race suit | black base, **neon red-orange** panels on chest, shoulders, knees; grey chest stripe; white accents; knee sliders | generic panels; the owner may upload a logo texture | One-piece suit from primitives (black, neon panels on chest, shoulders and knees, grey chest stripe); no knee sliders, no logo image yet |
+| Riding boots | adventure boots | black, three buckles, textured shin plate | | Black boots with three buckle bands (primitive); no shin texture |
+| Helmet | full-face MTB style | **red shell, white chin bar and visor**, large vents | | Red shell, white chin bar, dark visor, two vent slots (primitive); no CC0 motorcycle helmet exists, the CC-BY "Helmet" candidates are knight and football helmets |
+| Bike key | KTM-style | black angular plastic head, steel blade | plain head; the owner may upload a logo or text | Black angular head and steel blade (primitive); no text |
+| Car key | BMW-style with roundel fob | black key, round blue/white quartered fob on a ring | plain quartered disc; the owner may upload a roundel | Round black fob with a plain blue and white quartered face on a ring (primitive) |
+| Console | PS5 slim style | **white vertical slab with black centre strip**, white controller beside | already "generic console"; keep the two-tone | Unchanged (white slab, black strip, white controllers); no CC0 PS5-style model found |
+| Gaming PC | white glass-sided case | **white case, glass front and side, 6-9 white RGB fans**, white GPU, cool-white light | two case styles shown; pick the first (tall, front glass) | Unchanged (parametric glass tower, RGB fans); the CC-BY "Gaming Computer" model has 16 materials (too many draws) |
+| Gaming chair | racing style | **blue and black** leather, headrest and lumbar pillows, black 5-star base | | Blue and black racing style from primitives (two-tone from data, headrest, side wings, lumbar pillow); a CC0 blue office chair was tried and rejected |
+| Guitar | black acoustic cutaway | **black body, cutaway, white binding, black headstock**, strap hanging | matches the guitar-app round | A CC-BY low-poly acoustic (glTF) recoloured black from data, on the drawn stand; no cutaway, no white binding, no strap |
+| Cap | Bulls-style | **black cap with red brim edge**; blank front by default; the owner may upload the logo | | Black caps with a red brim edge (primitive); no logo image yet |
+| Monitors wallpaper | manga collage | black/white panels with lavender tint | owner uploads real images; placeholder is a procedural monochrome collage | Not built (the monitors show the terminal, code and projects) |
 
 ## Open questions for the owner
-1. Are photos 1-5 **your real room**, or a reference you like? (The AC/vent style looks North American.) It changes nothing in the build but decides whether "feels original" means "like my room" or "like this room".
-2. Rug: keep the big white shag rug (it hides most of the tile and is cheap to render) or show more tile?
-3. The two closets replace the single wardrobe: confirm.
-4. Which objects carry real logos later (via your uploads): cap, keys, suit, PC? Nothing with a logo ships in the repo.
+1. ~~Are photos 1-5 your real room?~~ **Answered:** a reference, not his room.
+2. ~~Rug~~ **Answered:** the white shag rug stays (built in 37e: 4.0 x 3.4 m, very rough, a fuzzy normal map).
+3. ~~The two closets replace the single wardrobe~~ **Answered:** yes (built in 37e; the `wardrobe` kind stays in the schema only so old saved rooms still load).
+4. ~~Which objects carry real logos later?~~ **Answered (owner, 2026-11-15):** logos are allowed on any object (personal project), as the owner's own uploads (`image` params), never as bundled files; every object has a plain fallback.
+
+## Built in round 37e (the room)
+Closets (two bi-fold, plushies and a MIDI keyboard; clothes on black hangers), shag rug, ceiling and fan, triangle panels (7, column), pegboard of six keyboards, neon rectangle round the window, a run on the ceiling edge and a wave above the TV unit, white blinds and two LED tube lamps at the window, white six-panel door, white cube shelving under the TV with books and boxes, grey fabric bed with a white duvet and an under-bed glow. **Not built:** the AC unit and ceiling vent, the mirror, backpack and dumbbells, the task lamp and the drawer unit under the desk, the cream floor cushion, the framed posters and the cherry-blossom branch, the printed blanket, speakers on the left shelf, a bottle and notebook set, the manga wallpapers (placeholders stay), the Trader dark variant, and everything marked "not built" in the table above.
