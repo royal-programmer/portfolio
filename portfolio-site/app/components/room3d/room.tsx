@@ -8,7 +8,7 @@
  */
 import { AccumulativeShadows, ContactShadows, Environment, Lightformer, RandomizedLight } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
-import { Component, memo, Suspense, useEffect, useMemo, useRef, type ComponentType, type ReactNode } from "react";
+import { Component, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import * as THREE from "three";
 import type { KindId, ObjectOf, Room as RoomData, RoomObject, Tier } from "@/lib/room3d/schema";
 import { trimToBudget } from "@/lib/room3d/tiers";
@@ -17,6 +17,7 @@ import * as Decor from "./kit-decor";
 import * as Dream from "./kit-dream";
 import * as Stage from "./kit-stage";
 import * as Work from "./kit-work";
+import { ModelOr, preloadModels } from "./kit-model";
 import { mergeStatic, type MergeStats } from "./static-merge";
 import { tileTextures, TILE_M, woodTexture } from "./textures";
 
@@ -92,7 +93,7 @@ export type RoomProps = {
   onRun: (i: Interaction, o: RoomObject, e?: ThreeEvent<MouseEvent>) => void;
 };
 
-function Placed({ o, onHover, onRun }: { o: RoomObject; onHover: RoomProps["onHover"]; onRun: RoomProps["onRun"] }) {
+function Placed({ o, onHover, onRun, onModel }: { o: RoomObject; onHover: RoomProps["onHover"]; onRun: RoomProps["onRun"]; onModel: () => void }) {
   const Kind = KINDS[o.kind] as ComponentType<{ o: RoomObject }>;
   const env = useEnv();
   const it = o.interaction;
@@ -116,7 +117,7 @@ function Placed({ o, onHover, onRun }: { o: RoomObject; onHover: RoomProps["onHo
   const { pos, rotY, scale } = o.transform;
   return (
     <group name={o.id} position={pos} rotation={[0, rotY, 0]} scale={scale} {...handlers}>
-      <Kind o={o} />
+      <ModelOr o={o} fallback={<Kind o={o} />} onReady={onModel} />
       {env.hoverId === o.id && o.interaction && o.kind !== "door" ? <Halo position={[0, 0.12, 0.08]} size={[0.45, 0.45]} color={env.accent} opacity={0.4} /> : null}
     </group>
   );
@@ -248,6 +249,10 @@ export function Room(props: RoomProps) {
     l.target.updateMatrixWorld();
   }, [sun]);
   // Merge what never moves into a few meshes, once the objects are mounted (and again when their materials change).
+  // A model that has arrived replaces its primitive: the static merge runs again so it holds no ghost of the old shape.
+  const [modelsIn, setModelsIn] = useState(0);
+  const onModel = useCallback(() => setModelsIn((n) => n + 1), []);
+  useEffect(() => preloadModels(objects), [objects]);
   const root = useRef<THREE.Group>(null);
   const { merge = true } = props;
   const onMerged = useRef(props.onMerged);
@@ -260,7 +265,7 @@ export function Room(props: RoomProps) {
     const m = mergeStatic(g);
     onMerged.current?.(m.stats);
     return m.restore;
-  }, [merge, objects, kit, bandId, accent, props.consoleOn, props.boards, room.shell, floorTex]);
+  }, [merge, objects, kit, bandId, accent, props.consoleOn, props.boards, room.shell, floorTex, modelsIn]);
   const desk = room.objects.find((o) => o.kind === "desk") as ObjectOf<"desk"> | undefined;
   const sunOn = light.windowLight.intensity > 0.1;
   return (
@@ -304,7 +309,7 @@ export function Room(props: RoomProps) {
         </mesh>
       ))}
       {objects.map((o) => (
-        <Placed key={o.id} o={o} onHover={props.onHover} onRun={props.onRun} />
+        <Placed key={o.id} o={o} onHover={props.onHover} onRun={props.onRun} onModel={onModel} />
       ))}
       </group>
       <Shadows aoOn={tier.aoOn} big={tier.shadowRes >= 2048} W={W} D={D} deskX={desk?.transform.pos[0]} deskZ={desk?.transform.pos[2]} deskH={desk?.params.h} deskW={desk?.params.w} deskD={desk?.params.d} />

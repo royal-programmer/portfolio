@@ -23,7 +23,7 @@ const MAT_BY_KIND: Partial<Record<KindId, Mat>> = {
 };
 const FALLBACK = M("plastic", "#1a1c23", 0.5);
 
-type Extra = { rotY?: number; scale?: number; material?: Mat; interaction?: RoomObject["interaction"]; hideOnPhone?: boolean };
+type Extra = { rotY?: number; scale?: number; material?: Mat; interaction?: RoomObject["interaction"]; hideOnPhone?: boolean; model?: string };
 function obj<K extends KindId>(id: string, kind: K, pos: [number, number, number], params: Extract<RoomObject, { kind: K }>["params"], x: Extra = {}): RoomObject {
   return {
     id,
@@ -32,6 +32,7 @@ function obj<K extends KindId>(id: string, kind: K, pos: [number, number, number
     transform: { pos, rotY: x.rotY ?? 0, scale: x.scale ?? 1 },
     material: x.material ?? MAT_BY_KIND[kind] ?? FALLBACK,
     ...(x.interaction ? { interaction: x.interaction } : {}),
+    ...(x.model ? { model: x.model } : {}),
     visibility: "public",
     hideOnPhone: x.hideOnPhone ?? false,
   } as RoomObject;
@@ -75,7 +76,7 @@ const workRoom: Room = {
     obj("chair", "chair", [-0.3, 0, -1.75], { style: "gaming" }, { rotY: Math.PI + 0.95, material: M("fabric", "#2a4fb0", 0.8) }),
     obj("shelf", "shelf", [-3.2, 0, -2.88], { w: 1, d: 0.24, tiers: 1, lift: 1.5 }),
     obj("books", "bookStack", [-3.45, 1.5175, -2.88], { count: 9, layout: "row" }, { material: M("paper", "#5a6aa8", 0.7) }),
-    obj("plant", "plant", [0.8, 0, -2.7], { height: 0.9, leaves: 26, pot: "round" }),
+    obj("plant", "plant", [0.8, 0, -2.7], { height: 0.9, leaves: 26, pot: "round" }, { model: "/models/plant.glb" }),
     obj("clock", "clock", [-2.05, 0, -2.99], { diameter: 0.34, lift: 2.1, ownerZone: "Asia/Kolkata", digital: true }, { material: M("plastic", "#e8e1d6", 0.5), interaction: { label: "time", card: "Owner time (Asia/Kolkata) and yours." } }),
     obj("neon-top", "neonStrip", [-1.2, 0, -2.97], { length: 1.3, vertical: false, lift: 2.05, intensity: 3.2 }),
     obj("neon-corner", "neonStrip", [-3.95, 0, -2.95], { length: 2.2, vertical: true, lift: 0.2, intensity: 3.2 }, { material: M("emissive", "#cfe6ff", 0.5) }),
