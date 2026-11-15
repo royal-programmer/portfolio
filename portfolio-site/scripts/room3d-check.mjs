@@ -3,6 +3,7 @@
  * selection and the object budget behave. Run from portfolio-site/:  node scripts/room3d-check.mjs
  * Loads TypeScript through jiti with the `@/` alias, like settings-roundtrip.mjs. Exits 1 on any failure.
  */
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -25,6 +26,11 @@ const { buildRoomContent, boardItems, parsePanel, PANEL_IDS } = await jiti.impor
 const { floorItems, laneReport, eyeInFurniture, LANE } = await jiti.import(path.join(root, "lib/room3d/layout.ts"));
 const { chordNotes, strumPlan, pluck, midiHz } = await jiti.import(path.join(root, "lib/room3d/chord.ts"));
 const { CHORD_IDS } = await jiti.import(path.join(root, "lib/room3d/schema.ts"));
+const { DRAW_CAPS } = await jiti.import(path.join(root, "lib/room3d/tiers.ts"));
+const { newBall, stepBall, kick, kickFromRay, SLEEP_AFTER } = await jiti.import(path.join(root, "lib/room3d/ball.ts"));
+const G = await jiti.import(path.join(root, "lib/room3d/guitar.ts"));
+const { THUD } = await jiti.import(path.join(root, "lib/room3d/thud.ts"));
+const { modelHeight } = await jiti.import(path.join(root, "lib/room3d/models.ts"));
 const { STAGE_PROPS, SHELF_MAX, STAGE_TIERS } = await jiti.import(path.join(root, "lib/site/stage-data.ts"));
 
 let failed = 0;
@@ -336,6 +342,119 @@ check("the desk props map to room objects (headphones are the headset)", STAGE_P
   const a = pluck(110, 8000, 0.5, 3);
   const b2 = pluck(110, 8000, 0.5, 3);
   check("a pluck is deterministic, finite, bounded and dies away", a.length === 4000 && a.every((x, i) => x === b2[i] && Number.isFinite(x) && Math.abs(x) <= 1) && Math.max(...a.slice(3500).map(Math.abs)) < Math.max(...a.slice(0, 500).map(Math.abs)));
+}
+
+// round 37d: assets, draw caps, the look pass, the football, the guitar app
+{
+  const pub = path.join(root, "public");
+  const walk = (d) => (fs.existsSync(d) ? fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)])) : []);
+  const files = ["models", "hdri", "audio", "textures"].flatMap((d) => walk(path.join(pub, d)));
+  const credits = fs.readFileSync(path.resolve(root, "../docs/claude-planning/15-credits.md"), "utf8");
+  const missing = files.filter((f) => !credits.includes("public/" + path.relative(pub, f).split(path.sep).join("/")));
+  check("every file in public/models|hdri|audio|textures has a credits line", files.length > 0 && missing.length === 0, missing.join());
+  const bytes = files.reduce((n, f) => n + fs.statSync(f).size, 0);
+  check(`committed room assets stay under 3.5 MB (${(bytes / 1048576).toFixed(2)} MB in ${files.length} files)`, bytes < 3.5 * 1048576);
+  const noLicence = credits.split("\n").filter((l) => l.startsWith("| `portfolio-site/public/") && !/CC0|CC BY|CC-BY/.test(l));
+  check("every credits row for an asset names a licence (CC0 or CC-BY)", noLicence.length === 0, noLicence.join());
+  const withModel = room.objects.filter((o) => o.model);
+  check("every object's model path exists in public/ and its kind has a model slot", withModel.every((o) => fs.existsSync(path.join(pub, o.model)) && modelHeight(o) !== null));
+  check("the shell's HDRI exists in public/hdri and is under 1.6 MB", fs.existsSync(path.join(pub, room.shell.hdri)) && fs.statSync(path.join(pub, room.shell.hdri)).size < 1.6 * 1048576);
+  check("the guitar samples named in guitar.ts all exist as Ogg files", G.SAMPLES.every((x) => fs.existsSync(path.join(pub, "audio/guitar", x.id + ".ogg"))));
+  check("the guitar samples total under 1.2 MB", G.SAMPLES.reduce((n, x) => n + fs.statSync(path.join(pub, "audio/guitar", x.id + ".ogg")).size, 0) < 1.2 * 1048576);
+  check("draw-call caps per tier: low <= medium <= high <= 150", DRAW_CAPS.low <= DRAW_CAPS.medium && DRAW_CAPS.medium <= DRAW_CAPS.high && DRAW_CAPS.high <= 150 && DRAW_CAPS.low >= 30);
+  check("tiers carry the env map choice: low uses the lightformers, medium and high the HDRI", ROOM3D_DEFAULT.tiers.low.envMap === "lightformers" && ROOM3D_DEFAULT.tiers.medium.envMap === "hdri" && ROOM3D_DEFAULT.tiers.high.envMap === "hdri");
+  const bad = clone(ROOM3D_DEFAULT);
+  bad.rooms[0].shell.hdri = "https://example.com/x.hdr";
+  check("an HDRI path must be /hdri/... (https rejected)", !room3dSchema.safeParse(bad).success);
+  check("the white room: the floor is glossy tile and the walls are light", room.shell.floorMaterial === "tile" && parseInt(room.shell.wallColor.slice(1, 3), 16) > 0xd8);
+}
+{
+  const { width: W, depth: D, height: H } = room.shell;
+  const world = { W, D, H, boxes: floorItems(room).map((f) => ({ ...f.rect, h: f.h })) };
+  const r = room.objects.find((o) => o.kind === "football").params.r;
+  const home = [1.2, r, 2.1];
+  let worst = true;
+  let allSleep = true;
+  for (let k = 0; k < 40; k++) {
+    const b = newBall(home);
+    const ang = (k / 40) * Math.PI * 2;
+    kick(b, kickFromRay([Math.cos(ang), -0.2, Math.sin(ang)], 4.2, 2.4, (k % 5) / 2 - 1));
+    let t = 0;
+    let slept = null;
+    for (let i = 0; i < 60 * 40; i++) {
+      stepBall(b, 1 / 60, r, world, home);
+      t += 1 / 60;
+      const ok = b.p.every(Number.isFinite) && Math.abs(b.p[0]) <= W / 2 && Math.abs(b.p[2]) <= D / 2 && b.p[1] >= r - 1e-6 && b.p[1] <= H;
+      if (!ok) worst = false;
+      if (b.asleep && slept === null) slept = t;
+    }
+    if (slept === null) allSleep = false;
+  }
+  check("a kicked football stays inside the room (40 kicks, 40 s each, never NaN)", worst);
+  check("every kicked football comes to rest and sleeps", allSleep);
+  const b2 = newBall(home);
+  stepBall(b2, 1, r, world, home);
+  const early = b2.asleep;
+  for (let i = 0; i < 60 * 3; i++) stepBall(b2, 1 / 60, r, world, home);
+  check("a ball at rest on the floor sleeps after about 2 s, not before", !early && b2.asleep && SLEEP_AFTER === 2);
+  const drop = newBall([0, 1.5, 0]);
+  let maxUp = 0;
+  let prevVy = 0;
+  for (let i = 0; i < 600; i++) {
+    stepBall(drop, 1 / 120, r, { W: 8, D: 6, H: 3, boxes: [] }, [0, 1.5, 0]);
+    if (prevVy < -1 && drop.v[1] > 0) maxUp = Math.max(maxUp, drop.v[1] / -prevVy);
+    prevVy = drop.v[1];
+  }
+  check("a bounce keeps about 0.6 of the speed", maxUp > 0.5 && maxUp < 0.7, String(maxUp));
+  const onUnit = newBall([1.4, 0.9, 2.79]);
+  for (let i = 0; i < 60 * 5; i++) stepBall(onUnit, 1 / 60, r, world, [1.4, 0.9, 2.79]);
+  check("a ball dropped on the TV unit lands on top of it", Math.abs(onUnit.p[1] - (0.42 + r)) < 0.02, JSON.stringify(onUnit.p));
+  const nan = newBall(home);
+  nan.p[0] = NaN;
+  stepBall(nan, 1 / 60, r, world, home);
+  check("a NaN position resets the ball to its home", nan.p.every(Number.isFinite) && nan.p[0] === home[0]);
+  const k1 = kickFromRay([0, 0.5, -1], 4, 2, 0);
+  check("a kick goes away from the camera, flattened, with an upward part", Math.abs(k1[0]) < 1e-9 && k1[2] < 0 && Math.abs(Math.hypot(k1[0], k1[2]) - 4) < 1e-9 && k1[1] === 2);
+  check("the kick sound is a short thud (a falling pitch under a third of a second)", THUD.from > THUD.to && THUD.length < 0.3);
+  const fb = room.objects.find((o) => o.kind === "football");
+  check("the football answers a click and shows on a phone", fb.interaction?.cmd === "kick:football" && fb.hideOnPhone === false);
+}
+{
+  check("six strings in standard tuning, low to high (E A D G B E)", G.OPEN_STRINGS.join() === "40,45,50,55,59,64" && G.STRING_NAMES.join("") === "EADGBe");
+  check("a fret adds a semitone to the string's note", G.noteFor(2, 5) === 55 && G.noteFor(5, 12) === 76);
+  check("the finger's fret: open before the nut, 1 just after it, 12 at the end", G.fretAt(-0.1) === 0 && G.fretAt(0) === 0 && G.fretAt(0.001) === 1 && G.fretAt(1) === 12 && G.fretAt(5) === 12);
+  let exact = true;
+  let shrinks = true;
+  for (let n = 1; n <= 12; n++) {
+    if (G.fretAt(G.fretLine(n) - 1e-6) !== n) exact = false;
+    if (G.fretAt(G.fretMid(n)) !== n) exact = false;
+    if (n > 2 && G.fretLine(n) - G.fretLine(n - 1) >= G.fretLine(n - 1) - G.fretLine(n - 2)) shrinks = false;
+  }
+  check("a tap between fret line n-1 and n is fret n, and the spaces shrink toward the body", exact && shrinks);
+  let near = true;
+  let rates = true;
+  for (let s = 0; s < 6; s++) {
+    for (let f = 0; f <= 12; f++) {
+      const v = G.voiceFor(s, f);
+      const smp = G.SAMPLES.find((x) => x.id === v.sample);
+      if (Math.abs(smp.midi - v.midi) > 4) near = false;
+      if (Math.abs(12 * Math.log2(v.rate) - (v.midi - smp.midi)) > 1e-9 || v.rate < 0.7 || v.rate > 1.4) rates = false;
+    }
+  }
+  check("every string and fret maps to a recorded sample within 4 semitones (fret-exact pitch by playbackRate)", near && rates);
+  check("an open string is at most 2 semitones from its sample", [0, 1, 2, 3, 4, 5].every((s) => { const v = G.voiceFor(s, 0); return Math.abs(G.SAMPLES.find((x) => x.id === v.sample).midi - v.midi) <= 2; }));
+  const em = G.chordPlan("Em");
+  check("a chord strums its sounding strings low to high, 20 to 40 ms apart", em.length === 6 && em.every((n, i) => n.string === i && (i === 0 || (n.at - em[i - 1].at >= 0.02 - 1e-9 && n.at - em[i - 1].at <= 0.04 + 1e-9))));
+  check("muted strings are skipped (C has five, D four)", G.chordPlan("C").length === 5 && G.chordPlan("D").length === 4);
+  check("every chord the guitar object can name has a shape of six strings", CHORD_IDS.every((c) => G.CHORD_SHAPES[c] && G.CHORD_SHAPES[c].length === 6));
+  const t0 = 10;
+  const a = G.swipeStart(t0, -Infinity);
+  const b3 = G.swipeStart(t0, a);
+  const c3 = G.swipeStart(t0, b3);
+  check("a swipe starts its strings at least 30 ms apart even when the finger is faster", a === t0 && b3 - a >= 0.0299 && c3 - b3 >= 0.0299);
+  check("the neck's marker frets are 3, 5, 7, 9 and 12", G.MARKERS.join() === "3,5,7,9,12");
+  const gz = room.zones.find((z) => z.id === "guitar-play");
+  check("the guitar's close-up is a hidden stop: no chip, not stepped to, 1.2 m from its subject", gz && gz.hidden === true && visibleZones(orderedZones(room)).every((z) => z.id !== "guitar-play") && Math.hypot(gz.eye[0] - gz.look[0], gz.eye[2] - gz.look[2]) >= 1.2);
 }
 
 console.log(failed ? `\n${failed} failing` : "\nall room3d checks pass");

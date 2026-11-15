@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- a CommonJS script that loads Playwright from a path */
 /**
  * Measures the 3D room on this machine (round 37d): for each tier at 1280 x 800, per camera zone, the draw calls, the
  * triangles and the frame time (median and p95 over 120 requestAnimationFrame deltas), plus the GPU the headless
