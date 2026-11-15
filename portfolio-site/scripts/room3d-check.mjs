@@ -359,6 +359,7 @@ check("the desk props map to room objects (headphones are the headset)", STAGE_P
   check("every credits row for an asset names a licence (CC0 or CC-BY)", noLicence.length === 0, noLicence.join());
   const withModel = room.objects.filter((o) => o.model);
   check("every object's model path exists in public/ and its kind has a model slot", withModel.every((o) => fs.existsSync(path.join(pub, o.model)) && (modelHeight(o) !== null || MODEL_PARTS.includes(o.kind))));
+  check("the guitar's model is recoloured from its own material colour (a tinted kind), and the closet uses its model as a part", MODEL_TINT.includes("guitar") && MODEL_PARTS.includes("closet") && room.objects.find((o) => o.kind === "guitar").model === "/models/guitar.glb" && room.objects.some((o) => o.kind === "closet" && o.model === "/models/plush.glb"));
   check("the shell's HDRI exists in public/hdri and is under 1.6 MB", fs.existsSync(path.join(pub, room.shell.hdri)) && fs.statSync(path.join(pub, room.shell.hdri)).size < 1.6 * 1048576);
   check("the guitar samples named in guitar.ts all exist as Ogg files", G.SAMPLES.every((x) => fs.existsSync(path.join(pub, "audio/guitar", x.id + ".ogg"))));
   check("the guitar samples total under 1.2 MB", G.SAMPLES.reduce((n, x) => n + fs.statSync(path.join(pub, "audio/guitar", x.id + ".ogg")).size, 0) < 1.2 * 1048576);

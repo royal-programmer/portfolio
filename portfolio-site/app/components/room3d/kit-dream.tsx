@@ -61,21 +61,21 @@ export function Bed({ o }: P<"bed">) {
       <Rb a={[w, 0.18, 1.9]} p={[0, 0.35, 0.0]} r={0.05} m={mattress} />
       {headboard ? (
         <>
-          <Rb a={[w + 0.1, 0.92, 0.05]} p={[0, 0.46, -1.025]} r={0.02} m={head} />
-          <Rb a={[w - 0.1, 0.5, 0.025]} p={[0, 0.7, -0.99]} r={0.015} m={head} />
+          <Rb cast={false} a={[w + 0.1, 0.92, 0.05]} p={[0, 0.46, -1.025]} r={0.02} m={head} />
+          <Rb cast={false} a={[w - 0.1, 0.5, 0.025]} p={[0, 0.7, -0.99]} r={0.015} m={head} />
         </>
       ) : null}
-      <Rb a={[w - 0.02, 0.07, 1.3]} p={[0, 0.475, 0.25]} r={0.035} m={duvet} />
+      <Rb cast={false} a={[w - 0.02, 0.07, 1.3]} p={[0, 0.475, 0.25]} r={0.035} m={duvet} />
       {blanket ? (
         <>
-          <Rb a={[w - 0.04, 0.1, 0.46]} p={[0, 0.54, 0.62]} r={0.04} m={fold} />
-          <Rb a={[w - 0.1, 0.02, 0.4]} p={[0, 0.605, 0.62]} r={0.01} m={fold} />
+          <Rb cast={false} a={[w - 0.04, 0.1, 0.46]} p={[0, 0.54, 0.62]} r={0.04} m={fold} />
+          <Rb cast={false} a={[w - 0.1, 0.02, 0.4]} p={[0, 0.605, 0.62]} r={0.01} m={fold} />
         </>
       ) : null}
       {Array.from({ length: pillows }, (_, i) => {
         const two = pillows > 1;
         const pw = two ? w / 2 - 0.06 : Math.min(0.6, w - 0.2);
-        return <Rb key={i} a={[pw, 0.12, 0.34]} p={[two ? (i % 2 ? 1 : -1) * (w / 4) : 0, 0.54 + Math.floor(i / 2) * 0.1, -0.78]} rot={[-0.1, 0, 0]} r={0.05} m={pillow} />;
+        return <Rb key={i} cast={false} a={[pw, 0.12, 0.34]} p={[two ? (i % 2 ? 1 : -1) * (w / 4) : 0, 0.54 + Math.floor(i / 2) * 0.1, -0.78]} rot={[-0.1, 0, 0]} r={0.05} m={pillow} />;
       })}
     </group>
   );
@@ -253,7 +253,6 @@ export function Guitar({ o }: P<"guitar">) {
   const body = useMat(o.material);
   const neckMat = env.kit.mat("wood", "#5a3d27", 0.5);
   const dark = env.kit.mat("plastic", "#0b0b0e", 0.6);
-  const steel = dark;
   const board = dark;
   const bright = env.kit.mat("metal", "#cfd3dc", 0.25);
   const top = env.kit.mat("wood", "#26262b", 0.4);
@@ -364,7 +363,7 @@ export function CapRow({ o }: P<"capRow">) {
   const x0 = (-(count - 1) * spacing) / 2;
   return (
     <group>
-      <Rb a={[(count - 1) * spacing + 0.3, 0.06, 0.02]} p={[0, lift + 0.01, 0.01]} r={0.008} m={wood} />
+      <Rb cast={false} a={[(count - 1) * spacing + 0.3, 0.06, 0.02]} p={[0, lift + 0.01, 0.01]} r={0.008} m={wood} />
       {Array.from({ length: count }, (_, i) => (
         <mesh key={i} position={[x0 + i * spacing, lift, 0.06]} rotation={[Math.PI / 2, 0, 0]} material={peg}>
           <cylinderGeometry args={[0.008, 0.008, 0.1, 8]} />
@@ -483,7 +482,7 @@ export function KeyRack({ o }: P<"keyRack">) {
   );
   return (
     <group>
-      <Rb a={[w, 0.28, 0.03]} p={[0, lift - 0.09, 0.015]} r={0.008} m={board} />
+      <Rb cast={false} a={[w, 0.28, 0.03]} p={[0, lift - 0.09, 0.015]} r={0.008} m={board} />
       {Array.from({ length: keys }, (_, i) => (
         <mesh key={i} position={[xAt(i), lift - 0.015, 0.045]} rotation={[Math.PI / 2, 0, 0]} material={peg}>
           <cylinderGeometry args={[0.005, 0.005, 0.03, 8]} />
@@ -526,26 +525,26 @@ export function RidingSet({ o }: P<"ridingSet">) {
       {jacket || pants ? <Rb a={[0.46, 0.018, 0.018]} p={[0, 1.845, 0.075]} r={0.005} m={steel} cast={false} /> : null}
       {jacket ? (
         <group>
-          <Rb a={[0.42, 0.56, 0.13]} p={[0, 1.54, 0.085]} r={0.04} m={black} />
-          <Rb a={[0.52, 0.1, 0.14]} p={[0, 1.78, 0.085]} r={0.04} m={black} />
-          <Rb a={[0.3, 0.2, 0.138]} p={[0, 1.63, 0.085]} r={0.03} m={neon} />
-          <Rb a={[0.3, 0.032, 0.141]} p={[0, 1.5, 0.085]} r={0.012} m={grey} />
+          <Rb cast={false} a={[0.42, 0.56, 0.13]} p={[0, 1.54, 0.085]} r={0.04} m={black} />
+          <Rb cast={false} a={[0.52, 0.1, 0.14]} p={[0, 1.78, 0.085]} r={0.04} m={black} />
+          <Rb cast={false} a={[0.3, 0.2, 0.138]} p={[0, 1.63, 0.085]} r={0.03} m={neon} />
+          <Rb cast={false} a={[0.3, 0.032, 0.141]} p={[0, 1.5, 0.085]} r={0.012} m={grey} />
           {[-1, 1].map((s) => (
             <group key={s}>
-              <Rb a={[0.11, 0.62, 0.11]} p={[s * 0.285, 1.46, 0.09]} rot={[0, 0, s * 0.07]} r={0.04} m={black} />
-              <Rb a={[0.13, 0.09, 0.145]} p={[s * 0.235, 1.8, 0.085]} r={0.03} m={neon} />
-              <Rb a={[0.115, 0.04, 0.115]} p={[s * 0.3, 1.2, 0.09]} rot={[0, 0, s * 0.07]} r={0.015} m={grey} />
+              <Rb cast={false} a={[0.11, 0.62, 0.11]} p={[s * 0.285, 1.46, 0.09]} rot={[0, 0, s * 0.07]} r={0.04} m={black} />
+              <Rb cast={false} a={[0.13, 0.09, 0.145]} p={[s * 0.235, 1.8, 0.085]} r={0.03} m={neon} />
+              <Rb cast={false} a={[0.115, 0.04, 0.115]} p={[s * 0.3, 1.2, 0.09]} rot={[0, 0, s * 0.07]} r={0.015} m={grey} />
             </group>
           ))}
         </group>
       ) : null}
       {pants ? (
         <group>
-          <Rb a={[0.42, 0.1, 0.13]} p={[0, 1.2, 0.085]} r={0.03} m={black} />
+          <Rb cast={false} a={[0.42, 0.1, 0.13]} p={[0, 1.2, 0.085]} r={0.03} m={black} />
           {[-1, 1].map((s) => (
             <group key={s}>
-              <Rb a={[0.19, 0.84, 0.12]} p={[s * 0.1, 0.76, 0.085]} r={0.04} m={black} />
-              <Rb a={[0.15, 0.17, 0.128]} p={[s * 0.1, 0.78, 0.089]} r={0.03} m={neon} />
+              <Rb cast={false} a={[0.19, 0.84, 0.12]} p={[s * 0.1, 0.76, 0.085]} r={0.04} m={black} />
+              <Rb cast={false} a={[0.15, 0.17, 0.128]} p={[s * 0.1, 0.78, 0.089]} r={0.03} m={neon} />
             </group>
           ))}
         </group>
@@ -553,16 +552,16 @@ export function RidingSet({ o }: P<"ridingSet">) {
       {gloves
         ? [-1, 1].map((s) => (
             <group key={s} position={[s * 0.34, 1.12, 0.09]}>
-              <Rb a={[0.085, 0.13, 0.04]} p={[0, 0, 0]} r={0.02} m={black} />
-              <Rb a={[0.075, 0.07, 0.036]} p={[0, -0.095, 0]} r={0.02} m={black} />
+              <Rb cast={false} a={[0.085, 0.13, 0.04]} p={[0, 0, 0]} r={0.02} m={black} />
+              <Rb cast={false} a={[0.075, 0.07, 0.036]} p={[0, -0.095, 0]} r={0.02} m={black} />
             </group>
           ))
         : null}
       {boots
         ? [-1, 1].map((s) => (
             <group key={s} position={[s * 0.115, 0, 0.17]}>
-              <Rb a={[0.11, 0.28, 0.12]} p={[0, 0.17, -0.01]} r={0.035} m={black} />
-              <Rb a={[0.11, 0.07, 0.26]} p={[0, 0.045, 0.06]} r={0.03} m={black} />
+              <Rb cast={false} a={[0.11, 0.28, 0.12]} p={[0, 0.17, -0.01]} r={0.035} m={black} />
+              <Rb cast={false} a={[0.11, 0.07, 0.26]} p={[0, 0.045, 0.06]} r={0.03} m={black} />
               {[0.1, 0.18, 0.26].map((y) => (
                 <Rb key={y} a={[0.118, 0.016, 0.128]} p={[0, y, -0.01]} r={0.004} m={steel} cast={false} />
               ))}
@@ -572,11 +571,11 @@ export function RidingSet({ o }: P<"ridingSet">) {
         : null}
       {helmet ? (
         <group position={[0, 2.0, 0.17]}>
-          <mesh scale={[0.95, 1.0, 1.15]} castShadow material={shell}>
+          <mesh scale={[0.95, 1.0, 1.15]} material={shell}>
             <sphereGeometry args={[0.14, 24, 16]} />
           </mesh>
           <mesh geometry={visorGeo} scale={[0.95, 1.0, 1.15]} material={visor} />
-          <Rb a={[0.17, 0.085, 0.14]} p={[0, -0.095, 0.075]} r={0.035} m={chin} />
+          <Rb cast={false} a={[0.17, 0.085, 0.14]} p={[0, -0.095, 0.075]} r={0.035} m={chin} />
           {[-1, 1].map((s) => (
             <Rb key={s} a={[0.018, 0.006, 0.1]} p={[s * 0.034, 0.128, 0.015]} rot={[-0.1, 0, 0]} r={0.003} m={visor} cast={false} />
           ))}
@@ -794,14 +793,14 @@ export function CubeShelf({ o }: P<"cubeShelf">) {
   );
   return (
     <group>
-      <mesh position={[0, H - t / 2, 0]} castShadow receiveShadow material={white}>
+      <mesh position={[0, H - t / 2, 0]} receiveShadow material={white}>
         <boxGeometry args={[W, t, d]} />
       </mesh>
-      <mesh position={[0, t / 2, 0]} castShadow receiveShadow material={white}>
+      <mesh position={[0, t / 2, 0]} receiveShadow material={white}>
         <boxGeometry args={[W, t, d]} />
       </mesh>
       {[-1, 1].map((s) => (
-        <mesh key={s} position={[s * (W / 2 - t / 2), H / 2, 0]} castShadow receiveShadow material={white}>
+        <mesh key={s} position={[s * (W / 2 - t / 2), H / 2, 0]} receiveShadow material={white}>
           <boxGeometry args={[t, H, d]} />
         </mesh>
       ))}
@@ -809,12 +808,12 @@ export function CubeShelf({ o }: P<"cubeShelf">) {
         <boxGeometry args={[W, H, t]} />
       </mesh>
       {Array.from({ length: cols - 1 }, (_, i) => (
-        <mesh key={`v${i}`} position={[-W / 2 + (i + 1) * cell, H / 2, 0]} castShadow receiveShadow material={white}>
+        <mesh key={`v${i}`} position={[-W / 2 + (i + 1) * cell, H / 2, 0]} receiveShadow material={white}>
           <boxGeometry args={[t, H, d]} />
         </mesh>
       ))}
       {Array.from({ length: rows - 1 }, (_, i) => (
-        <mesh key={`h${i}`} position={[0, (i + 1) * cell, 0]} castShadow receiveShadow material={white}>
+        <mesh key={`h${i}`} position={[0, (i + 1) * cell, 0]} receiveShadow material={white}>
           <boxGeometry args={[W, t, d]} />
         </mesh>
       ))}

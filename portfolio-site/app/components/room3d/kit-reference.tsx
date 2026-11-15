@@ -83,7 +83,7 @@ export function Closet({ o }: P<"closet">) {
   const env = useEnv();
   const { doors, rows, topShelf, floorItem, open, w, h, d, items, stuff, wireBoxes, floorKeys, palette } = o.params;
   const white = useMat(o.material);
-  const inner = env.kit.mat("plastic", "#eceef3", 0.7);
+  const inner = white;
   const wire = env.kit.mat("metal", "#c9ccd4", 0.4);
   const black = env.kit.mat("plastic", "#15161a", 0.45);
   const trim = env.kit.mat("plastic", "#2a2c33", 0.5);
@@ -99,7 +99,7 @@ export function Closet({ o }: P<"closet">) {
   const pairs = useMemo(() => closetPairs(doors, w), [doors, w]);
   const a = pairs[0].a;
   const leafGeo = env.kit.geo(`closet-leaf:${a.toFixed(3)}:${h}`, () => leafGeometry(a, h));
-  const knob = env.kit.mat("metal", "#c9ccd4", 0.3);
+  const knob = wire;
 
   // The doors: each pair's outer leaf turns about its jamb, the inner one folds back twice as far.
   const outer = useRef<(THREE.Group | null)[]>([]);
@@ -199,11 +199,11 @@ export function Closet({ o }: P<"closet">) {
         <boxGeometry args={[w, h, t]} />
       </mesh>
       {[-1, 1].map((s) => (
-        <mesh key={s} position={[s * (w / 2 - t / 2), h / 2, 0]} castShadow receiveShadow material={white}>
+        <mesh key={s} position={[s * (w / 2 - t / 2), h / 2, 0]} receiveShadow material={white}>
           <boxGeometry args={[t, h, d]} />
         </mesh>
       ))}
-      <mesh position={[0, h - t / 2, 0]} castShadow receiveShadow material={white}>
+      <mesh position={[0, h - t / 2, 0]} receiveShadow material={white}>
         <boxGeometry args={[w, t, d]} />
       </mesh>
       <mesh position={[0, 0.03, 0.01]} receiveShadow material={inner}>
@@ -246,7 +246,7 @@ export function Closet({ o }: P<"closet">) {
       {crates.length > 0 ? <Inst count={crates.length} geometry={unit} material={paper} fill={fillCrate} cast={false} /> : null}
       {floorItem !== "none" ? (
         <group>
-          <Rb a={[w * 0.86, unitH, d - 0.14]} p={[0, unitH / 2 + 0.06, 0.0]} r={0.01} m={black} />
+          <Rb cast={false} a={[w * 0.86, unitH, d - 0.14]} p={[0, unitH / 2 + 0.06, 0.0]} r={0.01} m={black} />
           {[0, 1, 2].map((i) => (
             <Rb key={i} a={[w * 0.8, 0.005, 0.01]} p={[0, 0.06 + (unitH / 3) * (i + 1) - 0.02, (d - 0.14) / 2 + 0.002]} r={0.002} m={trim} cast={false} />
           ))}
@@ -310,7 +310,7 @@ export function CeilingFan({ o }: P<"ceilingFan">) {
       <mesh position={[0, -drop / 2, 0]} material={steel}>
         <cylinderGeometry args={[0.01, 0.01, drop, 8]} />
       </mesh>
-      <mesh position={[0, hubY, 0]} castShadow material={steel}>
+      <mesh position={[0, hubY, 0]} material={steel}>
         <cylinderGeometry args={[0.1, 0.09, 0.11, 24]} />
       </mesh>
       <group ref={rotor} position={[0, hubY - 0.02, 0]} userData={{ dynamic: true }}>
@@ -433,7 +433,7 @@ export function Pegboard({ o }: P<"pegboard">) {
   );
   return (
     <group position={[0, lift, 0]}>
-      <mesh position={[0, h / 2, 0.011]} castShadow receiveShadow material={board}>
+      <mesh position={[0, h / 2, 0.011]} receiveShadow material={board}>
         <boxGeometry args={[w, h, 0.022]} />
       </mesh>
       <Inst count={items} geometry={kb} material={vcol} fill={fill} cast={false} />
