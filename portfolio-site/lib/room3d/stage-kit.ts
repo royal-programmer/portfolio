@@ -55,7 +55,7 @@ export function stageAction(o: Pick<RoomObject, "id" | "kind" | "interaction"> &
   if (prop) return { do: "prop", prop };
   const it = o.interaction;
   if (!it) return { do: "none" };
-  if ("cmd" in it) return it.cmd && !it.cmd.startsWith("play:") ? { do: "cmd", cmd: it.cmd } : { do: "none" };
+  if ("cmd" in it) return it.cmd && !it.cmd.startsWith("play:") && !it.cmd.startsWith("kick:") ? { do: "cmd", cmd: it.cmd } : { do: "none" };
   if ("href" in it) return { do: "href", href: it.href };
   return { do: "card", text: it.card };
 }

@@ -8,6 +8,7 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { MutableRefObject } from "react";
+import type { BallWorld } from "@/lib/room3d/ball";
 import type { Room, Tier } from "@/lib/room3d/schema";
 import type { Constellation } from "@/lib/site/stage-constellation";
 import type { ShelfCase } from "@/lib/site/stage-data";
@@ -188,6 +189,8 @@ export type Env = {
   stage?: StageExtras;
   /** The live terminal texture (the Stage's, redrawn by the page): a monitor whose `screen` is `terminal` shows it. */
   liveScreen?: THREE.Texture | null;
+  /** The room as the football sees it: its size and the floor items' footprints (absent in the lab viewer: the ball stays put). */
+  ballWorld?: BallWorld;
   /** Content boards drawn from the content layer, by object id: a `board` object's face, the projects monitor, the TV's reel. */
   boards?: Record<string, THREE.Texture>;
 };

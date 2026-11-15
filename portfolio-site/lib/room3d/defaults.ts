@@ -99,7 +99,7 @@ const workRoom: Room = {
     obj("tv-unit", "box", [1.4, 0, 2.79], { w: 1.8, h: 0.42, d: 0.42, round: 0.012 }, { material: M("wood", "#4a3422", 0.5) }),
     obj("tv", "tv", [1.4, 0, 2.97], { inches: 55, lift: 0.44, mode: "reel" }, { rotY: Math.PI, material: M("plastic", "#0b0c10", 0.4), interaction: { label: "project reel", cmd: "panel:tv" } }),
     obj("console", "console", [0.8, 0.42, 2.8], { controllers: 2 }, { rotY: Math.PI, material: M("plastic", "#e8e8ee", 0.4), interaction: { label: "the worlds", cmd: "panel:worlds" } }),
-    obj("football", "football", [2.75, 0, 2.5], { r: 0.11 }, { material: M("plastic", "#f1f1f1", 0.5), hideOnPhone: true }),
+    obj("football", "football", [2.75, 0, 2.5], { r: 0.11 }, { material: M("plastic", "#f1f1f1", 0.5), interaction: { label: "kick", cmd: "kick:football" } }),
     obj("cube", "puzzleCube", [1.95, 0.42, 2.8], { size: 0.057 }, { rotY: 0.5, material: M("plastic", "#111216", 0.4), hideOnPhone: true }),
     // Wardrobe and entry (front wall, left; left wall, front half): the wardrobe whose doors open, the caps, the key rack, the riding set, the door.
     obj("wardrobe", "wardrobe", [-2.6, 0, 2.7], { w: 1.2, h: 2.1, d: 0.6, open: false, clothes: 14 }, { rotY: Math.PI, material: M("wood", "#8a6a4a", 0.5), interaction: { label: "wardrobe", card: "Jackets and shirts." } }),

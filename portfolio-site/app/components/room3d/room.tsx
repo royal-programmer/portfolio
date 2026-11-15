@@ -11,6 +11,7 @@ import type { ThreeEvent } from "@react-three/fiber";
 import { Component, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import * as THREE from "three";
 import type { KindId, ObjectOf, Room as RoomData, RoomObject, Tier } from "@/lib/room3d/schema";
+import { floorItems } from "@/lib/room3d/layout";
 import { trimToBudget } from "@/lib/room3d/tiers";
 import { EnvCtx, Halo, Kit, useEnv, type Env, type StageExtras } from "./kit-core";
 import * as Decor from "./kit-decor";
@@ -118,7 +119,7 @@ function Placed({ o, onHover, onRun, onModel }: { o: RoomObject; onHover: RoomPr
   return (
     <group name={o.id} position={pos} rotation={[0, rotY, 0]} scale={scale} {...handlers}>
       <ModelOr o={o} fallback={<Kind o={o} />} onReady={onModel} />
-      {env.hoverId === o.id && o.interaction && o.kind !== "door" ? <Halo position={[0, 0.12, 0.08]} size={[0.45, 0.45]} color={env.accent} opacity={0.4} /> : null}
+      {env.hoverId === o.id && o.interaction && o.kind !== "door" && o.kind !== "football" ? <Halo position={[0, 0.12, 0.08]} size={[0.45, 0.45]} color={env.accent} opacity={0.4} /> : null}
     </group>
   );
 }
@@ -216,9 +217,10 @@ export function Room(props: RoomProps) {
   const kit = useMemo(() => new Kit(tier.textureSize), [tier.textureSize]);
   useEffect(() => () => kit.dispose(), [kit]);
   const objects = useMemo(() => trimToBudget(room.objects, tier.objectBudget, { phone, includeDraft }), [room.objects, tier.objectBudget, phone, includeDraft]);
+  const ballWorld = useMemo(() => ({ W: room.shell.width, D: room.shell.depth, H: room.shell.height, boxes: floorItems(room).map((f) => ({ ...f.rect, h: f.h })) }), [room]);
   const env = useMemo<Env>(
-    () => ({ kit, light, accent, phone, tier, hoverId: props.hoverId, openIds: props.openIds, consoleOn: props.consoleOn, reduced: props.reduced, worlds: props.worlds, clockOffsetMs: props.clockOffsetMs, stage: props.stage, liveScreen: props.liveScreen, boards: props.boards }),
-    [kit, light, accent, phone, tier, props.hoverId, props.openIds, props.consoleOn, props.reduced, props.worlds, props.clockOffsetMs, props.stage, props.liveScreen, props.boards],
+    () => ({ ballWorld, kit, light, accent, phone, tier, hoverId: props.hoverId, openIds: props.openIds, consoleOn: props.consoleOn, reduced: props.reduced, worlds: props.worlds, clockOffsetMs: props.clockOffsetMs, stage: props.stage, liveScreen: props.liveScreen, boards: props.boards }),
+    [ballWorld, kit, light, accent, phone, tier, props.hoverId, props.openIds, props.consoleOn, props.reduced, props.worlds, props.clockOffsetMs, props.stage, props.liveScreen, props.boards],
   );
   const { width: W, depth: D, height: H } = room.shell;
   const tiled = room.shell.floorMaterial === "tile";

@@ -22,6 +22,7 @@ import { pickItem } from "@/lib/room3d/board-layout";
 import { resolveRoom3d } from "@/lib/room3d/resolve";
 import type { Room3d, RoomObject, Zone } from "@/lib/room3d/schema";
 import { strumChord, type ChordId } from "@/lib/room3d/chord";
+import { thud } from "@/lib/room3d/thud";
 import { stageKitTier } from "@/lib/room3d/stage-kit";
 import { activeRoom, parseQuality, stepDown } from "@/lib/room3d/tiers";
 import { flick, lookFromDrag, orderedZones, stepZone, zoneForObject } from "@/lib/room3d/zones";
@@ -333,6 +334,16 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
     [sound, flash],
   );
 
+  // A click on the football: it flies away from the camera (the ray's direction); the thud sounds only while Sound is on.
+  const kickBall = useCallback(
+    (o: RoomObject, ray?: THREE.Ray) => {
+      const d = ray?.direction ?? new THREE.Vector3(0, 0, -1);
+      window.dispatchEvent(new CustomEvent("room3d:kick", { detail: { id: o.id, dir: [d.x, d.y, d.z] } }));
+      if (sound) thud();
+    },
+    [sound],
+  );
+
   // A click on an object.
   const drag = useRef({ down: false, moved: false, x: 0, y: 0, t: 0, yaw: 0, pitch: 0 });
   const onRun = useCallback(
@@ -343,6 +354,7 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
       if (o.kind === "monitor" && (o.params as { screen?: string }).screen === "terminal") return openTerminal(o);
       if (cmd === "sound") return toggleSound();
       if (cmd === "play:guitar") return strum(o);
+      if (cmd === "kick:football") return kickBall(o, (e as { ray?: THREE.Ray } | undefined)?.ray);
       if (o.kind === "wardrobe") return toggleOpen(o.id);
       if (o.kind === "ridingSet" && it && "card" in it) return flash(it.card ? `${it.label}. ${it.card}` : it.label);
       const target = zoneForObject(zones, o.id);
@@ -371,7 +383,7 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
       }
       if (it && "card" in it) flash(it.card);
     },
-    [boards, flash, leave, openTerminal, runCommand, strum, toggleOpen, toggleSound, zoneId, zones],
+    [boards, flash, kickBall, leave, openTerminal, runCommand, strum, toggleOpen, toggleSound, zoneId, zones],
   );
   /** What a zone's `act` does: the click of that object, from the keyboard or the chip. */
   const activate = useCallback(

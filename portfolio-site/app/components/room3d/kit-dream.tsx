@@ -13,6 +13,7 @@ import { useFrame } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { kick, kickFromRay, newBall, stepBall, type Ball } from "@/lib/room3d/ball";
 import type { KindId, ObjectOf } from "@/lib/room3d/schema";
 import { Inst, useEnv, useMat } from "./kit-core";
 
@@ -539,15 +540,54 @@ function footballTexture(): THREE.CanvasTexture {
   return t;
 }
 
+/**
+ * The football: a ball that answers a click (`room3d:kick`, with the camera ray's direction) with hand-rolled physics from
+ * lib/room3d/ball.ts. It lives in the object's own frame (the world position minus the object's position; the object is not
+ * rotated or scaled), is `dynamic` so the static merge leaves it, and casts a shadow only where the tier has shadow maps.
+ */
 export function Football({ o }: P<"football">) {
   const env = useEnv();
+  const r = o.params.r;
   const tex = env.kit.tex("football", footballTexture);
   const m = useMemo(() => new THREE.MeshStandardMaterial({ map: tex, color: o.material.color, roughness: o.material.roughness, metalness: 0 }), [tex, o.material.color, o.material.roughness]);
   useEffect(() => () => m.dispose(), [m]);
+  const [px, , pz] = o.transform.pos;
+  const group = useRef<THREE.Group>(null);
+  const ball = useRef<Ball>(newBall([px, r, pz]));
+  const spin = useRef(new THREE.Quaternion());
+  const world = env.ballWorld;
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<{ id?: string; dir?: V3 }>).detail;
+      if (d?.id !== o.id || !d.dir) return;
+      kick(ball.current, kickFromRay(d.dir, 4.2, 2.4, Math.random() * 2 - 1));
+    };
+    window.addEventListener("room3d:kick", on);
+    return () => window.removeEventListener("room3d:kick", on);
+  }, [o.id]);
+  useFrame((_, dt) => {
+    const g = group.current;
+    if (!g || !world) return;
+    const b = ball.current;
+    const before = [b.p[0], b.p[2]];
+    stepBall(b, dt, r, world, [px, r, pz]);
+    g.position.set(b.p[0] - px, b.p[1], b.p[2] - pz);
+    // Roll: turn about the axis across the direction of travel by the distance rolled.
+    const mx = b.p[0] - before[0];
+    const mz = b.p[2] - before[1];
+    const dist = Math.hypot(mx, mz);
+    if (dist > 1e-5) {
+      spin.current.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(mz, 0, -mx).normalize(), dist / r));
+      g.quaternion.copy(spin.current);
+    }
+    if (process.env.NODE_ENV !== "production") (window as unknown as { __ball?: unknown }).__ball = { p: b.p, v: b.v, asleep: b.asleep, world, home: [px, r, pz] };
+  });
   return (
-    <mesh position={[0, o.params.r, 0]} castShadow receiveShadow material={m}>
-      <sphereGeometry args={[o.params.r, 24, 16]} />
-    </mesh>
+    <group ref={group} position={[0, r, 0]} userData={{ dynamic: true }}>
+      <mesh castShadow={env.tier.shadowRes > 0} receiveShadow material={m}>
+        <sphereGeometry args={[r, 24, 16]} />
+      </mesh>
+    </group>
   );
 }
 
