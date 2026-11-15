@@ -16,6 +16,7 @@ import { trimToBudget } from "@/lib/room3d/tiers";
 import { EnvCtx, Halo, Kit, useEnv, type Env, type StageExtras } from "./kit-core";
 import * as Decor from "./kit-decor";
 import * as Dream from "./kit-dream";
+import * as Ref from "./kit-reference";
 import * as Stage from "./kit-stage";
 import * as Work from "./kit-work";
 import { ModelOr, preloadModels } from "./kit-model";
@@ -58,6 +59,10 @@ export const KINDS: KindMap = {
   bag: Decor.Bag,
   ridingSet: Dream.RidingSet,
   cubeShelf: Dream.CubeShelf,
+  closet: Ref.Closet,
+  ceilingFan: Ref.CeilingFan,
+  lightPanels: Ref.LightPanels,
+  pegboard: Ref.Pegboard,
   football: Dream.Football,
   puzzleCube: Dream.PuzzleCube,
   box: Decor.Box,
@@ -300,6 +305,10 @@ export function Room(props: RoomProps) {
         ) : (
           <meshStandardMaterial map={room.shell.floorMaterial === "wood" ? floorTex : null} {...floorMaps} color={room.shell.floorColor} roughness={0.5} metalness={0.02} envMapIntensity={0.7} />
         )}
+      </mesh>
+      {/* The ceiling: white plaster, seen from below (the fan hangs from it). */}
+      <mesh position={[0, H, 0]} rotation={[Math.PI / 2, 0, 0]} receiveShadow material={kit.wall(room.shell.wallColor, 0.95, W, D)}>
+        <planeGeometry args={[W, D]} />
       </mesh>
       {[
         { p: [0, H / 2, -D / 2] as const, r: 0, w: W },

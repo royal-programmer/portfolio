@@ -21,7 +21,7 @@ type P<K extends KindId> = { o: ObjectOf<K> };
 type V3 = [number, number, number];
 
 /** A rounded box that never asks for a radius bigger than half its smallest side. */
-function Rb({ a, p, r = 0.01, m, rot, cast = true }: { a: V3; p: V3; r?: number; m: THREE.Material; rot?: V3; cast?: boolean }) {
+export function Rb({ a, p, r = 0.01, m, rot, cast = true }: { a: V3; p: V3; r?: number; m: THREE.Material; rot?: V3; cast?: boolean }) {
   return <RoundedBox args={a} radius={Math.max(0.0005, Math.min(r, Math.min(...a) / 2 - 0.0005))} smoothness={3} position={p} rotation={rot} castShadow={cast} receiveShadow material={m} />;
 }
 
@@ -805,8 +805,8 @@ export function CubeShelf({ o }: P<"cubeShelf">) {
           <boxGeometry args={[W, t, d]} />
         </mesh>
       ))}
-      {items.spines.length > 0 ? <Inst count={items.spines.length} geometry={unit} material={paper} fill={fillSpine} /> : null}
-      {items.crates.length > 0 ? <Inst count={items.crates.length} geometry={unit} material={paper} fill={fillCrate} /> : null}
+      {items.spines.length > 0 ? <Inst count={items.spines.length} geometry={unit} material={paper} fill={fillSpine} cast={false} /> : null}
+      {items.crates.length > 0 ? <Inst count={items.crates.length} geometry={unit} material={paper} fill={fillCrate} cast={false} /> : null}
     </group>
   );
 }

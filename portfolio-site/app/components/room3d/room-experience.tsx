@@ -353,7 +353,7 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
       if (cmd === "sound") return toggleSound();
       if (cmd === "play:guitar") return enterGuitar();
       if (cmd === "kick:football") return kickBall(o, (e as { ray?: THREE.Ray } | undefined)?.ray);
-      if (o.kind === "wardrobe") return toggleOpen(o.id);
+      if (o.kind === "wardrobe" || o.kind === "closet") return toggleOpen(o.id);
       if (o.kind === "ridingSet" && it && "card" in it) return flash(it.card ? `${it.label}. ${it.card}` : it.label);
       const target = zoneForObject(zones, o.id);
       const pid = parsePanel(cmd) ?? (o.kind === "door" ? "worlds" : null);
@@ -546,7 +546,7 @@ export default function RoomExperience({ data, entries, persona, onReader, onFai
         }
       } else if (e.key === "Escape") {
         // Doors that are open close first, then the camera walks back to the desk.
-        const openDoors = (room.objects as RoomObject[]).filter((o) => o.kind === "wardrobe" && (o.params as { open: boolean }).open !== swingRef.current.has(o.id));
+        const openDoors = (room.objects as RoomObject[]).filter((o) => (o.kind === "wardrobe" && (o.params as { open: boolean }).open !== swingRef.current.has(o.id)) || (o.kind === "closet" && (o.params as { open: number }).open <= 0.05 && swingRef.current.has(o.id)));
         if (openDoors.length > 0) {
           e.preventDefault();
           openDoors.forEach((o) => toggleOpen(o.id));

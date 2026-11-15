@@ -128,6 +128,36 @@ export const KIND_SCHEMAS = {
       ledColor: colorD("#9ab4ff"),
     }),
   ),
+  /**
+   * A bi-fold door closet (it replaces the wardrobe): `doors` leaves (2 = one folding pair hinged at the left, 4 = a pair at each side),
+   * `rows` rails of clothes (`items` hangers a row, colours from `palette`), a top shelf of plushies or boxes (`stuff` of them), a wire
+   * shelf of `wireBoxes` boxes, a floor item (a black drawer unit, with a `floorKeys`-key MIDI keyboard on it for "midi"). `open` is how far
+   * the doors stand folded back (0 closed, 1 fully folded); a click flips it. The object's material is the white of the carcass and doors.
+   */
+  closet: kind(
+    "closet",
+    z.strictObject({
+      doors: z.union([z.literal(2), z.literal(4)]),
+      rows: z.union([z.literal(1), z.literal(2)]),
+      topShelf: z.enum(["plushies", "boxes", "none"]),
+      floorItem: z.enum(["midi", "drawers", "none"]),
+      open: num(0, 1),
+      w: num(0.6, 2),
+      h: num(1.4, 2.6),
+      d: num(0.4, 0.8),
+      items: z.number().int().min(0).max(24),
+      stuff: z.number().int().min(0).max(12),
+      wireBoxes: z.number().int().min(0).max(8),
+      floorKeys: z.number().int().min(25).max(88),
+      palette: z.array(color()).min(1).max(8),
+    }),
+  ),
+  /** A ceiling fan hanging `drop` metres from the ceiling (the object stands at the ceiling, y = the room height): `blades`, `lamps` shades, blades turning at `spin` (0 still, 1 about 1.3 turns a second; still under reduced motion). */
+  ceilingFan: kind("ceilingFan", z.strictObject({ blades: z.number().int().min(3).max(5), lamps: z.number().int().min(0).max(4), spin: num(0, 1), drop: num(0.1, 1) })),
+  /** Triangle light panels on a wall, centred on the object: `count` flat emissive triangles in a `column` or a `cluster`, `color` and `intensity` of the glow. */
+  lightPanels: kind("lightPanels", z.strictObject({ count: z.number().int().min(3).max(12), layout: z.enum(["column", "cluster"]), color: color(), intensity: num(0.5, 6) })),
+  /** A white pegboard `w` x `h` (bottom at `lift`) with `items` small keyboards hanging on it; the object's material tints the keyboards. */
+  pegboard: kind("pegboard", z.strictObject({ w: num(0.4, 3), h: num(0.4, 2), lift: num(0, 2.5), items: z.number().int().min(1).max(8) })),
   wardrobe: kind("wardrobe", z.strictObject({ w: num(0.6, 3), h: num(1.2, 2.6), d: num(0.4, 0.8), open: z.boolean(), clothes: z.number().int().min(0).max(40) })),
   frame: kind(
     "frame",
@@ -140,10 +170,18 @@ export const KIND_SCHEMAS = {
       title: str(60),
     }),
   ),
-  window: kind("window", z.strictObject({ w: num(0.4, 3), h: num(0.4, 2.2), lift: num(0.2, 2.2), panes: z.number().int().min(1).max(4) })),
+  /** `blinds`: how much of the opening white horizontal blinds cover from the top (0 = none); `tubes`: two vertical LED tube lamps flanking the window. */
+  window: kind("window", z.strictObject({ w: num(0.4, 3), h: num(0.4, 2.2), lift: num(0.2, 2.2), panes: z.number().int().min(1).max(4), blinds: num(0, 1).default(0.35), tubes: z.boolean().default(true) })),
   door: kind("door", z.strictObject({ w: num(0.6, 1.4), h: num(1.8, 2.5), swing: num(0, 2), leadsTo: str(40) })),
   rug: kind("rug", z.strictObject({ w: num(0.4, 6), d: num(0.4, 6), shape: z.enum(["rect", "round"]) })),
-  neonStrip: kind("neonStrip", z.strictObject({ length: num(0.1, 4), vertical: z.boolean(), lift: num(0, 3), intensity: num(0.5, 6) })),
+  /**
+   * Neon line art. `line`: a straight tube `length` long (`vertical` stands it up); `rect`: a rectangle `w` x `h` outline whose bottom edge is at
+   * `lift`; `wave`: a wavy tube `w` wide and `h` high, its bottom at `lift`.
+   */
+  neonStrip: kind(
+    "neonStrip",
+    z.strictObject({ length: num(0.1, 8), vertical: z.boolean(), lift: num(0, 3), intensity: num(0.5, 6), path: z.enum(["line", "rect", "wave"]).default("line"), w: num(0.1, 6).default(1), h: num(0.1, 3).default(1) }),
+  ),
   speaker: kind("speaker", z.strictObject({ h: num(0.1, 1.2) })),
   clock: kind(
     "clock",
@@ -211,6 +249,10 @@ export const objectSchema = z.discriminatedUnion("kind", [
   KIND_SCHEMAS.chair,
   KIND_SCHEMAS.bed,
   KIND_SCHEMAS.wardrobe,
+  KIND_SCHEMAS.closet,
+  KIND_SCHEMAS.ceilingFan,
+  KIND_SCHEMAS.lightPanels,
+  KIND_SCHEMAS.pegboard,
   KIND_SCHEMAS.frame,
   KIND_SCHEMAS.window,
   KIND_SCHEMAS.door,

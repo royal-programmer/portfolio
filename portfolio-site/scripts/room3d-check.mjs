@@ -269,17 +269,18 @@ check("the desk props map to room objects (headphones are the headset)", STAGE_P
   const byId = (id) => room.objects.find((o) => o.id === id);
   check("the room is about 8.0 x 6.0 x 3.0 m", W === 8 && D === 6 && H === 3);
   const kinds = new Set(room.objects.map((o) => o.kind));
-  check("the new objects are there: bed, wardrobe, guitar, riding set, key rack, caps, football, cube, MIDI keyboard", ["bed", "wardrobe", "guitar", "ridingSet", "keyRack", "capRow", "football", "puzzleCube", "midiKeyboard"].every((k) => kinds.has(k)));
+  check("the new objects are there: bed, closet, guitar, riding set, key rack, caps, football, cube, MIDI keyboard", ["bed", "closet", "guitar", "ridingSet", "keyRack", "capRow", "football", "puzzleCube", "midiKeyboard"].every((k) => kinds.has(k)));
   const zr = room.zones;
   check("the new zones exist and the old ids are stable", ["sleep", "wardrobe", "chill", "window", "gear"].every((id) => zr.some((z) => z.id === id)) && ["desk", "screens", "shelf", "tv", "wall", "door", "hire"].every((id) => zr.some((z) => z.id === id)));
   check("every zone has a label for its chip and at most 16 zones", zr.every((z) => z.label.length > 0 && z.label.length <= 30) && zr.length <= 16);
   check("every zone's act names an object of that zone", zr.every((z) => !z.act || (room.objects.some((o) => o.id === z.act) && z.objects.includes(z.act))));
-  check("the wardrobe zone opens the wardrobe and the sleep zone strums the guitar", zr.find((z) => z.id === "wardrobe").act === "wardrobe" && zr.find((z) => z.id === "sleep").act === "guitar");
+  check("the closets zone (id wardrobe, label Closets) opens a closet and the sleep zone strums the guitar", zr.find((z) => z.id === "wardrobe").act === "closet-left" && zr.find((z) => z.id === "wardrobe").label === "Closets" && zr.find((z) => z.id === "sleep").act === "guitar");
   check("every object sits inside the room (position and its floor footprint)", room.objects.every((o) => Math.abs(o.transform.pos[0]) <= W / 2 && Math.abs(o.transform.pos[2]) <= D / 2 && o.transform.pos[1] <= H) && floorItems(room).every((f) => f.rect.x0 >= -W / 2 - 0.02 && f.rect.x1 <= W / 2 + 0.02 && f.rect.z0 >= -D / 2 - 0.02 && f.rect.z1 <= D / 2 + 0.02));
   const bed = floorItems(room).find((f) => f.id === "bed");
   check("the bed is about 0.9 x 2.0 m (frame 0.98 x 2.06)", bed && Math.abs(Math.min(bed.rect.x1 - bed.rect.x0, bed.rect.z1 - bed.rect.z0) - 0.98) < 0.02 && Math.abs(Math.max(bed.rect.x1 - bed.rect.x0, bed.rect.z1 - bed.rect.z0) - 2.06) < 0.02);
-  const wd = byId("wardrobe").params;
-  check("the wardrobe is about 1.2 x 0.6 x 2.1 m", wd.w === 1.2 && wd.d === 0.6 && wd.h === 2.1);
+  const cl = byId("closet-left").params;
+  const cr = byId("closet-right").params;
+  check("two closets about 0.9 x 0.6 x 2.1 m stand side by side on the front wall (the wardrobe is gone from the default data)", cl.w === 0.9 && cl.d === 0.6 && cl.h === 2.1 && cr.w === 0.9 && Math.abs(byId("closet-left").transform.pos[2] - byId("closet-right").transform.pos[2]) < 1e-9 && !room.objects.some((o) => o.kind === "wardrobe"));
   check("the riding set has a helmet, a jacket, pants and boots", ["helmet", "jacket", "pants", "boots"].every((k) => byId("riding-set").params[k] === true));
   check("the key rack's tags come from data (bike and car)", byId("key-rack").params.labels.join() === "Bike,Car" && byId("key-rack").params.keys === 2);
   check("small things hide on a phone (the football shows: the low tier has the room, round 37d)", byId("football").hideOnPhone === false && ["cube", "key-rack", "midi"].every((id) => byId(id).hideOnPhone === true));
@@ -297,7 +298,7 @@ check("the desk props map to room objects (headphones are the headset)", STAGE_P
   // budgets: the default room fits every tier's object budget, the phone tier drops the small things
   const phoneLow = trimToBudget(room.objects, ROOM3D_DEFAULT.tiers.low.objectBudget, { phone: true, includeDraft: false });
   check("the room fits the medium and high object budgets and the low one on a phone", room.objects.length <= ROOM3D_DEFAULT.tiers.medium.objectBudget && room.objects.length <= ROOM3D_DEFAULT.tiers.high.objectBudget && phoneLow.length <= ROOM3D_DEFAULT.tiers.low.objectBudget);
-  check("the low tier on a phone keeps the bed, the wardrobe and the door", ["bed", "wardrobe", "door"].every((id) => phoneLow.some((o) => o.id === id)));
+  check("the low tier on a phone keeps the bed, a closet and the door", ["bed", "closet-left", "door"].every((id) => phoneLow.some((o) => o.id === id)));
   // the constellation shows only in the zone that lists it (the page reads this)
   const skyZones = zr.filter((z) => z.objects.includes("constellation"));
   check("the constellation belongs to exactly one zone: the one about skills", skyZones.length === 1 && skyZones[0].id === "shelf" && skyZones[0].panel === "skills");
@@ -455,6 +456,96 @@ check("the desk props map to room objects (headphones are the headset)", STAGE_P
   check("the neck's marker frets are 3, 5, 7, 9 and 12", G.MARKERS.join() === "3,5,7,9,12");
   const gz = room.zones.find((z) => z.id === "guitar-play");
   check("the guitar's close-up is a hidden stop: no chip, not stepped to, 1.2 m from its subject", gz && gz.hidden === true && visibleZones(orderedZones(room)).every((z) => z.id !== "guitar-play") && Math.hypot(gz.eye[0] - gz.look[0], gz.eye[2] - gz.look[2]) >= 1.2);
+}
+
+// round 37e: the reference room (closets, rug, fan, panels, pegboard, neon, blinds, door), colours as data, assets, caps
+{
+  const R = await jiti.import(path.join(root, "lib/room3d/reference.ts"));
+  const byId = (id) => room.objects.find((o) => o.id === id);
+  const kinds = new Set(room.objects.map((o) => o.kind));
+  check("the reference kinds are in the default room: closet, ceilingFan, lightPanels, pegboard, cubeShelf", ["closet", "ceilingFan", "lightPanels", "pegboard", "cubeShelf"].every((k) => kinds.has(k) && KIND_IDS.includes(k)));
+  const mutate = (id, fn) => {
+    const c = clone(ROOM3D_DEFAULT);
+    fn(c.rooms[0].objects.find((o) => o.id === id).params);
+    return room3dSchema.safeParse(c).success;
+  };
+  check("a closet takes 2 or 4 doors, 1 or 2 rows, a known top shelf and floor item (anything else is rejected)", mutate("closet-left", (p) => (p.doors = 4)) && !mutate("closet-left", (p) => (p.doors = 3)) && !mutate("closet-left", (p) => (p.rows = 3)) && !mutate("closet-left", (p) => (p.topShelf = "books")) && !mutate("closet-left", (p) => (p.floorItem = "bed")) && !mutate("closet-left", (p) => (p.open = 1.5)) && !mutate("closet-left", (p) => (p.palette = [])));
+  check("a ceiling fan has 3 to 5 blades and 0 to 4 lamps", mutate("fan", (p) => (p.blades = 5)) && !mutate("fan", (p) => (p.blades = 2)) && !mutate("fan", (p) => (p.blades = 6)) && !mutate("fan", (p) => (p.lamps = 5)) && !mutate("fan", (p) => (p.spin = 2)));
+  check("light panels take 3 to 12 triangles in a column or a cluster", mutate("light-panels", (p) => (p.layout = "cluster")) && !mutate("light-panels", (p) => (p.count = 2)) && !mutate("light-panels", (p) => (p.count = 13)) && !mutate("light-panels", (p) => (p.layout = "ring")));
+  check("a pegboard hangs 1 to 8 keyboards", mutate("pegboard", (p) => (p.items = 8)) && !mutate("pegboard", (p) => (p.items = 0)) && !mutate("pegboard", (p) => (p.items = 9)));
+  check("a neon strip is a line, a rect or a wave (anything else is rejected)", mutate("neon-window", (p) => (p.path = "wave")) && !mutate("neon-window", (p) => (p.path = "zigzag")));
+  {
+    const c = clone(ROOM3D_DEFAULT);
+    const ob = c.rooms[0].objects;
+    for (const id of ["neon-top", "neon-window"]) for (const k of ["path", "w", "h"]) delete ob.find((o) => o.id === id).params[k];
+    for (const k of ["blinds", "tubes"]) delete ob.find((o) => o.id === "window").params[k];
+    for (const k of ["baseColor", "pillowColor", "throwColor", "headboardColor", "led", "ledColor"]) delete ob.find((o) => o.id === "bed").params[k];
+    delete ob.find((o) => o.id === "chair").params.trim;
+    const r = room3dSchema.safeParse(c);
+    const got = r.success ? r.data.rooms[0].objects : [];
+    check("a room saved before this round (no path, blinds, bed colours or chair trim) still parses and gets the defaults", r.success && got.find((o) => o.id === "neon-top").params.path === "line" && got.find((o) => o.id === "window").params.blinds === 0.35 && got.find((o) => o.id === "bed").params.baseColor === "#8a8d93" && got.find((o) => o.id === "chair").params.trim === "#14151a", r.success ? "" : JSON.stringify(r.error.issues.slice(0, 2)));
+  }
+  {
+    const c = clone(ROOM3D_DEFAULT);
+    c.rooms[0].objects.push({ id: "old-wardrobe", kind: "wardrobe", transform: { pos: [-2.6, 0, 2.7], rotY: Math.PI, scale: 1 }, material: { preset: "wood", color: "#8a6a4a", roughness: 0.5 }, visibility: "public", hideOnPhone: false, params: { w: 1.2, h: 2.1, d: 0.6, open: false, clothes: 14 } });
+    check("an old saved wardrobe object still parses (the kind is kept for compatibility)", room3dSchema.safeParse(c).success);
+  }
+  // doors
+  const a = 0.45;
+  const f0 = R.foldPose(0, a);
+  const f1 = R.foldPose(1, a);
+  const fh = R.foldPose(0.5, a);
+  check("a bi-fold pair at 0 is flat on the track (reach 2a, nothing sticks out); at 1 it is folded back and sticks out", f0.outer === 0 && Math.abs(f0.reach - 2 * a) < 1e-9 && f0.out === 0 && f1.reach < a * 0.8 && f1.out > a * 0.8 && fh.reach < f0.reach && fh.reach > f1.reach);
+  check("the inner leaf turns back twice as far as the outer one, so the pair's free end stays on the track", [0, 0.3, 0.7, 1].every((v) => { const p = R.foldPose(v, a); return Math.abs(p.inner + 2 * p.outer) < 1e-9; }));
+  check("openness is clamped to 0..1", R.foldPose(-3, a).outer === 0 && R.foldPose(9, a).outer === R.foldPose(1, a).outer);
+  check("2 doors are one pair across the whole width, 4 doors a pair at each jamb", R.closetPairs(2, 0.9).length === 1 && R.closetPairs(2, 0.9)[0].a === 0.45 && R.closetPairs(4, 0.9).length === 2 && R.closetPairs(4, 0.9).map((p) => p.side).join() === "1,-1");
+  check("a click flips a closet's openness (open data folds shut, closed data opens fully), and a second click restores it", R.closetOpenness(0.85, false) === 0.85 && R.closetOpenness(0.85, true) === 0 && R.closetOpenness(0, true) === 1 && R.closetOpenness(0, false) === 0);
+  // panels and pegboard
+  let cellsOk = true;
+  for (const layout of ["column", "cluster"])
+    for (let n = 3; n <= 12; n++) {
+      const cells = R.panelCells(n, layout);
+      const keys = new Set(cells.map((c) => c.col + "," + c.row));
+      const touch = (c, d) => keys.has(c.col + d[0] + "," + (c.row + d[1]));
+      const connected = cells.every((c) => { const up = (c.col + c.row) % 2 === 0; return cells.length === 1 || touch(c, [1, 0]) || touch(c, [-1, 0]) || touch(c, [0, up ? -1 : 1]); });
+      if (cells.length !== n || keys.size !== n || !connected) cellsOk = false;
+    }
+  check("panelCells gives exactly the asked number of distinct triangles, each touching another, for every count and layout", cellsOk);
+  const tri = R.panelCorners({ col: 0, row: 0 }, 0.26);
+  const area = (t) => Math.abs((t[1][0] - t[0][0]) * (t[2][1] - t[0][1]) - (t[2][0] - t[0][0]) * (t[1][1] - t[0][1])) / 2;
+  check("a panel is an equilateral triangle of the given side, up and down alike", Math.abs(area(tri) - (Math.sqrt(3) / 4) * 0.26 * 0.26) < 1e-9 && Math.abs(area(R.panelCorners({ col: 1, row: 0 }, 0.26)) - area(tri)) < 1e-9);
+  check("the shared edge of an up and a down triangle is the same segment", (() => { const u = R.panelCorners({ col: 0, row: 0 }, 1); const d = R.panelCorners({ col: 1, row: 0 }, 1); return Math.abs(u[1][0] - d[2][0]) < 1e-9 && Math.abs(u[1][1] - d[2][1]) < 1e-9 && Math.abs(u[2][0] - d[0][0]) < 1e-9 && Math.abs(u[2][1] - d[0][1]) < 1e-9; })());
+  check("a pegboard grid holds every keyboard in at most 4 columns", [1, 2, 3, 4, 5, 6, 7, 8].every((n) => { const g = R.pegGrid(n, 1.1, 0.85); return g.cols * g.rows >= n && g.cols <= 4 && g.cols >= 1; }));
+  // the room as data
+  const rug = byId("rug");
+  check("the rug is a big white shag: 9 m2 or more, very rough, light", rug.params.w * rug.params.d >= 9 && rug.material.roughness >= 0.95 && parseInt(rug.material.color.slice(1, 3), 16) > 0xe8);
+  const fan = byId("fan");
+  check("the ceiling fan hangs from the ceiling (4 lamps, turning, hidden on a phone)", fan.transform.pos[1] === room.shell.height && fan.params.lamps === 4 && fan.params.spin > 0 && fan.hideOnPhone === true);
+  const neon = room.objects.filter((o) => o.kind === "neonStrip");
+  check("neon line art: a rectangle round the window, a straight run on the ceiling edge, a wave above the TV unit", neon.some((o) => o.params.path === "rect" && Math.abs(o.transform.pos[0] - byId("window").transform.pos[0]) < 0.01 && o.params.w > byId("window").params.w) && neon.some((o) => o.params.path === "line" && o.params.lift > 2.8 && o.params.length > 6) && neon.some((o) => o.params.path === "wave" && Math.abs(o.transform.pos[0] - byId("tv").transform.pos[0]) < 0.01 && o.params.lift > 1.4));
+  check("the window has blinds and two LED tube lamps, the door is white", byId("window").params.blinds > 0 && byId("window").params.tubes === true && parseInt(byId("door").material.color.slice(1, 3), 16) > 0xe8);
+  check("the TV unit is two rows of white cube shelving with books and boxes in some cubes", byId("tv-unit").kind === "cubeShelf" && byId("tv-unit").params.rows === 2 && byId("tv-unit").params.books > 0 && byId("tv-unit").params.boxes > 0 && byId("tv-unit").params.books + byId("tv-unit").params.boxes < byId("tv-unit").params.cols * 2 && parseInt(byId("tv-unit").material.color.slice(1, 3), 16) > 0xe8);
+  const bp = byId("bed").params;
+  check("the bed: grey fabric base, white duvet, white pillows and headboard, grey throw, under-bed LED", bp.baseColor.toLowerCase() === "#8a8d93" && parseInt(byId("bed").material.color.slice(1, 3), 16) > 0xe8 && bp.pillowColor === "#ffffff" && parseInt(bp.headboardColor.slice(1, 3), 16) > 0xe8 && bp.led === true && bp.pillows >= 2);
+  const rs = byId("riding-set").params;
+  check("the riding set is a black suit with neon panels and a grey stripe, red helmet shell", rs.base === "#101114" && rs.panel === "#ff3b1f" && rs.stripe === "#8a8e96" && byId("riding-set").material.color === "#e2321f");
+  check("the caps are black with a red brim edge, the key rack has a black bike key and a blue and white fob, the chair is blue and black", byId("caps").params.capColor === "#111216" && byId("caps").params.brimColor === "#d1202b" && byId("key-rack").params.headColor === "#0e0f12" && byId("key-rack").params.fobColors.join() === "#1c63d6,#f4f6fa" && byId("chair").params.style === "gaming" && byId("chair").params.trim === "#14151a");
+  const fl = floorItems(room);
+  const hit = (p, q) => p.rect.x0 < q.rect.x1 && q.rect.x0 < p.rect.x1 && p.rect.z0 < q.rect.z1 && q.rect.z0 < p.rect.z1;
+  const clItems = fl.filter((f) => f.kind === "closet");
+  check("the two closets are floor items that overlap nothing else on the floor and sit inside the room", clItems.length === 2 && clItems.every((c) => fl.every((q) => q.id === c.id || !hit(c, q)) && c.rect.z1 <= room.shell.depth / 2 + 0.02));
+  // every kind that stands out from a wall is hidden on a phone or cheap: the objects that low cannot afford are marked
+  check("what the low tier cannot afford is marked hideOnPhone (fan, pegboard, ceiling neon)", ["fan", "pegboard", "neon-ceiling"].every((id) => byId(id).hideOnPhone === true));
+  // measured draw calls, when a perf run is on disk (tmp/r37e/perf.json from scripts/room3d-perf.cjs, OUT=...)
+  const perfFile = path.resolve(root, "../tmp/r37e/perf.json");
+  if (fs.existsSync(perfFile)) {
+    const perf = JSON.parse(fs.readFileSync(perfFile, "utf8"));
+    const bad = [];
+    for (const [tierId, t] of Object.entries(perf.tiers)) for (const [zn, v] of Object.entries(t.zones)) if (v.calls > DRAW_CAPS[tierId]) bad.push(tierId + ":" + zn + "=" + v.calls);
+    check("measured draw calls stay under the tier caps in every zone (tmp/r37e/perf.json)", bad.length === 0, bad.join());
+    const med = Object.entries(perf.tiers.medium?.zones ?? {}).filter(([, v]) => v.p95Ms >= 16.7).map(([zn, v]) => zn + "=" + v.p95Ms);
+    check("medium p95 frame time stays under 16.7 ms in every zone (tmp/r37e/perf.json)", med.length === 0, med.join());
+  }
 }
 
 console.log(failed ? `\n${failed} failing` : "\nall room3d checks pass");

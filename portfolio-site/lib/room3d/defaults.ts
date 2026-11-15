@@ -78,11 +78,17 @@ const workRoom: Room = {
     obj("books", "bookStack", [-3.45, 1.5175, -2.88], { count: 9, layout: "row" }, { material: M("paper", "#5a6aa8", 0.7) }),
     obj("plant", "plant", [0.8, 0, -2.7], { height: 0.9, leaves: 26, pot: "round" }, { model: "/models/plant.glb" }),
     obj("clock", "clock", [-2.05, 0, -2.99], { diameter: 0.34, lift: 2.1, ownerZone: "Asia/Kolkata", digital: true }, { material: M("plastic", "#e8e1d6", 0.5), interaction: { label: "time", card: "Owner time (Asia/Kolkata) and yours." } }),
-    obj("neon-top", "neonStrip", [-1.2, 0, -2.97], { length: 1.3, vertical: false, lift: 2.05, intensity: 3.2 }),
-    obj("neon-corner", "neonStrip", [-3.95, 0, -2.95], { length: 2.2, vertical: true, lift: 0.2, intensity: 3.2 }, { material: M("emissive", "#cfe6ff", 0.5) }),
-    obj("rug", "rug", [-1.3, 0, -1.6], { w: 2.2, d: 1.6, shape: "rect" }),
+    obj("neon-top", "neonStrip", [-1.2, 0, -2.97], { length: 1.3, vertical: false, lift: 2.05, intensity: 3.2, path: "line", w: 1, h: 1 }),
+    obj("neon-corner", "neonStrip", [-3.95, 0, -2.95], { length: 2.2, vertical: true, lift: 0.2, intensity: 3.2, path: "line", w: 1, h: 1 }, { material: M("emissive", "#cfe6ff", 0.5) }),
+    // Neon line art (reference room): a rectangle round the window, a run along the ceiling edge, a wave above the TV unit (below).
+    obj("neon-window", "neonStrip", [1.7, 0, -2.97], { length: 1, vertical: false, lift: 0.7, intensity: 3, path: "rect", w: 1.8, h: 1.7 }, { material: M("emissive", "#cfe6ff", 0.5) }),
+    obj("neon-ceiling", "neonStrip", [0, 0, -2.97], { length: 7.9, vertical: false, lift: 2.92, intensity: 2.2, path: "line", w: 1, h: 1 }, { material: M("emissive", "#cfd6ff", 0.5), hideOnPhone: true }),
+    // The white long-pile shag rug between the bed, the shelves and the desk.
+    obj("rug", "rug", [0.2, 0, 0.1], { w: 4, d: 3.4, shape: "rect" }, { material: M("fabric", "#f4f4f6", 1) }),
+    obj("fan", "ceilingFan", [0.3, 3, 0.2], { blades: 4, lamps: 4, spin: 0.5, drop: 0.3 }, { hideOnPhone: true }),
+    obj("light-panels", "lightPanels", [3.3, 1.45, -2.985], { count: 7, layout: "column", color: "#cfe6ff", intensity: 2.2 }),
     // Window wall (back wall, right): a frame and a sky plane for now; the real window and the weather come in round 37b.
-    obj("window", "window", [1.7, 0, -2.99], { w: 1.4, h: 1.3, lift: 0.85, panes: 2 }, { material: M("plastic", "#d9d4cc", 0.6) }),
+    obj("window", "window", [1.7, 0, -2.99], { w: 1.4, h: 1.3, lift: 0.85, panes: 2, blinds: 0.35, tubes: true }, { material: M("plastic", "#d9d4cc", 0.6) }),
     // Wall (left wall, back half): the credentials and the key moments, drawn from the content layer by the page.
     obj("board-credentials", "board", [-3.97, 0, -2.05], { source: "credentials", style: "frames", w: 1.3, h: 0.85, lift: 1.0 }, { rotY: Math.PI / 2, interaction: { label: "certificates and education", cmd: "panel:credentials" } }),
     obj("board-moments", "board", [-3.97, 0, -0.65], { source: "moments", style: "cards", w: 1.2, h: 0.85, lift: 1.0 }, { rotY: Math.PI / 2, interaction: { label: "key moments", cmd: "panel:moments" } }),
@@ -97,14 +103,17 @@ const workRoom: Room = {
     obj("constellation", "constellation", [3.3, 2.2, 2.2], { stars: STAGE_TIERS.best.stars }, { rotY: -Math.PI / 2, scale: 0.4 }),
     // Chill (front wall, right): the TV on its low unit with the console, a football, a Rubik's cube.
     obj("tv-unit", "cubeShelf", [1.4, 0, 2.79], { cols: 6, rows: 2, cell: 0.3, d: 0.42, books: 5, boxes: 3 }, { rotY: Math.PI, material: M("plastic", "#f3f4f7", 0.5) }),
+    obj("neon-wave", "neonStrip", [1.4, 0, 2.97], { length: 1, vertical: false, lift: 1.62, intensity: 3, path: "wave", w: 1.7, h: 0.3 }, { rotY: Math.PI, material: M("emissive", "#d9c8ff", 0.5) }),
+    obj("pegboard", "pegboard", [2.95, 0, 2.985], { w: 1.1, h: 0.85, lift: 1.15, items: 6 }, { rotY: Math.PI, material: M("plastic", "#f6f7fa", 0.6), hideOnPhone: true }),
     obj("tv", "tv", [1.4, 0, 2.97], { inches: 55, lift: 0.7, mode: "reel" }, { rotY: Math.PI, material: M("plastic", "#0b0c10", 0.4), interaction: { label: "project reel", cmd: "panel:tv" } }),
     obj("console", "console", [0.8, 0.6, 2.8], { controllers: 2 }, { rotY: Math.PI, material: M("plastic", "#e8e8ee", 0.4), interaction: { label: "the worlds", cmd: "panel:worlds" } }),
     obj("football", "football", [1.2, 0, 2.1], { r: 0.11 }, { material: M("plastic", "#f1f1f1", 0.5), interaction: { label: "kick", cmd: "kick:football" } }),
     obj("cube", "puzzleCube", [1.95, 0.6, 2.8], { size: 0.057 }, { rotY: 0.5, material: M("plastic", "#111216", 0.4), hideOnPhone: true }),
-    // Wardrobe and entry (front wall, left; left wall, front half): the wardrobe whose doors open, the caps, the key rack, the riding set, the door.
-    obj("wardrobe", "wardrobe", [-2.6, 0, 2.7], { w: 1.2, h: 2.1, d: 0.6, open: false, clothes: 14 }, { rotY: Math.PI, material: M("wood", "#8a6a4a", 0.5), interaction: { label: "wardrobe", card: "Jackets and shirts." } }),
+    // Closets and entry (front wall, left; left wall, front half): two bi-fold closets (plushies, a wire shelf of boxes and a MIDI keyboard; clothes on black hangers), the caps, the key rack, the riding set, the door.
+    obj("closet-left", "closet", [-2.9, 0, 2.7], { doors: 2, rows: 1, topShelf: "plushies", floorItem: "midi", open: 0.85, w: 0.9, h: 2.1, d: 0.6, items: 0, stuff: 7, wireBoxes: 4, floorKeys: 37, palette: ["#e8a0b4", "#f2d36b", "#8fc7e8", "#b9a3e6", "#9fd8b0"] }, { rotY: Math.PI, material: M("plastic", "#f3f4f7", 0.5), interaction: { label: "closet", card: "Plushies, a MIDI keyboard and a few boxes." } }),
+    obj("closet-right", "closet", [-1.95, 0, 2.7], { doors: 2, rows: 2, topShelf: "none", floorItem: "none", open: 0.85, w: 0.9, h: 2.1, d: 0.6, items: 7, stuff: 0, wireBoxes: 0, floorKeys: 37, palette: ["#1d1f26", "#3b4a63", "#8a8d94", "#e9e6e0", "#4f6f5e", "#7a3b3b"] }, { rotY: Math.PI, material: M("plastic", "#f3f4f7", 0.5), interaction: { label: "closet", card: "Hoodies and jackets above, tees below." } }),
     obj("caps", "capRow", [-1.0, 0, 2.97], { count: 4, spacing: 0.2, lift: 1.7, capColor: "#111216", brimColor: "#d1202b" }, { rotY: Math.PI }),
-    obj("door", "door", [-3.98, 0, 0.8], { w: STAGE_DOOR.size[0], h: STAGE_DOOR.size[1], swing: OPEN_RAD, leadsTo: STAGE_DOOR.label }, { rotY: Math.PI / 2, material: M("wood", "#6b4a30", 0.6), interaction: { label: STAGE_DOOR.label, cmd: "panel:worlds" } }),
+    obj("door", "door", [-3.98, 0, 0.8], { w: STAGE_DOOR.size[0], h: STAGE_DOOR.size[1], swing: OPEN_RAD, leadsTo: STAGE_DOOR.label }, { rotY: Math.PI / 2, material: M("plastic", "#f4f5f8", 0.55), interaction: { label: STAGE_DOOR.label, cmd: "panel:worlds" } }),
     obj("key-rack", "keyRack", [-3.97, 0, 1.75], { keys: 2, w: 0.5, lift: 1.35, labels: ["Bike", "Car"], headColor: "#0e0f12", fobColors: ["#1c63d6", "#f4f6fa"] }, { rotY: Math.PI / 2, material: M("wood", "#4a3422", 0.5), hideOnPhone: true }),
     obj("riding-set", "ridingSet", [-3.95, 0, 2.5], { helmet: true, jacket: true, pants: true, gloves: true, boots: true, base: "#101114", panel: "#ff3b1f", stripe: "#8a8e96" }, { rotY: Math.PI / 2, material: M("plastic", "#e2321f", 0.25) }),
   ],

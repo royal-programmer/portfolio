@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { KindId, ObjectOf } from "@/lib/room3d/schema";
 import { Halo, Inst, useEnv, useImageTexture, useMat } from "./kit-core";
-import { labelTexture } from "./textures";
+import { blindsTexture, labelTexture, panelNormal } from "./textures";
 
 type P<K extends KindId> = { o: ObjectOf<K> };
 const hue = (i: number, s = 0.45, l = 0.32) => new THREE.Color().setHSL(((i * 0.137) % 1 + 1) % 1, s, l);
@@ -147,8 +147,18 @@ export function Board({ o }: P<"board">) {
 
 export function Window({ o }: P<"window">) {
   const env = useEnv();
-  const { w, h, lift, panes } = o.params;
+  const { w, h, lift, panes, blinds, tubes } = o.params;
   const frame = useMat(o.material);
+  // White horizontal blinds: one plane with a slat stripe repeating every 0.3 m of height (no per-slat meshes), hanging from the top of the opening.
+  const bh = h * blinds;
+  const slatMap = env.kit.tex("blinds", () => {
+    const t = blindsTexture(10);
+    t.wrapT = THREE.RepeatWrapping;
+    return t;
+  });
+  const blindMat = useMemo(() => new THREE.MeshStandardMaterial({ map: env.kit.tiled("blinds", slatMap, [1, Math.max(0.2, bh / 0.3)]), roughness: 0.7, metalness: 0 }), [env.kit, slatMap, bh]);
+  useEffect(() => () => blindMat.dispose(), [blindMat]);
+  const tubeMat = env.kit.glow("#eef4ff", 3 * Math.max(0.6, env.light.emissiveBoost));
   const wl = env.light.windowLight;
   const lit = wl.intensity > 0;
   const sky = env.kit.tex(`sky:${wl.color}:${lit}`, () => {
@@ -172,6 +182,18 @@ export function Window({ o }: P<"window">) {
       <mesh userData={{ noShadow: true }} material={pane}>
         <planeGeometry args={[w, h]} />
       </mesh>
+      {blinds > 0.01 ? (
+        <mesh position={[0, h / 2 - bh / 2, 0.03]} userData={{ noShadow: true }} material={blindMat}>
+          <planeGeometry args={[w, bh]} />
+        </mesh>
+      ) : null}
+      {tubes
+        ? [-1, 1].map((s) => (
+            <mesh key={s} position={[s * (w / 2 + 0.2), 0, 0.05]} userData={{ noShadow: true }} material={tubeMat}>
+              <cylinderGeometry args={[0.014, 0.014, h * 0.95, 8]} />
+            </mesh>
+          ))
+        : null}
       {[
         [0, h / 2 + 0.025, w + 0.1, 0.05],
         [0, -h / 2 - 0.025, w + 0.1, 0.05],
@@ -190,8 +212,11 @@ export function Window({ o }: P<"window">) {
 export function Door({ o }: P<"door">) {
   const env = useEnv();
   const { w, h, swing } = o.params;
-  const leaf = useMat(o.material);
-  const frame = env.kit.mat("wood", "#d9d4cc", 0.6);
+  // Six panels (two across, three down) as a normal map on the leaf: the grooves are in the map, not the geometry.
+  const panels = env.kit.tex("door-panels", () => panelNormal(256, 2, 3, 1));
+  const leaf = useMemo(() => new THREE.MeshStandardMaterial({ color: o.material.color, roughness: o.material.roughness, metalness: 0, normalMap: panels, normalScale: new THREE.Vector2(1.4, 1.4) }), [panels, o.material.color, o.material.roughness]);
+  useEffect(() => () => leaf.dispose(), [leaf]);
+  const frame = env.kit.mat("plastic", "#eef0f4", 0.6);
   const knob = env.kit.mat("metal", "#c8a24a", 0.3);
   const pivot = useRef<THREE.Group>(null);
   const angle = useRef(0);
@@ -226,21 +251,66 @@ export function Door({ o }: P<"door">) {
   );
 }
 
+/** A long-pile shag rug: a thick slab, very rough, with a fine fuzzy normal map tiling every 0.5 m (no fur shells). */
 export function Rug({ o }: P<"rug">) {
+  const env = useEnv();
   const { w, d, shape } = o.params;
-  const mat = useMat(o.material);
+  const mat = env.kit.soft(o.material.color, Math.max(0.95, o.material.roughness), "shag", 1, 0.7, [w / 0.5, d / 0.5]);
   return shape === "round" ? (
-    <mesh position={[0, 0.006, 0]} receiveShadow material={mat}>
-      <cylinderGeometry args={[w / 2, w / 2, 0.012, 40]} />
+    <mesh position={[0, 0.01, 0]} receiveShadow material={mat}>
+      <cylinderGeometry args={[w / 2, w / 2, 0.02, 40]} />
     </mesh>
   ) : (
-    <RoundedBox args={[w, 0.012, d]} radius={0.005} smoothness={2} position={[0, 0.006, 0]} receiveShadow material={mat} />
+    <RoundedBox args={[w, 0.02, d]} radius={0.008} smoothness={2} position={[0, 0.01, 0]} receiveShadow material={mat} />
+  );
+}
+
+/** The centre line of a neon tube: a rounded rectangle (`rect`, bottom-left at the origin) or a free-form wave, in the x-y plane. */
+function neonCurve(path: "rect" | "wave", w: number, h: number): THREE.Curve<THREE.Vector3> {
+  const pts: THREE.Vector3[] = [];
+  if (path === "wave") {
+    const n = 14;
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      pts.push(new THREE.Vector3(-w / 2 + t * w, h / 2 + (h / 2) * (0.8 * Math.sin(t * Math.PI * 3) + 0.2 * Math.sin(t * Math.PI * 6.2 + 1)), 0));
+    }
+    return new THREE.CatmullRomCurve3(pts, false, "centripetal");
+  }
+  const r = Math.min(0.07, w / 4, h / 4);
+  const corner = (cx: number, cy: number, a0: number) => {
+    for (let k = 0; k <= 3; k++) {
+      const a = a0 + (k / 3) * (Math.PI / 2);
+      pts.push(new THREE.Vector3(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 0));
+    }
+  };
+  const edge = (x0: number, y0: number, x1: number, y1: number, n: number) => {
+    for (let k = 1; k < n; k++) pts.push(new THREE.Vector3(x0 + ((x1 - x0) * k) / n, y0 + ((y1 - y0) * k) / n, 0));
+  };
+  corner(w / 2 - r, r, -Math.PI / 2);
+  edge(w / 2, r, w / 2, h - r, 3);
+  corner(w / 2 - r, h - r, 0);
+  edge(w / 2 - r, h, -w / 2 + r, h, 4);
+  corner(-w / 2 + r, h - r, Math.PI / 2);
+  edge(-w / 2, h - r, -w / 2, r, 3);
+  corner(-w / 2 + r, r, Math.PI);
+  edge(-w / 2 + r, 0, w / 2 - r, 0, 4);
+  return new THREE.CatmullRomCurve3(pts, true, "centripetal");
+}
+
+/** A neon outline or wave: one low-poly tube along a curve, one draw, glowing (bloom picks it up on the high tier). */
+function NeonTube({ o }: P<"neonStrip">) {
+  const env = useEnv();
+  const { lift, intensity, path, w, h } = o.params;
+  const geo = env.kit.geo(`neon:${path}:${w}:${h}`,() => new THREE.TubeGeometry(neonCurve(path === "wave" ? "wave" : "rect", w, h), path === "wave" ? 90 : 120, 0.011, 6, path !== "wave"));
+  return (
+    <mesh geometry={geo} position={[0, lift, 0.022]} userData={{ noShadow: true }} material={env.kit.glow(o.material.color, intensity * env.light.emissiveBoost)} />
   );
 }
 
 export function NeonStrip({ o }: P<"neonStrip">) {
   const env = useEnv();
   const { length, vertical, lift, intensity } = o.params;
+  if (o.params.path !== "line") return <NeonTube o={o} />;
   const k = intensity * env.light.emissiveBoost;
   const col = o.material.color;
   const mid = lift + (vertical ? length / 2 : 0);

@@ -10,21 +10,21 @@ import type { Room, Zone } from "./schema";
  * The defaults for the 8.0 x 6.0 x 3.0 m room (round 37a). Work: the desk on the back wall, left. Window wall: the
  * back wall, right. Sleep: the bed, the guitar and the MIDI keyboard on the right wall, back half. Shelf: the project
  * cases, the skills board and the skill stars on the right wall, front half. Chill: the TV, the console, the football and
- * the cube on the front wall, right. Wardrobe and entry: the wardrobe and the caps on the front wall, left; the key rack
+ * the cube on the front wall, right. Closets and entry: the two bi-fold closets and the caps on the front wall, left; the key rack
  * and the riding set on the left wall, front half, with the door beside them; Wall: the certificates and the key moments
  * on the left wall, back half. `panel` names what Enter opens (see panels.ts); `act` names the object Enter acts on as a
- * click would (the wardrobe's doors, the guitar's chord). Zone ids are stable: the page, the tests and saved rooms use them.
+ * click would (the closets' doors, the guitar's chord). Zone ids are stable: the page, the tests and saved rooms use them.
  */
 export const DEFAULT_ZONES: Zone[] = [
   { id: "desk", label: "Desk", order: 0, eye: [-1.2, 1.6, -0.3], look: [-1.2, 1.1, -2.8], objects: ["monitor-low", "keyboard", "mug", "notebook", "headset"], panel: "terminal" },
   { id: "screens", label: "Projects", order: 1, eye: [-1.2, 1.4, -1.1], look: [-1.2, 1.3, -2.8], objects: ["monitor-high"], panel: "projects" },
   { id: "hire", label: "Hire", order: 2, eye: [-1.9, 1.3, -0.9], look: [-1.62, 0.9, -2.37], objects: ["phone", "sticky"], panel: "hire" },
-  { id: "window", label: "Window", order: 3, eye: [0.6, 1.55, 1.2], look: [1.9, 1.25, -3], objects: ["window"] },
+  { id: "window", label: "Window", order: 3, eye: [0.6, 1.55, 1.2], look: [1.9, 1.25, -3], objects: ["window", "neon-window", "light-panels", "neon-ceiling"] },
   { id: "sleep", label: "Sleep", order: 4, eye: [0.2, 1.7, 0.3], look: [3.5, 0.6, -1.9], objects: ["bed", "guitar", "midi"], act: "guitar" },
   { id: "shelf", label: "Shelf", order: 5, eye: [-0.9, 1.6, 2.3], look: [3.95, 1.6, 2.3], objects: ["board-skills", "project-shelf", "constellation"], panel: "skills" },
-  { id: "tv", label: "TV", order: 6, eye: [1.4, 1.15, 0.6], look: [1.4, 0.8, 2.95], objects: ["tv", "console"], panel: "tv" },
+  { id: "tv", label: "TV", order: 6, eye: [1.4, 1.3, 0.2], look: [1.4, 1.2, 2.95], objects: ["tv", "console", "tv-unit", "neon-wave", "pegboard"], panel: "tv" },
   { id: "chill", label: "Chill", order: 7, eye: [-1.2, 1.6, -0.3], look: [1.4, 0.55, 2.8], objects: ["football", "cube"] },
-  { id: "wardrobe", label: "Wardrobe", order: 8, eye: [1.0, 1.8, -0.2], look: [-2.6, 1.0, 2.7], objects: ["wardrobe", "caps"], act: "wardrobe" },
+  { id: "wardrobe", label: "Closets", order: 8, eye: [-2.2, 1.55, -0.3], look: [-2.45, 1.1, 2.7], objects: ["closet-left", "closet-right", "caps"], act: "closet-left" },
   { id: "gear", label: "Riding", order: 9, eye: [-1.4, 1.5, -0.2], look: [-4, 1.15, 2.4], objects: ["riding-set", "key-rack"] },
   { id: "door", label: "Door", order: 10, eye: [-0.8, 1.45, 0.8], look: [-4, 1.1, 0.8], objects: ["door"], panel: "worlds" },
   { id: "guitar-play", label: "Guitar", order: 12, hidden: true, eye: [2.2, 1.2, -1.0], look: [3.5, 0.7, -1.3], objects: ["guitar"] },
