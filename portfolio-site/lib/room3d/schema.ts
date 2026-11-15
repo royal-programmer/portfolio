@@ -49,8 +49,13 @@ export const interactionSchema = z.union([
   z.strictObject({ label: str(60), card: str(240) }),
 ]);
 
-/** An optional glTF model or texture map for an object (a https URL or a /path in public/). Declared now, drawn from round 37d; nothing reads them yet. */
-const assetUrl = () => z.string().max(500).regex(/^(https:\/\/|\/)/, "an https:// URL or a /path");
+/** An optional glTF model or texture map for an object: only a /models/... or /textures/... path in public/ (no https, no "..": every asset is committed, CC0 and credited, never loaded from a URL). */
+const assetUrl = () =>
+  z
+    .string()
+    .max(200)
+    .regex(/^\/(models|textures)\/[A-Za-z0-9][A-Za-z0-9._\-/]*$/, "a /models/... or /textures/... path")
+    .refine((v) => !v.includes(".."), "no ..");
 
 /** The chords a guitar can strum (see lib/room3d/chord.ts for their notes). */
 export const CHORD_IDS = ["Em", "Am", "C", "G", "D", "E", "A", "Dm"] as const;
@@ -62,7 +67,7 @@ const base = {
   interaction: interactionSchema.optional(),
   visibility: z.enum(["public", "draft"]),
   hideOnPhone: z.boolean(),
-  /** Later: a CC0 glTF model that replaces the drawn shape, and a texture map for the material. Optional and unused for now. */
+  /** A CC0 glTF model that replaces the drawn shape (scaled to the object's size), and a texture map for the material. Paths in public/ only. */
   model: assetUrl().optional(),
   map: assetUrl().optional(),
 };

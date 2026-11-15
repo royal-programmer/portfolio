@@ -15,19 +15,23 @@ bag) and 3dcyberroom.vercel.app (cyberpunk desk, neon, bloom, curved monitor, sh
 Look: good textures, soft shadows, no jagged edges. Performance: 55+ fps at 1280 on an integrated
 GPU, a smooth frame on the Vivo X200 Pro, first load under 5 MB.
 
-Both references are almost certainly authored Blender models with baked lighting (the critic's
-judgement, to be confirmed with devtools). A parametric kit plus real-time light and ambient
-occlusion gives a **clean stylised room, better than today's Stage but not that exact look**.
-Detail (cables, clutter, plants) comes from free glTF assets, not from the lighting.
+Verified facts about the joan-portfolio reference (code read 2026-11-15; its assets are never copied): three 0.161, **no
+lights at all**, every surface a `MeshBasicMaterial` carrying one of three baked lightmaps (`baked1-3.ktx2`, 3.7 MB in total),
+and a 355 KB `room3.glb`. The look is the bake, not the model detail. We cannot copy that route: **baking and admin-movable
+objects are incompatible**. The room stays real-time, and realism comes from image-based lighting (one 1k CC0 HDRI in
+`public/`), roughness and normal variation on every material preset, ambient occlusion on medium and high, and a small set of
+CC0 glTFs for organic shapes. A parametric kit plus real-time light and ambient occlusion gives a **clean stylised room,
+better than today's Stage but not that exact look**. Detail (cables, clutter, plants) comes from free glTF assets.
 
 Decisions taken from the critic:
-- **No Blender, no cloud baking.** The Actions bake (UV unwrap of parametric geometry, minutes
+- **No Blender, no cloud baking** (closed for good on 2026-11-15, see section 9). The Actions bake (UV unwrap of parametric geometry, minutes
   per room on a 2-core runner, a dispatch token to store, a script Ratul cannot debug) is dropped.
   Revisit only if the look-dev spike looks flat.
 - **Cheap bake substitute in the browser:** drei `AccumulativeShadows` and `ContactShadows`
   accumulate once and then cost nothing per frame.
-- **Lighting without a download:** drei `Environment` with `Lightformer`s (0 bytes), not an HDRI
-  file (1.5 MB or more of the 5 MB budget).
+- **Lighting:** a 1k CC0 HDRI from `public/hdri/` (round 37d, about 1.4 MB, loaded with `RGBELoader` through drei
+  `Environment files=`, never a drei preset: those fetch from a CDN) on medium and high; `Lightformer`s (0 bytes) stay as the
+  low tier's fallback (`tiers.ts` flag `envMap: "hdri" | "lightformers"`).
 - **Neon bloom:** emissive above 1.0 with `toneMapped = false` and a luminance threshold; no
   selective-bloom pass.
 - **Edges:** SMAA on desktop; MSAA only when no post-processing runs (multisampled targets are
@@ -71,6 +75,10 @@ Rules from the critic:
 - **Parametric generators (code, no model files).** Desk (straight or L), monitor (inches, aspect,
   curve radius), bed, wall shelf, chair, rug, bean bag, picture frame, lamp, PC tower with a glass
   side and RGB, keyboard, speakers, pot, mug, books. Merged into few draw calls.
+- **Asset paths:** an object's `model` and `map` accept only `/models/...` and `/textures/...` paths in `public/` (no https;
+  `schema.ts` enforces it). **Asset rule:** every committed asset is CC0 (or CC-BY with a credit) and has a line in
+  `15-credits.md` (file, source URL, author, licence, download date, notes); `scripts/room3d-check.mjs` fails on a file in
+  `public/models|hdri|audio|textures` with no credits line. No trademarked shapes or marks; the console stays generic.
 - **Curated glTF catalog, committed to `portfolio-site/public/models/`** (CC0 from Poly Haven,
   Kenney, Quaternius; CC-BY only with a credits line in `15-credits.md`). Pre-optimised with
   `gltf-transform` (meshopt, KTX2, triangle and texture caps) before commit, referenced by id with
@@ -83,7 +91,8 @@ Rules from the critic:
 **Form editor first, and probably only:** object list, add from a palette, duplicate, remove,
 numeric position / rotation / size / params / material / interaction, arrow-key nudge buttons, and
 a live preview beside the form where clicking an object selects its row. A phone preview toggle.
-A drag-handle gizmo (drei `TransformControls`, snapping, undo) is deferred: about three times the
+An **object-list card** sits alongside the chips (later); chips stay. Every interaction stays reachable by clicking the object
+in 3D (this keeps WebXR possible). A drag-handle gizmo (drei `TransformControls`, snapping, undo) is deferred: about three times the
 work, and an editor on a phone is unusable anyway.
 
 ## 5. Phone budget (fixed in P1, tested on the real phone)
@@ -94,6 +103,8 @@ work, and an editor on a phone is unusable anyway.
 | Phone | about 150k triangles, under 60 to 150 draw calls, dpr cap 1.5, no AO, 1k KTX2 textures |
 | First load | under 5 MB; shell and hero desk first, the rest streams in |
 | Draw calls | under 120 desktop |
+| Physics libraries | none (rapier3d-compat 1.65 MB gzip, cannon-es 34 KB gzip; one ball is hand-rolled) |
+| Draw-call cap | 120 is a plan number; measured ceiling: <to be filled from the round 37d measurement, see section 14> |
 
 Fill rate, not triangle count, is the phone limit (about 3.5 MP at dpr 3). Handle
 `webglcontextlost` and restore. Dispose everything on a room change. Keep the runtime fps
@@ -131,7 +142,8 @@ About 3 to 5 builder rounds for P0 to P5. The full plan with gizmo, uploads and 
 
 - **Best experience wins.** Where the plan says "clean stylised room first", Ratul chose the best
   experience: P0 look-dev tests both the real-time route and cloud baking, and the better look
-  ships. Cloud baking (GitHub Actions, headless Blender) moves from "later" to "decide after P0".
+  ships. ~~Cloud baking moves from "later" to "decide after P0".~~ **Closed for good (2026-11-15):** baking is incompatible
+  with admin-movable objects; the room is real-time.
 - **Drag handles are in.** The form editor (P2) is followed by the gizmo editor (drei
   `TransformControls`, snap to grid and walls, undo) as P2b. Touch editing stays desktop-first.
 - **Swarm is a third view mode**, alongside **3D** and **Netflix**. It is its own view, not a
@@ -217,3 +229,17 @@ Phone tier settings the spike needs: dpr cap 1.5, no composer (MSAA on), one con
 for about 2x more objects**. Medium (SMAA, no bloom, 1k shadow map) is the sensible default for an integrated-GPU laptop; high adds
 bloom and the 2k shadow map and should be a visitor choice. Draw calls on medium and high are about double low because of the
 shadow-map pass, so the 120-call desktop cap needs instancing for repeated props (books, keys, clothes, caps) as the plan says.
+
+## 12. Round 37 order (2026-11-15)
+
+After the critic's verdict (build the cut-down version): **37d** the look pass (measure the ceiling, HDRI, material variation, AO,
+a few CC0 glTFs, the football, the guitar app), then **37b** (real window, weather, curtains, light switch), then **37c** (free
+look, gyro), then the **Rubik's cube round** (turnable), then the **admin editor**.
+
+## 13. Toys (owner decisions, 2026-11-15)
+
+- **Football:** hand-rolled ballistics (gravity, restitution about 0.6, rolling friction, sleep after 2 s, collisions with the
+  floor, walls and the floor items' footprints), click to kick, a synthesised thud. Drag-to-throw is deferred. No physics library.
+- **Guitar:** like a phone guitar app, with **recorded CC0 samples** (the owner's pick): a zoom stop, tap a string between two
+  frets for a note, swipe to strum, chord buttons; the Karplus-Strong chords stay as the fallback.
+- **Rubik's cube:** turnable, but its own later round. The object-list card is later too.

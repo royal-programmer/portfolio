@@ -35,3 +35,11 @@ primitives in code.
 ## Fonts
 
 Fraunces, Geist, Geist Mono via `next/font` (SIL Open Font License).
+
+## Room assets (HDRI, glTF models, textures, audio samples; round 37d)
+
+Every file under `portfolio-site/public/models`, `hdri`, `textures` and `audio` has a line here (CC0, or CC-BY with the credit);
+`scripts/room3d-check.mjs` fails when one is missing. Assets are committed to the public repo, never loaded from a CDN.
+
+| File | Source URL | Author | Licence | Downloaded | Notes |
+|------|------------|--------|---------|------------|-------|

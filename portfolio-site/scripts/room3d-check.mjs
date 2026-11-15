@@ -300,10 +300,16 @@ check("the desk props map to room objects (headphones are the headset)", STAGE_P
   // data model: a model and a map URL are optional and unused for now
   const withAsset = clone(ROOM3D_DEFAULT);
   withAsset.rooms[0].objects[0].model = "/models/desk.glb";
-  withAsset.rooms[0].objects[0].map = "https://example.com/wood.jpg";
-  check("an object may name a glTF model and a texture map (optional, unused)", room3dSchema.safeParse(withAsset).success);
-  withAsset.rooms[0].objects[0].model = "javascript:alert(1)";
-  check("a model URL must be https or a /path", !room3dSchema.safeParse(withAsset).success);
+  withAsset.rooms[0].objects[0].map = "/textures/wood.jpg";
+  check("an object may name a glTF model and a texture map (optional, public paths)", room3dSchema.safeParse(withAsset).success);
+  for (const bad of ["javascript:alert(1)", "https://example.com/desk.glb", "/models/../secret.glb", "/other/desk.glb", "desk.glb"]) {
+    const w = clone(withAsset);
+    w.rooms[0].objects[0].model = bad;
+    check(`a model path must be /models/... (rejects ${bad})`, !room3dSchema.safeParse(w).success);
+    const m = clone(withAsset);
+    m.rooms[0].objects[0].map = bad;
+    check(`a map path must be /textures/... (rejects ${bad})`, !room3dSchema.safeParse(m).success);
+  }
   // the new kinds are strict
   const badChord = clone(ROOM3D_DEFAULT);
   badChord.rooms[0].objects.find((o) => o.kind === "guitar").params.chords = ["H#"];
