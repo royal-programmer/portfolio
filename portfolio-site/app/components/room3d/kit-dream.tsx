@@ -40,7 +40,6 @@ export function Bed({ o }: P<"bed">) {
   const wood = env.kit.mat("wood", "#6b4a30", 0.6);
   const sheet = useMat(o.material);
   const mattress = env.kit.mat("fabric", "#e9e6df", 0.95);
-  const pillow = env.kit.mat("fabric", "#f1efe9", 0.92);
   const fold = env.kit.mat("fabric", "#cdbb9c", 0.95);
   const legGeo = env.kit.geo("bed-leg", () => new THREE.BoxGeometry(0.05, 0.1, 0.05));
   return (
@@ -53,7 +52,7 @@ export function Bed({ o }: P<"bed">) {
       {headboard ? (
         <>
           <Rb a={[w + 0.1, 0.92, 0.05]} p={[0, 0.46, -1.025]} r={0.02} m={wood} />
-          <Rb a={[w - 0.1, 0.5, 0.025]} p={[0, 0.7, -0.99]} r={0.015} m={env.kit.mat("wood", "#7a553a", 0.55)} />
+          <Rb a={[w - 0.1, 0.5, 0.025]} p={[0, 0.7, -0.99]} r={0.015} m={wood} />
           <Rb a={[w + 0.08, 0.4, 0.05]} p={[0, 0.2, 1.025]} r={0.02} m={wood} />
         </>
       ) : null}
@@ -61,13 +60,13 @@ export function Bed({ o }: P<"bed">) {
       {blanket ? (
         <>
           <Rb a={[w - 0.04, 0.1, 0.46]} p={[0, 0.54, 0.62]} r={0.04} m={fold} />
-          <Rb a={[w - 0.1, 0.02, 0.4]} p={[0, 0.605, 0.62]} r={0.01} m={env.kit.mat("fabric", "#b9a583", 0.95)} />
+          <Rb a={[w - 0.1, 0.02, 0.4]} p={[0, 0.605, 0.62]} r={0.01} m={fold} />
         </>
       ) : null}
       {Array.from({ length: pillows }, (_, i) => {
         const two = pillows > 1;
         const pw = two ? w / 2 - 0.06 : Math.min(0.6, w - 0.2);
-        return <Rb key={i} a={[pw, 0.12, 0.34]} p={[two ? (i % 2 ? 1 : -1) * (w / 4) : 0, 0.54 + Math.floor(i / 2) * 0.1, -0.78]} rot={[-0.1, 0, 0]} r={0.05} m={pillow} />;
+        return <Rb key={i} a={[pw, 0.12, 0.34]} p={[two ? (i % 2 ? 1 : -1) * (w / 4) : 0, 0.54 + Math.floor(i / 2) * 0.1, -0.78]} rot={[-0.1, 0, 0]} r={0.05} m={mattress} />;
       })}
     </group>
   );
@@ -110,7 +109,7 @@ export function Wardrobe({ o }: P<"wardrobe">) {
   const body = useMat(o.material);
   const inner = env.kit.mat("wood", "#2a2018", 0.8);
   const rod = env.kit.mat("metal", "#b8bcc6", 0.3);
-  const handle = env.kit.mat("metal", "#a9adb8", 0.3);
+  const handle = rod;
   const hanger = env.kit.geo("hanger", hangerGeometry);
   const garments = env.kit.geo("garment", garmentGeometry);
   const leafGeo = env.kit.geo(`wardrobe-leaf:${w}:${h}`, () => leafGeometry(w, h));
@@ -207,10 +206,10 @@ export function Guitar({ o }: P<"guitar">) {
   const { stand } = o.params;
   const body = useMat(o.material);
   const neckMat = env.kit.mat("wood", "#5a3d27", 0.5);
-  const board = env.kit.mat("wood", "#1d1510", 0.45);
-  const steel = env.kit.mat("metal", "#14151a", 0.4);
-  const bright = env.kit.mat("metal", "#cfd3dc", 0.25);
   const dark = env.kit.mat("plastic", "#0b0b0e", 0.6);
+  const steel = dark;
+  const board = dark;
+  const bright = env.kit.mat("metal", "#cfd3dc", 0.25);
   const top = env.kit.mat("wood", "#d9a566", 0.4);
   const strings = env.kit.geo("guitar-strings", stringsGeometry);
   const stringRef = useRef<THREE.Mesh>(null);
@@ -434,8 +433,8 @@ export function RidingSet({ o }: P<"ridingSet">) {
   const body = useMat(o.material);
   const shell = env.kit.mat("plastic", o.material.color, 0.22);
   const dark = env.kit.mat("rubber", "#111216", 0.6);
-  const legs = env.kit.mat("fabric", "#20232a", 0.85);
-  const backing = env.kit.mat("wood", "#2b2b30", 0.6);
+  const legs = dark;
+  const backing = dark;
   const steel = env.kit.mat("metal", "#b8bcc6", 0.3);
   return (
     <group>

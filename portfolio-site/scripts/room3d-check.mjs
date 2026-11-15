@@ -22,6 +22,9 @@ const { DEFAULT_ZONES, orderedZones, stepZone, zoneForObject, lookFromDrag, LOOK
 const { resolveReader, lowEnd } = await jiti.import(path.join(root, "lib/room3d/reader.ts"));
 const { layoutBoard, pickItem, BOARD_MAX } = await jiti.import(path.join(root, "lib/room3d/board-layout.ts"));
 const { buildRoomContent, boardItems, parsePanel, PANEL_IDS } = await jiti.import(path.join(root, "lib/room3d/content.ts"));
+const { floorItems, laneReport, eyeInFurniture, LANE } = await jiti.import(path.join(root, "lib/room3d/layout.ts"));
+const { chordNotes, strumPlan, pluck, midiHz } = await jiti.import(path.join(root, "lib/room3d/chord.ts"));
+const { CHORD_IDS } = await jiti.import(path.join(root, "lib/room3d/schema.ts"));
 const { STAGE_PROPS, SHELF_MAX, STAGE_TIERS } = await jiti.import(path.join(root, "lib/site/stage-data.ts"));
 
 let failed = 0;
@@ -98,7 +101,7 @@ check("auto uses the probe", resolveTier({ query: null, saved: null, setting: "a
   const hidden = clone(objs);
   hidden[5].hideOnPhone = true;
   hidden[6].visibility = "draft";
-  check("phone drops hideOnPhone, public drops drafts", trimToBudget(hidden, 200, { phone: true, includeDraft: false }).length === objs.length - 2);
+  check("phone drops hideOnPhone, public drops drafts", trimToBudget(hidden, 200, { phone: true, includeDraft: false }).length === objs.filter((o) => !o.hideOnPhone).length - 2);
   check("preview keeps drafts", trimToBudget(hidden, 200, { phone: false, includeDraft: true }).length === objs.length);
 }
 
@@ -252,6 +255,81 @@ check("the desk props map to room objects (headphones are the headset)", STAGE_P
   check("board layouts stay inside the board and never overlap, for every style, count and aspect", layoutOk);
   const rs = layoutBoard("frames", 5, 1.5);
   check("a click's point resolves to the tile drawn there, and to none outside every tile", rs.every((r, i) => pickItem(rs, r.x + r.w / 2, r.y + r.h / 2) === i) && pickItem(rs, 0.001, 0.001) === -1);
+}
+
+// round 37a: the bigger room, the dream objects, the constellation rule
+{
+  const { width: W, depth: D, height: H } = room.shell;
+  const byId = (id) => room.objects.find((o) => o.id === id);
+  check("the room is about 8.0 x 6.0 x 3.0 m", W === 8 && D === 6 && H === 3);
+  const kinds = new Set(room.objects.map((o) => o.kind));
+  check("the new objects are there: bed, wardrobe, guitar, riding set, key rack, caps, football, cube, MIDI keyboard", ["bed", "wardrobe", "guitar", "ridingSet", "keyRack", "capRow", "football", "puzzleCube", "midiKeyboard"].every((k) => kinds.has(k)));
+  const zr = room.zones;
+  check("the new zones exist and the old ids are stable", ["sleep", "wardrobe", "chill", "window", "gear"].every((id) => zr.some((z) => z.id === id)) && ["desk", "screens", "shelf", "tv", "wall", "door", "hire"].every((id) => zr.some((z) => z.id === id)));
+  check("every zone has a label for its chip and at most 16 zones", zr.every((z) => z.label.length > 0 && z.label.length <= 30) && zr.length <= 16);
+  check("every zone's act names an object of that zone", zr.every((z) => !z.act || (room.objects.some((o) => o.id === z.act) && z.objects.includes(z.act))));
+  check("the wardrobe zone opens the wardrobe and the sleep zone strums the guitar", zr.find((z) => z.id === "wardrobe").act === "wardrobe" && zr.find((z) => z.id === "sleep").act === "guitar");
+  check("every object sits inside the room (position and its floor footprint)", room.objects.every((o) => Math.abs(o.transform.pos[0]) <= W / 2 && Math.abs(o.transform.pos[2]) <= D / 2 && o.transform.pos[1] <= H) && floorItems(room).every((f) => f.rect.x0 >= -W / 2 - 0.02 && f.rect.x1 <= W / 2 + 0.02 && f.rect.z0 >= -D / 2 - 0.02 && f.rect.z1 <= D / 2 + 0.02));
+  const bed = floorItems(room).find((f) => f.id === "bed");
+  check("the bed is about 0.9 x 2.0 m (frame 0.98 x 2.06)", bed && Math.abs(Math.min(bed.rect.x1 - bed.rect.x0, bed.rect.z1 - bed.rect.z0) - 0.98) < 0.02 && Math.abs(Math.max(bed.rect.x1 - bed.rect.x0, bed.rect.z1 - bed.rect.z0) - 2.06) < 0.02);
+  const wd = byId("wardrobe").params;
+  check("the wardrobe is about 1.2 x 0.6 x 2.1 m", wd.w === 1.2 && wd.d === 0.6 && wd.h === 2.1);
+  check("the riding set has a helmet, a jacket, pants and boots", ["helmet", "jacket", "pants", "boots"].every((k) => byId("riding-set").params[k] === true));
+  check("the key rack's tags come from data (bike and car)", byId("key-rack").params.labels.join() === "Bike,Car" && byId("key-rack").params.keys === 2);
+  check("small things hide on a phone", ["football", "cube", "key-rack", "midi"].every((id) => byId(id).hideOnPhone === true));
+  const lane = laneReport(room, LANE);
+  check(`the walking lane (${LANE} m) is clear: one connected stretch through the middle`, lane.connected && lane.cells > 200, JSON.stringify({ cells: lane.cells, main: lane.main }));
+  check("every floor object can be walked up to", lane.unreachable.length === 0, lane.unreachable.join());
+  const items = floorItems(room);
+  check("no camera stop stands inside furniture", zr.every((z) => eyeInFurniture(z.eye, items) === null), zr.filter((z) => eyeInFurniture(z.eye, items)).map((z) => z.id + ":" + eyeInFurniture(z.eye, items)).join());
+  check("every camera stop's eye keeps 0.15 m from the walls", zr.every((z) => Math.abs(z.eye[0]) <= W / 2 - 0.15 && Math.abs(z.eye[2]) <= D / 2 - 0.15 && z.eye[1] > 0.6 && z.eye[1] < H - 0.3));
+  check("every camera stop looks at something at least 1.2 m away", zr.every((z) => Math.hypot(z.eye[0] - z.look[0], z.eye[2] - z.look[2]) >= 1.2));
+  // a blocked lane is noticed
+  const jam = clone(room);
+  jam.objects.push({ ...clone(byId("bed")), id: "jam", transform: { pos: [0, 0, 0], rotY: 0, scale: 1 } }, { ...clone(byId("bed")), id: "jam2", transform: { pos: [0, 0, -1.0], rotY: Math.PI / 2, scale: 1 } });
+  check("a jammed lane is reported", !laneReport(jam, LANE).connected || laneReport(jam, LANE).unreachable.length > 0 || laneReport(jam, LANE).cells < lane.cells);
+  // budgets: the default room fits every tier's object budget, the phone tier drops the small things
+  const phoneLow = trimToBudget(room.objects, ROOM3D_DEFAULT.tiers.low.objectBudget, { phone: true, includeDraft: false });
+  check("the room fits the medium and high object budgets and the low one on a phone", room.objects.length <= ROOM3D_DEFAULT.tiers.medium.objectBudget && room.objects.length <= ROOM3D_DEFAULT.tiers.high.objectBudget && phoneLow.length <= ROOM3D_DEFAULT.tiers.low.objectBudget);
+  check("the low tier on a phone keeps the bed, the wardrobe and the door", ["bed", "wardrobe", "door"].every((id) => phoneLow.some((o) => o.id === id)));
+  // the constellation shows only in the zone that lists it (the page reads this)
+  const skyZones = zr.filter((z) => z.objects.includes("constellation"));
+  check("the constellation belongs to exactly one zone: the one about skills", skyZones.length === 1 && skyZones[0].id === "shelf" && skyZones[0].panel === "skills");
+  const sky = byId("constellation");
+  check("the constellation hangs in front of its zone's camera, inside the room, away from the ceiling's light line", sky && sky.transform.pos[1] <= H - 0.5 && Math.abs(sky.transform.pos[0]) < W / 2);
+  // data model: a model and a map URL are optional and unused for now
+  const withAsset = clone(ROOM3D_DEFAULT);
+  withAsset.rooms[0].objects[0].model = "/models/desk.glb";
+  withAsset.rooms[0].objects[0].map = "https://example.com/wood.jpg";
+  check("an object may name a glTF model and a texture map (optional, unused)", room3dSchema.safeParse(withAsset).success);
+  withAsset.rooms[0].objects[0].model = "javascript:alert(1)";
+  check("a model URL must be https or a /path", !room3dSchema.safeParse(withAsset).success);
+  // the new kinds are strict
+  const badChord = clone(ROOM3D_DEFAULT);
+  badChord.rooms[0].objects.find((o) => o.kind === "guitar").params.chords = ["H#"];
+  check("a guitar chord outside the list is rejected", !room3dSchema.safeParse(badChord).success);
+  const noChord = clone(ROOM3D_DEFAULT);
+  noChord.rooms[0].objects.find((o) => o.kind === "guitar").params.chords = [];
+  check("a guitar needs at least one chord", !room3dSchema.safeParse(noChord).success);
+  const longTag = clone(ROOM3D_DEFAULT);
+  longTag.rooms[0].objects.find((o) => o.kind === "keyRack").params.labels = ["x".repeat(40)];
+  check("a key tag is a short text", !room3dSchema.safeParse(longTag).success);
+  const badAct = clone(ROOM3D_DEFAULT);
+  badAct.rooms[0].zones[0].act = "x".repeat(60);
+  check("a zone's act is an id (at most 40 characters)", !room3dSchema.safeParse(badAct).success);
+  const noPants = clone(ROOM3D_DEFAULT);
+  delete noPants.rooms[0].objects.find((o) => o.kind === "ridingSet").params.pants;
+  check("a riding set without its pants flag is rejected (strict params)", !room3dSchema.safeParse(noPants).success);
+  // actions
+  check("a guitar click is not a terminal command", stageAction(byId("guitar")).do === "none");
+  // the chords
+  check("every chord has notes, low to high, inside the guitar's range", CHORD_IDS.every((c) => { const f = chordNotes(c); return f.length >= 4 && f.every((x, i) => x >= 80 && x <= 700 && (i === 0 || x > f[i - 1])); }));
+  check("E minor's low string is E2 (82.41 Hz) and A4 is 440", Math.abs(chordNotes("Em")[0] - 82.41) < 0.01 && midiHz(69) === 440);
+  const plan = strumPlan(6);
+  check("a strum starts the low string first, a few ms apart, and gets no louder", plan.length === 6 && plan.every((p, i) => i === 0 || (p.at > plan[i - 1].at && p.at - plan[i - 1].at < 0.06 && p.gain <= plan[i - 1].gain)));
+  const a = pluck(110, 8000, 0.5, 3);
+  const b2 = pluck(110, 8000, 0.5, 3);
+  check("a pluck is deterministic, finite, bounded and dies away", a.length === 4000 && a.every((x, i) => x === b2[i] && Number.isFinite(x) && Math.abs(x) <= 1) && Math.max(...a.slice(3500).map(Math.abs)) < Math.max(...a.slice(0, 500).map(Math.abs)));
 }
 
 console.log(failed ? `\n${failed} failing` : "\nall room3d checks pass");
