@@ -63,6 +63,14 @@ export function resolveTier(args: { query: string | null; saved: string | null; 
   return want === "auto" ? pickTier(args.probe) : want;
 }
 
+/**
+ * The draw-call cap per tier (calls the renderer reports in one frame, shadow pass included). 120 was a plan number; round 37d
+ * measured it (scripts/room3d-perf.cjs, docs/claude-planning/18-3d-room-plan.md section 5): on an Intel UHD integrated GPU the
+ * medium tier still holds p95 under 16.7 ms at 150 calls, but high does not (bloom and SMAA, not the calls, are its cost), so the
+ * cap stays 120 for it. The phone tier's 60 is the plan's lower figure; the Vivo X200 Pro was not measured.
+ */
+export const DRAW_CAPS: Record<TierId, number> = { low: 60, medium: 120, high: 120 };
+
 /** What is cut first when the budget bites: lower number = kept longer. Anything unlisted goes last. */
 const PRIORITY: Partial<Record<RoomObject["kind"], number>> = {
   desk: 0, monitor: 0, door: 0, window: 0, chair: 1, tv: 1, bed: 1, pcTower: 1, keyboard: 1, tablet: 2, phone: 2, wardrobe: 2, lamp: 2, neonStrip: 2, clock: 3, frame: 3, shelf: 3, rug: 3,

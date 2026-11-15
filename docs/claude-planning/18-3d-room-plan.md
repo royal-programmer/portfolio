@@ -104,7 +104,7 @@ work, and an editor on a phone is unusable anyway.
 | First load | under 5 MB; shell and hero desk first, the rest streams in |
 | Draw calls | under 120 desktop |
 | Physics libraries | none (rapier3d-compat 1.65 MB gzip, cannon-es 34 KB gzip; one ball is hand-rolled) |
-| Draw-call cap | 120 is a plan number; measured ceiling: <to be filled from the round 37d measurement, see section 14> |
+| Draw-call cap | 120 is a plan number; **measured ceiling (round 37d, Intel UHD Graphics 0x4628, integrated, 1280 x 800, uncapped rAF)**: medium holds 150 calls at p95 11 to 13 ms; high is 15 ms median and 20 to 32 ms p95 at 150 calls (about 20 ms at its normal 100 to 115): bloom and SMAA, not the calls, cost it. Cap stays 120 (`DRAW_CAPS` in `tiers.ts`). The owner's laptop and the phone were not measured. |
 
 Fill rate, not triangle count, is the phone limit (about 3.5 MP at dpr 3). Handle
 `webglcontextlost` and restore. Dispose everything on a room change. Keep the runtime fps
