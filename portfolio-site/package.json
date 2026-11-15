@@ -7,6 +7,7 @@
     "build": "next build && node scripts/sw-manifest.mjs",
     "start": "next start",
     "lint": "eslint",
+    "assets:optimise": "node scripts/assets-optimise.mjs",
     "hub:media": "node scripts/hub-media.mjs",
     "predev": "node scripts/hub-media.mjs",
     "prebuild": "node scripts/hub-media.mjs"
@@ -33,6 +34,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "^4.5.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
